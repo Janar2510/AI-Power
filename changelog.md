@@ -250,6 +250,46 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
 ### Python
 - tests/test_http.py - test_js_test_runner_served, test_js_test_mock_rpc_served
 
+## 1.11.0 (Phase 7 completion: Parity Verification)
+
+### Parity Verification Tests
+- tests/test_parity_verification.py - Module lifecycle (load order, acyclic, base before dependents), security invariants (ir.model.access parse, build_access_map, check_access default-allow, deny when no match, allow when rule matches)
+
+### HTTP Tests
+- test_debug_assets_serves_individual_files - get_bundle_urls returns individual URLs
+- test_asset_bundles_load_from_manifest - resolve_bundle_assets from manifest
+
+### Docs
+- Success criteria all marked done
+- Parity matrix: Web client done, Test harness done, Prefetch deferred
+
+### Bugfix
+- addons/web/views/webclient_templates.xml: wrap HTML in CDATA to fix XML parse error (DOCTYPE invalid inside element)
+
+## 1.12.0 (Phase 8 + 9: CRM + AI Assistant)
+
+### Phase 8: CRM Module
+- addons/crm: crm.lead (name, partner_id, stage, expected_revenue, description)
+- views/crm_views.xml: list, form; action_crm_lead; menu Leads
+- security/ir.model.access.csv
+- main.js: generic model routing (getModelForRoute, renderList, renderForm for contacts + leads)
+- server_wide_modules: crm
+
+### Phase 9: AI RAG + Tool Registry
+- addons/ai_assistant: ai.audit.log, ai.tool.definition, ai.prompt.template (implemented)
+- addons/ai_assistant/tools/registry.py: search_records, summarise_recordset; execute_tool, log_audit
+- /ai/tools (GET): list available tools (auth required)
+- /ai/chat (POST): execute tool under user context; logs to ai.audit.log
+- server_wide_modules: ai_assistant
+
+### Tests
+- test_ai_tools_requires_auth
+- test_load_views_registry_has_crm_lead
+
 ### Run JS Unit Tests
 - Browser: http://localhost:8069/web/static/tests/test_runner.html
 - Playwright: pytest tests/e2e/test_js_unit_tests.py -v (with server running)
+
+### Docs
+- DeploymentChecklist.md: Leads verification, AI tools verification, db init note for new modules
+- docs/ai-implementation-checklist.md: AI deployment and tool-registry verification checklist

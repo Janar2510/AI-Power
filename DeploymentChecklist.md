@@ -8,7 +8,7 @@
 - [ ] Optional: run e2e tour: `pip install -r requirements-dev.txt && playwright install chromium && python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python -m pytest tests/e2e/ -v`
 - [ ] Install passlib: `pip install "passlib[bcrypt]>=1.7"`
 - [ ] Verify addons path: `./erp-bin module list`
-- [ ] Initialize database: `./erp-bin db init -d <dbname>`
+- [ ] Initialize database: `./erp-bin db init -d <dbname>` (re-run when adding modules like crm, ai_assistant)
 - [ ] Optional: install module: `./erp-bin module install -d <db> -m <module>`
 - [ ] Check config: `./erp-bin help server`
 
@@ -32,3 +32,11 @@
 - [ ] Verify jsonrpc responds at /jsonrpc (object service requires session)
 - [ ] Verify static assets serve from /<module>/static/
 - [ ] Verify Contacts list loads (login, click Contacts)
+- [ ] Verify Leads list loads (login, click Leads)
+- [ ] Verify AI tools: `GET /ai/tools` returns 401 when not authenticated; returns tool list when session present
+
+## AI Module (Phase 9)
+
+- [ ] ai_assistant in server_wide_modules (core/tools/config.py)
+- [ ] /ai/tools and /ai/chat routes registered
+- [ ] ai.audit.log table created (db init)

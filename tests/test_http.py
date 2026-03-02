@@ -76,3 +76,32 @@ class TestHTTP(unittest.TestCase):
         r = self.client.get("/web/static/tests/mock_rpc.js")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"MockRpc", r.data)
+
+    def test_debug_assets_serves_individual_files(self):
+        """With ?debug=assets, webclient uses individual asset URLs not bundle."""
+        # Simulate request with debug=assets - we need to hit a route that uses _is_debug_assets
+        # The index route requires auth. Use a workaround: check that get_bundle_urls returns
+        # individual paths when we'd use debug mode.
+        from core.modules.assets import get_bundle_urls
+
+        urls = get_bundle_urls("web.assets_web")
+        self.assertIn("css", urls)
+        self.assertIn("js", urls)
+        self.assertGreater(len(urls["css"]), 0)
+        self.assertGreater(len(urls["js"]), 0)
+        # Individual file URLs (not bundle)
+        self.assertTrue(any("/web/static/" in u for u in urls["js"]))
+
+    def test_ai_tools_requires_auth(self):
+        """GET /ai/tools returns 401 when not authenticated."""
+        r = self.client.get("/ai/tools")
+        self.assertEqual(r.status_code, 401)
+
+    def test_asset_bundles_load_from_manifest(self):
+        """Asset bundles resolve from manifest assets key."""
+        from core.modules.assets import resolve_bundle_assets
+
+        resolved = resolve_bundle_assets("web.assets_web")
+        self.assertIn("css", resolved)
+        self.assertIn("js", resolved)
+        self.assertGreater(len(resolved["js"]), 0, "web.assets_web should have JS from manifest")

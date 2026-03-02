@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-  <template id="webclient_layout">
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8"/>
-        <title>ERP Platform</title>
-        <link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
-      </head>
-      <body>
-        <div id="webclient">
-          <header id="navbar">
-            <span class="logo">ERP Platform</span>
-          </header>
-          <main id="main">
-            <div id="action-manager"></div>
-          </main>
-        </div>
-        <script src="/web/static/src/session.js"></script>
-        <script src="/web/static/src/main.js"></script>
-      </body>
-    </html>
-  </template>
+  <template id="webclient_layout"><![CDATA[
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>ERP Platform</title>
+    <link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
+  </head>
+  <body>
+    <div id="webclient">
+      <header id="navbar">
+        <span class="logo">ERP Platform</span>
+      </header>
+      <main id="main">
+        <div id="action-manager"></div>
+      </main>
+    </div>
+    <script src="/web/static/src/session.js"></script>
+    <script src="/web/static/src/main.js"></script>
+  </body>
+</html>
+]]></template>
 </odoo>

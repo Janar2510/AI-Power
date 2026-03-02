@@ -21,6 +21,10 @@ from .rpc import dispatch_jsonrpc
 # Load default routes (after all imports to avoid circular import)
 def _load_routes():
     import core.http.routes  # noqa: F401
+    try:
+        import addons.ai_assistant.controllers  # noqa: F401 - registers /ai/tools, /ai/chat
+    except ImportError:
+        pass
 
 _logger = logging.getLogger("erp.http")
 

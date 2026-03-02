@@ -14,7 +14,21 @@
     if (!action || action.type !== 'ir.actions.act_window') return null;
     const m = (action.res_model || '').replace(/\./g, '_');
     if (m === 'res_partner') return 'contacts';
+    if (m === 'crm_lead') return 'leads';
     return m || null;
+  }
+
+  /** Get model name for route slug (inverse of actionToRoute) */
+  function getModelForRoute(route) {
+    if (!viewsSvc) return null;
+    const menus = viewsSvc.getMenus() || [];
+    for (let i = 0; i < menus.length; i++) {
+      const action = menus[i].action ? viewsSvc.getAction(menus[i].action) : null;
+      if (action && actionToRoute(action) === route) return action.res_model || action.resModel;
+    }
+    if (route === 'contacts') return 'res.partner';
+    if (route === 'leads') return 'crm.lead';
+    return null;
   }
 
   function renderNavbar() {
@@ -32,20 +46,26 @@
     navbar.innerHTML = html;
   }
 
-  function getListColumns() {
-    if (viewsSvc) {
-      const v = viewsSvc.getView('res.partner', 'list');
-      if (v && v.columns && v.columns.length) return v.columns.map(c => c.name || c);
+  function getListColumns(model) {
+    if (viewsSvc && model) {
+      const v = viewsSvc.getView(model, 'list');
+      if (v && v.columns && v.columns.length) return v.columns.map(c => (typeof c === 'object' ? c.name : c) || c);
     }
-    return ['name', 'email', 'phone', 'city'];
+    return model === 'crm.lead' ? ['name', 'stage', 'expected_revenue'] : ['name', 'email', 'phone', 'city'];
   }
 
-  function getFormFields() {
-    if (viewsSvc) {
-      const v = viewsSvc.getView('res.partner', 'form');
-      if (v && v.fields && v.fields.length) return v.fields.map(f => f.name || f);
+  function getFormFields(model) {
+    if (viewsSvc && model) {
+      const v = viewsSvc.getView(model, 'form');
+      if (v && v.fields && v.fields.length) return v.fields.map(f => (typeof f === 'object' ? f.name : f) || f);
     }
-    return ['name', 'email', 'phone', 'city'];
+    return model === 'crm.lead' ? ['name', 'stage', 'expected_revenue', 'description'] : ['name', 'email', 'phone', 'street', 'city', 'country'];
+  }
+
+  function getTitle(route) {
+    if (route === 'contacts') return 'Contacts';
+    if (route === 'leads') return 'Leads';
+    return route || 'Records';
   }
 
   String.prototype.escapeHtml = function () {
@@ -55,96 +75,85 @@
   };
 
   function renderHome() {
-    main.innerHTML = '<h2>Welcome</h2><p>Use the menu to navigate. <strong>Contacts</strong> shows your contact list.</p>';
+    main.innerHTML = '<h2>Welcome</h2><p>Use the menu to navigate. <strong>Contacts</strong> and <strong>Leads</strong> are available.</p>';
   }
 
-  function renderContacts(contacts) {
-    const cols = getListColumns();
-    let html = '<h2>Contacts</h2>';
-    html += '<p><button type="button" id="btn-add-contact" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add contact</button></p>';
-    if (!contacts || !contacts.length) {
-      main.innerHTML = html + '<p>No contacts yet.</p>';
+  function renderList(model, route, records) {
+    const cols = getListColumns(model);
+    const title = getTitle(route);
+    const addLabel = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : 'Add';
+    let html = '<h2>' + title + '</h2>';
+    html += '<p><button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
+    if (!records || !records.length) {
+      main.innerHTML = html + '<p>No records yet.</p>';
     } else {
       html += '<table style="width:100%;border-collapse:collapse"><thead><tr>';
-      cols.forEach(c => { html += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd">' + c + '</th>'; });
+      cols.forEach(c => { html += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd">' + (typeof c === 'object' ? c.name || c : c) + '</th>'; });
       html += '<th></th></tr></thead><tbody>';
-      contacts.forEach(r => {
+      records.forEach(r => {
         html += '<tr data-id="' + (r.id || '') + '">';
-        cols.forEach(c => { html += '<td style="padding:0.5rem;border-bottom:1px solid #eee">' + (r[c] || '').toString().escapeHtml() + '</td>'; });
-        html += '<td style="padding:0.5rem"><a href="#contacts/edit/' + (r.id || '') + '" style="font-size:0.9rem;margin-right:0.5rem">Edit</a>';
+        cols.forEach(c => {
+          const f = typeof c === 'object' ? c.name : c;
+          html += '<td style="padding:0.5rem;border-bottom:1px solid #eee">' + (r[f] != null ? String(r[f]) : '').replace(/</g, '&lt;') + '</td>';
+        });
+        html += '<td style="padding:0.5rem"><a href="#' + route + '/edit/' + (r.id || '') + '" style="font-size:0.9rem;margin-right:0.5rem">Edit</a>';
         html += '<a href="#" class="btn-delete" data-id="' + (r.id || '') + '" style="font-size:0.9rem;color:#c00">Delete</a></td></tr>';
       });
       html += '</tbody></table>';
       main.innerHTML = html;
     }
-    const btn = document.getElementById('btn-add-contact');
-    if (btn) btn.onclick = () => { window.location.hash = 'contacts/new'; };
+    const btn = document.getElementById('btn-add');
+    if (btn) btn.onclick = () => { window.location.hash = route + '/new'; };
     main.querySelectorAll('.btn-delete').forEach(a => {
-      a.onclick = (e) => { e.preventDefault(); if (confirm('Delete this contact?')) deleteContact(a.dataset.id); };
+      a.onclick = (e) => { e.preventDefault(); if (confirm('Delete this record?')) deleteRecord(model, route, a.dataset.id); };
     });
   }
 
-  function deleteContact(id) {
-    rpc.callKw('res.partner', 'unlink', [[parseInt(id, 10)]])
-      .then(() => loadContacts())
+  function deleteRecord(model, route, id) {
+    rpc.callKw(model, 'unlink', [[parseInt(id, 10)]])
+      .then(() => loadRecords(model, route))
       .catch(err => { alert(err.message || 'Failed to delete'); });
   }
 
-  function renderContactForm(id) {
+  function renderForm(model, route, id) {
+    const fields = getFormFields(model);
+    const title = getTitle(route);
     const isNew = !id;
-    const title = isNew ? 'New contact' : 'Edit contact';
-    const fields = getFormFields();
-    let html = '<h2>' + title + '</h2><form id="contact-form" style="max-width:400px">';
+    const formTitle = isNew ? ('New ' + title.slice(0, -1)) : ('Edit ' + title.slice(0, -1));
+    let html = '<h2>' + formTitle + '</h2><form id="record-form" style="max-width:400px">';
     fields.forEach(f => {
-      const required = f === 'name';
-      const inputType = f === 'email' ? 'email' : 'text';
-      html += '<p><label>' + f + (required ? ' *' : '') + '<br><input type="' + inputType + '" name="' + f + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem"></label></p>';
+      const fname = typeof f === 'object' ? f.name : f;
+      const required = fname === 'name';
+      const inputType = fname === 'email' ? 'email' : fname === 'description' ? 'textarea' : 'text';
+      if (inputType === 'textarea') {
+        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><textarea name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem;min-height:4em"></textarea></label></p>';
+      } else {
+        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><input type="' + inputType + '" name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem"></label></p>';
+      }
     });
     html += '<p><button type="submit" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Save</button> ';
-    html += '<a href="#contacts" style="margin-left:0.5rem">Cancel</a></p></form>';
+    html += '<a href="#' + route + '" style="margin-left:0.5rem">Cancel</a></p></form>';
     main.innerHTML = html;
-    const form = document.getElementById('contact-form');
+    const form = document.getElementById('record-form');
     if (isNew) {
-      form.onsubmit = (e) => { e.preventDefault(); createContact(form); return false; };
+      form.onsubmit = (e) => { e.preventDefault(); createRecord(model, route, form); return false; };
     } else {
-      loadContact(id).then(r => {
+      loadRecord(model, id).then(r => {
         if (r && r[0]) {
           const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el) el.value = v != null ? v : ''; };
-          fields.forEach(n => set(n, r[0][n]));
+          fields.forEach(f => { const n = typeof f === 'object' ? f.name : f; set(n, r[0][n]); });
         }
       }).catch(() => {});
-      form.onsubmit = (e) => { e.preventDefault(); updateContact(id, form); return false; };
+      form.onsubmit = (e) => { e.preventDefault(); updateRecord(model, route, id, form); return false; };
     }
   }
 
-  function getFormVals(form) {
-    const fields = getFormFields();
-    const byName = (n) => (form.querySelector('[name="' + n + '"]') || {}).value || '';
+  function getFormVals(form, model) {
+    const fields = getFormFields(model);
+    const byName = (n) => { const el = form.querySelector('[name="' + n + '"]'); return el ? el.value : ''; };
     const vals = {};
-    fields.forEach(n => { vals[n] = byName(n).trim(); });
+    fields.forEach(f => { const n = typeof f === 'object' ? f.name : f; vals[n] = byName(n).trim(); });
     return vals;
-  }
-
-  function createContact(form) {
-    const vals = getFormVals(form);
-    if (!vals.name) {
-      showFormError(form, 'Please enter a name.');
-      return;
-    }
-    const btn = form.querySelector('button[type="submit"]');
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    rpc.callKw('res.partner', 'create', [[vals]])
-      .then(() => { window.location.hash = 'contacts'; loadContacts(); })
-      .catch(err => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-        const msg = err.message || 'Failed to save';
-        if (msg.indexOf('Session expired') >= 0) {
-          window.location.href = '/web/login';
-          return;
-        }
-        showFormError(form, msg);
-        alert('Could not save: ' + msg);
-      });
   }
 
   function showFormError(form, msg) {
@@ -153,50 +162,85 @@
     form.insertAdjacentHTML('beforeend', '<p class="error" style="color:#c00;margin-top:0.5rem">' + msg.replace(/</g, '&lt;') + '</p>');
   }
 
-  function updateContact(id, form) {
-    const vals = getFormVals(form);
-    if (!vals.name) {
-      showFormError(form, 'Please enter a name.');
+  function createRecord(model, route, form) {
+    const vals = getFormVals(form, model);
+    const requiredField = model === 'crm.lead' || model === 'res.partner' ? 'name' : 'name';
+    if (!vals[requiredField]) {
+      showFormError(form, 'Please enter ' + requiredField + '.');
       return;
     }
     const btn = form.querySelector('button[type="submit"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-    rpc.callKw('res.partner', 'write', [[parseInt(id, 10)], vals])
-      .then(() => { window.location.hash = 'contacts'; loadContacts(); })
+    rpc.callKw(model, 'create', [[vals]])
+      .then(() => { window.location.hash = route; loadRecords(model, route); })
       .catch(err => {
         if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-        const msg = err.message || 'Failed to save';
-        if (msg.indexOf('Session expired') >= 0) {
-          window.location.href = '/web/login';
-          return;
-        }
-        showFormError(form, msg);
+        if ((err.message || '').indexOf('Session expired') >= 0) { window.location.href = '/web/login'; return; }
+        showFormError(form, err.message || 'Failed to save');
       });
   }
 
-  function loadContact(id) {
-    const fields = getFormFields();
-    return rpc.callKw('res.partner', 'read', [[parseInt(id, 10)], fields]);
+  function updateRecord(model, route, id, form) {
+    const vals = getFormVals(form, model);
+    const requiredField = 'name';
+    if (!vals[requiredField]) {
+      showFormError(form, 'Please enter ' + requiredField + '.');
+      return;
+    }
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    rpc.callKw(model, 'write', [[parseInt(id, 10)], vals])
+      .then(() => { window.location.hash = route; loadRecords(model, route); })
+      .catch(err => {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+        if ((err.message || '').indexOf('Session expired') >= 0) { window.location.href = '/web/login'; return; }
+        showFormError(form, err.message || 'Failed to save');
+      });
   }
 
-  function loadContacts() {
-    const cols = getListColumns();
-    const fields = ['id'].concat(cols);
-    main.innerHTML = '<h2>Contacts</h2><p>Loading...</p>';
-    rpc.callKw('res.partner', 'search_read', [[]], { fields: fields, limit: 100 })
-      .then(renderContacts)
+  function loadRecord(model, id) {
+    const fields = getFormFields(model);
+    const fnames = fields.map(f => typeof f === 'object' ? f.name : f);
+    return rpc.callKw(model, 'read', [[parseInt(id, 10)], fnames]);
+  }
+
+  function loadRecords(model, route) {
+    const cols = getListColumns(model);
+    const fnames = cols.map(c => typeof c === 'object' ? c.name : c);
+    const fields = ['id'].concat(fnames);
+    const title = getTitle(route);
+    main.innerHTML = '<h2>' + title + '</h2><p>Loading...</p>';
+    rpc.callKw(model, 'search_read', [[]], { fields: fields, limit: 100 })
+      .then(records => renderList(model, route, records))
       .catch(err => {
-        main.innerHTML = '<h2>Contacts</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load') + '</p>';
+        main.innerHTML = '<h2>' + title + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load') + '</p>';
       });
   }
 
   function route() {
     const hash = (window.location.hash || '#home').slice(1);
-    const m = hash.match(/^contacts\/edit\/(\d+)$/);
-    if (hash === 'contacts') loadContacts();
-    else if (hash === 'contacts/new') renderContactForm();
-    else if (m) renderContactForm(m[1]);
-    else renderHome();
+    const editMatch = hash.match(/^(contacts|leads)\/edit\/(\d+)$/);
+    const newMatch = hash.match(/^(contacts|leads)\/new$/);
+    const listMatch = hash.match(/^(contacts|leads)$/);
+
+    if (listMatch) {
+      const route = listMatch[1];
+      const model = getModelForRoute(route);
+      if (model) loadRecords(model, route);
+      else renderHome();
+    } else if (newMatch) {
+      const route = newMatch[1];
+      const model = getModelForRoute(route);
+      if (model) renderForm(model, route);
+      else renderHome();
+    } else if (editMatch) {
+      const route = editMatch[1], id = editMatch[2];
+      const model = getModelForRoute(route);
+      if (model) renderForm(model, route, id);
+      else renderHome();
+    } else {
+      renderHome();
+    }
   }
 
   window.addEventListener('hashchange', route);

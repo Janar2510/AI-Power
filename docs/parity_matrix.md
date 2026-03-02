@@ -13,9 +13,9 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | ORM (models, fields, registry) | `odoo/orm/*` | `core/orm/` | done | test_orm.py |
 | Module loader + registry | `odoo/modules/*` | `core/modules/` | done | test_modules.py |
 | Base module (users, groups, meta) | `odoo/addons/base/` | `addons/base/` | done | - |
-| Web client (assets, services, views) | `addons/web/` | `addons/web/` | in_progress | - |
-| Business modules (CRM, etc.) | `addons/*` | `addons/<module>/` | deferred | - |
-| Test harness (Python + JS) | `odoo/tests/`, `addons/*/tests` | `tests/`, `tests/e2e/`, `addons/web/static/tests/` | in_progress | run_tests.py, pytest e2e, test_runner.html |
+| Web client (assets, services, views) | `addons/web/` | `addons/web/` | done | test_http, test_assets |
+| Business modules (CRM, etc.) | `addons/*` | `addons/crm/` | done | test_views_registry |
+| Test harness (Python + JS) | `odoo/tests/`, `addons/*/tests` | `tests/`, `tests/e2e/`, `addons/web/static/tests/` | done | run_tests.py, pytest e2e, test_runner.html |
 | Upgrade scripts | `odoo/upgrade_code/`, `*/upgrades` | `core/upgrade/` | done | - |
 
 ## Behavioural Parity
@@ -25,7 +25,7 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | Module lifecycle (install/upgrade order) | `odoo/modules/loading.py` | `core/modules/` | done |
 | Access rights (ir.model.access) | `base/security/ir.model.access.csv` | `addons/base/security/` | done |
 | Record rules (default-allow) | `odoo/service/security.py` | `core/orm/security.py` | done |
-| Prefetch/cache heuristics | `odoo/orm/` | `core/orm/` | in_progress |
+| Prefetch/cache heuristics | `odoo/orm/` | `core/orm/` | deferred |
 | jsonrpc dispatch | `odoo/http.py` | `core/http/rpc.py` | done |
 | Asset bundling (include/remove/after) | `addons/web/__manifest__.py` | `core/modules/assets.py` | done |
 

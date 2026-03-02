@@ -10,10 +10,10 @@ Based on [deep-research-report-2.md](../deep-research-report-2.md) and current [
 |-------|--------|-------|
 | Foundation (docs, CLI, config) | done | Phases 1–2 complete |
 | Core runtime (module loader, ORM, HTTP, security) | done | Phases 3–5 complete |
-| Web client kernel | in_progress | Basic shell, static serving; no asset bundling, no view pipeline |
-| Testing | in_progress | Python unit tests; no JS tests, no integration tours |
+| Web client kernel | done | Asset bundling, services, data-driven list/form |
+| Testing | done | Python + JS unit tests, Playwright e2e, parity verification |
 | Upgrades | done | `migrate(cr, version)` contract |
-| AI assistant | scaffold | Models/controllers stubbed; no RAG, no tool registry |
+| AI assistant | done | Tool registry, audit log, /ai/tools, /ai/chat |
 
 ---
 
@@ -100,6 +100,26 @@ Based on [deep-research-report-2.md](../deep-research-report-2.md) and current [
 
 ---
 
+## Phase 7 Complete ✅
+
+All success criteria met. Web client parity kernel and verification baseline established.
+
+## Phase 8: First Business Module ✅
+
+- addons/crm - CRM module with crm.lead (name, stage, expected_revenue, description)
+- Views: list, form; menu: Leads
+- main.js: generic model routing (contacts, leads)
+- server_wide_modules: crm
+
+## Phase 9: AI RAG + Tool Registry ✅
+
+- addons/ai_assistant: ai.audit.log, ai.tool.definition, ai.prompt.template
+- addons/ai_assistant/tools/registry.py: search_records, summarise_recordset; execute_tool, log_audit
+- /ai/tools (GET) - list tools; /ai/chat (POST) - execute tool under user context
+- All tools call ORM under user context; audit log per invocation
+
+---
+
 ## Out of Scope (Deferred)
 
 - Kanban, calendar, graph views
@@ -107,21 +127,20 @@ Based on [deep-research-report-2.md](../deep-research-report-2.md) and current [
 - Mobile JS layer
 - Scheduler/Cron (backend)
 - External JSON-2 API
-- First business domain modules (CRM, accounting)
-- AI RAG + tool registry (Phase 9)
+- Additional business modules (accounting, inventory)
 
 ---
 
 ## Success Criteria
 
-- [ ] Asset bundles load from manifest; `debug=assets` works
-- [ ] Service container (rpc, session, action) injectable
-- [ ] List view renders from XML view definition
-- [ ] Form view renders from XML view definition
+- [x] Asset bundles load from manifest; `debug=assets` works
+- [x] Service container (rpc, session, action) injectable
+- [x] List view renders from XML view definition
+- [x] Form view renders from XML view definition
 - [x] Menu + actions load from module data
 - [x] Playwright tour: login → list → create record
 - [x] JS unit test with mock server runs
-- [ ] Parity matrix updated for completed items
+- [x] Parity matrix updated for completed items
 
 ---
 

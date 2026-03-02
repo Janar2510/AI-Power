@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 # Defaults (Odoo 19 parity)
-DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web"]
+DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web", "crm", "ai_assistant"]
 REQUIRED_SERVER_WIDE_MODULES = ["base", "web"]
 
 

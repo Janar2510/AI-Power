@@ -1,0 +1,5 @@
+# ERP Platform dependencies
+Jinja2>=3.0
+Werkzeug>=2.0
+psycopg2-binary>=2.9
+passlib[bcrypt]>=1.7

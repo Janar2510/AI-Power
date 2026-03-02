@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <!-- List view -->
+    <!--
+    <record model="ir.ui.view" id="{{ name|snake }}_list">
+      <field name="name">{{ name }} list</field>
+      <field name="model">{{ name|snake }}.{{ name|snake }}</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="value"/>
+        </list>
+      </field>
+    </record>
+    -->
+  </data>
+</odoo>

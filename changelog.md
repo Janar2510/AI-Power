@@ -1,0 +1,255 @@
+# Changelog
+
+## 1.0.0 (Initial Release)
+
+### Phase 1: Foundation
+- docs/odoo_repo_map.md - Odoo 19.0 repository mapping
+- docs/parity_matrix.md - Parity tracking matrix
+- docs/architecture.md, frontend.md, backend.md, api.md, migrations.md, test_plan.md
+- docs/decisions.md - Architecture decision records
+- README.md, CONTRIBUTING.md
+
+### Phase 2: CLI + Config
+- erp-bin entrypoint
+- core/tools/config.py - addons-path, http-port, gevent-port, proxy-mode, db-filter, test-enable
+- core/cli/command.py - command registry, help, server, scaffold, module
+- core/cli/templates/default/ - module scaffold template
+
+### Phase 3: Module Loader
+- core/modules/module.py - manifest parsing, discovery, dependency resolution
+- core/modules/loader.py - load_openerp_module, load_module_graph
+- core/modules/registry.py - ModuleRegistry
+
+### Phase 4: ORM MVP
+- core/orm/models.py - Model, Recordset, ModelBase
+- core/orm/fields.py - Char, Text, Integer, Float, Boolean, Date, Datetime
+- core/orm/registry.py, environment.py - Registry, Environment
+- core/orm/security.py - ir.model.access CSV parsing
+
+### Phase 5: HTTP + jsonrpc
+- core/http/application.py - WSGI Application
+- core/http/request.py, controller.py - Request, route decorator
+- core/http/routes.py - root route
+- Static serving: /<module>/static/<path>
+- jsonrpc: /jsonrpc
+
+### Phase 6: Web Client
+- addons/web - web client module
+- addons/web/static/src/ - session.js, main.js, webclient.css
+- Root route serves web client shell
+
+### Phase 7: Testing
+- tests/test_config.py, test_modules.py, test_orm.py, test_http.py
+- run_tests.py - unittest runner
+
+### Phase 8: Upgrades
+- core/upgrade/runner.py - run_migrate(cr, version) contract
+
+### Phase 9: AI Assistant
+- addons/ai_assistant - scaffold with models (stubbed), controllers (stubbed), security
+- docs/ai.md - threat model and verification
+
+## 1.1.0 (Database + Auth)
+
+### Database Integration
+- core/sql_db.py - PostgreSQL connection, get_cursor, create_database, db_exists
+- core/db/schema.py - create tables from model definitions
+- core/cli/db.py - db create, init, list, drop commands
+- addons/base/models/res_users.py - User model (login, password, name)
+- Config: db_host, db_port, db_user, db_password, db_name (env: PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE)
+
+### ORM Real CRUD
+- Model.read(), write(), create(), unlink(), search() use PostgreSQL
+- Environment.cr - cursor for DB operations
+
+### Authentication
+- /web/login - login form (GET) and authenticate (POST)
+- /web/logout - clear session
+- core/http/session.py - in-memory session store
+- core/http/auth.py - authenticate(), login_response(), login_response_with_html()
+- Root (/) redirects to login when not authenticated
+
+### Bugfix: Invalid login or password
+- Auth now uses direct SQL for password check (avoids ORM read cursor state issue)
+
+### Bugfix: White screen after login
+- Login now returns webclient HTML directly (200) instead of 302 redirect
+- Avoids Safari/browser issues where session cookie was not sent on redirect
+
+## 1.2.0 (Session RPC + Contacts)
+
+### Session-aware RPC
+- core/http/rpc.py - dispatch_jsonrpc with call_kw / execute_kw
+- Object service requires session; dispatches to ORM with uid/db from cookie
+- Supports: search, search_read, read, create, write, unlink
+
+### ORM
+- ModelBase.search_read(domain, fields, offset, limit, order)
+- ModelBase.read(ids, fields) - class-level API
+- Recordset.read(fields)
+
+### Contacts
+- addons/base/models/res_partner.py - res.partner (name, email, phone, street, city, country)
+- Web client: Home + Contacts nav, Contacts list view via RPC search_read
+
+## 1.3.0 (Contact Form + Security + Module Install)
+
+### Contact form
+- Add contact button, create form (#contacts/new)
+- Edit contact form (#contacts/edit/:id)
+- Recordset.write(), Model.write(ids, vals) for RPC
+
+### Password hashing
+- passlib[bcrypt] for password storage
+- hash_password(), verify_password() - backward compat with plain passwords
+- db init creates admin with hashed password
+
+### Module install CLI
+- erp-bin module install -d <db> -m <module>
+- Resolves dependencies, loads modules, creates tables
+
+## 1.4.0 (Delete + Access Rights)
+
+### Delete contact
+- Delete button in Contacts list with confirm
+- Recordset.unlink(), Model.unlink(ids) for RPC
+
+### ir.model.access
+- addons/base/security/ir.model.access.csv - res.users, res.partner
+- build_access_map(), check_access() - RPC enforces before call_kw
+- Default-allow when no rules (backward compat)
+
+### Odoo 19.0 RPC compatibility (from odoo-19.0 reference)
+- Add /web/dataset/call_kw support with params { model, method, args, kwargs }
+- session.js now uses Odoo 19.0 format: POST /web/dataset/call_kw with direct params
+- Handle Odoo create: args = [records] where records is list of dicts
+- Match /web/dataset/call_kw and /web/dataset/call_kw/<model>.<method>
+
+### Bugfix: Contact create still failing
+- session.js: use credentials: 'include' for fetch (ensures cookies sent)
+- rpc.py: support params as list [url, params] (Odoo variant)
+- main.js: console.error on create failure for debugging
+- /web/session/get_session_info endpoint for session verification
+
+### Bugfix: Session cookie not sent with /jsonrpc (contacts not saving)
+- Set cookie path='/' explicitly so session is sent with all requests including /jsonrpc
+- On "Session expired", redirect to /web/login
+- RPC logging when 401 (no session)
+
+### Bugfix: New contact form not saving
+- Use form.querySelector('[name="..."]') instead of form.name (avoids conflict with form's native name property)
+- Add getFormVals() and showFormError() helpers
+- Show "Please enter a name" when Name is empty; show "Saving..." on button during submit
+- Fix error display and button re-enable on failure
+
+### Bugfix: 500 'NoneType' has no attribute 'startswith'
+- RPC: validate model_name before access check and _call_kw; return 400 if missing
+- security.check_access: handle None/empty model_name; return True (allow)
+- security.parse_ir_model_access_csv: handle None content
+- config._parse_config: skip None/non-string args
+- _get_access_map: try/except with fallback to empty map
+- application._guess_mimetype: handle None path
+
+## 1.5.0 (AI Rules + Parity Matrix)
+
+### Documentation
+- docs/ai-rules.md - Codified AI agent rules from build plan and deep-research-report
+- docs/parity_matrix.md - Updated status to reflect actual implementation (done/in_progress)
+
+### Skills
+- Installed: webapp-testing (anthropics/skills), verification-before-completion, test-driven-development, requesting-code-review (obra/superpowers), skill-creator (anthropics/skills)
+- Created: odoo-parity skill pack at .agents/skills/odoo-parity (module conventions, naming, acceptance criteria)
+
+## 1.6.0 (Phase 6a: Asset System MVP)
+
+### Asset Bundle System
+- core/modules/assets.py - Parse manifest `assets`, resolve include/remove/after/prepend directives
+- Route /web/assets/<bundle_id>.<css|js> - Serve concatenated bundles
+- debug=assets mode: ?debug=assets or --debug=assets for individual file URLs (no minification)
+- Web client uses bundle URLs by default; individual files when debug
+
+### Config
+- --debug=assets flag for server-wide debug asset mode
+
+### Tests
+- tests/test_assets.py - resolve_bundle_assets, get_bundle_content, get_bundle_urls
+- test_asset_bundle_css, test_asset_bundle_js in test_http.py
+
+## 1.7.0 (Phase 6b: Service Container + View Pipeline)
+
+### Service Layer
+- addons/web/static/src/services/rpc.js - RPC service (callKw)
+- addons/web/static/src/services/session.js - Session info (getSessionInfo)
+- addons/web/static/src/services/action.js - Action manager (window, client, URL)
+- addons/web/static/src/services/i18n.js - Translation stub _(...)
+- addons/web/static/src/services/registry.js - Service registry
+
+### View Renderers
+- addons/web/static/src/views/list_renderer.js - List view skeleton
+- addons/web/static/src/views/form_renderer.js - Form view skeleton
+- addons/web/static/src/views/modifier_eval.js - Python-like modifier evaluator
+
+### Refactor
+- main.js uses Services.rpc; removed standalone session.js
+
+## 1.8.0 (Phase 6c: Data-Driven Views)
+
+### XML Loader + Views Registry
+- core/data/xml_loader.py - Parse ir.ui.view, ir.actions.act_window, menuitem from XML
+- core/data/views_registry.py - Aggregate views, actions, menus from module data
+- addons/base/views/ir_views.xml - res.partner list/form views, action, menu
+
+### API
+- /web/load_views - JSON endpoint (auth required) returns views, actions, menus
+
+### Client
+- addons/web/static/src/services/views.js - Views service (load, getView, getAction, getMenus)
+- main.js - Columns and form fields from view definitions; loads views on init
+- Navbar rendered from menu data (getMenus); action-driven routing (act_window res_model -> hash)
+
+### Bugfix
+- views.js: handle 404/500 and non-JSON responses; avoid SyntaxError on r.json() when load_views fails
+
+## 1.9.0 (Phase 7: Testing + Verification)
+
+### Playwright Integration Tour
+- tests/e2e/test_login_list_form_tour.py - E2E tour: login → Contacts list → create record
+- scripts/with_server.py - Server lifecycle helper for e2e (start server, run command, cleanup)
+- playwright.config.py - Base URL, timeouts
+- requirements-dev.txt - playwright, pytest, pytest-playwright
+
+### Test Infrastructure
+- tests/e2e/conftest.py - E2E fixtures (base_url, login, password, db)
+- load_tests in tests/e2e/__init__.py - Exclude e2e from unittest discovery (pytest-based)
+
+### Run E2E
+```bash
+pip install -r requirements-dev.txt
+playwright install chromium
+./erp-bin db init -d erp   # if not already done
+python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python -m pytest tests/e2e/ -v
+```
+
+## 1.10.0 (Phase 7 continued: JS Unit Tests + Mock Server)
+
+### JS Unit Test Harness
+- addons/web/static/tests/test_runner.html - Browser test runner
+- addons/web/static/tests/test_runner.js - Runs all suites, supports sync/async
+- addons/web/static/tests/test_helpers.js - DOM helpers (createContainer, assertEqual, etc.)
+- addons/web/static/tests/mock_rpc.js - Mock fetch with deterministic responses (setLoadViewsResponse, setRpcResponse)
+
+### JS Unit Tests
+- test_modifier_eval.js - ModifierEval.eval, evalAttr
+- test_list_renderer.js - ViewRenderers.list render
+- test_views_service.js - Services.views load, getView, getMenus (with mocked fetch)
+- test_action_service.js - Services.action doAction (window, url, client)
+
+### Playwright
+- tests/e2e/test_js_unit_tests.py - Opens test_runner.html, asserts 0 failures
+
+### Python
+- tests/test_http.py - test_js_test_runner_served, test_js_test_mock_rpc_served
+
+### Run JS Unit Tests
+- Browser: http://localhost:8069/web/static/tests/test_runner.html
+- Playwright: pytest tests/e2e/test_js_unit_tests.py -v (with server running)

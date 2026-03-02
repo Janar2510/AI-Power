@@ -1,0 +1,4 @@
+{%- set snake_name = name|snake -%}
+{%- set model_id = "model_%s_%s"|format(snake_name, snake_name) -%}
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_{{ snake_name }}_{{ snake_name }},{{ name|snake }}.{{ name|snake }},{{ model_id }},base.group_user,1,1,1,1

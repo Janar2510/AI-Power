@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+# AI models - add when models are implemented
+# access_ai_audit_log_admin,ai.audit.log admin,model_ai_audit_log,base.group_system,1,1,0,1
+# access_ai_tool_definition_user,ai.tool.definition user,model_ai_tool_definition,base.group_user,1,0,0,0
+# access_ai_prompt_template_user,ai.prompt.template user,model_ai_prompt_template,base.group_user,1,0,0,0

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ERP Platform - JS Unit Tests</title>
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; padding: 1rem; }
+    #test-results { margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>JS Unit Tests</h1>
+  <p>Loading tests...</p>
+  <div id="test-results"></div>
+
+  <!-- Mock must load first to intercept fetch -->
+  <script src="/web/static/tests/mock_rpc.js"></script>
+  <script src="/web/static/tests/test_helpers.js"></script>
+  <!-- Source under test -->
+  <script src="/web/static/src/views/modifier_eval.js"></script>
+  <script src="/web/static/src/views/list_renderer.js"></script>
+  <script src="/web/static/src/services/views.js"></script>
+  <script src="/web/static/src/services/action.js"></script>
+  <!-- Tests -->
+  <script src="/web/static/tests/test_modifier_eval.js"></script>
+  <script src="/web/static/tests/test_list_renderer.js"></script>
+  <script src="/web/static/tests/test_views_service.js"></script>
+  <script src="/web/static/tests/test_action_service.js"></script>
+  <script src="/web/static/tests/test_runner.js"></script>
+</body>
+</html>

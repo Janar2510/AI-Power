@@ -1,0 +1,7 @@
+# from core.http import Controller, route
+
+
+# class {{ name|pascal }}Controller(Controller):
+#     @route('/{{ name|snake }}/hello', auth='public')
+#     def hello(self):
+#         return "Hello, world"

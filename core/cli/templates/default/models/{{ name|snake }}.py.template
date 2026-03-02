@@ -1,0 +1,10 @@
+# from core.orm import models, fields
+
+
+# class {{ name|pascal }}(models.Model):
+#     _name = '{{ name|snake }}.{{ name|snake }}'
+#     _description = '{{ name|snake }}.{{ name|snake }}'
+
+#     name = fields.Char()
+#     value = fields.Integer()
+#     description = fields.Text()

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <!-- List view -->
+    <!--
+    <record model="ir.ui.view" id="my_module_list">
+      <field name="name">my_module list</field>
+      <field name="model">my_module.my_module</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="value"/>
+        </list>
+      </field>
+    </record>
+    -->
+  </data>
+</odoo>

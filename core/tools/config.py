@@ -34,6 +34,7 @@ def _parse_config(args: list[str]) -> dict:
         "db_user": os.environ.get("PGUSER", os.environ.get("USER", "postgres")),
         "db_password": os.environ.get("PGPASSWORD", ""),
         "db_name": os.environ.get("PGDATABASE", "erp"),
+        "api_key": os.environ.get("API_KEY", ""),
     }
 
     for arg in args:
@@ -65,6 +66,8 @@ def _parse_config(args: list[str]) -> dict:
             result["db_password"] = arg.split("=", 1)[1]
         elif arg.startswith("-d=") or arg.startswith("--database="):
             result["db_name"] = arg.split("=", 1)[1]
+        elif arg.startswith("--api-key="):
+            result["api_key"] = arg.split("=", 1)[1]
 
     return result
 

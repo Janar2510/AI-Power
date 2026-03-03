@@ -37,7 +37,7 @@ def _parse_record(el: ET.Element) -> Dict[str, Any]:
 
 
 def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
-    """Convert arch XML to dict (list/form structure)."""
+    """Convert arch XML to dict (list/form/kanban structure)."""
     tag = node.tag
     if tag == "list":
         cols = []
@@ -49,6 +49,10 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
         for f in node.findall("field"):
             fields.append({"name": f.get("name", ""), "string": f.get("string", "")})
         return {"type": "form", "fields": fields}
+    if tag == "kanban":
+        default_group = node.get("default_group_by", "")
+        fields = [f.get("name", "") for f in node.findall("field") if f.get("name")]
+        return {"type": "kanban", "default_group_by": default_group, "fields": fields}
     return {"type": tag}
 
 

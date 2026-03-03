@@ -26,6 +26,11 @@
 - [ ] Use `--no-database-list` when hosting multiple databases
 - [ ] Restrict DB manager access in production
 
+## Scheduler (Phase 24)
+
+- [ ] Run `erp-bin cron -d <db>` periodically (e.g. via system cron every minute)
+- [ ] ir_cron table created on db init; add cron records via RPC or data XML
+
 ## Post-deployment
 
 - [ ] Verify web client loads at /
@@ -35,8 +40,17 @@
 - [ ] Verify Leads list loads (login, click Leads)
 - [ ] Verify AI tools: `GET /ai/tools` returns 401 when not authenticated; returns tool list when session present
 
-## AI Module (Phase 9)
+## AI Module (Phases 9–12)
 
 - [ ] ai_assistant in server_wide_modules (core/tools/config.py)
-- [ ] /ai/tools and /ai/chat routes registered
-- [ ] ai.audit.log table created (db init)
+- [ ] /ai/tools, /ai/chat, /ai/retrieve routes registered
+- [ ] ai.audit.log, ai.document.chunk tables created (db init)
+- [ ] Chat panel: AI button in webclient
+
+## External JSON-2 API (Phases 14, 20, 21)
+
+- [ ] Set API_KEY env or --api-key= for bearer token auth (fallback)
+- [ ] Per-user API keys: web UI at #settings/apikeys (Generate, Revoke)
+- [ ] POST /json/2/<model>/<method> with Authorization: bearer <key>
+- [ ] X-Odoo-Database header for multi-db
+- [ ] res_users_apikeys table created on db init (base module)

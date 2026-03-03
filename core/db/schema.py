@@ -34,8 +34,6 @@ def _column_def(field: fields.Field) -> str:
         return "VARCHAR(255)"
     if col_type == "text":
         return "TEXT"
-    if col_type == "integer":
-        return "INTEGER"
     if col_type == "double precision":
         return "DOUBLE PRECISION"
     if col_type == "boolean":
@@ -44,6 +42,8 @@ def _column_def(field: fields.Field) -> str:
         return "DATE"
     if col_type == "timestamp":
         return "TIMESTAMP"
+    if col_type == "integer":
+        return "INTEGER"
     return "VARCHAR(255)"
 
 
@@ -78,8 +78,40 @@ def create_table(cursor: Any, model_class: Type[ModelBase]) -> None:
     _logger.info("Created table %s", table)
 
 
+def column_exists(cursor: Any, table_name: str, column_name: str) -> bool:
+    """Check if column exists in table."""
+    cursor.execute(
+        """
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = %s AND column_name = %s
+        """,
+        (table_name, column_name),
+    )
+    return cursor.fetchone() is not None
+
+
+def add_missing_columns(cursor: Any, registry: Any) -> None:
+    """Add missing columns to existing tables (simple migration)."""
+    for model_name, model_class in registry._models.items():
+        table = getattr(model_class, "_table", None)
+        if not table or not table_exists(cursor, table):
+            continue
+        field_defs = _get_model_fields(model_class)
+        for col_name, field in field_defs.items():
+            if col_name == "id":
+                continue
+            if not column_exists(cursor, table, col_name):
+                col_def = _column_def(field)
+                try:
+                    cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col_name}" {col_def}')
+                    _logger.info("Added column %s.%s", table, col_name)
+                except Exception as e:
+                    _logger.warning("Could not add column %s.%s: %s", table, col_name, e)
+
+
 def init_schema(cursor: Any, registry: Any) -> None:
-    """Create tables for all registered models."""
+    """Create tables for all registered models; add missing columns."""
     for model_name, model_class in registry._models.items():
         if hasattr(model_class, "_table") and model_class._table:
             create_table(cursor, model_class)
+    add_missing_columns(cursor, registry)

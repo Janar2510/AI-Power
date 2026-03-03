@@ -17,6 +17,7 @@ from core.modules.assets import get_bundle_content
 from .controller import _ROUTES
 from .request import Request
 from .rpc import dispatch_jsonrpc
+from .json2 import dispatch_json2, JSON2_RE
 
 # Load default routes (after all imports to avoid circular import)
 def _load_routes():
@@ -134,6 +135,11 @@ class Application:
             request.path.startswith("/web/dataset/call_kw/")
         ):
             resp = dispatch_jsonrpc(request)
+            return resp(environ, start_response)
+
+        # External JSON-2 API: /json/2/<model>/<method>
+        if request.method == "POST" and JSON2_RE.match(request.path):
+            resp = dispatch_json2(request)
             return resp(environ, start_response)
 
         return NotFound()(environ, start_response)

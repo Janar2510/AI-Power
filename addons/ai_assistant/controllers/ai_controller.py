@@ -10,7 +10,7 @@ from core.sql_db import get_cursor
 from core.orm import Environment
 from werkzeug.wrappers import Response
 
-from ..tools.registry import get_tools, execute_tool, log_audit
+from ..tools.registry import get_tools, execute_tool, log_audit, retrieve_chunks
 
 
 @route("/ai/tools", auth="public", methods=["GET"])
@@ -21,6 +21,25 @@ def ai_tools(request: Request) -> Response:
         return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
     tools = get_tools()
     return Response(json.dumps(tools), content_type="application/json")
+
+
+@route("/ai/retrieve", auth="public", methods=["GET"])
+def ai_retrieve(request: Request) -> Response:
+    """Retrieve document chunks by query. Auth required. Record rules applied before retrieval."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
+    q = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 10)), 50)
+    if not q:
+        return Response(json.dumps([]), content_type="application/json")
+    registry = _get_registry(db)
+    with get_cursor(db) as cr:
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        chunks = retrieve_chunks(env, q, limit=limit)
+    return Response(json.dumps(chunks), content_type="application/json")
 
 
 @route("/ai/chat", auth="public", methods=["POST"])
@@ -36,6 +55,7 @@ def ai_chat(request: Request) -> Response:
         prompt = data.get("prompt", "")
         tool_name = data.get("tool", "").strip()
         tool_kwargs = data.get("kwargs", {})
+        do_retrieve = data.get("retrieve", False)
 
         prompt_hash = hashlib.sha256(prompt.encode()).hexdigest() if prompt else ""
 
@@ -50,6 +70,10 @@ def ai_chat(request: Request) -> Response:
         with get_cursor(db) as cr:
             env = Environment(registry, cr=cr, uid=uid)
             registry.set_env(env)
+            retrieved_doc_ids = "[]"
+            if do_retrieve and prompt:
+                chunks = retrieve_chunks(env, prompt, limit=5)
+                retrieved_doc_ids = json.dumps([{"model": c.get("model"), "res_id": c.get("res_id")} for c in chunks])
             result = execute_tool(env, tool_name, **tool_kwargs)
             outcome = json.dumps(result) if not isinstance(result, str) else result
             log_audit(
@@ -57,6 +81,7 @@ def ai_chat(request: Request) -> Response:
                 prompt_hash=prompt_hash,
                 tool_calls=json.dumps([{"tool": tool_name, "kwargs": tool_kwargs}]),
                 outcome=outcome[:1000],
+                retrieved_doc_ids=retrieved_doc_ids,
             )
 
         return Response(

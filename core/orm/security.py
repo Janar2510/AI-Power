@@ -58,6 +58,71 @@ def check_access(
     return False
 
 
+# Record rules: model -> list of domains to AND with search
+_RECORD_RULES: Dict[str, List[List]] = {}
+
+
+def load_record_rules(addons_paths: List[Path]) -> Dict[str, List[List]]:
+    """Load ir.rule from security/ir_rule.xml. Returns model -> [domain, ...]."""
+    result: Dict[str, List[List]] = {}
+    for addons_dir in addons_paths:
+        if not addons_dir.exists():
+            continue
+        for entry in addons_dir.iterdir():
+            if not entry.is_dir():
+                continue
+            xml_path = entry / "security" / "ir_rule.xml"
+            if not xml_path.exists():
+                continue
+            try:
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(xml_path)
+                for rec in tree.getroot().findall(".//{*}record"):
+                    if rec.get("model") != "ir.rule":
+                        continue
+                    model_ref = None
+                    domain_force = []
+                    for f in rec.findall("{*}field"):
+                        name = f.get("name")
+                        if name == "model_id":
+                            model_ref = (f.text or "").strip()
+                            if model_ref and model_ref.startswith("model_"):
+                                model_ref = model_ref.replace("model_", "").replace("_", ".")
+                        elif name == "domain_force":
+                            text = (f.text or "").strip()
+                            if text:
+                                try:
+                                    domain_force = eval(text)
+                                except Exception:
+                                    pass
+                    if model_ref and domain_force:
+                        result.setdefault(model_ref, []).append(domain_force)
+            except Exception:
+                pass
+    return result
+
+
+def get_record_rules(model_name: str, uid: int) -> List[List]:
+    """Get record rule domains for model. Substitute uid in domain."""
+    global _RECORD_RULES
+    if not _RECORD_RULES:
+        from core.tools import config
+        _RECORD_RULES = load_record_rules(config.get_addons_paths())
+    rules = _RECORD_RULES.get(model_name, [])
+    out = []
+    for domain in rules:
+        sub = []
+        for term in domain:
+            if isinstance(term, (list, tuple)) and len(term) >= 3:
+                val = term[2]
+                if val == "uid" or (isinstance(val, str) and "uid" in val):
+                    val = uid
+                sub.append([term[0], term[1], val])
+        if sub:
+            out.append(sub)
+    return out
+
+
 def build_access_map(addons_paths: List[Path]) -> Dict[str, List[Tuple[str, str]]]:
     """Build model -> [(group, op), ...] from all module security CSVs."""
     result: Dict[str, List[Tuple[str, str]]] = {}

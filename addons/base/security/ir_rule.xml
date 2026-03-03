@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.rule" id="res_users_apikeys_own_keys">
+      <field name="model_id">model_res_users_apikeys</field>
+      <field name="domain_force">[['user_id', '=', uid]]</field>
+    </record>
+  </data>
+</odoo>

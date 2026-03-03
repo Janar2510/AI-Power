@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record model="crm.stage" id="stage_new">
+    <field name="name">New</field>
+    <field name="sequence">1</field>
+  </record>
+  <record model="crm.stage" id="stage_qualified">
+    <field name="name">Qualified</field>
+    <field name="sequence">2</field>
+  </record>
+  <record model="crm.stage" id="stage_proposition">
+    <field name="name">Proposition</field>
+    <field name="sequence">3</field>
+  </record>
+  <record model="crm.stage" id="stage_won">
+    <field name="name">Won</field>
+    <field name="sequence">70</field>
+    <field name="is_won">True</field>
+  </record>
+  <record model="crm.stage" id="stage_lost">
+    <field name="name">Lost</field>
+    <field name="sequence">80</field>
+    <field name="fold">True</field>
+  </record>
+</odoo>

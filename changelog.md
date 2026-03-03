@@ -293,3 +293,95 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
 ### Docs
 - DeploymentChecklist.md: Leads verification, AI tools verification, db init note for new modules
 - docs/ai-implementation-checklist.md: AI deployment and tool-registry verification checklist
+
+## 1.13.0 (Phases 10–14 Implemented)
+
+### Phase 10: AI Chat UI
+- addons/web: chat panel (collapsible), tool/model dropdowns, POST /ai/chat
+- chat_panel.js: send, display messages, placeholder per tool
+
+### Phase 11: AI Tools Expansion
+- addons/ai_assistant/tools/registry.py: draft_message, create_activity, propose_workflow_step
+- addons/crm/models/crm_activity.py: crm.activity (name, lead_id, note)
+- Chat panel: new tools in dropdown
+
+### Phase 12: RAG Retrieval
+- addons/ai_assistant/models/ai_document_chunk.py
+- tools/registry.py: retrieve_chunks() with record-rule filtering
+- GET /ai/retrieve?q=query&limit=10
+- /ai/chat: optional retrieve=true, pass retrieved_doc_ids to audit
+
+### Phase 13: List Search + Filters
+- main.js: search bar, Search button, domain [['name','ilike',q]]
+- loadRecords(model, route, searchTerm)
+
+### Phase 14: External JSON-2 API
+- core/http/json2.py: POST /json/2/<model>/<method>
+- Bearer token (API_KEY env or --api-key=)
+- X-Odoo-Database header
+- search, search_read, read, create, write, unlink
+
+### ORM
+- core/orm/models.py: ilike operator in search
+
+### Tests
+- test_json2_requires_auth
+
+## 1.17.0 (Phase 24: Scheduler / Cron)
+
+### Phase 24: Scheduler / Cron
+- addons/base/models/ir_cron.py: ir.cron (name, model, method, interval_minutes, next_run, active)
+- run_due(env): run crons where next_run <= now; update next_run after each run
+- core/cli/cron.py: `erp-bin cron [-d db]` runs due jobs
+- core/orm/models.py: search supports `<=` operator (for next_run)
+
+## 1.16.0 (Phases 22–23: Kanban Drag-Drop + List Filters)
+
+### Phase 22: Kanban Drag-Drop
+- addons/web/static/src/views/kanban_renderer.js: HTML5 drag-and-drop on cards
+- Drop on column updates stage_id via write; visual feedback (kanban-dragging, kanban-drag-over)
+- main.js: onStageChange callback for leads kanban
+
+### Phase 23: List Column Filters
+- Stage filter dropdown for leads (list + kanban views)
+- domain [['stage_id','=',id]] when filter selected
+- currentListState.stageFilter; Search preserves filter
+
+## 1.15.0 (Phase 21: User Menu + API Key Management UI)
+
+### Phase 21: User Menu + API Keys
+- addons/web/static/src/main.js: User menu (API Keys, Logout) in navbar
+- addons/web/static/src/scss/webclient.css: nav-user styles
+- Route #settings/apikeys: API Keys management (list, generate, revoke)
+- addons/base/models/res_users_apikeys.py: revoke(ids), generate(user_id, name) no longer takes env
+- addons/base/security/ir_rule.xml: Record rule for res.users.apikeys (user_id = uid)
+
+## 1.14.0 (Phase 20: API Key Model)
+
+### Phase 20: res.users.apikeys
+- addons/base/models/res_users_apikeys.py: User-bound API keys (user_id, name, key_hash)
+- generate(env, user_id, name): create key, return raw token (show once)
+- _check_credentials(env, key): validate bearer token, return user_id or None
+- core/http/json2.py: _auth_bearer checks res.users.apikeys first, falls back to API_KEY env
+- addons/base/security/ir.model.access.csv: access_res_users_apikeys
+
+### Schema
+- res_users_apikeys table created from model (key_hash column for SHA256)
+
+## Planning: Phases 15–20 (Odoo 19.0 Parity)
+
+- docs/next-phase-plan.md: Phases 15–20 added from odoo-19.0 reference
+  - Phase 15: ORM Many2one + relational fields
+  - Phase 16: CRM Stage model (crm.stage)
+  - Phase 17: Kanban view MVP
+  - Phase 18: Record rules (ir.rule)
+  - Phase 19: RAG document indexing on write
+  - Phase 20: JSON-2 + res.users.apikeys ✓
+
+### Planning (1.13.0)
+- docs/next-phase-plan.md: Phases 10–14 added
+  - Phase 10: AI Chat UI (chat panel in webclient, /ai/chat integration)
+  - Phase 11: AI Tools Expansion (draft_message, create_activity, propose_workflow_step)
+  - Phase 12: RAG Retrieval Skeleton (document index, retrieval API)
+  - Phase 13: List Search + Filters (search bar, domain from input)
+  - Phase 14: External JSON-2 API (deferred)

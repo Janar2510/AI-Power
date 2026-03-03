@@ -4,6 +4,7 @@ import sys
 
 from core.sql_db import create_database, db_exists, get_cursor
 from core.db import init_schema
+from core.db.init_data import load_default_data
 from core.orm import Registry, Environment
 from core.orm.models import ModelBase
 from core.modules import load_module_graph
@@ -57,6 +58,7 @@ class Db(Command):
             init_schema(cr, registry)
             env = Environment(registry, cr=cr, uid=1)
             registry.set_env(env)
+            load_default_data(env)
             User = env["res.users"]
             existing = User.search([("login", "=", "admin")])
             if not existing:

@@ -189,6 +189,14 @@ class ModelBase(metaclass=Model):
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
             return Recordset(cls, [])
+        from core.orm.security import get_record_rules
+        model_name = getattr(cls, "_name", "")
+        uid = getattr(env, "uid", 1)
+        rule_domains = get_record_rules(model_name, uid)
+        combined = list(domain or [])
+        for rd in rule_domains:
+            combined = combined + rd
+        domain = combined
         table = cls._table
         where = "1=1"
         params = []
@@ -203,6 +211,12 @@ class ModelBase(metaclass=Model):
                 elif op == "!=":
                     where += f' AND "{fld}" != %s'
                     params.append(val)
+                elif op == "<=":
+                    where += f' AND ("{fld}" IS NULL OR "{fld}" <= %s)'
+                    params.append(val)
+                elif op == "ilike":
+                    where += f' AND "{fld}" ILIKE %s'
+                    params.append(f"%{val}%" if isinstance(val, str) else val)
         order_by = f' ORDER BY {order}' if order else ""
         limit_clause = f" LIMIT {limit}" if limit else ""
         params.append(offset)

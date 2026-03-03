@@ -52,13 +52,18 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
                     if m:
                         arch = r.get("arch", {})
                         view_type = arch.get("type", "list") if isinstance(arch, dict) else "list"
+                        cols = arch.get("columns", []) if isinstance(arch, dict) else []
+                        flds = arch.get("fields", []) if isinstance(arch, dict) else []
+                        if view_type == "kanban" and not cols:
+                            flds = arch.get("fields", []) if isinstance(arch, dict) else []
                         view_def = {
                             "id": full_id,
                             "model": m,
                             "name": r.get("name", ""),
                             "type": view_type,
-                            "columns": arch.get("columns", []) if isinstance(arch, dict) else [],
-                            "fields": arch.get("fields", []) if isinstance(arch, dict) else [],
+                            "columns": cols,
+                            "fields": flds,
+                            "default_group_by": arch.get("default_group_by", "") if isinstance(arch, dict) else "",
                         }
                         views.setdefault(m, []).append(view_def)
                         id_map[full_id] = full_id

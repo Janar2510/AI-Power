@@ -20,6 +20,12 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] Tools use ORM (search_read, read) under env with user uid
 - [ ] Available tools: search_records, summarise_recordset (extend as needed)
 
+## RAG Retrieval
+
+- [ ] ai.document.chunk model indexed (manual or on-write)
+- [ ] GET /ai/retrieve?q=query&limit=10 returns chunks (record rules applied)
+- [ ] /ai/chat with retrieve=true passes retrieved_doc_ids to audit
+
 ## Adding New Tools
 
 1. Add tool function in `registry.py` (signature: `env, **kwargs`)

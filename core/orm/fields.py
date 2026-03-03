@@ -83,3 +83,14 @@ class Datetime(Field):
 
     type = "datetime"
     column_type = "timestamp"
+
+
+class Many2one(Field):
+    """Many2one relation - stores FK (integer) to comodel."""
+
+    type = "many2one"
+    column_type = "integer"
+
+    def __init__(self, comodel: str = "", string: str = "", **kwargs):
+        super().__init__(string=string, **kwargs)
+        self.comodel = comodel

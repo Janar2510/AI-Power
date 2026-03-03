@@ -1,6 +1,7 @@
 """Tests for HTTP layer."""
 
 import json
+import os
 import unittest
 
 from werkzeug.test import Client
@@ -105,3 +106,14 @@ class TestHTTP(unittest.TestCase):
         self.assertIn("css", resolved)
         self.assertIn("js", resolved)
         self.assertGreater(len(resolved["js"]), 0, "web.assets_web should have JS from manifest")
+
+    def test_json2_requires_auth(self):
+        """POST /json/2/<model>/<method> returns 401 without bearer token."""
+        r = self.client.post(
+            "/json/2/res.partner/search_read",
+            data=json.dumps({"domain": []}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 401)
+        data = json.loads(r.get_data(as_text=True))
+        self.assertIn("Invalid apikey", data.get("message", ""))

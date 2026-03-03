@@ -148,6 +148,22 @@ def dispatch_jsonrpc(request: Request) -> Response:
                     result = result.ids
                 elif isinstance(result, ModelBase):
                     result = result.id if result.id is not None else result.ids
+                if model_name in ("res.partner", "crm.lead") and method_name in ("create", "write"):
+                    try:
+                        from addons.ai_assistant.tools.registry import index_record_for_rag
+                        registry = _get_registry(db)
+                        with get_cursor(db) as cr:
+                            env = Environment(registry, cr=cr, uid=uid)
+                            registry.set_env(env)
+                            ids_to_index = []
+                            if method_name == "create":
+                                ids_to_index = [result] if isinstance(result, int) else (result or [])
+                            elif method_name == "write" and method_args and len(method_args) >= 1:
+                                ids_to_index = method_args[0] if isinstance(method_args[0], list) else [method_args[0]]
+                            for rid in ids_to_index:
+                                index_record_for_rag(env, model_name, int(rid))
+                    except Exception:
+                        pass
                 return Response(
                     json.dumps({"jsonrpc": "2.0", "result": result, "id": req_id}),
                     mimetype="application/json",

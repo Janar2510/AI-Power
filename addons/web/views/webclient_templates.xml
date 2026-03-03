@@ -16,6 +16,29 @@
       <main id="main">
         <div id="action-manager"></div>
       </main>
+      <aside id="chat-panel" class="chat-panel-hidden" aria-label="AI Assistant">
+        <div class="chat-panel-header">
+          <h3>AI Assistant</h3>
+          <button type="button" id="chat-panel-close" class="chat-panel-close" aria-label="Close">×</button>
+        </div>
+        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-input-area">
+          <select id="chat-tool" class="chat-tool-select">
+            <option value="search_records">Search records</option>
+            <option value="summarise_recordset">Summarise records</option>
+            <option value="draft_message">Draft message</option>
+            <option value="create_activity">Create activity</option>
+            <option value="propose_workflow_step">Propose workflow step</option>
+          </select>
+          <select id="chat-model" class="chat-model-select">
+            <option value="res.partner">Contacts</option>
+            <option value="crm.lead">Leads</option>
+          </select>
+          <input type="text" id="chat-query" class="chat-query-input" placeholder="Search term (optional) or record IDs for summarise" />
+          <button type="button" id="chat-send" class="chat-send-btn">Send</button>
+        </div>
+      </aside>
+      <button type="button" id="chat-toggle" class="chat-toggle-btn" aria-label="Open AI Assistant">AI</button>
     </div>
     <script src="/web/static/src/session.js"></script>
     <script src="/web/static/src/main.js"></script>

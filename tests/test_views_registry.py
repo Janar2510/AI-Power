@@ -29,7 +29,7 @@ class TestViewsRegistry(unittest.TestCase):
         self.assertGreater(len(views), 0)
         list_view = next((v for v in views if v["type"] == "list"), None)
         self.assertIsNotNone(list_view)
-        self.assertIn("stage", [c.get("name") for c in list_view["columns"]])
+        self.assertIn("stage_id", [c.get("name") for c in list_view["columns"]])
 
     def test_load_views_registry_has_actions(self):
         registry = load_views_registry()

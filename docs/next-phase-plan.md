@@ -120,13 +120,284 @@ All success criteria met. Web client parity kernel and verification baseline est
 
 ---
 
+---
+
+## Phase 10: AI Chat UI ✅
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| Chat panel/sidebar | Collapsible panel in webclient; toggle button in navbar | Minimal UX |
+| Chat input + send | Text input, POST to /ai/chat with tool params | Use existing /ai/chat API |
+| Message display | Show user prompt + tool result (or error) | Read-only, no streaming yet |
+| Tool selection | Optional: dropdown or natural-language → tool mapping | MVP: fixed search_records/summarise |
+
+**Deliverables:** `addons/web/static/src/` chat component; navbar "AI" or chat icon; calls /ai/chat; displays response.
+
+**Scope boundary:** Single-turn only; no RAG retrieval; no streaming.
+
+**Delivered:** Chat panel, tool/model dropdowns, POST /ai/chat, message display.
+
+---
+
+## Phase 11: AI Tools Expansion ✅
+
+| Task | Implementation | Reference |
+|------|----------------|-----------|
+| draft_message | Generate draft email/message for record | docs/ai.md |
+| create_activity | Create activity/task linked to record | docs/ai.md |
+| propose_workflow_step | Suggest next stage (e.g. lead → qualified) | docs/ai.md |
+| User confirmation | Require confirm for state-changing tools | docs/ai.md, ai-rules |
+
+**Deliverables:** New tools in `addons/ai_assistant/tools/registry.py`; audit log per invocation; confirmation UI for create_activity, propose_workflow_step.
+
+**Delivered:** draft_message, create_activity, propose_workflow_step; crm.activity model.
+
+---
+
+## Phase 12: RAG Retrieval Skeleton ✅
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| Document index | Store document chunks (model, record_id, text) | Minimal schema |
+| Retrieval API | Search index by query; return top-k chunks | Record rules before retrieval |
+| RAG in /ai/chat | Optional: pass retrieved_doc_ids to tools | Extend log_audit |
+| Indexing | Manual or on-write hook for res.partner, crm.lead | Defer full pipeline |
+
+**Deliverables:** `ai.document.chunk` or similar; retrieval endpoint; integrate with /ai/chat flow.
+
+**Scope boundary:** In-memory or simple DB index; defer vector/embedding.
+
+**Delivered:** ai.document.chunk model; retrieve_chunks(); GET /ai/retrieve; optional retrieve in /ai/chat.
+
+---
+
+## Phase 13: List Search + Filters ✅
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| Search bar | Text input above list; domain `[('name','ilike',q)]` | UX parity |
+| Domain from URL | Support `?search=foo` or `#contacts?search=foo` | Optional |
+| Column filters | Simple filter dropdowns (e.g. stage for leads) | Defer advanced |
+
+**Deliverables:** Search input in list view; pass domain to search_read.
+
+**Delivered:** Search bar, Search button, domain [['name','ilike',q]].
+
+---
+
+## Phase 14: External JSON-2 API ✅
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| Token auth | API key or JWT for external clients | docs/architecture |
+| JSON-2 endpoints | Standard Odoo 19 JSON-2 contract | api-contracts when added |
+| Multi-db headers | db name from header | Multi-tenant |
+
+**Deliverables:** `core/http/json2.py`; route `/api/v2/...`; token validation.
+
+**Scope boundary:** Defer until internal RPC + AI flow stable.
+
+**Delivered:** core/http/json2.py; POST /json/2/<model>/<method>; bearer token (API_KEY env); X-Odoo-Database header.
+
+---
+
+## Next Phases (15–20) — Odoo 19.0 Parity
+
+Based on [odoo-19.0](../odoo-19.0) reference: `addons/crm`, `addons/rpc`, `odoo/orm`, `odoo/addons/base`.
+
+---
+
+### Phase 15: ORM Many2one + Relational Fields
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| Many2one field | `odoo/fields.py` Many2one | `core/orm/fields.py` Many2one |
+| Foreign key in schema | `res_id` + `_model` or single FK column | `partner_id INTEGER REFERENCES res_partner(id)` |
+| Browse/read display | `record.partner_id.name` | Resolve FK to related record |
+| One2many (reverse) | `fields.One2many` | Defer or minimal (computed from inverse) |
+
+**Deliverables:** Many2one field type; crm.lead.partner_id → res.partner; crm.lead.stage_id → crm.stage; form dropdown for Many2one.
+
+**Scope:** Single FK column; no `_model` polymorphic. Defer One2many/Many2many.
+
+---
+
+### Phase 16: CRM Stage Model (crm.stage)
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| crm.stage model | `addons/crm/models/crm_stage.py` | `addons/crm/models/crm_stage.py` |
+| Stage data | `data/crm_stage_data.xml` | New, Qualified, Proposition, Won |
+| crm.lead.stage_id | Many2one to crm.stage | Replace Char `stage` with stage_id |
+| Default stage | `default` on stage_id | First stage by sequence |
+
+**Deliverables:** crm.stage (name, sequence, fold, is_won); crm_lead.stage_id FK; data XML; form stage dropdown.
+
+---
+
+### Phase 17: Kanban View (MVP)
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| Kanban arch | `addons/crm/views/crm_lead_views.xml` `<kanban>` | Parse kanban from XML |
+| Column by field | `default_group_by="stage_id"` | Group records by stage_id |
+| Card template | `<templates><t t-name="...">` | Simple card: name, expected_revenue |
+| Drag-drop | Odoo OWL components | Defer; static columns first |
+
+**Deliverables:** `core/data/xml_loader.py` parse kanban; `views/kanban_renderer.js`; main.js route `#leads` to kanban when view type=kanban. No drag-drop.
+
+**Scope:** Read-only kanban; column headers from stage names; cards from template.
+
+---
+
+### Phase 18: Record Rules (ir.rule)
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| ir.rule model | `odoo/addons/base/models/ir_rule.py` | `addons/base/models/ir_rule.py` |
+| Domain filter | `domain_force` applied to search | Inject domain in ORM search |
+| Rule evaluation | Per model, per user groups | `check_rule(env, model, domain, uid)` |
+| ir.rule CSV/XML | `security/ir_rule.xml` | Load rules into registry |
+
+**Deliverables:** ir.rule (name, model_id, domain_force, groups); apply in `Model.search()` before SQL; default-allow when no rules.
+
+**Scope:** Domain-only rules; no `perm_read`/`perm_write` split (simplified).
+
+---
+
+### Phase 19: RAG Document Indexing
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| Index on write | N/A (custom) | On res.partner/crm.lead write, upsert ai.document.chunk |
+| Chunk content | name, email, description, etc. | Concatenate searchable fields |
+| Trigger | ORM write/create | Optional: `_index_for_rag()` called from model |
+
+**Deliverables:** `ai_document_chunk` upsert on partner/lead create/write; `retrieve_chunks` returns populated results.
+
+---
+
+### Phase 20: JSON-2 Parity + API Key Model
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| res.users.apikeys | `addons/base/models/res_users_apikeys.py` | User-bound API keys |
+| generate/revoke | `/json/2/res.users.apikeys/generate` | Store hashed key, map to user |
+| Bearer auth | `auth='bearer'` in route | Validate against apikeys table |
+| /doc endpoint | `addons/api_doc` | Defer |
+
+**Deliverables:** res.users.apikeys model; generate/revoke methods; json2 auth from apikeys instead of env API_KEY.
+
+**Scope:** Replace single API_KEY with per-user keys; keep env fallback for dev.
+
+---
+
+## Recommended Execution Order (Phases 15–20)
+
+1. **Phase 15** — Many2one (enables relational forms)
+2. **Phase 16** — CRM Stage (cleaner lead pipeline)
+3. **Phase 17** — Kanban (visual pipeline view)
+4. **Phase 18** — Record Rules (row-level security)
+5. **Phase 19** — RAG Indexing (populate chunks)
+6. **Phase 20** — API Key Model (production JSON-2 auth)
+
+---
+
+## Execution Order Summary
+
+**Phases 10–14:** 10 (AI Chat) → 11 (Tools) → 13 (Search) → 12 (RAG) → 14 (JSON-2) — all done.
+
+**Phases 15–20:** 15 (Many2one) → 16 (Stage) → 17 (Kanban) → 18 (Rules) → 19 (RAG Index) → 20 (API Keys).
+
+---
+
+## Next Phases (21–24) — Post Odoo 19 Parity
+
+Phases 15–20 complete. Below is the recommended plan for the next implementation cycle.
+
+---
+
+### Phase 21: User Menu + API Key Management UI
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| User menu in navbar | Dropdown or link group: user name, Logout, API Keys | Navbar currently overwritten by main.js; add user section |
+| Logout link | Ensure `/web/logout` visible when navbar re-renders | renderNavbar replaces full navbar; add Logout to nav output |
+| API Keys settings view | Route `#settings/apikeys` or modal from user menu | List keys (name, created); Generate; Revoke |
+| res.users.apikeys revoke | `revoke(env, ids)` method on model | Delete records by id; restrict to own keys |
+| RPC for generate/revoke | call_kw `res.users.apikeys` generate, unlink | Generate returns raw key (show once, copy); unlink for revoke |
+
+**Deliverables:** User menu (logout + API Keys); API Keys management UI; revoke method; RPC integration.
+
+**Scope:** Own-key management only (user_id = env.uid). No admin management of other users' keys in MVP.
+
+**Delivered (1.15.0):** Navbar user menu with API Keys, Logout; #settings/apikeys route; list/generate/revoke UI; ir_rule for res.users.apikeys.
+
+---
+
+### Phase 22: Kanban Drag-Drop (Stage Change)
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| Drag handlers | HTML5 drag-and-drop on kanban cards | `draggable`, `ondragstart`, `ondragover`, `ondrop` |
+| Drop target | Column = stage; drop updates `stage_id` | call_kw write on drop |
+| Visual feedback | Drop placeholder, column highlight | UX polish |
+| Access control | Write permission on crm.lead | Already enforced by RPC |
+
+**Deliverables:** Draggable cards; drop updates stage_id via write; basic visual feedback.
+
+**Scope:** Leads kanban only. Defer calendar, graph, pivot.
+
+**Delivered (1.16.0):** HTML5 drag-drop; onStageChange callback; kanban-dragging, kanban-drag-over CSS.
+
+---
+
+### Phase 23: List Column Filters
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| Stage filter (leads) | Dropdown above list: All, New, Qualified, Won, Lost | domain `[('stage_id','=',id)]` or `in` |
+| Filter UI component | Reusable for other models (e.g. partner type) | Simple `<select>` or filter chips |
+| URL/state | Optional: `?stage=1` in hash | Persist filter in session or URL |
+
+**Deliverables:** Stage filter dropdown for leads list; domain from filter; optional URL sync.
+
+**Scope:** One filter per model (stage for leads). Defer multi-filter, saved filters.
+
+**Delivered (1.16.0):** Stage filter in leads list and kanban; domain [['stage_id','=',id]]; currentListState.stageFilter.
+
+---
+
+### Phase 24: Scheduler / Cron (Backend)
+
+| Task | Implementation | Notes |
+|------|----------------|-------|
+| ir.cron model | `addons/base` or `addons/scheduler`: name, model, method, interval | Store cron definitions |
+| Cron runner | CLI `erp-bin cron` or background thread | Run due crons; `call_kw(model, method, [], {})` |
+| Default crons | Optional: garbage collect sessions, RAG reindex | Defer complex scheduling |
+
+**Deliverables:** ir.cron model; cron runner command or worker; run model methods on schedule.
+
+**Scope:** Interval-based (minutes). Defer cron expressions, timezone handling.
+
+**Delivered (1.17.0):** ir.cron model; erp-bin cron; run_due(env); search <= operator.
+
+---
+
+## Recommended Execution Order (Phases 21–24)
+
+1. **Phase 21** — User menu + API Keys UI (completes Phase 20; enables self-service keys)
+2. **Phase 22** — Kanban drag-drop (high UX impact for leads)
+3. **Phase 23** — List filters (quick win for leads)
+4. **Phase 24** — Scheduler (enables background jobs; lower priority)
+
+---
+
 ## Out of Scope (Deferred)
 
-- Kanban, calendar, graph views
+- Calendar, graph, pivot views
 - Full i18n pipeline (`.po` extraction/import)
 - Mobile JS layer
-- Scheduler/Cron (backend)
-- External JSON-2 API
 - Additional business modules (accounting, inventory)
 
 ---

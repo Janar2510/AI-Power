@@ -34,5 +34,5 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | API Surface | Odoo Contract | Our Implementation | Status |
 |-------------|---------------|--------------------|--------|
 | Internal RPC (web client) | Session-aware, record-rule protected | `core/http/rpc.py`, `/web/dataset/call_kw` | done |
-| External JSON-2 | Token/key-based, multi-db headers | `core/http/json2.py` | deferred |
+| External JSON-2 | Token/key-based, multi-db headers | `core/http/json2.py` | done |
 | Extension controllers | `@route`, auth modes | `core/http/controller.py` | done |

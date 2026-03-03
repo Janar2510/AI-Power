@@ -8,7 +8,7 @@ class CrmLead(Model):
     _description = "Lead/Opportunity"
 
     name = fields.Char(required=True)
-    partner_id = fields.Integer()  # res.partner id
-    stage = fields.Char(default="new")  # new, qualified, proposal, won, lost
+    partner_id = fields.Many2one("res.partner", string="Contact")
+    stage_id = fields.Many2one("crm.stage", string="Stage")
     expected_revenue = fields.Float()
     description = fields.Text()

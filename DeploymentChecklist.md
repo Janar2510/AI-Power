@@ -47,6 +47,19 @@
 - [ ] ai.audit.log, ai.document.chunk tables created (db init)
 - [ ] Chat panel: AI button in webclient
 
+## Phase 26 (Base Models)
+
+- [ ] ir.sequence: next_by_code('crm.lead') via RPC returns next number
+- [ ] ir.attachment: create/read with res_model, res_id, datas (binary)
+- [ ] ir.model: table exists; search_read returns metadata
+- [ ] db init creates default crm.lead sequence
+
+## Phase 25 (ORM Field Types)
+
+- [ ] Leads form: Type dropdown (Lead/Opportunity)
+- [ ] Leads form: Activities read-only sublist (when activities exist)
+- [ ] List views: Selection fields show label (e.g. Lead vs lead)
+
 ## External JSON-2 API (Phases 14, 20, 21)
 
 - [ ] Set API_KEY env or --api-key= for bearer token auth (fallback)

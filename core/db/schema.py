@@ -44,6 +44,8 @@ def _column_def(field: fields.Field) -> str:
         return "TIMESTAMP"
     if col_type == "integer":
         return "INTEGER"
+    if col_type == "bytea":
+        return "BYTEA"
     return "VARCHAR(255)"
 
 
@@ -71,6 +73,8 @@ def create_table(cursor: Any, model_class: Type[ModelBase]) -> None:
         return
     columns = ["id SERIAL PRIMARY KEY"]
     for name, field in field_defs.items():
+        if getattr(field, "column_type", None) is None:
+            continue  # virtual fields (One2many, Many2many)
         col_def = _column_def(field)
         columns.append(f'"{name}" {col_def}')
     stmt = f'CREATE TABLE "{table}" ({", ".join(columns)})'
@@ -100,6 +104,8 @@ def add_missing_columns(cursor: Any, registry: Any) -> None:
         for col_name, field in field_defs.items():
             if col_name == "id":
                 continue
+            if getattr(field, "column_type", None) is None:
+                continue
             if not column_exists(cursor, table, col_name):
                 col_def = _column_def(field)
                 try:
@@ -109,9 +115,35 @@ def add_missing_columns(cursor: Any, registry: Any) -> None:
                     _logger.warning("Could not add column %s.%s: %s", table, col_name, e)
 
 
+def create_many2many_table(cursor: Any, relation: str, column1: str, column2: str, table1: str, table2: str) -> None:
+    """Create Many2many relation table if it does not exist."""
+    if table_exists(cursor, relation):
+        return
+    stmt = f'''CREATE TABLE "{relation}" (
+        "{column1}" INTEGER NOT NULL,
+        "{column2}" INTEGER NOT NULL,
+        PRIMARY KEY ("{column1}", "{column2}")
+    )'''
+    cursor.execute(stmt)
+    _logger.info("Created relation table %s", relation)
+
+
 def init_schema(cursor: Any, registry: Any) -> None:
-    """Create tables for all registered models; add missing columns."""
+    """Create tables for all registered models; add missing columns; create Many2many tables."""
     for model_name, model_class in registry._models.items():
         if hasattr(model_class, "_table") and model_class._table:
             create_table(cursor, model_class)
+    for model_name, model_class in registry._models.items():
+        table = getattr(model_class, "_table", None)
+        if not table:
+            continue
+        for fname, field in _get_model_fields(model_class).items():
+            if not isinstance(field, fields.Many2many):
+                continue
+            rel = getattr(field, "relation", fname + "_rel")
+            col1 = getattr(field, "column1", "left_id")
+            col2 = getattr(field, "column2", "right_id")
+            comodel = getattr(field, "comodel", "")
+            table2 = comodel.replace(".", "_") if comodel else "unknown"
+            create_many2many_table(cursor, rel, col1, col2, table, table2)
     add_missing_columns(cursor, registry)

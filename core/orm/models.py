@@ -116,20 +116,63 @@ class ModelBase(metaclass=Model):
         env = getattr(self._registry, "_env", None) if self._registry else None
         return env.cr if env and hasattr(env, "cr") else None
 
+    def _get_stored_columns(self) -> List[str]:
+        """Return field names that have a DB column (excludes One2many, Many2many)."""
+        from core.orm import fields as fmod
+        result = []
+        for name in dir(self._model):
+            if name.startswith("_"):
+                continue
+            obj = getattr(self._model, name)
+            if isinstance(obj, fmod.Field) and getattr(obj, "column_type", None) is not None:
+                result.append(name)
+        return result
+
     def read(self, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """Read field values from DB or cache."""
         cr = self._get_cr()
         if not cr or not self._ids:
             return [{"id": rid, **self._cache} for rid in self._ids]
         table = self._model._table
-        cols = fields or ["id"]
+        requested = fields or ["id"]
+        stored = self._get_stored_columns()
+        cols = [c for c in requested if c in stored]
+        if not cols:
+            cols = ["id"]
         col_list = ", ".join(f'"{c}"' for c in cols)
         placeholders = ", ".join("%s" for _ in self._ids)
         cr.execute(
             f'SELECT {col_list} FROM "{table}" WHERE id IN ({placeholders})',
             self._ids,
         )
-        return [dict(row) for row in cr.fetchall()]
+        rows = [dict(row) for row in cr.fetchall()]
+        from core.orm import fields as fmod
+        for fname in requested:
+            if fname in cols:
+                continue
+            field = getattr(self._model, fname, None)
+            if not isinstance(field, (fmod.One2many, fmod.Many2many)):
+                continue
+            for i, rid in enumerate(self._ids):
+                if isinstance(field, fmod.One2many):
+                    inv_name = getattr(field, "inverse_name", "")
+                    comodel = getattr(field, "comodel", "")
+                    if comodel and inv_name:
+                        Comodel = self.env.get(comodel) if hasattr(self, "env") else None
+                        if Comodel:
+                            recs = Comodel.search([(inv_name, "=", rid)])
+                            rows[i][fname] = recs.ids if hasattr(recs, "ids") else []
+                elif isinstance(field, fmod.Many2many):
+                    rel = getattr(field, "relation", "")
+                    col1 = getattr(field, "column1", "left_id")
+                    col2 = getattr(field, "column2", "right_id")
+                    if rel and cr:
+                        try:
+                            cr.execute(f'SELECT "{col2}" FROM "{rel}" WHERE "{col1}" = %s', (rid,))
+                            rows[i][fname] = [r[col2] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
+                        except Exception:
+                            rows[i][fname] = []
+        return rows
 
     def write(self, vals: Dict[str, Any]) -> bool:
         """Write field values to DB."""
@@ -139,13 +182,30 @@ class ModelBase(metaclass=Model):
         if not cr:
             self._cache.update(vals)
             return True
+        stored = self._get_stored_columns()
+        vals_stored = {k: v for k, v in vals.items() if k in stored}
+        if not vals_stored:
+            return True
         table = self._model._table
-        sets = ", ".join(f'"{k}" = %s' for k in vals)
+        sets = ", ".join(f'"{k}" = %s' for k in vals_stored)
         cr.execute(
             f'UPDATE "{table}" SET {sets} WHERE id = %s',
-            list(vals.values()) + [self._ids[0]],
+            list(vals_stored.values()) + [self._ids[0]],
         )
         return True
+
+    @classmethod
+    def _get_stored_field_names(cls) -> List[str]:
+        """Return field names that have a DB column."""
+        from core.orm import fields as fmod
+        result = []
+        for name in dir(cls):
+            if name.startswith("_"):
+                continue
+            obj = getattr(cls, name)
+            if isinstance(obj, fmod.Field) and getattr(obj, "column_type", None) is not None:
+                result.append(name)
+        return result
 
     @classmethod
     def create(cls: Type[T], vals: Dict[str, Any]) -> T:
@@ -155,13 +215,18 @@ class ModelBase(metaclass=Model):
         if not cr:
             return cls.browse(1)
         table = cls._table
-        cols = [c for c in vals if c != "id"]
-        col_list = ", ".join(f'"{c}"' for c in cols)
-        placeholders = ", ".join("%s" for _ in cols)
-        cr.execute(
-            f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders}) RETURNING id',
-            [vals[c] for c in cols],
-        )
+        stored = cls._get_stored_field_names()
+        vals_stored = {k: v for k, v in vals.items() if k != "id" and k in stored}
+        cols = [c for c in vals_stored if c in stored]
+        if cols:
+            col_list = ", ".join(f'"{c}"' for c in cols)
+            placeholders = ", ".join("%s" for _ in cols)
+            cr.execute(
+                f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders}) RETURNING id',
+                [vals_stored[c] for c in cols],
+            )
+        else:
+            cr.execute(f'INSERT INTO "{table}" DEFAULT VALUES RETURNING id')
         row = cr.fetchone()
         new_id = row["id"] if hasattr(row, "keys") else row[0]
         return cls.browse(new_id)

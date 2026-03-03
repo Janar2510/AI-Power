@@ -6,7 +6,7 @@ _logger = logging.getLogger("erp.db")
 
 
 def load_default_data(env) -> None:
-    """Load default records (stages, etc.) when tables are empty."""
+    """Load default records (stages, sequences, etc.) when tables are empty."""
     try:
         Stage = env.get("crm.stage")
         if Stage and not Stage.search([]):
@@ -21,3 +21,14 @@ def load_default_data(env) -> None:
             _logger.info("Created default crm.stage records")
     except Exception as e:
         _logger.warning("Could not load default data: %s", e)
+
+    try:
+        IrSequence = env.get("ir.sequence")
+        if IrSequence:
+            for code, name in [("crm.lead", "Lead/Opportunity Reference")]:
+                existing = IrSequence.search([("code", "=", code)])
+                if not existing:
+                    IrSequence.create({"code": code, "name": name, "number_next": 0})
+                    _logger.info("Created default ir.sequence: %s", code)
+    except Exception as e:
+        _logger.warning("Could not load default sequences: %s", e)

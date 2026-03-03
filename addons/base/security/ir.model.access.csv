@@ -3,3 +3,6 @@ access_res_users,access_res_users,model_res_users,,1,1,1,1
 access_res_partner,access_res_partner,model_res_partner,,1,1,1,1
 access_res_users_apikeys,access_res_users_apikeys,model_res_users_apikeys,,1,1,1,1
 access_ir_cron,access_ir_cron,model_ir_cron,,1,1,1,1
+access_ir_sequence,access_ir_sequence,model_ir_sequence,,1,1,1,1
+access_ir_attachment,access_ir_attachment,model_ir_attachment,,1,1,1,1
+access_ir_model,access_ir_model,model_ir_model,,1,1,1,1

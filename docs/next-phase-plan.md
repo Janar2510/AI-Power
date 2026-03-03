@@ -393,12 +393,153 @@ Phases 15–20 complete. Below is the recommended plan for the next implementati
 
 ---
 
+---
+
+## Next Phases (25–32) — Odoo 19.0 Clone Roadmap
+
+Based on [odoo-19.0](../odoo-19.0) reference: `odoo/addons/base`, `odoo/orm`, `addons/web`, `addons/rpc`.
+
+### Phase 25: ORM Field Types (Selection, One2many, Many2many)
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| Selection field | `odoo/orm/fields_selection.py` | `core/orm/fields.py` Selection |
+| One2many | `odoo/orm/fields_relational.py` | Inverse of Many2one; virtual, no DB column |
+| Many2many | `odoo/orm/fields_relational.py` | Relation table + link model |
+| Html field | `odoo/orm/fields_textual.py` | Text with `column_type='text'`; sanitize on write |
+
+**Deliverables:** Selection, One2many (read-only MVP), Many2many (relation table); Html as Text.
+
+**Scope:** One2many: display only, no create from form. Many2many: relation table `model1_id, model2_id`.
+
+---
+
+### Phase 26: Base Models (ir.model, ir.sequence, ir.attachment)
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| ir.model | `base/models/ir_model.py` | Model metadata: name, model, info; optional |
+| ir.sequence | `base/models/ir_sequence.py` | PostgreSQL sequence; `next_by_code()` |
+| ir.attachment | `base/models/ir_attachment.py` | res_model, res_id, datas (binary), name |
+
+**Deliverables:** ir.sequence for auto-numbering (e.g. lead ref); ir.attachment for file storage; ir.model stub.
+
+**Scope:** ir.model as read-only metadata from registry. ir.attachment: store in DB (datas as bytea).
+
+---
+
+### Phase 27: res.company, res.groups, Multi-Company Stub
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| res.company | `base/models/res_company.py` | Single company stub: name, currency_id |
+| res.groups | `base/models/res_groups.py` | Groups; link to ir.model.access (group_id) |
+| res.users groups | Many2many users ↔ groups | user_id, group_id relation |
+
+**Deliverables:** res.company (1 record default); res.groups; check_access uses user groups.
+
+**Scope:** Single-company; group-based access (group_id in ir.model.access already parsed).
+
+---
+
+### Phase 28: View Switcher + List/Kanban/Form Toggle
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| View mode buttons | `addons/web` list/kanban/form icons | Toggle buttons above content |
+| Persist view type | sessionStorage or URL | `#leads?view=kanban` |
+| view_mode from action | ir.actions.act_window | Already in action def; respect in UI |
+
+**Deliverables:** View switcher (list | kanban | form) for leads; persist choice per route.
+
+---
+
+### Phase 29: CLI Shell + Module Install
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| shell | `odoo/cli/shell.py` | `erp-bin shell -d db` → IPython/REPL with env |
+| module install | `odoo/cli/module.py` | `erp-bin module install -d db -m crm` |
+| DB module state | ir_module_module | Table: modules installed per DB |
+
+**Deliverables:** `erp-bin shell`; `erp-bin module install/list`; ir.module.module or minimal install tracking.
+
+**Scope:** install = ensure module in server_wide or DB module list; init schema for new models.
+
+---
+
+### Phase 30: ir.config_parameter + Settings Stub
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| ir.config_parameter | `base/models/ir_config_parameter.py` | key, value; get_param/set_param |
+| Settings menu | `base/views/res_config_views.xml` | Placeholder #settings route |
+
+**Deliverables:** ir.config_parameter; `env['ir.config_parameter'].get_param('key')`; settings page stub.
+
+---
+
+### Phase 31: Transient Models (Wizards)
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| TransientModel | `odoo/orm/models.py` | No table persistence; in-memory or temp table |
+| Wizard pattern | base/wizard/*.py | Form that calls method, then unlink |
+
+**Deliverables:** TransientModel base; simple wizard (e.g. confirm dialog) pattern.
+
+**Scope:** MVP: model with `_transient = True`, auto-vacuum old records.
+
+---
+
+### Phase 32: res.country, res.currency, res.lang (Stub)
+
+| Task | Odoo 19.0 Reference | Our Implementation |
+|------|--------------------|---------------------|
+| res.country | `base/models/res_country.py` | id, name, code; load from data |
+| res.currency | `base/models/res_currency.py` | name, symbol, rate |
+| res.lang | `base/models/res_lang.py` | code, name; active langs |
+
+**Deliverables:** res.country (minimal); res.currency (for res.company); res.lang stub. Data XML.
+
+**Scope:** Skeleton for localization; defer full i18n.
+
+---
+
+## Recommended Execution Order (Phases 25–32)
+
+1. **Phase 25** — ORM fields (Selection, One2many, Many2many) — enables richer models
+2. **Phase 26** — ir.sequence, ir.attachment — common base needs
+3. **Phase 27** — res.company, res.groups — access control refinement
+4. **Phase 28** — View switcher — UX parity
+5. **Phase 29** — Shell + module install — dev/ops
+6. **Phase 30** — ir.config_parameter — config storage
+7. **Phase 31** — Wizards — workflow pattern
+8. **Phase 32** — res.country/currency/lang — localization base
+
+---
+
+## Odoo 19.0 Reference Map (Key Paths)
+
+| Area | Odoo Path | Notes |
+|------|-----------|-------|
+| ORM fields | `odoo/orm/fields_*.py` | Selection, One2many, Many2many, Html, Binary |
+| Base models | `odoo/addons/base/models/` | ir_model, ir_sequence, ir_attachment, ir_config_parameter, ir_cron, ir_rule, ir_actions, ir_ui_view, ir_ui_menu |
+| res.* | `odoo/addons/base/models/res_*.py` | res_partner, res_users, res_company, res_country, res_currency, res_lang, res_groups |
+| RPC | `addons/rpc` | JSON-RPC, XML-RPC endpoints |
+| Web | `addons/web` | OWL, assets, webclient |
+| CLI | `odoo/cli/*.py` | server, db, module, shell, scaffold, i18n |
+
+---
+
 ## Out of Scope (Deferred)
 
 - Calendar, graph, pivot views
 - Full i18n pipeline (`.po` extraction/import)
 - Mobile JS layer
-- Additional business modules (accounting, inventory)
+- OWL component framework (stick with vanilla JS / incremental)
+- Model inheritance (`_inherit`, `_inherits`)
+- Accounting, inventory, e-commerce modules
 
 ---
 

@@ -100,3 +100,16 @@ This document maps the Odoo 19.0 upstream repository structure to our parity pla
 
 - Exact file-by-file mirroring
 - All Odoo addons (hundreds); focus on base + web + minimal demo
+
+## Next Phases (Odoo Clone Roadmap)
+
+See [next-phase-plan.md](next-phase-plan.md) for Phases 25–32:
+
+- **Phase 25:** ORM fields (Selection, One2many, Many2many)
+- **Phase 26:** ir.sequence, ir.attachment, ir.model stub
+- **Phase 27:** res.company, res.groups
+- **Phase 28:** View switcher (list/kanban/form)
+- **Phase 29:** CLI shell, module install
+- **Phase 30:** ir.config_parameter
+- **Phase 31:** Transient models (wizards)
+- **Phase 32:** res.country, res.currency, res.lang

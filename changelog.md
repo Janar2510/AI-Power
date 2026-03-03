@@ -327,6 +327,40 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
 ### Tests
 - test_json2_requires_auth
 
+## 1.19.0 (Phase 26: Base Models - ir.sequence, ir.attachment, ir.model)
+
+### Phase 26: ir.sequence
+- addons/base/models/ir_sequence.py: ir.sequence (code, name, number_next)
+- next_by_code(code): atomic increment, returns next number
+- core/db/init_data.py: creates crm.lead sequence on db init
+- core/orm/fields.py: Binary field (bytea)
+
+### Phase 26: ir.attachment
+- addons/base/models/ir_attachment.py: ir.attachment (name, res_model, res_id, datas)
+- File attachments linked to records; datas stored as bytea
+
+### Phase 26: ir.model stub
+- addons/base/models/ir_model.py: ir.model (name, model, info)
+- Table for model metadata; minimal stub for Odoo parity
+
+### Schema
+- core/db/schema.py: bytea column type for Binary
+- ir_sequence, ir_attachment, ir_model tables created on db init
+
+## 1.18.0 (Phase 25: ORM Field Types - Selection, One2many)
+
+### Phase 25: Selection Field
+- addons/crm/models/crm_lead.py: type Selection (lead/opportunity)
+- addons/crm/views/crm_views.xml: type in list and form views
+- main.js: getSelectionOptions, getSelectionLabel; form dropdown for Selection; list shows label
+- getFormVals: handles Selection (default first option when empty)
+
+### Phase 25: One2many (read-only MVP)
+- addons/crm/views/crm_views.xml: activity_ids in lead form
+- main.js: getOne2manyInfo; form renders read-only subtable for One2many
+- After loadRecord, fetches crm.activity by ids and displays Name/Note/Due table
+- getFormVals: skips One2many fields
+
 ## 1.17.0 (Phase 24: Scheduler / Cron)
 
 ### Phase 24: Scheduler / Cron

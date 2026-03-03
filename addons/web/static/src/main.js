@@ -56,7 +56,7 @@
       const v = viewsSvc.getView(model, 'list');
       if (v && v.columns && v.columns.length) return v.columns.map(c => (typeof c === 'object' ? c.name : c) || c);
     }
-    return model === 'crm.lead' ? ['name', 'stage_id', 'expected_revenue'] : ['name', 'email', 'phone', 'city'];
+    return model === 'crm.lead' ? ['name', 'type', 'stage_id', 'expected_revenue'] : ['name', 'email', 'phone', 'city'];
   }
 
   function getFormFields(model) {
@@ -64,7 +64,7 @@
       const v = viewsSvc.getView(model, 'form');
       if (v && v.fields && v.fields.length) return v.fields.map(f => (typeof f === 'object' ? f.name : f) || f);
     }
-    return model === 'crm.lead' ? ['name', 'partner_id', 'stage_id', 'expected_revenue', 'description'] : ['name', 'email', 'phone', 'street', 'city', 'country'];
+    return model === 'crm.lead' ? ['name', 'type', 'partner_id', 'stage_id', 'expected_revenue', 'description', 'activity_ids'] : ['name', 'email', 'phone', 'street', 'city', 'country'];
   }
 
   function getTitle(route) {
@@ -204,6 +204,10 @@
             const f = typeof c === 'object' ? c.name : c;
             let val = r[f];
             if (nameMap && nameMap[f] && val != null) val = nameMap[f][val] || val;
+            else if (val != null) {
+              const selLabel = getSelectionLabel(model, f, val);
+              if (selLabel !== val) val = selLabel;
+            }
             tbl += '<td style="padding:0.5rem;border-bottom:1px solid #eee">' + (val != null ? String(val) : '').replace(/</g, '&lt;') + '</td>';
           });
           tbl += '<td style="padding:0.5rem"><a href="#' + route + '/edit/' + (r.id || '') + '" style="font-size:0.9rem;margin-right:0.5rem">Edit</a>';
@@ -272,6 +276,23 @@
     return null;
   }
 
+  function getSelectionOptions(model, fname) {
+    if (model === 'crm.lead' && fname === 'type') return [['lead', 'Lead'], ['opportunity', 'Opportunity']];
+    return null;
+  }
+
+  function getSelectionLabel(model, fname, value) {
+    const opts = getSelectionOptions(model, fname);
+    if (!opts || value == null || value === '') return value;
+    const pair = opts.find(function (o) { return o[0] === value || String(o[0]) === String(value); });
+    return pair ? pair[1] : value;
+  }
+
+  function getOne2manyInfo(model, fname) {
+    if (model === 'crm.lead' && fname === 'activity_ids') return { comodel: 'crm.activity', inverse: 'lead_id' };
+    return null;
+  }
+
   function renderForm(model, route, id) {
     const fields = getFormFields(model);
     const title = getTitle(route);
@@ -280,11 +301,21 @@
     let html = '<h2>' + formTitle + '</h2><form id="record-form" style="max-width:400px">';
     fields.forEach(f => {
       const fname = typeof f === 'object' ? f.name : f;
+      const o2m = getOne2manyInfo(model, fname);
+      if (o2m) {
+        html += '<p><label>' + fname + '</label><div id="o2m-' + fname + '" data-comodel="' + (o2m.comodel || '') + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px;min-height:2em"></div></p>';
+        return;
+      }
       const required = fname === 'name';
       const comodel = getMany2oneComodel(model, fname);
-      const inputType = fname === 'email' ? 'email' : fname === 'description' ? 'textarea' : (comodel ? 'many2one' : 'text');
+      const selectionOpts = getSelectionOptions(model, fname);
+      const inputType = fname === 'email' ? 'email' : fname === 'description' ? 'textarea' : selectionOpts ? 'selection' : (comodel ? 'many2one' : 'text');
       if (inputType === 'textarea') {
         html += '<p><label>' + fname + (required ? ' *' : '') + '<br><textarea name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem;min-height:4em"></textarea></label></p>';
+      } else if (inputType === 'selection') {
+        let opts = '<option value="">--</option>';
+        selectionOpts.forEach(function (o) { opts += '<option value="' + (o[0] || '') + '">' + (o[1] || o[0]) + '</option>'; });
+        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem">' + opts + '</select></label></p>';
       } else if (inputType === 'many2one') {
         html += '<p><label>' + fname + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem" data-comodel="' + (comodel || '') + '"><option value="">--</option></select></label></p>';
       } else {
@@ -321,8 +352,34 @@
         return loadRecord(model, id);
       }).then(function (r) {
         if (r && r[0]) {
+          const rec = r[0];
           const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el) el.value = v != null ? v : ''; };
-          fields.forEach(f => { const n = typeof f === 'object' ? f.name : f; set(n, r[0][n]); });
+          fields.forEach(f => {
+            const n = typeof f === 'object' ? f.name : f;
+            const o2m = getOne2manyInfo(model, n);
+            if (o2m) {
+              const div = form.querySelector('#o2m-' + n);
+              if (div && rec[n] && Array.isArray(rec[n]) && rec[n].length) {
+                rpc.callKw(o2m.comodel, 'search_read', [[['id', 'in', rec[n]]]], { fields: ['id', 'name', 'note', 'date_deadline'] })
+                  .then(function (rows) {
+                    if (rows.length) {
+                      let tbl = '<table style="width:100%;font-size:0.9rem"><thead><tr><th style="text-align:left">Name</th><th style="text-align:left">Note</th><th>Due</th></tr></thead><tbody>';
+                      rows.forEach(function (row) {
+                        tbl += '<tr><td>' + (row.name || '').replace(/</g, '&lt;') + '</td><td>' + (row.note || '').replace(/</g, '&lt;').substring(0, 50) + '</td><td>' + (row.date_deadline || '') + '</td></tr>';
+                      });
+                      div.innerHTML = tbl + '</tbody></table>';
+                    } else {
+                      div.textContent = 'No items';
+                    }
+                  })
+                  .catch(function () { div.textContent = '—'; });
+              } else if (div) {
+                div.textContent = 'No items';
+              }
+            } else {
+              set(n, rec[n]);
+            }
+          });
         }
       }).catch(function () {});
       form.onsubmit = (e) => { e.preventDefault(); updateRecord(model, route, id, form); return false; };
@@ -335,10 +392,14 @@
     const vals = {};
     fields.forEach(f => {
       const n = typeof f === 'object' ? f.name : f;
+      if (getOne2manyInfo(model, n)) return;
       let v = byName(n).trim();
       const comodel = getMany2oneComodel(model, n);
+      const selectionOpts = getSelectionOptions(model, n);
       if (comodel) {
         vals[n] = v ? parseInt(v, 10) : null;
+      } else if (selectionOpts) {
+        vals[n] = v || (selectionOpts[0] ? selectionOpts[0][0] : null);
       } else {
         vals[n] = v;
       }

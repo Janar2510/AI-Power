@@ -4,11 +4,12 @@ import sys
 
 from core.sql_db import create_database, db_exists, get_cursor
 from core.db import init_schema
-from core.db.init_data import load_default_data
+from core.db.init_data import load_default_data, assign_admin_groups
 from core.orm import Registry, Environment
 from core.orm.models import ModelBase
 from core.modules import load_module_graph
 from core.tools import config
+from core.http.auth import hash_password
 
 from . import Command
 
@@ -68,6 +69,7 @@ class Db(Command):
                     "name": "Administrator",
                 })
                 print("Created admin user (login: admin, password: admin)")
+            assign_admin_groups(env)
         print(f"Database {dbname} initialized.")
 
     def _list(self) -> None:

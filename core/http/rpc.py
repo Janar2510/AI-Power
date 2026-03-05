@@ -9,7 +9,7 @@ from werkzeug.wrappers import Response
 from core.sql_db import get_cursor
 from core.orm import Environment
 from core.orm.models import ModelBase
-from core.orm.security import build_access_map, check_access
+from core.orm.security import build_access_map, check_access, get_user_groups
 from core.tools import config
 
 from .request import Request
@@ -34,11 +34,11 @@ def _get_access_map() -> dict:
 
 def _op_for_method(method: str) -> str:
     """Map ORM method to access operation."""
-    if method in ("search", "search_read", "read"):
+    if method in ("search", "search_read", "read", "get_param"):
         return "read"
     if method == "create":
         return "create"
-    if method == "write":
+    if method in ("write", "set_param", "action_confirm"):
         return "write"
     if method == "unlink":
         return "unlink"
@@ -70,6 +70,10 @@ def _call_kw(uid: int, db: str, model: str, method: str, args: List, kwargs: Dic
         if Model is None:
             raise ValueError(f"Model {model!r} not found. Available: {list(registry.keys())}")
         fn = getattr(Model, method, None)
+        if method == "read" and hasattr(Model, "read_ids"):
+            fn = getattr(Model, "read_ids")
+        elif method == "write" and hasattr(Model, "write_ids"):
+            fn = getattr(Model, "write_ids")
         if fn is None:
             raise ValueError(f"Model {model} has no method {method}")
         return fn(*args, **kwargs)
@@ -124,7 +128,9 @@ def dispatch_jsonrpc(request: Request) -> Response:
                 )
 
             op = _op_for_method(str(method_name or "read"))
-            if not check_access(_get_access_map(), str(model_name or ""), op, user_groups=set()):
+            registry = _get_registry(db)
+            user_groups = get_user_groups(registry, db, uid) if uid else set()
+            if not check_access(_get_access_map(), str(model_name or ""), op, user_groups=user_groups):
                 return Response(
                     json.dumps({
                         "jsonrpc": "2.0",
@@ -226,7 +232,9 @@ def dispatch_jsonrpc(request: Request) -> Response:
                     )
 
                 op = _op_for_method(str(method_name or "read"))
-                if not check_access(_get_access_map(), str(model_name or ""), op, user_groups=set()):
+                registry = _get_registry(db)
+                user_groups = get_user_groups(registry, db, uid) if uid else set()
+                if not check_access(_get_access_map(), str(model_name or ""), op, user_groups=user_groups):
                     return Response(
                         json.dumps({
                             "jsonrpc": "2.0",

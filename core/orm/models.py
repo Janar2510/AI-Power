@@ -27,10 +27,23 @@ class Recordset:
         if not self._ids:
             return True
         env = getattr(self._model._registry, "_env", None) if self._model._registry else None
+        cr = env.cr if env and hasattr(env, "cr") else None
+        if not cr:
+            return True
+        table = self._model._table
+        placeholders = ", ".join("%s" for _ in self._ids)
+        cr.execute(f'DELETE FROM "{table}" WHERE id IN ({placeholders})', self._ids)
+        return True
+
+    def write(self, vals: Dict[str, Any]) -> bool:
+        """Write vals to all records in recordset."""
+        if not self._ids or not vals:
+            return True
+        env = getattr(self._model._registry, "_env", None) if self._model._registry else None
         if not env:
             return True
         rec = self._model(env, self._ids)
-        return rec.unlink()
+        return rec.write(vals)
 
     def __iter__(self) -> Iterator["ModelBase"]:
         for rid in self._ids:
@@ -129,8 +142,13 @@ class ModelBase(metaclass=Model):
         return result
 
     def read(self, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-        """Read field values from DB or cache."""
-        cr = self._get_cr()
+        """Read field values from DB or cache (instance API)."""
+        # Prefer cursor from instance env (avoids registry._env drift in RPC/cursor context)
+        cr = None
+        if hasattr(self, "env") and self.env and hasattr(self.env, "cr"):
+            cr = self.env.cr
+        if cr is None:
+            cr = self._get_cr()
         if not cr or not self._ids:
             return [{"id": rid, **self._cache} for rid in self._ids]
         table = self._model._table
@@ -139,13 +157,15 @@ class ModelBase(metaclass=Model):
         cols = [c for c in requested if c in stored]
         if not cols:
             cols = ["id"]
+        # id is implicit (every table has it); include when requested
+        if "id" in requested and "id" not in cols:
+            cols = ["id"] + cols
         col_list = ", ".join(f'"{c}"' for c in cols)
         placeholders = ", ".join("%s" for _ in self._ids)
-        cr.execute(
-            f'SELECT {col_list} FROM "{table}" WHERE id IN ({placeholders})',
-            self._ids,
-        )
-        rows = [dict(row) for row in cr.fetchall()]
+        query = f'SELECT {col_list} FROM "{table}" WHERE id IN ({placeholders})'
+        cr.execute(query, self._ids)
+        raw_rows = cr.fetchall()
+        rows = [dict(row) for row in raw_rows]
         from core.orm import fields as fmod
         for fname in requested:
             if fname in cols:
@@ -178,20 +198,45 @@ class ModelBase(metaclass=Model):
         """Write field values to DB."""
         if not vals or not self._ids:
             return True
+        vals = self._model._sanitize_html_vals(vals)
         cr = self._get_cr()
         if not cr:
             self._cache.update(vals)
             return True
+        from core.orm import fields as fmod
         stored = self._get_stored_columns()
         vals_stored = {k: v for k, v in vals.items() if k in stored}
-        if not vals_stored:
-            return True
-        table = self._model._table
-        sets = ", ".join(f'"{k}" = %s' for k in vals_stored)
-        cr.execute(
-            f'UPDATE "{table}" SET {sets} WHERE id = %s',
-            list(vals_stored.values()) + [self._ids[0]],
-        )
+        if vals_stored:
+            table = self._model._table
+            sets = ", ".join(f'"{k}" = %s' for k in vals_stored)
+            cr.execute(
+                f'UPDATE "{table}" SET {sets} WHERE id = %s',
+                list(vals_stored.values()) + [self._ids[0]],
+            )
+        for fname, val in vals.items():
+            field = getattr(self._model, fname, None)
+            if not isinstance(field, fmod.Many2many):
+                continue
+            rel = getattr(field, "relation", "")
+            col1 = getattr(field, "column1", "left_id")
+            col2 = getattr(field, "column2", "right_id")
+            if not rel:
+                continue
+            ids_to_set = []
+            if isinstance(val, list):
+                for item in val:
+                    if isinstance(item, (list, tuple)) and len(item) >= 3 and item[0] == 6:
+                        ids_to_set = list(item[2]) if item[2] else []
+                        break
+                    elif isinstance(item, int):
+                        ids_to_set.append(item)
+                if not ids_to_set and not any(isinstance(x, (list, tuple)) for x in val):
+                    ids_to_set = [x for x in val if isinstance(x, int)]
+            for rid in self._ids:
+                cr.execute(f'DELETE FROM "{rel}" WHERE "{col1}" = %s', (rid,))
+                for gid in ids_to_set:
+                    if gid:
+                        cr.execute(f'INSERT INTO "{rel}" ("{col1}", "{col2}") VALUES (%s, %s)', (rid, gid))
         return True
 
     @classmethod
@@ -208,8 +253,22 @@ class ModelBase(metaclass=Model):
         return result
 
     @classmethod
+    def _sanitize_html_vals(cls: Type[T], vals: Dict[str, Any]) -> Dict[str, Any]:
+        """Sanitize Html field values (strip script/style tags)."""
+        import re
+        from core.orm import fields as fmod
+        out = dict(vals)
+        for fname, val in vals.items():
+            field = getattr(cls, fname, None)
+            if isinstance(field, fmod.Html) and isinstance(val, str):
+                s = re.sub(r"<script[^>]*>.*?</script>", "", val, flags=re.DOTALL | re.IGNORECASE)
+                out[fname] = re.sub(r"<style[^>]*>.*?</style>", "", s, flags=re.DOTALL | re.IGNORECASE)
+        return out
+
+    @classmethod
     def create(cls: Type[T], vals: Dict[str, Any]) -> T:
         """Create a new record in DB."""
+        vals = cls._sanitize_html_vals(vals)
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
@@ -229,7 +288,12 @@ class ModelBase(metaclass=Model):
             cr.execute(f'INSERT INTO "{table}" DEFAULT VALUES RETURNING id')
         row = cr.fetchone()
         new_id = row["id"] if hasattr(row, "keys") else row[0]
-        return cls.browse(new_id)
+        new_rec = cls.browse(new_id)
+        from core.orm import fields as fmod
+        m2m_vals = {k: v for k, v in vals.items() if isinstance(getattr(cls, k, None), fmod.Many2many)}
+        if m2m_vals:
+            new_rec.write(m2m_vals)
+        return new_rec
 
     def unlink(self) -> bool:
         """Delete record(s) from DB."""
@@ -257,7 +321,7 @@ class ModelBase(metaclass=Model):
         from core.orm.security import get_record_rules
         model_name = getattr(cls, "_name", "")
         uid = getattr(env, "uid", 1)
-        rule_domains = get_record_rules(model_name, uid)
+        rule_domains = get_record_rules(model_name, uid, env=env)
         combined = list(domain or [])
         for rd in rule_domains:
             combined = combined + rd
@@ -274,14 +338,108 @@ class ModelBase(metaclass=Model):
                     where += f' AND "{fld}" = %s'
                     params.append(val)
                 elif op == "!=":
-                    where += f' AND "{fld}" != %s'
+                    where += f' AND ("{fld}" IS NULL OR "{fld}" != %s)'
+                    params.append(val)
+                elif op == "<":
+                    where += f' AND "{fld}" < %s'
+                    params.append(val)
+                elif op == ">":
+                    where += f' AND "{fld}" > %s'
                     params.append(val)
                 elif op == "<=":
                     where += f' AND ("{fld}" IS NULL OR "{fld}" <= %s)'
                     params.append(val)
+                elif op == ">=":
+                    where += f' AND "{fld}" >= %s'
+                    params.append(val)
+                elif op == "in":
+                    vals = list(val) if isinstance(val, (list, tuple)) else [val]
+                    if not vals:
+                        where += " AND 1=0"
+                    else:
+                        ph = ", ".join("%s" for _ in vals)
+                        where += f' AND "{fld}" IN ({ph})'
+                        params.extend(vals)
+                elif op == "not in":
+                    vals = list(val) if isinstance(val, (list, tuple)) else [val]
+                    if not vals:
+                        where += " AND 1=1"
+                    else:
+                        ph = ", ".join("%s" for _ in vals)
+                        where += f' AND ("{fld}" IS NULL OR "{fld}" NOT IN ({ph}))'
+                        params.extend(vals)
                 elif op == "ilike":
                     where += f' AND "{fld}" ILIKE %s'
                     params.append(f"%{val}%" if isinstance(val, str) else val)
+                elif op == "like":
+                    where += f' AND "{fld}" LIKE %s'
+                    params.append(f"%{val}%" if isinstance(val, str) else val)
+                elif op == "=like":
+                    where += f' AND "{fld}" LIKE %s'
+                    params.append(val)
+                elif op == "child_of":
+                    cr.execute(
+                        """
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='public' AND table_name=%s AND column_name='parent_id'
+                        """,
+                        (table,),
+                    )
+                    if cr.fetchone():
+                        ids_param = "child_of_ids_" + str(len(params))
+                        cr.execute(
+                            f"""
+                            WITH RECURSIVE descendants AS (
+                                SELECT id FROM "{table}" WHERE id = %s
+                                UNION ALL
+                                SELECT p.id FROM "{table}" p
+                                INNER JOIN descendants d ON p.parent_id = d.id
+                            )
+                            SELECT id FROM descendants
+                            """,
+                            (val,),
+                        )
+                        child_ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
+                        if not child_ids:
+                            where += " AND 1=0"
+                        else:
+                            ph = ", ".join("%s" for _ in child_ids)
+                            where += f' AND "{fld}" IN ({ph})'
+                            params.extend(child_ids)
+                    else:
+                        where += f' AND "{fld}" = %s'
+                        params.append(val)
+                elif op == "parent_of":
+                    cr.execute(
+                        """
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='public' AND table_name=%s AND column_name='parent_id'
+                        """,
+                        (table,),
+                    )
+                    if cr.fetchone():
+                        cr.execute(
+                            f"""
+                            WITH RECURSIVE ancestors AS (
+                                SELECT id, parent_id FROM "{table}" WHERE id = %s
+                                UNION ALL
+                                SELECT p.id, p.parent_id FROM "{table}" p
+                                INNER JOIN ancestors a ON p.id = a.parent_id
+                            )
+                            SELECT id FROM ancestors
+                            """,
+                            (val,),
+                        )
+                        parent_ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
+                        if not parent_ids:
+                            where += " AND 1=0"
+                        else:
+                            ph = ", ".join("%s" for _ in parent_ids)
+                            where += f' AND "{fld}" IN ({ph})'
+                            params.extend(parent_ids)
+                    else:
+                        where += f' AND "{fld}" = %s'
+                        params.append(val)
         order_by = f' ORDER BY {order}' if order else ""
         limit_clause = f" LIMIT {limit}" if limit else ""
         params.append(offset)
@@ -308,8 +466,8 @@ class ModelBase(metaclass=Model):
         return cls.browse(recs.ids).read(fields)
 
     @classmethod
-    def read(cls: Type[T], ids: List[int], fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-        """Read records by ids. Class-level API for RPC."""
+    def read_ids(cls: Type[T], ids: List[int], fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+        """Read records by ids. Class-level API for RPC (call as Model.read_ids(ids, fields))."""
         if not ids:
             return []
         env = getattr(cls._registry, "_env", None) if cls._registry else None
@@ -319,8 +477,8 @@ class ModelBase(metaclass=Model):
         return rec.read(fields)
 
     @classmethod
-    def write(cls: Type[T], ids: List[int], vals: Dict[str, Any]) -> bool:
-        """Write vals to records by ids. Class-level API for RPC."""
+    def write_ids(cls: Type[T], ids: List[int], vals: Dict[str, Any]) -> bool:
+        """Write vals to records by ids. Class-level API for RPC (called as 'write')."""
         if not ids or not vals:
             return True
         return cls.browse(ids).write(vals)

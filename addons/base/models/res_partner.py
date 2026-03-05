@@ -8,9 +8,19 @@ class ResPartner(Model):
     _description = "Contact"
 
     name = fields.Char(required=True)
+    is_company = fields.Boolean(default=False, string="Is a Company")
+    type = fields.Selection(
+        [("contact", "Contact"), ("address", "Address")],
+        string="Address Type",
+        default="contact",
+    )
     email = fields.Char()
     phone = fields.Char()
     street = fields.Char()
+    street2 = fields.Char(string="Street 2")
     city = fields.Char()
-    country = fields.Char()
+    zip = fields.Char(string="ZIP")
+    country_id = fields.Many2one("res.country", string="Country")
+    state_id = fields.Many2one("res.country.state", string="State")
+    parent_id = fields.Many2one("res.partner", string="Parent")
     active = fields.Boolean(default=True)

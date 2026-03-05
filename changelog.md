@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.20.0 (Phases 46–50: Search operators, form metadata, ir.rule, ir.ui.view, menu visibility)
+
+### Phase 46: Search operators (child_of, =like)
+- core/orm/models.py: `=like` exact pattern match (no % wrap); `child_of` recursive CTE for hierarchical models; `parent_of` inverse
+- addons/base/models/res_partner.py: parent_id (Many2one) for child_of on res.partner
+- tests/test_rpc_read.py: test_search_read_with_eqlike_operator, test_search_read_with_child_of_operator
+
+### Phase 47: Form field metadata from XML
+- core/data/xml_loader.py: parse domain, domain_dep, comodel on form/list field elements
+- addons/base/views/ir_views.xml, addons/crm/views/crm_views.xml: domain, comodel on state_id, country_id, partner_id, stage_id, tag_ids
+- addons/web/static/src/main.js: getViewFieldDef, getMany2oneComodel, getMany2oneDomain, getMany2manyInfo read from view metadata; fallback to hardcoded maps
+
+### Phase 49: ir.rule ORM model
+- addons/base/models/ir_rule.py: ir.rule (xml_id, name, model, domain_force)
+- core/db/init_data.py: _load_ir_rules seeds from security/ir_rule.xml
+- core/orm/security.py: get_record_rules reads from DB when ir_rule table exists; fallback to XML
+- ir.model.access: access_ir_rule
+
+### Phase 48: ir.ui.view ORM + DB persistence
+- addons/base/models/ir_ui_view.py: ir.ui.view (xml_id, name, model, type, arch, priority)
+- core/db/init_data.py: _load_ir_ui_views seeds from load_views_registry
+- core/data/views_registry.py: load_views_registry_from_db reads views from ir_ui_view when table exists; arch stored as JSON
+
+### Phase 50: Group-based menu visibility
+- addons/base/models/ir_ui_menu.py: groups_ref (Char, comma-separated xml_ids)
+- core/data/views_registry.py: filter menus by user groups when groups_ref present; empty = visible to all
+
 ## 1.0.0 (Initial Release)
 
 ### Phase 1: Foundation
@@ -327,6 +354,57 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
 ### Tests
 - test_json2_requires_auth
 
+## 1.22.0 (Phase 29: CLI Shell + Module Install)
+
+### Phase 29: CLI shell
+- core/cli/shell.py: `erp-bin shell -d <db>` opens interactive REPL
+- Shell exports `env` (Environment), `registry`, and `db` for the selected database
+- Uses server-wide modules from config; loads model registry via load_module_graph
+
+### Phase 29: Module install/list
+- core/cli/module.py: `erp-bin module list|load|install`
+- `module list`: shows modules in addons path with version (from manifest)
+- `module install -d <db> -m <module>`: resolves dependencies, loads modules, initializes schema
+
+## 1.21.0 (Phase 28: View Switcher)
+
+### Phase 28: View Switcher (list | kanban)
+- main.js: View mode buttons above list/kanban content
+- getHashViewParam(): parse ?view= from hash
+- getAvailableViewModes(route): from action view_mode
+- getPreferredViewType(): URL ?view= > sessionStorage > action default
+- setViewAndReload(): persist to sessionStorage, update hash
+- renderViewSwitcher(): List | Kanban buttons (only when both available)
+- Leads: list and kanban; Contacts: list only
+- Hash format: #leads?view=kanban or #leads (list)
+
+## 1.20.0 (Phase 27: res.company, res.groups, User Groups)
+
+### Phase 27: res.company
+- addons/base/models/res_company.py: res.company (name, currency_id)
+- init_data: creates default "My Company" on db init
+
+### Phase 27: res.groups
+- addons/base/models/res_groups.py: res.groups (name, full_name)
+- init_data: base.group_user, base.group_public
+- full_name stores XML ID for access rule matching
+
+### Phase 27: res.users groups
+- res.users: company_id (Many2one), group_ids (Many2many to res.groups)
+- Many2many write support in ORM (create + write)
+- Recordset.write() added
+- init_data: assigns admin to base.group_user and default company
+- RPC: write dispatched to write_ids to avoid shadowing instance write
+
+### Phase 27: check_access uses user groups
+- security.get_user_groups(registry, db, uid) returns set of group full_name
+- rpc.py, json2.py: pass user_groups to check_access
+- Group-based access: rules with group_id require user in that group
+
+### Bugfix
+- ModelBase.write classmethod renamed to write_ids (was shadowing instance write)
+- core/cli/db.py: hash_password import for admin creation
+
 ## 1.19.0 (Phase 26: Base Models - ir.sequence, ir.attachment, ir.model)
 
 ### Phase 26: ir.sequence
@@ -346,6 +424,120 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
 ### Schema
 - core/db/schema.py: bytea column type for Binary
 - ir_sequence, ir_attachment, ir_model tables created on db init
+
+## 1.19.3 (Phase 32: res.country, res.currency, res.lang)
+
+### Phase 32: res.country
+- addons/base/models/res_country.py: name, code (ISO 2-char)
+- init_data: _load_res_country() - EE, US, GB, DE, FI
+
+### Phase 32: res.currency
+- addons/base/models/res_currency.py: name, symbol, rate
+- init_data: _load_res_currency() - EUR, USD, GBP
+
+### Phase 32: res.lang stub
+- addons/base/models/res_lang.py: code, name, active
+- init_data: _load_res_lang() - en_US, fi_FI
+
+### Phase 32: res.company currency_id
+- res.company.currency_id: Integer → Many2one(res.currency)
+- init_data: default company linked to EUR
+
+## 1.19.8 (Phases 41–45)
+
+### Phase 41: res.partner is_company, type
+- addons/base/models/res_partner.py: is_company (Boolean), type (Selection: contact, address)
+- ir_views.xml: is_company, type in form; is_company in list
+- main.js: getSelectionOptions for res.partner type; isBooleanField, checkbox for is_company; list display for boolean
+- addons/ai_assistant/tools/registry.py: fields_map includes is_company, type for RAG
+
+### Phase 42: Many2many column in list
+- addons/crm/views/crm_views.xml: tag_ids in crm_lead_list columns
+- main.js: getDisplayNamesForMany2many; m2mCols in renderList; comma-separated tag names in leads list
+
+### Phase 43: res.country.state_ids One2many
+- addons/base/models/res_country.py: state_ids = One2many("res.country.state", "country_id")
+
+### Phase 44: Search operator like
+- core/orm/models.py: like operator (case-sensitive) in Model.search
+- tests/test_rpc_read.py: test_search_read_with_like_operator
+
+### Phase 45: Menu tree structure
+- main.js: buildMenuTree; renderNavbar with parent hierarchy, dropdown for menus with children
+- addons/base/views/ir_views.xml: menu_settings, menu_settings_apikeys (parent)
+- init_data: _load_ir_actions_menus always upserts (adds new menus to existing DB)
+
+## 1.19.7 (Phase 40: Persistent ir.actions / ir.ui.menu)
+
+### Phase 40: ir.actions.act_window + ir.ui.menu (DB-persistent)
+- addons/base/models/ir_actions.py: ir.actions.act_window (xml_id, name, res_model, view_mode)
+- addons/base/models/ir_ui_menu.py: ir.ui.menu (xml_id, name, action_ref, parent_ref, sequence)
+- init_data: _load_ir_actions_menus() seeds actions and menus from XML (only when tables empty)
+- core/data/views_registry.py: load_views_registry_from_db(env) reads actions/menus from DB
+- core/http/routes.py: /web/load_views uses DB when session exists, falls back to XML on error
+- Views remain from XML; actions and menus persisted and editable at runtime
+
+## 1.19.4 (Phase 33: Fix ORM read/search_read bug)
+
+### Phase 33: ORM read bug fix
+- Root cause: classmethod `read(cls, ids, fields)` overrode instance `read(self, fields)`; `rec.read(fields)` invoked classmethod with wrong args
+- Fix: rename classmethod to `read_ids`; RPC routes `read` to `read_ids`; instance `read` preserved for search_read → browse().read()
+- Include implicit `id` in SELECT when requested (id not in stored fields)
+- _get_registry: clear addon modules before load so models register with correct registry (test isolation)
+- tests/test_rpc_read.py: search_read returns data via _call_kw
+
+## 1.19.5 (Phase 34: res.partner.country_id + res.country.state)
+
+### Phase 34: res.country.state
+- addons/base/models/res_country_state.py: name, code, country_id (Many2one)
+- init_data: _load_res_country_state() - 15 EE states (Harjumaa, Hiiumaa, etc.)
+
+### Phase 34: res.partner address fields
+- res.partner: country Char → country_id Many2one(res.country), state_id Many2one(res.country.state)
+- Form view: country_id, state_id dropdowns
+- main.js: getMany2oneComodel for country_id, state_id
+
+## 1.19.6 (Phase 35: Many2many + Html completion)
+
+### Phase 35 Track A: Many2many form display
+- addons/crm/models/crm_tag.py: crm.tag (name)
+- crm.lead.tag_ids: Many2many to crm.tag
+- main.js: getMany2manyInfo, form checkboxes for many2many, getFormVals collects selected ids
+- init_data: default crm.tag (Hot, Cold, Follow-up, Qualified, Demo)
+
+### Phase 35 Track A: Html field
+- crm.lead.note_html: Html field
+- Form: note_html rendered as textarea
+- ORM: _sanitize_html_vals strips script/style on create and write
+
+## 1.19.2 (Phase 31: Wizards / TransientModel)
+
+### Phase 31: TransientModel
+- core/orm/models_transient.py: TransientModel base (_transient=True), _transient_vacuum(), vacuum_transient_models()
+- Transient models use real PostgreSQL tables; auto-vacuum when count > _transient_max_count (default 1000)
+
+### Phase 31: Transient vacuum + cron
+- addons/base/models/transient_vacuum.py: base.transient.vacuum model, run() for cron
+- init_data: creates ir.cron for transient vacuum (hourly)
+
+### Phase 31: base.wizard.confirm
+- addons/base/models/wizard_confirm.py: TransientModel wizard with name, message; action_confirm(ids) RPC, _do_confirm() override
+
+### Bugfix
+- Recordset.unlink: perform delete directly (classmethod unlink shadows instance method)
+
+## 1.19.1 (Phase 30: ir.config_parameter + Settings Stub)
+
+### Phase 30: ir.config_parameter
+- addons/base/models/ir_config_parameter.py: ir.config_parameter (key, value)
+- get_param(key, default=None): returns value or default
+- set_param(key, value): create or update; RPC access via read/write ops
+- addons/base/security/ir.model.access.csv: access_ir_config_parameter
+
+### Phase 30: Settings stub
+- Placeholder #settings route: stub page with links (API Keys, more coming soon)
+- Navbar: "Settings" link to #settings; API Keys moved under Settings
+- main.js: renderSettingsStub(), route for #settings and #settings/apikeys
 
 ## 1.18.0 (Phase 25: ORM Field Types - Selection, One2many)
 

@@ -1,10 +1,107 @@
-"""Views registry - aggregated views, actions, menus from module data."""
+"""Views registry - aggregated views, actions, menus from module data or DB."""
 
+import json
 from typing import Any, Dict, List, Optional
 
 from core.tools import config
 
 from .xml_loader import load_xml_data
+
+
+def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
+    """
+    Load views from DB when ir.ui.view table exists and has data;
+    actions and menus from DB (persistent).
+    Falls back to XML when DB tables are empty.
+    Returns same structure as load_views_registry.
+    """
+    reg = load_views_registry()
+    try:
+        cr = getattr(env, "cr", None)
+        if cr:
+            cr.execute(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name = 'ir_ui_view'",
+            )
+            if cr.fetchone():
+                rows = env.get("ir.ui.view").search_read(
+                    [], ["xml_id", "name", "model", "type", "arch", "priority"]
+                )
+                if rows:
+                    views: Dict[str, List[Dict]] = {}
+                    for r in rows:
+                        model = r.get("model", "")
+                        if not model:
+                            continue
+                        arch_str = r.get("arch") or "{}"
+                        try:
+                            arch_dict = json.loads(arch_str)
+                        except Exception:
+                            arch_dict = {"type": r.get("type", "list"), "columns": [], "fields": []}
+                        view_def = {
+                            "id": r.get("xml_id") or f"__{r.get('id')}",
+                            "model": model,
+                            "name": r.get("name", ""),
+                            "type": r.get("type", "list"),
+                            "columns": arch_dict.get("columns", []),
+                            "fields": arch_dict.get("fields", []),
+                            "default_group_by": arch_dict.get("default_group_by", ""),
+                        }
+                        views.setdefault(model, []).append(view_def)
+                    reg["views"] = views
+    except Exception:
+        pass
+    ActWindow = env.get("ir.actions.act_window")
+    Menu = env.get("ir.ui.menu")
+    if ActWindow:
+        try:
+            rows = ActWindow.search_read([], ["xml_id", "name", "res_model", "view_mode"])
+            if rows:
+                actions: Dict[str, Dict] = {}
+                for r in rows:
+                    xid = r.get("xml_id") or f"__{r.get('id')}"
+                    view_mode = r.get("view_mode", "list,form")
+                    if isinstance(view_mode, str):
+                        view_mode = [x.strip() for x in view_mode.split(",") if x.strip()] or ["list", "form"]
+                    actions[xid] = {
+                        "id": xid,
+                        "name": r.get("name", ""),
+                        "res_model": r.get("res_model", ""),
+                        "view_mode": view_mode,
+                        "type": "ir.actions.act_window",
+                    }
+                reg["actions"] = actions
+        except Exception:
+            pass
+    if Menu:
+        try:
+            rows = Menu.search_read(
+                [], ["xml_id", "name", "action_ref", "parent_ref", "sequence", "groups_ref"]
+            )
+            if rows:
+                from core.orm.security import get_user_groups
+                db = getattr(getattr(env, "registry", None), "db_name", "") or ""
+                uid = getattr(env, "uid", 1)
+                registry = getattr(env, "registry", None)
+                user_groups = get_user_groups(registry, db, uid) if db and registry else set()
+                menus_filtered: List[Dict] = []
+                for r in rows:
+                    groups_ref = (r.get("groups_ref") or "").strip()
+                    if groups_ref:
+                        allowed = [g.strip() for g in groups_ref.split(",") if g.strip()]
+                        if allowed and not (user_groups & set(allowed)):
+                            continue
+                    menus_filtered.append({
+                        "id": r.get("xml_id") or f"__{r.get('id')}",
+                        "name": r.get("name", ""),
+                        "action": r.get("action_ref", ""),
+                        "parent": r.get("parent_ref", ""),
+                        "sequence": r.get("sequence", 10),
+                    })
+                reg["menus"] = menus_filtered
+        except Exception:
+            pass
+    return reg
 
 # Module -> [(rel_path, in_data)]
 _DATA_PATHS: Dict[str, List[str]] = {}

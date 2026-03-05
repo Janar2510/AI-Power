@@ -2,7 +2,7 @@
 
 import csv
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 AccessEntry = Tuple[str, str, bool, bool, bool, bool]  # model, group, r, w, c, u
 
@@ -102,8 +102,36 @@ def load_record_rules(addons_paths: List[Path]) -> Dict[str, List[List]]:
     return result
 
 
-def get_record_rules(model_name: str, uid: int) -> List[List]:
-    """Get record rule domains for model. Substitute uid in domain."""
+def get_record_rules(model_name: str, uid: int, env: Any = None) -> List[List]:
+    """Get record rule domains for model. Substitute uid in domain.
+    When env has ir.rule, read from DB; otherwise fallback to XML."""
+    if env and model_name != "ir.rule":
+        try:
+            cr = getattr(env, "cr", None)
+            if cr:
+                cr.execute(
+                    "SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ir_rule'",
+                )
+                if cr.fetchone():
+                    cr.execute(
+                        "SELECT domain_force FROM ir_rule WHERE model = %s",
+                        (model_name,),
+                    )
+                    rows = cr.fetchall()
+                    if rows:
+                        out = []
+                        for (domain_force,) in rows:
+                            domain = _parse_domain_force(domain_force or "", uid)
+                            if domain:
+                                out.append(domain)
+                        return out
+        except Exception:
+            cr = getattr(env, "cr", None)
+            if cr:
+                try:
+                    cr.rollback()
+                except Exception:
+                    pass
     global _RECORD_RULES
     if not _RECORD_RULES:
         from core.tools import config
@@ -111,16 +139,61 @@ def get_record_rules(model_name: str, uid: int) -> List[List]:
     rules = _RECORD_RULES.get(model_name, [])
     out = []
     for domain in rules:
-        sub = []
-        for term in domain:
-            if isinstance(term, (list, tuple)) and len(term) >= 3:
-                val = term[2]
-                if val == "uid" or (isinstance(val, str) and "uid" in val):
-                    val = uid
-                sub.append([term[0], term[1], val])
+        sub = _substitute_uid_in_domain(domain, uid)
         if sub:
             out.append(sub)
     return out
+
+
+def _parse_domain_force(text: str, uid: int) -> List:
+    """Parse domain_force string and substitute uid."""
+    if not text or not text.strip():
+        return []
+    try:
+        domain = eval(text.strip())
+        if isinstance(domain, (list, tuple)):
+            return _substitute_uid_in_domain(list(domain), uid)
+    except Exception:
+        pass
+    return []
+
+
+def _substitute_uid_in_domain(domain: List, uid: int) -> List:
+    """Substitute uid in domain terms."""
+    out = []
+    for term in domain:
+        if isinstance(term, (list, tuple)) and len(term) >= 3:
+            val = term[2]
+            if val == "uid" or (isinstance(val, str) and "uid" in val):
+                val = uid
+            out.append([term[0], term[1], val])
+    return out
+
+
+def get_user_groups(registry: Any, db: str, uid: int) -> Set[str]:
+    """Return set of group full_name (xml_id) for user. Used by check_access."""
+    if not uid or not registry or not db:
+        return set()
+    try:
+        from core.sql_db import get_cursor
+        from core.orm import Environment
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            User = registry.get("res.users") if hasattr(registry, "get") else None
+            Groups = registry.get("res.groups") if hasattr(registry, "get") else None
+            if not User or not Groups:
+                return set()
+            rows = User.read_ids([uid], ["group_ids"])
+            if not rows or not rows[0].get("group_ids"):
+                return set()
+            gids = rows[0]["group_ids"]
+            if not gids:
+                return set()
+            group_rows = Groups.read_ids(gids, ["full_name"])
+            return {r.get("full_name") for r in group_rows if r.get("full_name")}
+    except Exception:
+        return set()
 
 
 def build_access_map(addons_paths: List[Path]) -> Dict[str, List[Tuple[str, str]]]:

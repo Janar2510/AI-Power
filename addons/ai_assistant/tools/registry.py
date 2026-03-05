@@ -38,7 +38,7 @@ def draft_message(env, model: str, ids: List[int], fields: Optional[List[str]] =
     if not ids:
         return "No record specified"
     fields = fields or ["name", "email", "phone", "street", "city", "country", "description"]
-    records = M.read(ids, fields)
+    records = M.read_ids(ids, fields)
     if not records:
         return "Record not found"
     r = records[0]
@@ -82,7 +82,7 @@ def propose_workflow_step(env, model: str, ids: List[int]) -> str:
         return "crm.lead or crm.stage not available"
     if not ids:
         return "No lead specified"
-    records = Lead.read(ids, ["name", "stage_id"])
+    records = Lead.read_ids(ids, ["name", "stage_id"])
     if not records:
         return "Lead not found"
     stages = Stage.search_read([], ["id", "name", "sequence", "is_won", "fold"])
@@ -111,7 +111,7 @@ def summarise_recordset(env, model: str, ids: List[int], fields: Optional[List[s
     if not ids:
         return "No records"
     fields = fields or ["name", "id"]
-    records = Model.read(ids, fields)
+    records = Model.read_ids(ids, fields)
     return json.dumps(records, indent=2)
 
 
@@ -123,12 +123,12 @@ def index_record_for_rag(env, model: str, res_id: int) -> None:
     except KeyError:
         return
     fields_map = {
-        "res.partner": ["name", "email", "phone", "street", "city", "country"],
+        "res.partner": ["name", "is_company", "type", "email", "phone", "street", "street2", "city", "zip"],
         "crm.lead": ["name", "description", "expected_revenue"],
     }
     fields = fields_map.get(model, ["name"])
     try:
-        records = M.read([res_id], fields)
+        records = M.read_ids([res_id], fields)
     except Exception:
         return
     if not records:
@@ -167,7 +167,7 @@ def retrieve_chunks(env, query: str, limit: int = 10) -> List[Dict]:
             continue
         try:
             Model = env[model_name]
-            recs = Model.read([res_id], ["id"])
+            recs = Model.read_ids([res_id], ["id"])
             if recs:
                 result.append({"id": c.get("id"), "model": model_name, "res_id": res_id, "text": (c.get("text") or "")[:500]})
         except (KeyError, Exception):

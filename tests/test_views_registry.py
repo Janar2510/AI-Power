@@ -4,7 +4,11 @@ import json
 import unittest
 
 from core.tools import config
-from core.data.views_registry import load_views_registry, get_view_for_model
+from core.data.views_registry import (
+    load_views_registry,
+    load_views_registry_from_db,
+    get_view_for_model,
+)
 
 
 class TestViewsRegistry(unittest.TestCase):
@@ -51,3 +55,53 @@ class TestViewsRegistry(unittest.TestCase):
         home = next((m for m in registry["menus"] if m.get("name") == "Home"), None)
         self.assertIsNotNone(home)
         self.assertEqual(home.get("action"), "")
+
+    def test_load_views_registry_from_db_uses_db_actions_menus(self):
+        """load_views_registry_from_db returns actions and menus from DB when env provides them (Phase 40)."""
+        class MockActWindow:
+            @classmethod
+            def search_read(cls, domain=None, fields=None, offset=0, limit=None, order=None):
+                return [
+                    {
+                        "id": 1,
+                        "xml_id": "base.action_partner",
+                        "name": "Contacts",
+                        "res_model": "res.partner",
+                        "view_mode": "list,form",
+                    },
+                ]
+
+        class MockMenu:
+            @classmethod
+            def search_read(cls, domain=None, fields=None, offset=0, limit=None, order=None):
+                return [
+                    {
+                        "id": 1,
+                        "xml_id": "base.menu_contacts",
+                        "name": "Contacts",
+                        "action_ref": "base.action_partner",
+                        "parent_ref": "",
+                        "sequence": 10,
+                    },
+                ]
+
+        class MockEnv:
+            def get(self, name, default=None):
+                if name == "ir.actions.act_window":
+                    return MockActWindow
+                if name == "ir.ui.menu":
+                    return MockMenu
+                return default
+
+        reg = load_views_registry_from_db(MockEnv())
+        self.assertIn("views", reg)
+        self.assertIn("actions", reg)
+        self.assertIn("base.action_partner", reg["actions"])
+        self.assertEqual(reg["actions"]["base.action_partner"]["res_model"], "res.partner")
+        self.assertIn("menus", reg)
+        contacts_menu = next(
+            (m for m in reg["menus"] if m.get("action") == "base.action_partner"),
+            None,
+        )
+        self.assertIsNotNone(contacts_menu)
+        self.assertEqual(contacts_menu["name"], "Contacts")

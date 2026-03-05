@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reference data for res.country, res.currency, res.lang. Loaded via init_data.py on db init. -->
+<odoo>
+  <data noupdate="1">
+    <!-- Currencies: EUR, USD, GBP (created by _load_res_currency) -->
+    <!-- Countries: EE, US, GB, DE, FI (created by _load_res_country) -->
+    <!-- Languages: en_US, fi_FI (created by _load_res_lang) -->
+  </data>
+</odoo>

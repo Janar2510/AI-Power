@@ -7,9 +7,12 @@
       <field name="arch" type="xml">
         <list>
           <field name="name"/>
+          <field name="is_company"/>
           <field name="email"/>
           <field name="phone"/>
           <field name="city"/>
+          <field name="country_id" comodel="res.country"/>
+          <field name="state_id" comodel="res.country.state"/>
         </list>
       </field>
     </record>
@@ -19,11 +22,16 @@
       <field name="arch" type="xml">
         <form>
           <field name="name"/>
+          <field name="is_company"/>
+          <field name="type"/>
           <field name="email"/>
           <field name="phone"/>
           <field name="street"/>
+          <field name="street2"/>
           <field name="city"/>
-          <field name="country"/>
+          <field name="zip"/>
+          <field name="country_id" comodel="res.country"/>
+          <field name="state_id" comodel="res.country.state" domain="[('country_id','=',country_id)]" domain_dep="country_id"/>
         </form>
       </field>
     </record>
@@ -34,5 +42,7 @@
     </record>
     <menuitem name="Home" id="menu_home" sequence="10"/>
     <menuitem name="Contacts" id="menu_contacts" action="base.action_partner" sequence="20"/>
+    <menuitem name="Settings" id="menu_settings" sequence="40"/>
+    <menuitem name="API Keys" id="menu_settings_apikeys" parent="base.menu_settings" sequence="10"/>
   </data>
 </odoo>

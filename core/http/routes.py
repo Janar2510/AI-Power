@@ -20,8 +20,9 @@ from core.http.auth import (
     get_session_db,
     login_response_with_html,
     logout_response,
+    _get_registry,
 )
-from core.sql_db import db_exists
+from core.sql_db import db_exists, get_cursor
 
 
 LOGIN_HTML = """<!DOCTYPE html>
@@ -93,12 +94,23 @@ def logout(request):
 
 @route("/web/load_views", auth="user", methods=["GET"])
 def load_views(request):
-    """Return views, actions, menus from module data (data-driven UI)."""
-    if get_session_uid(request) is None:
+    """Return views, actions, menus from DB (persistent) when session exists, else XML."""
+    uid = get_session_uid(request)
+    if uid is None:
         return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
     import json
-    from core.data.views_registry import load_views_registry
-    registry = load_views_registry()
+    from core.orm import Environment
+    from core.data.views_registry import load_views_registry, load_views_registry_from_db
+
+    db = get_session_db(request)
+    try:
+        registry_obj = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry_obj, cr=cr, uid=uid)
+            registry_obj.set_env(env)
+            registry = load_views_registry_from_db(env)
+    except Exception:
+        registry = load_views_registry()
     return Response(
         json.dumps(registry),
         content_type="application/json",

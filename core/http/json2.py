@@ -12,7 +12,7 @@ from core.orm import Environment
 from core.http.request import Request
 from core.http.auth import _get_registry
 from core.http.rpc import _call_kw, _get_access_map, _op_for_method
-from core.orm.security import check_access
+from core.orm.security import check_access, get_user_groups
 
 _logger = logging.getLogger("erp.json2")
 
@@ -111,7 +111,9 @@ def dispatch_json2(request: Request) -> Response:
         kwargs = kwargs
 
     op = _op_for_method(method_name)
-    if not check_access(_get_access_map(), model_name, op, user_groups=set()):
+    registry = _get_registry(db)
+    user_groups = get_user_groups(registry, db, uid) if uid else set()
+    if not check_access(_get_access_map(), model_name, op, user_groups=user_groups):
         return _error_response("Access denied", 403)
 
     try:

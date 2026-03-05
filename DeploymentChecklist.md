@@ -47,6 +47,86 @@
 - [ ] ai.audit.log, ai.document.chunk tables created (db init)
 - [ ] Chat panel: AI button in webclient
 
+## Phase 29 (CLI Shell + Module Install)
+
+- [ ] `erp-bin module list` shows base, web, crm, ai_assistant
+- [ ] `erp-bin module install -d <db> -m crm` completes without errors
+- [ ] `erp-bin shell -d <db>` opens REPL with `env` and `registry`
+- [ ] From shell, `env['res.partner'].search_read([])` works
+
+## Phase 28 (View Switcher)
+
+- [ ] Leads: List | Kanban toggle buttons above content
+- [ ] #leads?view=kanban persists view; sessionStorage fallback
+- [ ] Contacts: List only (no kanban in view_mode)
+
+## Phase 27 (res.company, res.groups)
+
+- [ ] res.company: default "My Company" created on db init
+- [ ] res.groups: base.group_user, base.group_public
+- [ ] Admin user has company_id and group_ids (base.group_user) after init
+- [ ] Access rules with group_id: check_access uses user's groups
+
+## Phases 41–45
+
+- [ ] res.partner: is_company checkbox, type dropdown in form; list shows is_company
+- [ ] Leads list: tag_ids column shows comma-separated tag names
+- [ ] res.country.state_ids: env["res.country"].read(..., ["state_ids"]) returns state ids
+- [ ] Search domain [("name", "like", "X")] works (case-sensitive)
+- [ ] Navbar: Settings dropdown with API Keys submenu; menu tree from parent_ref
+
+## Phase 40 (Persistent ir.actions / ir.ui.menu)
+
+- [ ] ir.actions.act_window, ir.ui.menu tables created on db init
+- [ ] /web/load_views returns actions and menus from DB when authenticated
+- [ ] Navbar menus render from DB; runtime changes to actions/menus reflected on next load
+
+## Phases 46–50 (Search operators, form metadata, ir.rule, ir.ui.view, menu visibility)
+
+- [ ] Search domain [("name", "=like", "Estonia")] exact match; [("id", "child_of", id)] hierarchical
+- [ ] Form fields: domain/comodel from view XML; state_id filtered by country_id
+- [ ] ir.rule table; record rules read from DB; seeded from security/ir_rule.xml
+- [ ] ir.ui.view table; views read from DB; seeded from XML; arch stored as JSON
+- [ ] ir.ui.menu.groups_ref; menus with non-empty groups_ref filtered by user groups (backend)
+
+## Phase 33 (ORM read/search_read fix)
+
+- [ ] RPC search_read returns non-empty when data exists (res.country, res.partner, etc.)
+- [ ] List/form views populate correctly
+
+## Phase 35 (Many2many + Html)
+
+- [ ] Leads form: tag_ids checkboxes (crm.tag options)
+- [ ] Leads form: note_html textarea
+- [ ] Html fields sanitized on write (script/style stripped)
+
+## Phase 34 (res.partner.country_id + res.country.state)
+
+- [ ] res.country.state: 15 EE states loaded on db init
+- [ ] res.partner form: country_id, state_id dropdowns work
+- [ ] Contacts form: select country and state
+
+## Phase 32 (res.country, res.currency, res.lang)
+
+- [ ] res.country: search returns EE, US, GB, DE, FI
+- [ ] res.currency: EUR, USD, GBP created on db init
+- [ ] res.lang: en_US, fi_FI created on db init
+- [ ] res.company.currency_id Many2one to res.currency; default company has EUR
+
+## Phase 31 (Wizards / TransientModel)
+
+- [ ] TransientModel: models with _transient=True; auto-vacuum when count > max
+- [ ] base.wizard.confirm: create, action_confirm unlinks; override _do_confirm for custom logic
+- [ ] base.transient.vacuum.run: cron entrypoint; vacuum created on db init
+
+## Phase 30 (ir.config_parameter + Settings Stub)
+
+- [ ] ir.config_parameter: env['ir.config_parameter'].get_param('key') returns value or default
+- [ ] ir.config_parameter: set_param('key', 'value') creates/updates; callable via RPC
+- [ ] #settings shows stub page with API Keys link
+- [ ] #settings/apikeys still works
+- [ ] Navbar: Settings link goes to #settings
+
 ## Phase 26 (Base Models)
 
 - [ ] ir.sequence: next_by_code('crm.lead') via RPC returns next number

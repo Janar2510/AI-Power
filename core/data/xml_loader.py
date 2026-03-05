@@ -42,12 +42,26 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
     if tag == "list":
         cols = []
         for f in node.findall("field"):
-            cols.append({"name": f.get("name", ""), "string": f.get("string", "")})
+            col_def = {"name": f.get("name", ""), "string": f.get("string", "")}
+            comodel = f.get("comodel", "")
+            if comodel:
+                col_def["comodel"] = comodel
+            cols.append(col_def)
         return {"type": "list", "columns": cols}
     if tag == "form":
         fields = []
         for f in node.findall("field"):
-            fields.append({"name": f.get("name", ""), "string": f.get("string", "")})
+            field_def = {"name": f.get("name", ""), "string": f.get("string", "")}
+            domain = f.get("domain", "")
+            if domain:
+                field_def["domain"] = domain
+            domain_dep = f.get("domain_dep", "")
+            if domain_dep:
+                field_def["domain_dep"] = domain_dep
+            comodel = f.get("comodel", "")
+            if comodel:
+                field_def["comodel"] = comodel
+            fields.append(field_def)
         return {"type": "form", "fields": fields}
     if tag == "kanban":
         default_group = node.get("default_group_by", "")

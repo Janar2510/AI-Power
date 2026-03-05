@@ -18,6 +18,16 @@
     return m || null;
   }
 
+  /** Map menu to hash route when no action (e.g. Settings, API Keys) */
+  function menuToRoute(m) {
+    if (!m) return null;
+    const name = (m.name || '').toLowerCase();
+    if (name === 'home') return 'home';
+    if (name === 'settings') return 'settings';
+    if (name === 'api keys') return 'settings/apikeys';
+    return null;
+  }
+
   /** Get model name for route slug (inverse of actionToRoute) */
   function getModelForRoute(route) {
     if (!viewsSvc) return null;
@@ -31,24 +41,70 @@
     return null;
   }
 
+  function buildMenuTree(menus) {
+    const byId = {};
+    const roots = [];
+    (menus || []).forEach(function (m) {
+      byId[m.id || m.name] = { menu: m, children: [] };
+    });
+    (menus || []).forEach(function (m) {
+      const node = byId[m.id || m.name];
+      if (!node) return;
+      const parentRef = m.parent || '';
+      if (!parentRef || !byId[parentRef]) {
+        roots.push(node);
+      } else {
+        byId[parentRef].children.push(node);
+      }
+    });
+    roots.sort(function (a, b) { return (a.menu.sequence || 0) - (b.menu.sequence || 0); });
+    roots.forEach(function (n) {
+      n.children.sort(function (a, b) { return (a.menu.sequence || 0) - (b.menu.sequence || 0); });
+    });
+    return roots;
+  }
+
   function renderNavbar() {
     if (!navbar) return;
-    let html = '<span class="logo">ERP Platform</span><nav class="nav-menu">';
+    let html = '<span class="logo">ERP Platform</span><nav class="nav-menu" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
     if (viewsSvc) {
-      const menus = (viewsSvc.getMenus() || []).slice().sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-      menus.forEach(function (m) {
+      const menus = viewsSvc.getMenus() || [];
+      const tree = buildMenuTree(menus);
+      tree.forEach(function (node) {
+        const m = node.menu;
         const action = m.action ? viewsSvc.getAction(m.action) : null;
-        const route = action ? actionToRoute(action) : (m.name && m.name.toLowerCase() === 'home' ? 'home' : null);
+        const route = action ? actionToRoute(action) : menuToRoute(m);
         const href = route ? '#' + route : '#';
         const cls = 'nav-link' + (route ? '' : ' nav-link-disabled');
-        html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
+        if (node.children.length) {
+          html += '<span class="nav-dropdown" style="position:relative;display:inline-block">';
+          html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
+          html += '<span class="nav-dropdown-content" style="display:none;position:absolute;top:100%;left:0;background:#1a1a2e;min-width:140px;padding:0.5rem 0;border-radius:4px;z-index:100">';
+          node.children.forEach(function (ch) {
+            const cm = ch.menu;
+            const caction = cm.action ? viewsSvc.getAction(cm.action) : null;
+            const croute = caction ? actionToRoute(caction) : menuToRoute(cm);
+            const chref = croute ? '#' + croute : '#';
+            html += '<a href="' + chref + '" class="nav-link" style="display:block;padding:0.5rem 1rem;white-space:nowrap" data-menu-id="' + (cm.id || '').replace(/"/g, '&quot;') + '">' + (cm.name || '').replace(/</g, '&lt;') + '</a>';
+          });
+          html += '</span></span>';
+        } else {
+          html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
+        }
       });
     }
-    html += '</nav><span class="nav-user">';
-    html += '<a href="#settings/apikeys" class="nav-link">API Keys</a>';
+    html += '</nav><span class="nav-user" style="margin-left:auto">';
     html += '<a href="/web/logout" class="nav-link">Logout</a>';
     html += '</span>';
     navbar.innerHTML = html;
+    navbar.querySelectorAll('.nav-dropdown').forEach(function (dd) {
+      const label = dd.querySelector('a');
+      const content = dd.querySelector('.nav-dropdown-content');
+      if (label && content) {
+        label.onmouseenter = function () { content.style.display = 'block'; };
+        dd.onmouseleave = function () { content.style.display = 'none'; };
+      }
+    });
   }
 
   function getListColumns(model) {
@@ -56,7 +112,7 @@
       const v = viewsSvc.getView(model, 'list');
       if (v && v.columns && v.columns.length) return v.columns.map(c => (typeof c === 'object' ? c.name : c) || c);
     }
-    return model === 'crm.lead' ? ['name', 'type', 'stage_id', 'expected_revenue'] : ['name', 'email', 'phone', 'city'];
+    return model === 'crm.lead' ? ['name', 'type', 'stage_id', 'expected_revenue', 'tag_ids'] : ['name', 'is_company', 'email', 'phone', 'city', 'country_id', 'state_id'];
   }
 
   function getFormFields(model) {
@@ -64,7 +120,7 @@
       const v = viewsSvc.getView(model, 'form');
       if (v && v.fields && v.fields.length) return v.fields.map(f => (typeof f === 'object' ? f.name : f) || f);
     }
-    return model === 'crm.lead' ? ['name', 'type', 'partner_id', 'stage_id', 'expected_revenue', 'description', 'activity_ids'] : ['name', 'email', 'phone', 'street', 'city', 'country'];
+    return model === 'crm.lead' ? ['name', 'type', 'partner_id', 'stage_id', 'expected_revenue', 'description', 'note_html', 'tag_ids', 'activity_ids'] : ['name', 'is_company', 'type', 'email', 'phone', 'street', 'street2', 'city', 'zip', 'country_id', 'state_id'];
   }
 
   function getTitle(route) {
@@ -81,6 +137,14 @@
 
   function renderHome() {
     main.innerHTML = '<h2>Welcome</h2><p>Use the menu to navigate. <strong>Contacts</strong> and <strong>Leads</strong> are available.</p>';
+  }
+
+  function renderSettingsStub() {
+    main.innerHTML = '<h2>Settings</h2><p style="margin-bottom:1rem">Manage your account and preferences.</p>';
+    main.innerHTML += '<div style="display:flex;flex-direction:column;gap:0.5rem">';
+    main.innerHTML += '<a href="#settings/apikeys" style="display:block;padding:0.75rem 1rem;border:1px solid var(--border-color,#ddd);border-radius:4px;text-decoration:none;color:inherit;max-width:280px">API Keys</a>';
+    main.innerHTML += '<p style="margin-top:0.5rem;color:var(--text-muted,#666);font-size:0.9rem">More settings coming soon.</p>';
+    main.innerHTML += '</div>';
   }
 
   function renderApiKeysSettings() {
@@ -160,18 +224,48 @@
 
   function getDisplayNames(model, colName, records) {
     const comodel = getMany2oneComodel(model, colName);
-    if (!comodel) return {};
+    if (!comodel) return Promise.resolve({});
     const ids = [];
     records.forEach(function (r) { const v = r[colName]; if (v) ids.push(v); });
-    if (!ids.length) return {};
+    if (!ids.length) return Promise.resolve({});
     const uniq = ids.filter(function (x, i, a) { return a.indexOf(x) === i; });
     const map = {};
     return rpc.callKw(comodel, 'read', [uniq, ['id', 'name']])
       .then(function (rows) {
-        rows.forEach(function (row) { map[row.id] = row.name || row.id; });
+        (rows || []).forEach(function (row) { map[row.id] = row.name || row.id; });
         return map;
       })
       .catch(function () { return {}; });
+  }
+
+  function getDisplayNamesForMany2many(model, colName, records) {
+    const m2m = getMany2manyInfo(model, colName);
+    if (!m2m || !m2m.comodel) return Promise.resolve({});
+    const ids = [];
+    records.forEach(function (r) {
+      const v = r[colName];
+      if (Array.isArray(v)) v.forEach(function (id) { ids.push(id); });
+    });
+    if (!ids.length) return Promise.resolve({});
+    const uniq = ids.filter(function (x, i, a) { return a.indexOf(x) === i; });
+    const map = {};
+    return rpc.callKw(m2m.comodel, 'read', [uniq, ['id', 'name']])
+      .then(function (rows) {
+        (rows || []).forEach(function (row) { map[row.id] = row.name || row.id; });
+        return map;
+      })
+      .catch(function () { return {}; });
+  }
+
+  function renderViewSwitcher(route, currentView) {
+    const modes = getAvailableViewModes(route).filter(function (m) { return m === 'list' || m === 'kanban'; });
+    if (modes.length < 2) return '';
+    let html = '<span class="view-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
+    modes.forEach(function (m) {
+      const active = m === currentView;
+      html += '<button type="button" class="btn-view' + (active ? ' active' : '') + '" data-view="' + m + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (m === 'list' ? 'List' : 'Kanban') + '</button>';
+    });
+    return html + '</span>';
   }
 
   function renderList(model, route, records, searchTerm) {
@@ -179,8 +273,10 @@
     const title = getTitle(route);
     const addLabel = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : 'Add';
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
+    const currentView = (currentListState.route === route && currentListState.viewType) || 'list';
     let html = '<h2>' + title + '</h2>';
     html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
+    html += renderViewSwitcher(route, currentView);
     html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
     html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
     if (model === 'crm.lead') {
@@ -194,6 +290,10 @@
         const f = typeof c === 'object' ? c.name : c;
         return getMany2oneComodel(model, f);
       });
+      const m2mCols = cols.filter(function (c) {
+        const f = typeof c === 'object' ? c.name : c;
+        return getMany2manyInfo(model, f);
+      });
       function renderTable(nameMap) {
         let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
         cols.forEach(c => { tbl += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd">' + (typeof c === 'object' ? c.name || c : c) + '</th>'; });
@@ -203,10 +303,18 @@
           cols.forEach(c => {
             const f = typeof c === 'object' ? c.name : c;
             let val = r[f];
-            if (nameMap && nameMap[f] && val != null) val = nameMap[f][val] || val;
-            else if (val != null) {
-              const selLabel = getSelectionLabel(model, f, val);
-              if (selLabel !== val) val = selLabel;
+            if (nameMap && nameMap[f] && val != null) {
+              if (Array.isArray(val)) {
+                val = val.map(function (id) { return nameMap[f][id] || id; }).join(', ');
+              } else {
+                val = nameMap[f][val] || val;
+              }
+            } else if (val != null) {
+              if (typeof val === 'boolean') val = val ? 'Yes' : 'No';
+              else {
+                const selLabel = getSelectionLabel(model, f, val);
+                if (selLabel !== val) val = selLabel;
+              }
             }
             tbl += '<td style="padding:0.5rem;border-bottom:1px solid #eee">' + (val != null ? String(val) : '').replace(/</g, '&lt;') + '</td>';
           });
@@ -216,11 +324,16 @@
         tbl += '</tbody></table>';
         main.innerHTML = html + tbl;
       }
-      if (m2oCols.length) {
-        Promise.all(m2oCols.map(function (c) {
+      const allCols = m2oCols.length || m2mCols.length;
+      if (allCols) {
+        const promises = m2oCols.map(function (c) {
           const f = typeof c === 'object' ? c.name : c;
           return getDisplayNames(model, f, records).then(function (m) { return { f: f, m: m }; });
-        })).then(function (maps) {
+        }).concat(m2mCols.map(function (c) {
+          const f = typeof c === 'object' ? c.name : c;
+          return getDisplayNamesForMany2many(model, f, records).then(function (m) { return { f: f, m: m }; });
+        }));
+        Promise.all(promises).then(function (maps) {
           const nameMap = {};
           maps.forEach(function (x) { nameMap[x.f] = x.m; });
           renderTable(nameMap);
@@ -240,6 +353,9 @@
     }
     main.querySelectorAll('.btn-delete').forEach(a => {
       a.onclick = (e) => { e.preventDefault(); if (confirm('Delete this record?')) deleteRecord(model, route, a.dataset.id); };
+    });
+    main.querySelectorAll('.btn-view').forEach(btn => {
+      btn.onclick = () => { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
     });
     if (model === 'crm.lead') {
       const filterEl = document.getElementById('list-stage-filter');
@@ -270,15 +386,49 @@
       .catch(err => { alert(err.message || 'Failed to delete'); });
   }
 
+  function getViewFieldDef(model, fname) {
+    if (!viewsSvc || !model || !fname) return null;
+    const formV = viewsSvc.getView(model, 'form');
+    if (formV && formV.fields) {
+      const f = formV.fields.find(function (x) { const n = typeof x === 'object' ? x.name : x; return n === fname; });
+      if (f && typeof f === 'object') return f;
+    }
+    const listV = viewsSvc.getView(model, 'list');
+    if (listV && listV.columns) {
+      const c = listV.columns.find(function (x) { const n = typeof x === 'object' ? x.name : x; return n === fname; });
+      if (c && typeof c === 'object') return c;
+    }
+    return null;
+  }
+
   function getMany2oneComodel(model, fname) {
+    const def = getViewFieldDef(model, fname);
+    if (def && def.comodel) return def.comodel;
     if (model === 'crm.lead' && fname === 'partner_id') return 'res.partner';
     if (model === 'crm.lead' && fname === 'stage_id') return 'crm.stage';
+    if (model === 'res.partner' && fname === 'country_id') return 'res.country';
+    if (model === 'res.partner' && fname === 'state_id') return 'res.country.state';
+    return null;
+  }
+
+  function getMany2oneDomain(model, fname) {
+    const def = getViewFieldDef(model, fname);
+    if (def && def.domain_dep) {
+      const dep = def.domain_dep;
+      return { depField: dep, domain: [[dep, '=', null]] };
+    }
+    if (model === 'res.partner' && fname === 'state_id') return { depField: 'country_id', domain: [['country_id', '=', null]] };
     return null;
   }
 
   function getSelectionOptions(model, fname) {
     if (model === 'crm.lead' && fname === 'type') return [['lead', 'Lead'], ['opportunity', 'Opportunity']];
+    if (model === 'res.partner' && fname === 'type') return [['contact', 'Contact'], ['address', 'Address']];
     return null;
+  }
+
+  function isBooleanField(model, fname) {
+    return model === 'res.partner' && fname === 'is_company';
   }
 
   function getSelectionLabel(model, fname, value) {
@@ -293,6 +443,13 @@
     return null;
   }
 
+  function getMany2manyInfo(model, fname) {
+    const def = getViewFieldDef(model, fname);
+    if (def && def.comodel) return { comodel: def.comodel };
+    if (model === 'crm.lead' && fname === 'tag_ids') return { comodel: 'crm.tag' };
+    return null;
+  }
+
   function renderForm(model, route, id) {
     const fields = getFormFields(model);
     const title = getTitle(route);
@@ -302,22 +459,32 @@
     fields.forEach(f => {
       const fname = typeof f === 'object' ? f.name : f;
       const o2m = getOne2manyInfo(model, fname);
+      const m2m = getMany2manyInfo(model, fname);
       if (o2m) {
         html += '<p><label>' + fname + '</label><div id="o2m-' + fname + '" data-comodel="' + (o2m.comodel || '') + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px;min-height:2em"></div></p>';
+        return;
+      }
+      if (m2m) {
+        html += '<p><label>' + fname + '</label><div id="m2m-' + fname + '" data-comodel="' + (m2m.comodel || '') + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px;min-height:2em"></div></p>';
         return;
       }
       const required = fname === 'name';
       const comodel = getMany2oneComodel(model, fname);
       const selectionOpts = getSelectionOptions(model, fname);
-      const inputType = fname === 'email' ? 'email' : fname === 'description' ? 'textarea' : selectionOpts ? 'selection' : (comodel ? 'many2one' : 'text');
-      if (inputType === 'textarea') {
+      const isBool = isBooleanField(model, fname);
+      const inputType = isBool ? 'boolean' : (fname === 'email' ? 'email' : (fname === 'description' || fname === 'note_html') ? 'textarea' : selectionOpts ? 'selection' : (comodel ? 'many2one' : 'text'));
+      if (inputType === 'boolean') {
+        html += '<p><label style="display:flex;align-items:center;gap:0.5rem"><input type="checkbox" name="' + fname + '"> ' + fname + '</label></p>';
+      } else if (inputType === 'textarea') {
         html += '<p><label>' + fname + (required ? ' *' : '') + '<br><textarea name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem;min-height:4em"></textarea></label></p>';
       } else if (inputType === 'selection') {
         let opts = '<option value="">--</option>';
         selectionOpts.forEach(function (o) { opts += '<option value="' + (o[0] || '') + '">' + (o[1] || o[0]) + '</option>'; });
         html += '<p><label>' + fname + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem">' + opts + '</select></label></p>';
       } else if (inputType === 'many2one') {
-        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem" data-comodel="' + (comodel || '') + '"><option value="">--</option></select></label></p>';
+        const domainInfo = getMany2oneDomain(model, fname);
+        const depAttr = domainInfo ? ' data-depends-on="' + domainInfo.depField + '"' : '';
+        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem" data-comodel="' + (comodel || '') + '"' + depAttr + '><option value="">--</option></select></label></p>';
       } else {
         html += '<p><label>' + fname + (required ? ' *' : '') + '<br><input type="' + inputType + '" name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem"></label></p>';
       }
@@ -327,37 +494,97 @@
     main.innerHTML = html;
     const form = document.getElementById('record-form');
     const selects = form.querySelectorAll('select[data-comodel]');
-    const loadOptions = function () {
+    const m2mDivs = form.querySelectorAll('[id^="m2m-"]');
+    const getFormFieldVal = function (name) {
+      const el = form.querySelector('[name="' + name + '"]');
+      return el ? (el.value ? parseInt(el.value, 10) || el.value : null) : null;
+    };
+    const loadSelectOptions = function (sel, domain) {
+      const comodel = sel.dataset.comodel;
+      if (!comodel) return Promise.resolve();
+      const d = domain || [];
+      return rpc.callKw(comodel, 'search_read', [d], { fields: ['id', 'name'], limit: 200 })
+        .then(function (opts) {
+          sel.innerHTML = '<option value="">--</option>';
+          opts.forEach(function (o) {
+            sel.appendChild(document.createElement('option')).value = o.id;
+            sel.lastChild.textContent = o.name || o.id;
+          });
+        });
+    };
+    const loadOptions = function (formVals) {
       const promises = [];
       selects.forEach(function (sel) {
         const comodel = sel.dataset.comodel;
+        const fname = sel.getAttribute('name');
+        if (!comodel) return;
+        const domainInfo = getMany2oneDomain(model, fname);
+        let domain = [];
+        if (domainInfo) {
+          const depVal = formVals ? formVals[domainInfo.depField] : getFormFieldVal(domainInfo.depField);
+          if (depVal) domain = [[domainInfo.depField, '=', depVal]];
+          else domain = [[domainInfo.depField, '=', 0]];
+        }
+        promises.push(loadSelectOptions(sel, domain));
+      });
+      m2mDivs.forEach(function (div) {
+        const comodel = div.dataset.comodel;
+        const fname = (div.id || '').replace('m2m-', '');
         if (!comodel) return;
         promises.push(
           rpc.callKw(comodel, 'search_read', [[]], { fields: ['id', 'name'], limit: 200 })
             .then(function (opts) {
+              let inner = '';
               opts.forEach(function (o) {
-                sel.appendChild(document.createElement('option')).value = o.id;
-                sel.lastChild.textContent = o.name || o.id;
+                inner += '<label style="display:inline-block;margin-right:1rem;margin-bottom:0.25rem"><input type="checkbox" name="' + fname + '_cb" value="' + o.id + '"> ' + (o.name || o.id).replace(/</g, '&lt;') + '</label>';
               });
+              div.innerHTML = inner || 'No options';
             })
         );
       });
       return Promise.all(promises);
     };
+    const setupDependsOnHandlers = function () {
+      selects.forEach(function (sel) {
+        const fname = sel.getAttribute('name');
+        const domainInfo = getMany2oneDomain(model, fname);
+        if (!domainInfo) return;
+        const depEl = form.querySelector('[name="' + domainInfo.depField + '"]');
+        if (depEl) {
+          depEl.onchange = function () {
+            const depVal = getFormFieldVal(domainInfo.depField);
+            loadSelectOptions(sel, depVal ? [[domainInfo.depField, '=', depVal]] : [[domainInfo.depField, '=', 0]])
+              .then(function () {
+                const stateEl = form.querySelector('[name="' + fname + '"]');
+                if (stateEl) stateEl.value = '';
+              });
+          };
+        }
+      });
+    };
+    const setM2mChecked = function (fname, ids) {
+      const idSet = (ids || []).map(function (x) { return String(x); });
+      form.querySelectorAll('input[name="' + fname + '_cb"]').forEach(function (cb) {
+        cb.checked = idSet.indexOf(String(cb.value)) >= 0;
+      });
+    };
     if (isNew) {
-      loadOptions();
+      loadOptions({}).then(setupDependsOnHandlers);
       form.onsubmit = (e) => { e.preventDefault(); createRecord(model, route, form); return false; };
     } else {
-      loadOptions().then(function () {
-        return loadRecord(model, id);
-      }).then(function (r) {
+      loadRecord(model, id).then(function (r) {
         if (r && r[0]) {
           const rec = r[0];
-          const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el) el.value = v != null ? v : ''; };
-          fields.forEach(f => {
+          return loadOptions({ country_id: rec.country_id, state_id: rec.state_id }).then(function () {
+            setupDependsOnHandlers();
+            const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el) el.value = v != null ? v : ''; };
+            fields.forEach(f => {
             const n = typeof f === 'object' ? f.name : f;
             const o2m = getOne2manyInfo(model, n);
-            if (o2m) {
+            const m2m = getMany2manyInfo(model, n);
+            if (m2m) {
+              setM2mChecked(n, rec[n]);
+            } else if (o2m) {
               const div = form.querySelector('#o2m-' + n);
               if (div && rec[n] && Array.isArray(rec[n]) && rec[n].length) {
                 rpc.callKw(o2m.comodel, 'search_read', [[['id', 'in', rec[n]]]], { fields: ['id', 'name', 'note', 'date_deadline'] })
@@ -376,9 +603,13 @@
               } else if (div) {
                 div.textContent = 'No items';
               }
+            } else if (isBooleanField(model, n)) {
+              const cb = form.querySelector('[name="' + n + '"][type="checkbox"]');
+              if (cb) cb.checked = !!rec[n];
             } else {
               set(n, rec[n]);
             }
+          });
           });
         }
       }).catch(function () {});
@@ -393,6 +624,18 @@
     fields.forEach(f => {
       const n = typeof f === 'object' ? f.name : f;
       if (getOne2manyInfo(model, n)) return;
+      const m2m = getMany2manyInfo(model, n);
+      if (m2m) {
+        const ids = [];
+        form.querySelectorAll('input[name="' + n + '_cb"]:checked').forEach(function (cb) { ids.push(parseInt(cb.value, 10)); });
+        vals[n] = ids;
+        return;
+      }
+      if (isBooleanField(model, n)) {
+        const cb = form.querySelector('[name="' + n + '"][type="checkbox"]');
+        vals[n] = cb ? !!cb.checked : false;
+        return;
+      }
       let v = byName(n).trim();
       const comodel = getMany2oneComodel(model, n);
       const selectionOpts = getSelectionOptions(model, n);
@@ -455,21 +698,48 @@
     return rpc.callKw(model, 'read', [[parseInt(id, 10)], fnames]);
   }
 
-  function getPreferredViewType(route) {
-    if (!viewsSvc) return 'list';
+  function getHashViewParam() {
+    const hash = (window.location.hash || '').slice(1);
+    const q = hash.indexOf('?');
+    if (q < 0) return null;
+    const params = new URLSearchParams(hash.slice(q + 1));
+    return params.get('view') || null;
+  }
+
+  function getAvailableViewModes(route) {
+    if (!viewsSvc) return ['list'];
     const menus = viewsSvc.getMenus() || [];
     for (let i = 0; i < menus.length; i++) {
       const action = menus[i].action ? viewsSvc.getAction(menus[i].action) : null;
       if (action && actionToRoute(action) === route) {
-        const modes = action.view_mode || ['list', 'form'];
-        return modes[0] || 'list';
+        const raw = action.view_mode || action.viewMode || 'list,form';
+        const modes = Array.isArray(raw) ? raw : String(raw).split(/[,\s]+/).filter(Boolean);
+        return modes.length ? modes : ['list'];
       }
     }
-    return 'list';
+    return ['list'];
   }
 
-  function loadRecords(model, route, searchTerm, stageFilter) {
-    const viewType = getPreferredViewType(route);
+  function getPreferredViewType(route) {
+    const urlView = getHashViewParam();
+    if (urlView) return urlView;
+    try {
+      const stored = sessionStorage.getItem('view_' + route);
+      if (stored) return stored;
+    } catch (e) {}
+    const modes = getAvailableViewModes(route);
+    return modes[0] || 'list';
+  }
+
+  function setViewAndReload(route, view) {
+    try {
+      sessionStorage.setItem('view_' + route, view);
+    } catch (e) {}
+    window.location.hash = route + (view && view !== 'list' ? '?view=' + view : '');
+  }
+
+  function loadRecords(model, route, searchTerm, stageFilter, viewTypeOverride) {
+    const viewType = viewTypeOverride != null ? viewTypeOverride : getPreferredViewType(route);
     const cols = getListColumns(model);
     const fnames = cols.map(c => typeof c === 'object' ? c.name : c);
     const fields = ['id'].concat(fnames);
@@ -481,7 +751,7 @@
     if (model === 'crm.lead' && stageFilter) {
       domain = domain.concat([['stage_id', '=', stageFilter]]);
     }
-    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter };
+    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: viewType };
     main.innerHTML = '<h2>' + title + '</h2><p>Loading...</p>';
     rpc.callKw(model, 'search_read', [domain], { fields: fields, limit: 100 })
       .then(records => {
@@ -500,9 +770,11 @@
     const title = getTitle(route);
     const addLabel = route === 'leads' ? 'Add lead' : 'Add';
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
+    const currentView = (currentListState.route === route && currentListState.viewType) || 'kanban';
     const kanbanView = viewsSvc && viewsSvc.getView(model, 'kanban');
     let html = '<h2>' + title + '</h2>';
     html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
+    html += renderViewSwitcher(route, currentView);
     html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
     html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
     if (model === 'crm.lead') {
@@ -511,7 +783,10 @@
     html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
     html += '<div id="kanban-area"></div>';
     main.innerHTML = html;
-    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter };
+    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: currentView };
+    main.querySelectorAll('.btn-view').forEach(btn => {
+      btn.onclick = () => { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
+    });
     const btn = document.getElementById('btn-add');
     if (btn) btn.onclick = () => { window.location.hash = route + '/new'; };
     const btnSearch = document.getElementById('btn-search');
@@ -583,13 +858,17 @@
 
   function route() {
     const hash = (window.location.hash || '#home').slice(1);
+    const base = hash.split('?')[0];
     const editMatch = hash.match(/^(contacts|leads)\/edit\/(\d+)$/);
     const newMatch = hash.match(/^(contacts|leads)\/new$/);
-    const listMatch = hash.match(/^(contacts|leads)$/);
-    const settingsMatch = hash.match(/^settings\/apikeys$/);
+    const listMatch = base.match(/^(contacts|leads)$/);
+    const settingsApiKeysMatch = hash.match(/^settings\/apikeys$/);
+    const settingsIndexMatch = hash.match(/^settings\/?$/);
 
-    if (settingsMatch) {
+    if (settingsApiKeysMatch) {
       renderApiKeysSettings();
+    } else if (settingsIndexMatch) {
+      renderSettingsStub();
     } else if (listMatch) {
       const route = listMatch[1];
       const model = getModelForRoute(route);

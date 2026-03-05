@@ -17,4 +17,6 @@ class CrmLead(Model):
     stage_id = fields.Many2one("crm.stage", string="Stage")
     expected_revenue = fields.Float()
     description = fields.Text()
+    note_html = fields.Html(string="Notes")
+    tag_ids = fields.Many2many("crm.tag", string="Tags")
     activity_ids = fields.One2many("crm.activity", "lead_id", string="Activities")

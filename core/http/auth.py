@@ -45,6 +45,12 @@ def _get_registry(dbname: str) -> Registry:
         config.parse_config(["--addons-path=addons"])
         reg = Registry(dbname)
         ModelBase._registry = reg
+        # Clear addon modules so they reload with this registry (avoids stale
+        # classes from prior load_module_graph runs without a registry)
+        import sys
+        to_clear = [k for k in list(sys.modules) if k.startswith("addons.")]
+        for k in to_clear:
+            del sys.modules[k]
         load_module_graph()
         _registries[dbname] = reg
     return _registries[dbname]

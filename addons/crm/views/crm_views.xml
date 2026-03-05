@@ -8,8 +8,9 @@
         <list>
           <field name="name"/>
           <field name="type"/>
-          <field name="stage_id"/>
+          <field name="stage_id" comodel="crm.stage"/>
           <field name="expected_revenue"/>
+          <field name="tag_ids" comodel="crm.tag"/>
         </list>
       </field>
     </record>
@@ -20,10 +21,12 @@
         <form>
           <field name="name"/>
           <field name="type"/>
-          <field name="partner_id"/>
-          <field name="stage_id"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="stage_id" comodel="crm.stage"/>
           <field name="expected_revenue"/>
           <field name="description"/>
+          <field name="note_html"/>
+          <field name="tag_ids" comodel="crm.tag"/>
           <field name="activity_ids"/>
         </form>
       </field>

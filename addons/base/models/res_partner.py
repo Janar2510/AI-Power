@@ -24,3 +24,9 @@ class ResPartner(Model):
     state_id = fields.Many2one("res.country.state", string="State")
     parent_id = fields.Many2one("res.partner", string="Parent")
     active = fields.Boolean(default=True)
+    display_name = fields.Computed(compute="_compute_display_name", store=True, string="Display Name")
+
+    def _compute_display_name(self):
+        """Compute display name from name field."""
+        rows = self.read(["name"])
+        return [r.get("name") or "" for r in rows]

@@ -1,6 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
+    <record model="ir.ui.view" id="res_partner_search">
+      <field name="name">res.partner search</field>
+      <field name="model">res.partner</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="name"/>
+          <field name="email"/>
+          <field name="phone"/>
+        </search>
+      </field>
+    </record>
     <record model="ir.ui.view" id="res_partner_list">
       <field name="name">res.partner list</field>
       <field name="model">res.partner</field>

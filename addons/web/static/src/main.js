@@ -28,17 +28,36 @@
     return null;
   }
 
-  /** Get model name for route slug (inverse of actionToRoute) */
-  function getModelForRoute(route) {
+  /** Get action for route (from menu) */
+  function getActionForRoute(route) {
     if (!viewsSvc) return null;
     const menus = viewsSvc.getMenus() || [];
     for (let i = 0; i < menus.length; i++) {
       const action = menus[i].action ? viewsSvc.getAction(menus[i].action) : null;
-      if (action && actionToRoute(action) === route) return action.res_model || action.resModel;
+      if (action && actionToRoute(action) === route) return action;
     }
+    return null;
+  }
+
+  /** Get model name for route slug (inverse of actionToRoute) */
+  function getModelForRoute(route) {
+    const action = getActionForRoute(route);
+    if (action) return action.res_model || action.resModel;
     if (route === 'contacts') return 'res.partner';
     if (route === 'leads') return 'crm.lead';
     return null;
+  }
+
+  /** Parse action domain string to array (JSON or Python-like) */
+  function parseActionDomain(s) {
+    if (!s || typeof s !== 'string') return [];
+    const t = s.trim();
+    if (!t) return [];
+    try {
+      const parsed = JSON.parse(t.replace(/'/g, '"'));
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {}
+    return [];
   }
 
   function buildMenuTree(menus) {
@@ -113,6 +132,47 @@
       if (v && v.columns && v.columns.length) return v.columns.map(c => (typeof c === 'object' ? c.name : c) || c);
     }
     return model === 'crm.lead' ? ['name', 'type', 'stage_id', 'expected_revenue', 'tag_ids'] : ['name', 'is_company', 'email', 'phone', 'city', 'country_id', 'state_id'];
+  }
+
+  function getSearchFields(model) {
+    if (viewsSvc && model) {
+      const v = viewsSvc.getView(model, 'search');
+      if (v && v.search_fields && v.search_fields.length) return v.search_fields;
+    }
+    return ['name'];
+  }
+
+  function buildSearchDomain(model, searchTerm) {
+    const fields = getSearchFields(model);
+    if (!searchTerm || !fields.length) return [];
+    if (fields.length === 1) return [[fields[0], 'ilike', searchTerm]];
+    const terms = fields.map(function (f) { return [f, 'ilike', searchTerm]; });
+    const ops = [];
+    for (let i = 0; i < terms.length - 1; i++) ops.push('|');
+    return ops.concat(terms);
+  }
+
+  var _savedFilterId = 0;
+  function getSavedFilters(model) {
+    try {
+      const raw = localStorage.getItem('erp_saved_filters_' + (model || '').replace(/\./g, '_'));
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveSavedFilter(model, name, domain) {
+    const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
+    const filters = getSavedFilters(model);
+    const id = 'f' + (++_savedFilterId) + Date.now();
+    filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
+    try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+    return id;
+  }
+  function removeSavedFilter(model, id) {
+    const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
+    const filters = getSavedFilters(model).filter(function (f) { return f.id !== id; });
+    try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
   }
 
   function getFormFields(model) {
@@ -279,6 +339,13 @@
     html += renderViewSwitcher(route, currentView);
     html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
     html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+    const savedFiltersList = getSavedFilters(model);
+    html += '<select id="list-saved-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">Filters</option>';
+    savedFiltersList.forEach(function (f) {
+      html += '<option value="' + (f.id || '').replace(/"/g, '&quot;') + '"' + (currentListState.savedFilterId === f.id ? ' selected' : '') + '>' + (f.name || 'Filter').replace(/</g, '&lt;') + '</option>';
+    });
+    html += '</select>';
+    html += '<button type="button" id="btn-save-filter" style="padding:0.5rem 0.75rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Save</button>';
     if (model === 'crm.lead') {
       html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
     }
@@ -347,7 +414,12 @@
     const btnSearch = document.getElementById('btn-search');
     const searchInput = document.getElementById('list-search');
     if (btnSearch && searchInput) {
-      const doSearch = function () { loadRecords(model, route, searchInput.value.trim(), currentListState.stageFilter); };
+      const doSearch = function () {
+        const sf = document.getElementById('list-saved-filter');
+        const stageEl = document.getElementById('list-stage-filter');
+        const stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
+        loadRecords(model, route, searchInput.value.trim(), stageVal, null, sf && sf.value ? sf.value : null);
+      };
       btnSearch.onclick = doSearch;
       searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
     }
@@ -371,14 +443,39 @@
             });
             filterEl.onchange = function () {
               const val = filterEl.value ? parseInt(filterEl.value, 10) : null;
-              loadRecords(model, route, document.getElementById('list-search').value.trim(), val);
+              loadRecords(model, route, document.getElementById('list-search').value.trim(), val, null, null);
             };
           });
       }
     }
+    const savedFilterEl = document.getElementById('list-saved-filter');
+    if (savedFilterEl) {
+      savedFilterEl.onchange = function () {
+        const fid = savedFilterEl.value || null;
+        const si = document.getElementById('list-search');
+        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, fid);
+      };
+    }
+    const btnSaveFilter = document.getElementById('btn-save-filter');
+    if (btnSaveFilter) {
+      btnSaveFilter.onclick = function () {
+        const name = prompt('Filter name:');
+        if (!name || !name.trim()) return;
+        const si = document.getElementById('list-search');
+        const st = si ? si.value.trim() : '';
+        const action = getActionForRoute(route);
+        const actionDomain = action ? parseActionDomain(action.domain || '') : [];
+        let domain = actionDomain.slice();
+        const searchDom = buildSearchDomain(model, st);
+        if (searchDom.length) domain = domain.concat(searchDom);
+        if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
+        saveSavedFilter(model, name.trim(), domain);
+        loadRecords(model, route, st, stageFilter, null, null);
+      };
+    }
   }
 
-  let currentListState = { model: null, route: null, searchTerm: '' };
+  let currentListState = { model: null, route: null, searchTerm: '', stageFilter: null, viewType: null, savedFilterId: null };
 
   function deleteRecord(model, route, id) {
     rpc.callKw(model, 'unlink', [[parseInt(id, 10)]])
@@ -738,20 +835,27 @@
     window.location.hash = route + (view && view !== 'list' ? '?view=' + view : '');
   }
 
-  function loadRecords(model, route, searchTerm, stageFilter, viewTypeOverride) {
+  function loadRecords(model, route, searchTerm, stageFilter, viewTypeOverride, savedFilterId) {
     const viewType = viewTypeOverride != null ? viewTypeOverride : getPreferredViewType(route);
     const cols = getListColumns(model);
     const fnames = cols.map(c => typeof c === 'object' ? c.name : c);
     const fields = ['id'].concat(fnames);
     const title = getTitle(route);
-    if (stageFilter === undefined && currentListState.route === route) {
-      stageFilter = currentListState.stageFilter;
+    if (stageFilter === undefined && currentListState.route === route) stageFilter = currentListState.stageFilter;
+    if (savedFilterId === undefined && currentListState.route === route) savedFilterId = currentListState.savedFilterId;
+    const action = getActionForRoute(route);
+    const actionDomain = action ? parseActionDomain(action.domain || '') : [];
+    let domain = actionDomain.slice();
+    const savedFilters = getSavedFilters(model);
+    const savedFilter = savedFilterId ? savedFilters.find(function (f) { return f.id === savedFilterId; }) : null;
+    if (savedFilter && savedFilter.domain && savedFilter.domain.length) {
+      domain = domain.concat(savedFilter.domain);
+    } else {
+      const searchDom = buildSearchDomain(model, searchTerm && searchTerm.trim() ? searchTerm.trim() : '');
+      if (searchDom.length) domain = domain.concat(searchDom);
+      if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
     }
-    let domain = (searchTerm && searchTerm.trim()) ? [['name', 'ilike', searchTerm.trim()]] : [];
-    if (model === 'crm.lead' && stageFilter) {
-      domain = domain.concat([['stage_id', '=', stageFilter]]);
-    }
-    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: viewType };
+    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: viewType, savedFilterId: savedFilterId || null };
     main.innerHTML = '<h2>' + title + '</h2><p>Loading...</p>';
     rpc.callKw(model, 'search_read', [domain], { fields: fields, limit: 100 })
       .then(records => {

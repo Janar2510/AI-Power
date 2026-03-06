@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <data>
+    <record model="ir.ui.view" id="crm_lead_search">
+      <field name="name">crm.lead search</field>
+      <field name="model">crm.lead</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="name"/>
+          <field name="description"/>
+        </search>
+      </field>
+    </record>
     <record model="ir.ui.view" id="crm_lead_list">
       <field name="name">crm.lead list</field>
       <field name="model">crm.lead</field>

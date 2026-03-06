@@ -1,8 +1,115 @@
 """Model base class and recordset."""
 
-from typing import Any, Dict, List, Optional, Type, TypeVar, Iterator, Union
+from typing import Any, Dict, List, Optional, Type, TypeVar, Iterator, Union, Tuple
 
 T = TypeVar("T", bound="ModelBase")
+
+
+def _domain_to_sql(
+    domain: List,
+    table: str,
+    cr: Any,
+    model_cls: Type["ModelBase"],
+) -> Tuple[str, List[Any]]:
+    """Convert Odoo domain to (WHERE clause, params). Supports | (OR), & (AND), and leaf terms."""
+    if not domain:
+        return "1=1", []
+
+    # Polish notation: ['|', term1, term2] or ['&', term1, term2]
+    if len(domain) >= 3 and domain[0] in ("|", "&") and isinstance(domain[1], (list, tuple)) and isinstance(domain[2], (list, tuple)):
+        op = domain[0]
+        w1, p1 = _domain_to_sql(domain[1], table, cr, model_cls)
+        w2, p2 = _domain_to_sql(domain[2], table, cr, model_cls)
+        joiner = " OR " if op == "|" else " AND "
+        return f"({w1}){joiner}({w2})", p1 + p2
+
+    # Leaf: [field, op, value]
+    if len(domain) >= 3 and isinstance(domain[0], str) and isinstance(domain[1], str):
+        fld, op, val = domain[0], domain[1], domain[2]
+        if op == "=":
+            return f'"{fld}" = %s', [val]
+        if op == "!=":
+            return f'("{fld}" IS NULL OR "{fld}" != %s)', [val]
+        if op in ("<", ">", ">=", "<="):
+            return f'"{fld}" {op} %s', [val]
+        if op == "in":
+            vals = list(val) if isinstance(val, (list, tuple)) else [val]
+            if not vals:
+                return "1=0", []
+            ph = ", ".join("%s" for _ in vals)
+            return f'"{fld}" IN ({ph})', vals
+        if op == "not in":
+            vals = list(val) if isinstance(val, (list, tuple)) else [val]
+            if not vals:
+                return "1=1", []
+            ph = ", ".join("%s" for _ in vals)
+            return f'("{fld}" IS NULL OR "{fld}" NOT IN ({ph}))', vals
+        if op == "ilike":
+            return f'"{fld}" ILIKE %s', [f"%{val}%" if isinstance(val, str) else val]
+        if op == "like":
+            return f'"{fld}" LIKE %s', [f"%{val}%" if isinstance(val, str) else val]
+        if op == "=like":
+            return f'"{fld}" LIKE %s', [val]
+        if op == "child_of":
+            cr.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=%s AND column_name='parent_id'",
+                (table,),
+            )
+            if cr.fetchone():
+                cr.execute(
+                    f"""
+                    WITH RECURSIVE descendants AS (
+                        SELECT id FROM "{table}" WHERE id = %s
+                        UNION ALL
+                        SELECT p.id FROM "{table}" p INNER JOIN descendants d ON p.parent_id = d.id
+                    )
+                    SELECT id FROM descendants
+                    """,
+                    (val,),
+                )
+                child_ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
+                if not child_ids:
+                    return "1=0", []
+                ph = ", ".join("%s" for _ in child_ids)
+                return f'"{fld}" IN ({ph})', child_ids
+            return f'"{fld}" = %s', [val]
+        if op == "parent_of":
+            cr.execute(
+                "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=%s AND column_name='parent_id'",
+                (table,),
+            )
+            if cr.fetchone():
+                cr.execute(
+                    f"""
+                    WITH RECURSIVE ancestors AS (
+                        SELECT id, parent_id FROM "{table}" WHERE id = %s
+                        UNION ALL
+                        SELECT p.id, p.parent_id FROM "{table}" p INNER JOIN ancestors a ON p.id = a.parent_id
+                    )
+                    SELECT id FROM ancestors
+                    """,
+                    (val,),
+                )
+                parent_ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
+                if not parent_ids:
+                    return "1=0", []
+                ph = ", ".join("%s" for _ in parent_ids)
+                return f'"{fld}" IN ({ph})', parent_ids
+            return f'"{fld}" = %s', [val]
+
+    # Implicit AND: list of terms
+    parts = []
+    all_params: List[Any] = []
+    for term in domain:
+        if not isinstance(term, (list, tuple)):
+            continue
+        w, p = _domain_to_sql(term, table, cr, model_cls)
+        if w and w != "1=1":
+            parts.append(f"({w})")
+            all_params.extend(p)
+    if not parts:
+        return "1=1", []
+    return " AND ".join(parts), all_params
 
 
 class Recordset:
@@ -237,6 +344,19 @@ class ModelBase(metaclass=Model):
                 for gid in ids_to_set:
                     if gid:
                         cr.execute(f'INSERT INTO "{rel}" ("{col1}", "{col2}") VALUES (%s, %s)', (rid, gid))
+        computed_list = self._model._compute_stored_values(self)
+        computed_stored = set(self._model._get_stored_computed_fields())
+        if computed_list and cr:
+            table = self._model._table
+            for i, rid in enumerate(self._ids):
+                to_write = {k: v for k, v in (computed_list[i] or {}).items() if k in computed_stored}
+                if to_write:
+                    self._cache.update(to_write)
+                    sets = ", ".join(f'"{k}" = %s' for k in to_write)
+                    cr.execute(
+                        f'UPDATE "{table}" SET {sets} WHERE id = %s',
+                        list(to_write.values()) + [rid],
+                    )
         return True
 
     @classmethod
@@ -250,6 +370,40 @@ class ModelBase(metaclass=Model):
             obj = getattr(cls, name)
             if isinstance(obj, fmod.Field) and getattr(obj, "column_type", None) is not None:
                 result.append(name)
+        return result
+
+    @classmethod
+    def _get_stored_computed_fields(cls) -> List[str]:
+        """Return stored computed field names (Computed with store=True)."""
+        from core.orm import fields as fmod
+        result = []
+        for name in dir(cls):
+            if name.startswith("_"):
+                continue
+            obj = getattr(cls, name)
+            if isinstance(obj, fmod.Computed) and getattr(obj, "store", False):
+                result.append(name)
+        return result
+
+    @classmethod
+    def _compute_stored_values(cls: Type[T], record: "Recordset") -> List[Dict[str, Any]]:
+        """Run compute methods for stored computed fields. Returns list of dicts, one per record."""
+        from core.orm import fields as fmod
+        computed_names = cls._get_stored_computed_fields()
+        n = len(record._ids) if record._ids else 0
+        result: List[Dict[str, Any]] = [{} for _ in range(n)]
+        for fname in computed_names:
+            field = getattr(cls, fname, None)
+            if not isinstance(field, fmod.Computed) or not getattr(field, "compute", None):
+                continue
+            method = getattr(cls, field.compute, None)
+            if not callable(method):
+                continue
+            val = method(record)
+            vals = val if isinstance(val, (list, tuple)) else [val] * n
+            for i, v in enumerate(vals):
+                if i < n:
+                    result[i][fname] = v
         return result
 
     @classmethod
@@ -275,7 +429,11 @@ class ModelBase(metaclass=Model):
             return cls.browse(1)
         table = cls._table
         stored = cls._get_stored_field_names()
-        vals_stored = {k: v for k, v in vals.items() if k != "id" and k in stored}
+        computed_stored = set(cls._get_stored_computed_fields())
+        vals_stored = {
+            k: v for k, v in vals.items()
+            if k != "id" and k in stored and k not in computed_stored
+        }
         cols = [c for c in vals_stored if c in stored]
         if cols:
             col_list = ", ".join(f'"{c}"' for c in cols)
@@ -289,6 +447,9 @@ class ModelBase(metaclass=Model):
         row = cr.fetchone()
         new_id = row["id"] if hasattr(row, "keys") else row[0]
         new_rec = cls.browse(new_id)
+        computed_list = cls._compute_stored_values(new_rec)
+        if computed_list and computed_list[0]:
+            new_rec.write(computed_list[0])
         from core.orm import fields as fmod
         m2m_vals = {k: v for k, v in vals.items() if isinstance(getattr(cls, k, None), fmod.Many2many)}
         if m2m_vals:
@@ -328,118 +489,11 @@ class ModelBase(metaclass=Model):
         domain = combined
         table = cls._table
         where = "1=1"
-        params = []
+        params: List[Any] = []
         if domain:
-            for term in domain:
-                if not isinstance(term, (list, tuple)) or len(term) < 3:
-                    continue
-                fld, op, val = term[0], term[1], term[2]
-                if op == "=":
-                    where += f' AND "{fld}" = %s'
-                    params.append(val)
-                elif op == "!=":
-                    where += f' AND ("{fld}" IS NULL OR "{fld}" != %s)'
-                    params.append(val)
-                elif op == "<":
-                    where += f' AND "{fld}" < %s'
-                    params.append(val)
-                elif op == ">":
-                    where += f' AND "{fld}" > %s'
-                    params.append(val)
-                elif op == "<=":
-                    where += f' AND ("{fld}" IS NULL OR "{fld}" <= %s)'
-                    params.append(val)
-                elif op == ">=":
-                    where += f' AND "{fld}" >= %s'
-                    params.append(val)
-                elif op == "in":
-                    vals = list(val) if isinstance(val, (list, tuple)) else [val]
-                    if not vals:
-                        where += " AND 1=0"
-                    else:
-                        ph = ", ".join("%s" for _ in vals)
-                        where += f' AND "{fld}" IN ({ph})'
-                        params.extend(vals)
-                elif op == "not in":
-                    vals = list(val) if isinstance(val, (list, tuple)) else [val]
-                    if not vals:
-                        where += " AND 1=1"
-                    else:
-                        ph = ", ".join("%s" for _ in vals)
-                        where += f' AND ("{fld}" IS NULL OR "{fld}" NOT IN ({ph}))'
-                        params.extend(vals)
-                elif op == "ilike":
-                    where += f' AND "{fld}" ILIKE %s'
-                    params.append(f"%{val}%" if isinstance(val, str) else val)
-                elif op == "like":
-                    where += f' AND "{fld}" LIKE %s'
-                    params.append(f"%{val}%" if isinstance(val, str) else val)
-                elif op == "=like":
-                    where += f' AND "{fld}" LIKE %s'
-                    params.append(val)
-                elif op == "child_of":
-                    cr.execute(
-                        """
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_schema='public' AND table_name=%s AND column_name='parent_id'
-                        """,
-                        (table,),
-                    )
-                    if cr.fetchone():
-                        ids_param = "child_of_ids_" + str(len(params))
-                        cr.execute(
-                            f"""
-                            WITH RECURSIVE descendants AS (
-                                SELECT id FROM "{table}" WHERE id = %s
-                                UNION ALL
-                                SELECT p.id FROM "{table}" p
-                                INNER JOIN descendants d ON p.parent_id = d.id
-                            )
-                            SELECT id FROM descendants
-                            """,
-                            (val,),
-                        )
-                        child_ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
-                        if not child_ids:
-                            where += " AND 1=0"
-                        else:
-                            ph = ", ".join("%s" for _ in child_ids)
-                            where += f' AND "{fld}" IN ({ph})'
-                            params.extend(child_ids)
-                    else:
-                        where += f' AND "{fld}" = %s'
-                        params.append(val)
-                elif op == "parent_of":
-                    cr.execute(
-                        """
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_schema='public' AND table_name=%s AND column_name='parent_id'
-                        """,
-                        (table,),
-                    )
-                    if cr.fetchone():
-                        cr.execute(
-                            f"""
-                            WITH RECURSIVE ancestors AS (
-                                SELECT id, parent_id FROM "{table}" WHERE id = %s
-                                UNION ALL
-                                SELECT p.id, p.parent_id FROM "{table}" p
-                                INNER JOIN ancestors a ON p.id = a.parent_id
-                            )
-                            SELECT id FROM ancestors
-                            """,
-                            (val,),
-                        )
-                        parent_ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
-                        if not parent_ids:
-                            where += " AND 1=0"
-                        else:
-                            ph = ", ".join("%s" for _ in parent_ids)
-                            where += f' AND "{fld}" IN ({ph})'
-                            params.extend(parent_ids)
-                    else:
-                        where += f' AND "{fld}" = %s'
-                        params.append(val)
+            dom_where, dom_params = _domain_to_sql(domain, table, cr, cls)
+            where = dom_where
+            params = list(dom_params)
         order_by = f' ORDER BY {order}' if order else ""
         limit_clause = f" LIMIT {limit}" if limit else ""
         params.append(offset)

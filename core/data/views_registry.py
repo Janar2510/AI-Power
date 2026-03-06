@@ -46,6 +46,7 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                             "columns": arch_dict.get("columns", []),
                             "fields": arch_dict.get("fields", []),
                             "default_group_by": arch_dict.get("default_group_by", ""),
+                            "search_fields": arch_dict.get("search_fields", []),
                         }
                         views.setdefault(model, []).append(view_def)
                     reg["views"] = views
@@ -55,7 +56,7 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
     Menu = env.get("ir.ui.menu")
     if ActWindow:
         try:
-            rows = ActWindow.search_read([], ["xml_id", "name", "res_model", "view_mode"])
+            rows = ActWindow.search_read([], ["xml_id", "name", "res_model", "view_mode", "context", "domain"])
             if rows:
                 actions: Dict[str, Dict] = {}
                 for r in rows:
@@ -68,6 +69,8 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                         "name": r.get("name", ""),
                         "res_model": r.get("res_model", ""),
                         "view_mode": view_mode,
+                        "context": r.get("context", "") or "",
+                        "domain": r.get("domain", "") or "",
                         "type": "ir.actions.act_window",
                     }
                 reg["actions"] = actions
@@ -151,6 +154,7 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
                         view_type = arch.get("type", "list") if isinstance(arch, dict) else "list"
                         cols = arch.get("columns", []) if isinstance(arch, dict) else []
                         flds = arch.get("fields", []) if isinstance(arch, dict) else []
+                        search_fields = arch.get("search_fields", []) if isinstance(arch, dict) else []
                         if view_type == "kanban" and not cols:
                             flds = arch.get("fields", []) if isinstance(arch, dict) else []
                         view_def = {
@@ -161,6 +165,7 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
                             "columns": cols,
                             "fields": flds,
                             "default_group_by": arch.get("default_group_by", "") if isinstance(arch, dict) else "",
+                            "search_fields": search_fields,
                         }
                         views.setdefault(m, []).append(view_def)
                         id_map[full_id] = full_id
@@ -171,6 +176,8 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
                         "name": r.get("name", ""),
                         "res_model": r.get("res_model", ""),
                         "view_mode": (r.get("view_mode") or "list,form").split(","),
+                        "context": r.get("context", "") or "",
+                        "domain": r.get("domain", "") or "",
                         "type": "ir.actions.act_window",
                     }
                     id_map[full_id] = full_id

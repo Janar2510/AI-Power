@@ -67,6 +67,9 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
         default_group = node.get("default_group_by", "")
         fields = [f.get("name", "") for f in node.findall("field") if f.get("name")]
         return {"type": "kanban", "default_group_by": default_group, "fields": fields}
+    if tag == "search":
+        search_fields = [f.get("name", "") for f in node.findall("field") if f.get("name")]
+        return {"type": "search", "search_fields": search_fields}
     return {"type": tag}
 
 

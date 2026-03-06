@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.21.0 (Phases 51–54: Action domain, search view, saved filters, computed fields)
+
+### Phase 51: Action context and domain
+- ir.actions.act_window: context, domain fields; load_views passes to frontend
+- main.js: apply action domain on list load; parseActionDomain, getActionForRoute
+
+### Phase 52: Search view (filter fields from XML)
+- xml_loader: parse \<search\> arch with \<field\> elements
+- views_registry: search_fields per model from search view
+- main.js: buildSearchDomain from search_fields; ORM _domain_to_sql supports | and &
+
+### Phase 53: Saved filters (client-side)
+- main.js: getSavedFilters, saveSavedFilter, removeSavedFilter (localStorage)
+- List toolbar: Filters dropdown, Save button for current search
+
+### Phase 54: Computed fields (stored)
+- core/orm/fields.py: Computed(compute=, store=True); column_type from store
+- core/orm/models.py: _get_stored_computed_fields, _compute_stored_values; create/write trigger compute
+- res.partner: display_name computed from name; test_computed_field_stored_on_create
+
 ## 1.20.0 (Phases 46–50: Search operators, form metadata, ir.rule, ir.ui.view, menu visibility)
 
 ### Phase 46: Search operators (child_of, =like)

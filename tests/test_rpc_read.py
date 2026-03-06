@@ -100,3 +100,17 @@ class TestRpcRead(unittest.TestCase):
         self.assertGreaterEqual(len(result), 1)
         ids = [r["id"] for r in result]
         self.assertIn(1, ids)
+
+    def test_computed_field_stored_on_create(self):
+        """Stored computed field (display_name) is computed on create and returned in search_read (Phase 54)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        rec = _call_kw(1, self.db, "res.partner", "create", [{"name": "ComputedTestPartner"}], {})
+        rec_id = rec.ids[0] if rec.ids else getattr(rec, "id", None)
+        self.assertIsInstance(rec_id, int)
+        result = _call_kw(1, self.db, "res.partner", "search_read", [[["id", "=", rec_id]]], {
+            "fields": ["id", "name", "display_name"],
+        })
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["name"], "ComputedTestPartner")
+        self.assertEqual(result[0]["display_name"], "ComputedTestPartner")

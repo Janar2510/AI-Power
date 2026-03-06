@@ -103,6 +103,8 @@ def _load_ir_actions_menus(env) -> None:
                 "name": act.get("name", ""),
                 "res_model": act.get("res_model", ""),
                 "view_mode": view_mode or "list,form",
+                "context": act.get("context", "") or "",
+                "domain": act.get("domain", "") or "",
             }
             if existing:
                 ActWindow.browse(existing.ids[0]).write(vals)
@@ -207,6 +209,7 @@ def _load_ir_ui_views(env) -> None:
                     "columns": v.get("columns", []),
                     "fields": v.get("fields", []),
                     "default_group_by": v.get("default_group_by", ""),
+                    "search_fields": v.get("search_fields", []),
                 }
                 arch_json = json.dumps(arch_dict)
                 existing = IrUiView.search([("xml_id", "=", xml_id)])

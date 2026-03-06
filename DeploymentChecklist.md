@@ -81,6 +81,12 @@
 - [ ] /web/load_views returns actions and menus from DB when authenticated
 - [ ] Navbar menus render from DB; runtime changes to actions/menus reflected on next load
 
+## Phases 51–54 (Action domain, search view, saved filters, computed fields)
+
+- [ ] List views: action domain applied as default filter; search bar uses search_fields from XML
+- [ ] Saved filters: Filters dropdown in list; Save current search to localStorage
+- [ ] res.partner.display_name: stored computed field; search_read returns display_name
+
 ## Phases 46–50 (Search operators, form metadata, ir.rule, ir.ui.view, menu visibility)
 
 - [ ] Search domain [("name", "=like", "Estonia")] exact match; [("id", "child_of", id)] hierarchical

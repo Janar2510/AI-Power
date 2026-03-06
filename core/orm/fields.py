@@ -119,6 +119,24 @@ class Html(Field):
     column_type = "text"
 
 
+class Computed(Field):
+    """Computed field - value from compute method, optionally stored."""
+
+    type = "computed"
+
+    def __init__(
+        self,
+        compute: Optional[str] = None,
+        store: bool = False,
+        string: str = "",
+        **kwargs,
+    ):
+        super().__init__(string=string, readonly=True, **kwargs)
+        self.compute = compute or ""
+        self.store = store
+        self.column_type = "varchar" if store else None
+
+
 class Binary(Field):
     """Binary field - stored as bytea in PostgreSQL."""
 

@@ -211,6 +211,8 @@ def _load_ir_ui_views(env) -> None:
                     "default_group_by": v.get("default_group_by", ""),
                     "search_fields": v.get("search_fields", []),
                 }
+                if v.get("children"):
+                    arch_dict["children"] = v["children"]
                 arch_json = json.dumps(arch_dict)
                 existing = IrUiView.search([("xml_id", "=", xml_id)])
                 vals = {

@@ -1,4 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ir_filters,access_ir_filters,model_ir_filters,,1,1,1,1
+access_mail_activity,access_mail_activity,model_mail_activity,,1,1,1,1
+access_mail_message,access_mail_message,model_mail_message,,1,1,1,1
 access_res_users,access_res_users,model_res_users,,1,1,1,1
 access_res_partner,access_res_partner,model_res_partner,,1,1,1,1
 access_res_country,access_res_country,model_res_country,,1,1,1,1

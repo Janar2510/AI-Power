@@ -128,6 +128,30 @@ def create_many2many_table(cursor: Any, relation: str, column1: str, column2: st
     _logger.info("Created relation table %s", relation)
 
 
+def _apply_sql_constraints(cursor: Any, model_class: Type[ModelBase]) -> None:
+    """Create SQL constraints defined in model._sql_constraints."""
+    constraints = getattr(model_class, "_sql_constraints", None)
+    if not constraints:
+        return
+    table = getattr(model_class, "_table", None)
+    if not table or not table_exists(cursor, table):
+        return
+    for name, definition, _message in constraints:
+        constraint_name = f"{table}_{name}"
+        cursor.execute(
+            "SELECT 1 FROM information_schema.table_constraints "
+            "WHERE constraint_name = %s AND table_name = %s",
+            (constraint_name, table),
+        )
+        if cursor.fetchone():
+            continue
+        try:
+            cursor.execute(f'ALTER TABLE "{table}" ADD CONSTRAINT "{constraint_name}" {definition}')
+            _logger.info("Added constraint %s on %s", constraint_name, table)
+        except Exception as e:
+            _logger.warning("Could not add constraint %s on %s: %s", constraint_name, table, e)
+
+
 def init_schema(cursor: Any, registry: Any) -> None:
     """Create tables for all registered models; add missing columns; create Many2many tables."""
     for model_name, model_class in registry._models.items():
@@ -147,3 +171,5 @@ def init_schema(cursor: Any, registry: Any) -> None:
             table2 = comodel.replace(".", "_") if comodel else "unknown"
             create_many2many_table(cursor, rel, col1, col2, table, table2)
     add_missing_columns(cursor, registry)
+    for model_name, model_class in registry._models.items():
+        _apply_sql_constraints(cursor, model_class)

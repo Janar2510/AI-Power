@@ -8,6 +8,9 @@
         <search>
           <field name="name"/>
           <field name="description"/>
+          <filter name="opportunities" string="Opportunities" domain="[('type','=','opportunity')]"/>
+          <filter name="leads" string="Leads" domain="[('type','=','lead')]"/>
+          <filter name="group_stage" string="Stage" context="{'group_by': 'stage_id'}"/>
         </search>
       </field>
     </record>
@@ -19,6 +22,7 @@
           <field name="name"/>
           <field name="type"/>
           <field name="stage_id" comodel="crm.stage"/>
+          <field name="date_deadline"/>
           <field name="expected_revenue"/>
           <field name="tag_ids" comodel="crm.tag"/>
         </list>
@@ -29,15 +33,22 @@
       <field name="model">crm.lead</field>
       <field name="arch" type="xml">
         <form>
-          <field name="name"/>
-          <field name="type"/>
-          <field name="partner_id" comodel="res.partner"/>
-          <field name="stage_id" comodel="crm.stage"/>
-          <field name="expected_revenue"/>
-          <field name="description"/>
-          <field name="note_html"/>
+          <header>
+            <field name="stage_id" comodel="crm.stage" widget="statusbar"/>
+            <button name="action_mark_won" string="Mark Won" type="object"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="type"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="expected_revenue" invisible="[('type','=','lead')]"/>
+            <field name="description"/>
+            <field name="note_html"/>
           <field name="tag_ids" comodel="crm.tag"/>
+          <field name="date_deadline"/>
           <field name="activity_ids"/>
+          <field name="message_ids"/>
+          </sheet>
         </form>
       </field>
     </record>
@@ -57,10 +68,27 @@
         </kanban>
       </field>
     </record>
+    <record model="ir.ui.view" id="crm_lead_calendar">
+      <field name="name">crm.lead calendar</field>
+      <field name="model">crm.lead</field>
+      <field name="arch" type="xml">
+        <calendar date_start="date_deadline" string="name"/>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="crm_lead_graph">
+      <field name="name">crm.lead graph</field>
+      <field name="model">crm.lead</field>
+      <field name="arch" type="xml">
+        <graph type="bar">
+          <field name="stage_id" type="row" comodel="crm.stage"/>
+          <field name="expected_revenue" type="measure"/>
+        </graph>
+      </field>
+    </record>
     <record model="ir.actions.act_window" id="action_crm_lead">
       <field name="name">Leads</field>
       <field name="res_model">crm.lead</field>
-      <field name="view_mode">kanban,list,form</field>
+      <field name="view_mode">kanban,list,graph,calendar,form</field>
     </record>
     <menuitem name="Leads" id="menu_crm_lead" action="action_crm_lead" sequence="30"/>
   </data>

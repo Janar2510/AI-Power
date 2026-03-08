@@ -34,11 +34,11 @@ def _get_access_map() -> dict:
 
 def _op_for_method(method: str) -> str:
     """Map ORM method to access operation."""
-    if method in ("search", "search_read", "read", "get_param"):
+    if method in ("search", "search_read", "search_count", "read", "read_group", "get_param", "onchange", "fields_get", "default_get", "name_get", "name_search"):
         return "read"
-    if method == "create":
+    if method in ("create", "import_data"):
         return "create"
-    if method in ("write", "set_param", "action_confirm"):
+    if method in ("write", "set_param", "action_confirm", "copy", "action_mark_won", "activity_schedule", "message_post"):
         return "write"
     if method == "unlink":
         return "unlink"
@@ -58,6 +58,17 @@ def _rpc_unauthorized(req_id: Any) -> Response:
     )
 
 
+class UserError(Exception):
+    """User-facing error (validation, constraint violation)."""
+    pass
+
+
+_CLASS_METHODS = frozenset({
+    "create", "import_data", "search", "search_read", "search_count", "read", "read_group", "read_ids", "write_ids",
+    "fields_get", "default_get", "onchange", "name_get", "name_search", "write", "copy",
+})
+
+
 def _call_kw(uid: int, db: str, model: str, method: str, args: List, kwargs: Dict) -> Any:
     """Execute model method with user context."""
     if model is None or not str(model).strip():
@@ -74,9 +85,26 @@ def _call_kw(uid: int, db: str, model: str, method: str, args: List, kwargs: Dic
             fn = getattr(Model, "read_ids")
         elif method == "write" and hasattr(Model, "write_ids"):
             fn = getattr(Model, "write_ids")
+        elif method == "search_count" and fn is None:
+            # Fallback for models that may not have search_count (e.g. before Phase 56)
+            search_fn = getattr(Model, "search", None)
+            if search_fn:
+                domain = args[0] if args else []
+                return len(search_fn(domain))
         if fn is None:
             raise ValueError(f"Model {model} has no method {method}")
-        return fn(*args, **kwargs)
+        try:
+            if method not in _CLASS_METHODS:
+                # Recordset method: first arg is ids
+                ids = args[0] if args else []
+                recs = Model.browse(ids)
+                return getattr(recs, method)(*args[1:], **kwargs)
+            return fn(*args, **kwargs)
+        except Exception as e:
+            from core.orm.api import ValidationError
+            if isinstance(e, ValidationError):
+                raise UserError(str(e)) from e
+            raise
 
 
 def dispatch_jsonrpc(request: Request) -> Response:
@@ -141,6 +169,12 @@ def dispatch_jsonrpc(request: Request) -> Response:
                     mimetype="application/json",
                 )
 
+            # Odoo copy: args may be [id] or [[id]]; we expect single id
+            if method_name == "copy" and method_args:
+                first = method_args[0]
+                if isinstance(first, list):
+                    method_args = [first[0] if first else 0] + list(method_args[1:])
+
             # Odoo create: args = [records] where records is list of dicts; our create expects single dict
             if method_name == "create" and method_args and isinstance(method_args[0], list):
                 records = method_args[0]
@@ -154,7 +188,7 @@ def dispatch_jsonrpc(request: Request) -> Response:
                     result = result.ids
                 elif isinstance(result, ModelBase):
                     result = result.id if result.id is not None else result.ids
-                if model_name in ("res.partner", "crm.lead") and method_name in ("create", "write"):
+                if model_name in ("res.partner", "crm.lead") and method_name in ("create", "write", "copy"):
                     try:
                         from addons.ai_assistant.tools.registry import index_record_for_rag
                         registry = _get_registry(db)
@@ -162,7 +196,7 @@ def dispatch_jsonrpc(request: Request) -> Response:
                             env = Environment(registry, cr=cr, uid=uid)
                             registry.set_env(env)
                             ids_to_index = []
-                            if method_name == "create":
+                            if method_name == "create" or method_name == "copy":
                                 ids_to_index = [result] if isinstance(result, int) else (result or [])
                             elif method_name == "write" and method_args and len(method_args) >= 1:
                                 ids_to_index = method_args[0] if isinstance(method_args[0], list) else [method_args[0]]

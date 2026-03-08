@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Lead Summary</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1rem; color: #333; }
+    h1 { margin-top: 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+    .lead-name { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Lead Summary Report</h1>
+  {% for record in records %}
+  <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #ddd; border-radius: 4px;">
+    <p class="lead-name">{{ record.name or 'Untitled' }}</p>
+    <p><strong>Type:</strong> {{ record.type or '-' }}</p>
+    <p><strong>Stage:</strong> {{ record.stage_id_display or '-' }}</p>
+    <p><strong>Expected Revenue:</strong> {{ "%.2f"|format(record.expected_revenue or 0) }}</p>
+    <p><strong>Deadline:</strong> {{ record.date_deadline or '-' }}</p>
+    {% if record.description %}
+    <p><strong>Description:</strong> {{ record.description[:200] }}{% if record.description|length > 200 %}...{% endif %}</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</body>
+</html>

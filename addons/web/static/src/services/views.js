@@ -38,6 +38,15 @@
       return (_cache && _cache.menus) || [];
     },
 
+    getFieldsMeta(model) {
+      return (_cache && _cache.fields_meta && _cache.fields_meta[model]) || null;
+    },
+
+    getFieldMeta(model, fname) {
+      var meta = this.getFieldsMeta(model);
+      return meta ? (meta[fname] || null) : null;
+    },
+
     clearCache() { _cache = null; }
   };
 

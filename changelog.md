@@ -1,5 +1,210 @@
 # Changelog
 
+## 1.28.0 (Phases 84–88: Graph, Search Facets, Import, Reports, AI/LLM)
+
+### Phase 84: Graph view
+- core/data/xml_loader.py: parse `<graph type="bar">` with `<field name="..." type="row|col|measure"/>` and optional comodel
+- core/data/views_registry.py: graph view_def with graph_type, fields
+- core/orm/models.py: read_group(domain, fields, groupby, lazy) with SQL GROUP BY, SUM, COUNT
+- core/http/rpc.py: read_group registered as read op; Chart.js CDN in webclient HTML
+- addons/crm/views/crm_views.xml: crm_lead_graph view; view_mode includes graph
+- addons/web/static/src/main.js: loadGraphData, renderGraph with Chart.js; view switcher Graph button; bar/line/pie type switcher
+- test_read_group_aggregation
+
+### Phase 85: Search facets + group by
+- core/data/xml_loader.py: parse `<filter>` in search arch (name, string, domain, context with group_by)
+- core/data/views_registry.py: search view_def with filters, group_bys
+- addons/crm/views/crm_views.xml: search filters (Opportunities, Leads), group_stage group-by
+- addons/web/static/src/main.js: filter buttons (toggleable), group-by dropdown, facet chips (removable), grouped list rows with headers and subtotals
+
+### Phase 86: Import wizard
+- core/orm/models.py: import_data(fields, rows) - create/update by id; Many2one name_search resolve
+- core/http/rpc.py: import_data registered as create op
+- addons/web/static/src/main.js: Import button, CSV upload modal, column mapping, result summary
+- test_import_data_creates_records
+
+### Phase 87: QWeb-style reports
+- core/http/report.py: _REPORT_REGISTRY, _render_report_html, _render_report_pdf; handle_report for /report/html|pdf
+- core/http/application.py: report route handling before route dispatch
+- addons/crm/report/lead_summary.html: Jinja2 template
+- addons/web/static/src/main.js: Print button on form and list; getReportName
+- test_report_html_renders
+
+### Phase 88: AI LLM integration
+- addons/ai_assistant/llm.py: call_llm() with OpenAI function-calling; tool_calls loop; _get_api_key from env or ir.config_parameter
+- addons/ai_assistant/controllers/ai_controller.py: /ai/config (llm_enabled, llm_model); ai_chat uses call_llm when ai.llm_enabled=1; RAG context injection in system message
+- addons/web/static/src/main.js: AI Configuration section in Settings (API key, enable toggle, model selector)
+- addons/web/static/src/chat_panel.js: fetch /ai/config; LLM mode (prompt-only when enabled); loading indicator; tool/model row hidden when LLM on
+- addons/web/views/webclient_templates.xml: chat-tool-row wrapper for tool/model selects
+- tests/test_ai_llm.py: test_ai_chat_llm_with_mock, test_ai_chat_requires_tool_when_llm_disabled, test_ai_config_returns_llm_settings
+
+## 1.27.0 (Phases 79–83: Settings UI, ir.filters, Chatter, Calendar, Form UX)
+
+### Phase 79: Settings UI
+- addons/base/views/ir_views.xml: res_users_list, res_users_form, action_res_users, menu_settings_users
+- addons/web/static/src/main.js: renderSettings() replaces stub; General (company), Users link, System Parameters (ir.config_parameter), API Keys
+- Route #settings/users for res.users list/form
+
+### Phase 80: Server-side ir.filters
+- addons/base/models/ir_filters.py: IrFilters (name, model_id, domain, context, user_id, is_default)
+- addons/web/static/src/main.js: getSavedFilters RPC to ir.filters; saveSavedFilter create; removeSavedFilter unlink; localStorage fallback
+- test_ir_filters_create_and_read
+
+### Phase 81: Chatter (mail.message + mail.thread)
+- addons/base/models/mail_message.py: MailMessage, MailThreadMixin with message_ids, message_post()
+- addons/crm/models/crm_lead.py: MailThreadMixin; message_ids in form
+- addons/web/static/src/main.js: chatter widget on lead form; loadChatter, setupChatter; message_post RPC
+- core/http/rpc.py: message_post in write op
+- test_message_post_and_read
+
+### Phase 82: Calendar view
+- addons/crm/models/crm_lead.py: date_deadline field
+- addons/crm/views/crm_views.xml: crm_lead_calendar view; view_mode includes calendar
+- core/data/xml_loader.py: parse calendar date_start, string
+- core/data/views_registry.py: calendar view_def date_start, string
+- addons/web/static/src/main.js: renderCalendar month grid; Prev/Next/Today; view switcher Calendar button
+
+### Phase 83: Form UX hardening
+- addons/web/static/src/main.js: validateRequiredFields; showFieldError/clearFieldErrors; setupFormDirtyTracking; form-dirty-banner; navigation guard (confirm on leave)
+- addons/web/static/src/scss/webclient.css: .field-error, .field-error-msg, .form-dirty-banner
+- Server ValidationError displayed on relevant field when message contains field name
+
+## 1.26.0 (Phases 74–78: form structure, activity mixin, server actions, export, design system)
+
+### Phase 74: Form structure (header, sheet, button_box)
+- core/data/xml_loader.py: _parse_form_child handles header, sheet, button, oe_button_box
+- addons/crm/views/crm_views.xml, addons/base/views/ir_views.xml: form wrapped in header + sheet
+- addons/web/static/src/main.js: renderFormTreeToHtml for header, sheet, button_box, button; btn-action-object RPC
+- addons/web/static/src/scss/webclient.css: .o-form-header, .o-form-sheet, .o-button-box
+
+### Phase 75: Activity mixin (mail.activity)
+- addons/base/models/mail_activity.py: MailActivity (res_model, res_id, summary, note, date_deadline, user_id, state); MailActivityMixin with activity_ids, activity_schedule
+- core/orm/fields.py: One2many domain, inverse_extra for generic relations
+- core/orm/models.py: One2many read/write with domain; Recordset __getattr__, id, env for mixin methods
+- core/http/rpc.py: recordset methods (first arg ids) via browse
+- addons/crm/models/crm_lead.py: MailActivityMixin; activity_ids now mail.activity
+- addons/ai_assistant/tools/registry.py: create_activity uses activity_schedule
+- test_mail_activity_create_and_read
+
+### Phase 76: Server actions + form action buttons
+- addons/crm/models/crm_lead.py: action_mark_won() sets stage to Won
+- addons/crm/views/crm_views.xml: Mark Won button in header
+- core/http/rpc.py: _op_for_method for action_mark_won, activity_schedule
+- test_action_button_calls_method
+
+### Phase 77: List export to CSV
+- addons/web/static/src/main.js: Export button in list toolbar; client-side CSV from table DOM; Blob + URL.createObjectURL download
+
+### Phase 78: CSS design system
+- addons/web/static/src/scss/webclient.css: :root tokens (--space-xs..xl, --card-gap, --border-color, --text-muted, --color-primary/success/danger/warning, --radius-sm/md)
+- Replaced hardcoded colors/spacing with CSS variables
+- @keyframes o-card-gradient, .o-card-gradient for gradient border animation
+- Dark-mode ready (var(--color-bg) instead of white)
+
+## 1.25.0 (Phases 69–73: default_get, name_get, attrs, copy, statusbar)
+
+### Phase 69: default_get + field defaults from context
+- core/orm/models.py: default_get(cls, field_names, context) merges field.default with context["default_<fname>"]
+- core/http/rpc.py: default_get registered as read
+- addons/web/static/src/main.js: renderForm for new records calls default_get, applies defaults before loadOptions
+- test_default_get_returns_field_defaults
+
+### Phase 70: name_get / name_search
+- core/orm/models.py: name_get(ids), name_search(name, domain, operator, limit)
+- core/http/rpc.py: name_get, name_search registered as read
+- addons/web/static/src/main.js: Many2one replaced with searchable input; debounced name_search; dropdown selection
+- test_name_get_returns_display_name, test_name_search_filters_by_name
+
+### Phase 71: Field visibility (attrs)
+- core/data/xml_loader.py: parse invisible, readonly, required_cond on field elements
+- addons/web/static/src/main.js: evaluateCondition, applyAttrsToForm; attr-field wrapper; o-invisible class
+- addons/web/static/src/scss/webclient.css: .o-invisible
+- addons/crm/views/crm_views.xml: expected_revenue invisible="[('type','=','lead')]"
+
+### Phase 72: Record duplication (copy)
+- core/orm/models.py: copy(cls, id, default) reads record, excludes o2m/computed/related, appends " (copy)" to name
+- core/http/rpc.py: copy registered as write; RAG indexing for copy
+- addons/web/static/src/main.js: Duplicate and Delete buttons in form; copy RPC, navigate to new record
+- test_copy_creates_duplicate
+
+### Phase 73: Statusbar widget
+- core/data/xml_loader.py: widget attribute already parsed
+- addons/web/static/src/main.js: renderFieldHtml for widget="statusbar"; setupStatusbar; pills for Many2one/Selection; click writes and reloads
+- addons/web/static/src/scss/webclient.css: .o-statusbar, .o-statusbar-item, .o-statusbar-item--active, .o-statusbar-item--done
+- addons/crm/views/crm_views.xml: stage_id with widget="statusbar" in form header
+
+## 1.24.0 (Phases 67–68: One2many editable, multi-level Related)
+
+### Phase 67: One2many editable from parent form
+- addons/web/static/src/main.js: getOne2manyLineFields, renderOne2manyRow, setupOne2manyAddButtons; O2m div renders editable table with Add/Delete; getFormVals collects o2m rows
+- core/orm/models.py: create excludes One2many from vals_stored; after parent create, creates children with inverse_name; write processes One2many (create new, update existing, unlink removed)
+
+### Phase 68: Multi-level Related fields
+- core/orm/models.py: _compute_related_values extended for multi-level chains (e.g. partner_id.country_id.code); walks chain, builds maps per step, resolves final value per record
+- addons/base/models/res_partner.py: country_code = fields.Related("country_id.code", store=True)
+- test_related_field_multi_level
+
+## 1.23.0 (Phases 61–66: fields_get, model/view inheritance, constraints, breadcrumbs, prefetch)
+
+### Phase 66: Prefetch / cache heuristics
+- core/orm/models.py: _prefetch_many2one_display() in read(); batch-fetches display_name for Many2one fields, adds fname_display to each row
+- addons/web/static/src/main.js: getDisplayNames uses pre-fetched _display when present, skips RPC
+
+### Phase 61: fields_get metadata
+- core/orm/models.py: fields_get() classmethod returns type, string, required, readonly, selection, comodel per field
+- core/http/rpc.py: fields_get registered as read
+- core/http/routes.py: load_views includes fields_meta per model
+- addons/web/static/src/services/views.js: getFieldsMeta, getFieldMeta
+- addons/web/static/src/main.js: getFieldMeta helper; getSelectionOptions, isBooleanField, isBinaryField, getOne2manyInfo, getMany2manyInfo now metadata-driven; form labels use field.string
+
+### Phase 62: Model inheritance (_inherit)
+- core/orm/models.py: Model metaclass handles _inherit attribute; extension inheritance (no new _name)
+- core/orm/registry.py: merge_model() merges fields and methods into existing model class
+
+### Phase 63: View inheritance (xpath)
+- core/data/xml_loader.py: _parse_record detects inherit_id + raw xpath arch
+- core/data/views_registry.py: _find_node_in_children, _apply_xpath_ops, _parse_xpath_from_raw_xml; positions: inside, after, before, replace, attributes; inherit_pending collection and application
+
+### Phase 64: SQL + Python constraints
+- core/orm/api.py: ValidationError, @constrains decorator
+- core/orm/models.py: _sql_constraints list; _sql_constraint_message; _run_python_constraints in create/write; IntegrityError caught and mapped to ValidationError
+- core/db/schema.py: _apply_sql_constraints in init_schema
+- core/http/rpc.py: UserError wraps ValidationError in RPC
+
+### Phase 65: Breadcrumbs + action stack
+- addons/web/static/src/main.js: actionStack, pushBreadcrumb, popBreadcrumbTo, renderBreadcrumbs, attachBreadcrumbHandlers; list/kanban/form/settings/apikeys set breadcrumbs; form shows record name after load
+- addons/web/static/src/scss/webclient.css: .breadcrumbs, .breadcrumb-item, .breadcrumb-sep styles
+
+## 1.22.0 (Phases 56–60: List pagination, toasts, form layout, related fields, onchange)
+
+### Phase 56: List pagination + sortable columns
+- core/orm/models.py: search_count(domain) classmethod
+- core/http/rpc.py: search_count in _op_for_method as read
+- main.js: currentListState.offset, limit, order, totalCount; loadRecords calls search_count + search_read; sortable column headers; pager "1-80 of N | Prev | Next"
+
+### Phase 57: Toast notifications
+- core/http/routes.py, webclient_templates.xml: #toast-container in shell
+- main.js: showToast(message, type); replace alert() with showToast in create/update/delete, kanban, API Keys
+- webclient.css: .toast, .toast-success, .toast-error, .toast-warning, .toast-info
+
+### Phase 58: Form layout (group, notebook, page)
+- core/data/xml_loader.py: _parse_form_child for group/notebook/page; form arch children tree
+- main.js: renderFormTreeToHtml, renderFieldHtml; notebook tabs; form-group, form-notebook CSS
+- ir_views.xml: res.partner form with group and notebook
+
+### Phase 59: Related fields
+- core/orm/fields.py: Related(related=, store=)
+- core/orm/models.py: _get_stored_related_fields, _compute_related_values; create/write trigger
+- crm.lead: partner_name = fields.Related("partner_id.name", store=True)
+- test_related_field_stored_on_create
+
+### Phase 60: Server-side onchange
+- core/orm/models.py: onchange(field_name, vals) classmethod; calls _onchange_<field> if defined
+- core/http/rpc.py: onchange in _op_for_method as read
+- addons/base/models/res_partner.py: _onchange_country_id returns {"state_id": None}
+- main.js: runServerOnchange (debounced), setupOnchangeHandlers; apply updates to form on field change/blur
+- test_onchange_country_id_clears_state_id
+
 ## 1.21.0 (Phases 51–54: Action domain, search view, saved filters, computed fields)
 
 ### Phase 51: Action context and domain
@@ -19,6 +224,13 @@
 - core/orm/fields.py: Computed(compute=, store=True); column_type from store
 - core/orm/models.py: _get_stored_computed_fields, _compute_stored_values; create/write trigger compute
 - res.partner: display_name computed from name; test_computed_field_stored_on_create
+
+### Phase 55: Binary field and file upload
+- core/orm/models.py: Binary encode to base64 on read (bytes/memoryview); _decode_binary_vals for create/write
+- core/data/xml_loader.py: parse widget="binary" on form fields
+- addons/base/views/ir_views.xml: ir.attachment list/form views, action, Attachments menu
+- addons/web/static/src/main.js: isBinaryField, file input + hidden base64; getFormVals includes binary; attachments route
+- test_binary_field_create_and_read
 
 ## 1.20.0 (Phases 46–50: Search operators, form metadata, ir.rule, ir.ui.view, menu visibility)
 

@@ -1,0 +1,106 @@
+"""Report rendering - Jinja2 HTML templates, optional PDF via weasyprint."""
+
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from werkzeug.wrappers import Response
+
+from core.tools import config
+from core.modules.module import get_module_path
+from core.sql_db import get_cursor
+from core.orm import Environment
+from core.http.auth import get_session_uid, get_session_db, _get_registry
+from .request import Request
+
+# Report name -> (model, template_path, fields)
+_REPORT_REGISTRY: Dict[str, tuple] = {
+    "crm.lead_summary": ("crm.lead", "crm/report/lead_summary.html", ["id", "name", "type", "stage_id", "expected_revenue", "date_deadline", "description"]),
+}
+
+
+def _register_reports():
+    """Ensure report registry is populated from modules."""
+    pass  # Can be extended to load from ir.actions.report
+
+
+def _load_template(module: str, rel_path: str) -> Optional[str]:
+    """Load template content from module path."""
+    base = get_module_path(module)
+    if not base:
+        return None
+    path = base / rel_path
+    if not path.exists() or not path.is_file():
+        return None
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def _render_report_html(report_name: str, ids: List[int], request: Request) -> Optional[Response]:
+    """Render report as HTML. Returns Response or None."""
+    if report_name not in _REPORT_REGISTRY:
+        return None
+    reg = _REPORT_REGISTRY[report_name]
+    model_name, template_rel = reg[0], reg[1]
+    report_fields = reg[2] if len(reg) > 2 else ["id", "name"]
+    module = template_rel.split("/")[0]
+    template_path = "/".join(template_rel.split("/")[1:])
+    content = _load_template(module, template_path)
+    if not content:
+        return Response("Report template not found", status=404)
+
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response("Unauthorized", status=401)
+    registry = _get_registry(db)
+    with get_cursor(db) as cr:
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        Model = env.get(model_name)
+        if not Model:
+            return Response("Model not found", status=404)
+        records = Model.browse(ids).read(report_fields) if ids else []
+        if not ids and not records:
+            records = []
+
+    try:
+        from jinja2 import Template
+        template = Template(content)
+        html = template.render(records=records)
+        return Response(html, mimetype="text/html; charset=utf-8")
+    except Exception as e:
+        return Response(f"Template error: {e}", status=500)
+
+
+def _render_report_pdf(report_name: str, ids: List[int], request: Request) -> Optional[Response]:
+    """Render report as PDF. Falls back to HTML if weasyprint not available."""
+    html_resp = _render_report_html(report_name, ids, request)
+    if not html_resp or html_resp.status_code != 200:
+        return html_resp
+    try:
+        from weasyprint import HTML
+        from io import BytesIO
+        pdf_bytes = HTML(string=html_resp.get_data(as_text=True)).write_pdf()
+        return Response(pdf_bytes, mimetype="application/pdf")
+    except ImportError:
+        return html_resp
+    except Exception as e:
+        return html_resp  # Fallback to HTML on PDF error
+
+
+REPORT_PATH_RE = re.compile(r"^/report/(html|pdf)/([a-zA-Z0-9_.]+)/([\d,]+)$")
+
+
+def handle_report(request: Request) -> Optional[Response]:
+    """Handle /report/html/<name>/<ids> or /report/pdf/<name>/<ids>. Returns None if path doesn't match."""
+    m = REPORT_PATH_RE.match(request.path)
+    if not m:
+        return None
+    fmt, report_name, ids_str = m.group(1), m.group(2), m.group(3)
+    ids = [int(x.strip()) for x in ids_str.split(",") if x.strip()]
+    if fmt == "pdf":
+        return _render_report_pdf(report_name, ids, request)
+    return _render_report_html(report_name, ids, request)

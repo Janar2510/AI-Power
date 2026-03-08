@@ -21,6 +21,7 @@ class ResPartner(Model):
     city = fields.Char()
     zip = fields.Char(string="ZIP")
     country_id = fields.Many2one("res.country", string="Country")
+    country_code = fields.Related("country_id.code", store=True, string="Country Code")
     state_id = fields.Many2one("res.country.state", string="State")
     parent_id = fields.Many2one("res.partner", string="Parent")
     active = fields.Boolean(default=True)
@@ -30,3 +31,8 @@ class ResPartner(Model):
         """Compute display name from name field."""
         rows = self.read(["name"])
         return [r.get("name") or "" for r in rows]
+
+    @classmethod
+    def _onchange_country_id(cls, vals):
+        """Clear state_id when country changes."""
+        return {"state_id": None}

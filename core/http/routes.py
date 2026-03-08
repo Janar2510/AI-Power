@@ -109,6 +109,15 @@ def load_views(request):
             env = Environment(registry_obj, cr=cr, uid=uid)
             registry_obj.set_env(env)
             registry = load_views_registry_from_db(env)
+            fields_meta = {}
+            for model_name in list(registry.get("views", {}).keys()):
+                ModelCls = env.get(model_name)
+                if ModelCls and hasattr(ModelCls, "fields_get"):
+                    try:
+                        fields_meta[model_name] = ModelCls.fields_get()
+                    except Exception:
+                        pass
+            registry["fields_meta"] = fields_meta
     except Exception:
         registry = load_views_registry()
     return Response(
@@ -169,7 +178,9 @@ def _webclient_html(debug_assets: bool = False) -> str:
     <a href="/web/logout" style="margin-left:auto;">Logout</a>
   </header>
   <main id="main"><div id="action-manager">Loading...</div></main>
+  <div id="toast-container" style="position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none"></div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 {js_tags}
 </body>
 </html>"""

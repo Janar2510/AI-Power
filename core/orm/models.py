@@ -1,5 +1,6 @@
 """Model base class and recordset."""
 
+import base64
 from typing import Any, Dict, List, Optional, Type, TypeVar, Iterator, Union, Tuple
 
 T = TypeVar("T", bound="ModelBase")
@@ -166,11 +167,32 @@ class Recordset:
     def ids(self) -> List[int]:
         return self._ids.copy()
 
+    @property
+    def id(self) -> Optional[int]:
+        """Single-record id; None if empty or multi-record."""
+        return self._ids[0] if len(self._ids) == 1 else None
+
+    @property
+    def env(self) -> Any:
+        """Environment from registry."""
+        return getattr(self._model._registry, "_env", None) if self._model._registry else None
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate model methods (e.g. activity_schedule) to Model, passing self as first arg."""
+        if hasattr(self._model, name):
+            attr = getattr(self._model, name)
+            if callable(attr):
+                def _bound(*args: Any, **kwargs: Any) -> Any:
+                    return attr(self, *args, **kwargs)
+                return _bound
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
 
 class Model(type):
     """Metaclass for model classes."""
 
     _name: str = ""
+    _inherit: str = ""
     _description: str = ""
     _table: Optional[str] = None
     _registry: Optional[Any] = None
@@ -183,7 +205,10 @@ class Model(type):
 
     def __init__(cls, name: str, bases: tuple, attrs: dict):
         super().__init__(name, bases, attrs)
-        if cls._name and cls._registry:
+        inherit = getattr(cls, "_inherit", "")
+        if inherit and not cls._name and cls._registry:
+            cls._registry.merge_model(inherit, cls, attrs)
+        elif cls._name and cls._registry:
             cls._registry.register_model(cls._name, cls)
 
 
@@ -248,6 +273,63 @@ class ModelBase(metaclass=Model):
                 result.append(name)
         return result
 
+    @classmethod
+    def default_get(cls: Type[T], field_names: Optional[List[str]] = None, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Return default values for fields. Merges field.default with context['default_<fname>'] (Phase 69)."""
+        from core.orm import fields as fmod
+        context = context or {}
+        result: Dict[str, Any] = {}
+        for name in dir(cls):
+            if name.startswith("_"):
+                continue
+            obj = getattr(cls, name, None)
+            if not isinstance(obj, fmod.Field):
+                continue
+            if field_names and name not in field_names:
+                continue
+            if isinstance(obj, (fmod.One2many, fmod.Many2many)):
+                continue
+            val = None
+            ctx_key = f"default_{name}"
+            if ctx_key in context:
+                val = context[ctx_key]
+            elif hasattr(obj, "default") and obj.default is not None:
+                d = obj.default
+                val = d() if callable(d) else d
+            if val is not None:
+                result[name] = val
+        return result
+
+    @classmethod
+    def fields_get(cls: Type[T], allfields: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
+        """Return metadata for model fields. Mirrors Odoo fields_get()."""
+        from core.orm import fields as fmod
+        result: Dict[str, Dict[str, Any]] = {}
+        for name in dir(cls):
+            if name.startswith("_"):
+                continue
+            if allfields and name not in allfields:
+                continue
+            obj = getattr(cls, name, None)
+            if not isinstance(obj, fmod.Field):
+                continue
+            info: Dict[str, Any] = {
+                "type": getattr(obj, "type", "char"),
+                "string": getattr(obj, "string", "") or name.replace("_", " ").title(),
+                "required": getattr(obj, "required", False),
+                "readonly": getattr(obj, "readonly", False),
+            }
+            if hasattr(obj, "comodel") and obj.comodel:
+                info["comodel"] = obj.comodel
+            if hasattr(obj, "selection") and obj.selection:
+                info["selection"] = obj.selection
+            if hasattr(obj, "inverse_name") and obj.inverse_name:
+                info["inverse_name"] = obj.inverse_name
+            if hasattr(obj, "default") and obj.default is not None:
+                info["default"] = obj.default
+            result[name] = info
+        return result
+
     def read(self, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """Read field values from DB or cache (instance API)."""
         # Prefer cursor from instance env (avoids registry._env drift in RPC/cursor context)
@@ -287,7 +369,12 @@ class ModelBase(metaclass=Model):
                     if comodel and inv_name:
                         Comodel = self.env.get(comodel) if hasattr(self, "env") else None
                         if Comodel:
-                            recs = Comodel.search([(inv_name, "=", rid)])
+                            domain = [(inv_name, "=", rid)]
+                            extra = getattr(field, "domain", None)
+                            if extra:
+                                d = extra(self._model) if callable(extra) else (extra or [])
+                                domain = d + domain
+                            recs = Comodel.search(domain)
                             rows[i][fname] = recs.ids if hasattr(recs, "ids") else []
                 elif isinstance(field, fmod.Many2many):
                     rel = getattr(field, "relation", "")
@@ -299,29 +386,129 @@ class ModelBase(metaclass=Model):
                             rows[i][fname] = [r[col2] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
                         except Exception:
                             rows[i][fname] = []
+        for fname in requested:
+            field = getattr(self._model, fname, None)
+            if isinstance(field, fmod.Binary):
+                for i in range(len(rows)):
+                    val = rows[i].get(fname)
+                    if val is not None:
+                        b = val.tobytes() if isinstance(val, memoryview) else (val if isinstance(val, bytes) else None)
+                        if b is not None:
+                            rows[i][fname] = base64.b64encode(b).decode("ascii")
+        self._prefetch_many2one_display(rows, requested)
         return rows
+
+    def _prefetch_many2one_display(self, rows: List[Dict[str, Any]], requested: List[str]) -> None:
+        """Batch-fetch display names for Many2one fields to avoid N+1. Adds fname_display to each row."""
+        from core.orm import fields as fmod
+        env = getattr(self, "env", None)
+        if not env:
+            return
+        for fname in requested:
+            field = getattr(self._model, fname, None)
+            if not isinstance(field, fmod.Many2one):
+                continue
+            comodel = getattr(field, "comodel", "")
+            if not comodel:
+                continue
+            ids = []
+            for row in rows:
+                v = row.get(fname)
+                if v and v not in ids:
+                    ids.append(v)
+            if not ids:
+                continue
+            Comodel = env.get(comodel)
+            if not Comodel:
+                continue
+            try:
+                rel_rows = Comodel.browse(ids).read(["id", "name", "display_name"])
+                display_map = {}
+                for r in rel_rows:
+                    rid = r.get("id")
+                    name = r.get("display_name") or r.get("name") or str(rid)
+                    if rid:
+                        display_map[rid] = name
+                for row in rows:
+                    v = row.get(fname)
+                    row[fname + "_display"] = display_map.get(v) if v else None
+            except Exception:
+                for row in rows:
+                    row[fname + "_display"] = None
 
     def write(self, vals: Dict[str, Any]) -> bool:
         """Write field values to DB."""
+        from core.orm.api import ValidationError
         if not vals or not self._ids:
             return True
         vals = self._model._sanitize_html_vals(vals)
+        vals = self._model._decode_binary_vals(vals)
         cr = self._get_cr()
         if not cr:
             self._cache.update(vals)
             return True
         from core.orm import fields as fmod
         stored = self._get_stored_columns()
-        vals_stored = {k: v for k, v in vals.items() if k in stored}
+        related_stored = set(self._model._get_stored_related_fields())
+        vals_stored = {k: v for k, v in vals.items() if k in stored and k not in related_stored}
         if vals_stored:
             table = self._model._table
             sets = ", ".join(f'"{k}" = %s' for k in vals_stored)
-            cr.execute(
-                f'UPDATE "{table}" SET {sets} WHERE id = %s',
-                list(vals_stored.values()) + [self._ids[0]],
-            )
+            try:
+                cr.execute(
+                    f'UPDATE "{table}" SET {sets} WHERE id = %s',
+                    list(vals_stored.values()) + [self._ids[0]],
+                )
+            except Exception as e:
+                msg = self._model._sql_constraint_message(str(e))
+                if msg:
+                    raise ValidationError(msg) from e
+                raise
+        self._model._run_python_constraints(self, vals)
         for fname, val in vals.items():
             field = getattr(self._model, fname, None)
+            if isinstance(field, fmod.One2many) and isinstance(val, (list, tuple)):
+                lines = val
+                comodel = getattr(field, "comodel", "")
+                inv_name = getattr(field, "inverse_name", "")
+                if not comodel or not inv_name:
+                    continue
+                env = getattr(self, "env", None)
+                Comodel = env.get(comodel) if env else None
+                if not Comodel:
+                    continue
+                parent_id = self._ids[0]
+                current_ids = []
+                domain = [(inv_name, "=", parent_id)]
+                extra = getattr(field, "domain", None)
+                if extra:
+                    d = extra(self._model) if callable(extra) else (extra or [])
+                    domain = d + domain
+                try:
+                    recs = Comodel.search(domain)
+                    current_ids = recs.ids if hasattr(recs, "ids") else [r for r in recs]
+                except Exception:
+                    pass
+                submitted_ids = []
+                inv_extra = getattr(field, "inverse_extra", None)
+                for line in lines:
+                    if not isinstance(line, dict):
+                        continue
+                    lid = line.get("id")
+                    line_vals = {k: v for k, v in line.items() if k != "id"}
+                    if lid and lid in current_ids:
+                        Comodel.browse(lid).write(line_vals)
+                        submitted_ids.append(lid)
+                    else:
+                        line_vals[inv_name] = parent_id
+                        if inv_extra and callable(inv_extra):
+                            line_vals.update(inv_extra(self._model))
+                        new_rec = Comodel.create(line_vals)
+                        submitted_ids.append(new_rec.id if hasattr(new_rec, "id") else new_rec.ids[0])
+                to_unlink = [i for i in current_ids if i not in submitted_ids]
+                if to_unlink:
+                    Comodel.browse(to_unlink).unlink()
+                continue
             if not isinstance(field, fmod.Many2many):
                 continue
             rel = getattr(field, "relation", "")
@@ -350,6 +537,19 @@ class ModelBase(metaclass=Model):
             table = self._model._table
             for i, rid in enumerate(self._ids):
                 to_write = {k: v for k, v in (computed_list[i] or {}).items() if k in computed_stored}
+                if to_write:
+                    self._cache.update(to_write)
+                    sets = ", ".join(f'"{k}" = %s' for k in to_write)
+                    cr.execute(
+                        f'UPDATE "{table}" SET {sets} WHERE id = %s',
+                        list(to_write.values()) + [rid],
+                    )
+        related_list = self._model._compute_related_values(self)
+        related_stored = set(self._model._get_stored_related_fields())
+        if related_list and cr:
+            table = self._model._table
+            for i, rid in enumerate(self._ids):
+                to_write = {k: v for k, v in (related_list[i] or {}).items() if k in related_stored}
                 if to_write:
                     self._cache.update(to_write)
                     sets = ", ".join(f'"{k}" = %s' for k in to_write)
@@ -386,6 +586,95 @@ class ModelBase(metaclass=Model):
         return result
 
     @classmethod
+    def _get_stored_related_fields(cls) -> List[str]:
+        """Return stored related field names (Related with store=True)."""
+        from core.orm import fields as fmod
+        result = []
+        for name in dir(cls):
+            if name.startswith("_"):
+                continue
+            obj = getattr(cls, name)
+            if isinstance(obj, fmod.Related) and getattr(obj, "store", False):
+                result.append(name)
+        return result
+
+    @classmethod
+    def _compute_related_values(cls: Type[T], record: "Recordset") -> List[Dict[str, Any]]:
+        """Compute stored related values. Supports single and multi-level (e.g. partner_id.name, partner_id.country_id.code)."""
+        from core.orm import fields as fmod
+        env = getattr(record, "env", None)
+        if not env:
+            return []
+        related_names = cls._get_stored_related_fields()
+        n = len(record._ids) if record._ids else 0
+        result: List[Dict[str, Any]] = [{} for _ in range(n)]
+        for fname in related_names:
+            field = getattr(cls, fname, None)
+            if not isinstance(field, fmod.Related) or not getattr(field, "related", ""):
+                continue
+            parts = [p.strip() for p in (field.related or "").split(".") if p.strip()]
+            if len(parts) < 2:
+                continue
+            if len(parts) == 2:
+                rel_field, target_field = parts[0], parts[1]
+                rel_field_obj = getattr(cls, rel_field, None)
+                if not isinstance(rel_field_obj, fmod.Many2one):
+                    continue
+                comodel = getattr(rel_field_obj, "comodel", "")
+                Comodel = env.get(comodel) if comodel else None
+                if not Comodel:
+                    continue
+                rows = record.read([rel_field])
+                rel_ids = [r.get(rel_field) for r in rows if r.get(rel_field)]
+                if not rel_ids:
+                    continue
+                rel_recs = Comodel.browse(rel_ids)
+                rel_rows = rel_recs.read([target_field])
+                rel_map = {}
+                for i, r in enumerate(rel_rows):
+                    rid = rel_recs._ids[i] if i < len(rel_recs._ids) else None
+                    if rid:
+                        rel_map[rid] = r.get(target_field)
+                for i in range(n):
+                    rel_id = rows[i].get(rel_field) if i < len(rows) else None
+                    result[i][fname] = rel_map.get(rel_id) if rel_id else None
+            else:
+                current_model = cls
+                first_rows = record.read([parts[0]])
+                first_ids = [r.get(parts[0]) for r in first_rows]
+                maps = []
+                ids_at_step = [first_ids]
+                for step in range(len(parts) - 1):
+                    rel_field = parts[step]
+                    next_field = parts[step + 1]
+                    rel_field_obj = getattr(current_model, rel_field, None)
+                    if not isinstance(rel_field_obj, fmod.Many2one):
+                        break
+                    comodel = getattr(rel_field_obj, "comodel", "")
+                    current_model = env.get(comodel) if comodel else None
+                    if not current_model:
+                        break
+                    ids = list(dict.fromkeys(x for x in ids_at_step[-1] if x))
+                    if not ids:
+                        break
+                    rel_recs = current_model.browse(ids)
+                    rel_rows = rel_recs.read([next_field])
+                    step_map = {}
+                    for i, r in enumerate(rel_rows):
+                        rid = rel_recs._ids[i] if i < len(rel_recs._ids) else None
+                        if rid:
+                            step_map[rid] = r.get(next_field)
+                    maps.append(step_map)
+                    ids_at_step.append([step_map.get(pid) for pid in ids_at_step[-1]])
+                if len(maps) == len(parts) - 1:
+                    for i in range(n):
+                        val = first_ids[i] if i < len(first_ids) else None
+                        for step_map in maps:
+                            val = step_map.get(val) if val else None
+                        result[i][fname] = val
+        return result
+
+    @classmethod
     def _compute_stored_values(cls: Type[T], record: "Recordset") -> List[Dict[str, Any]]:
         """Run compute methods for stored computed fields. Returns list of dicts, one per record."""
         from core.orm import fields as fmod
@@ -406,6 +695,30 @@ class ModelBase(metaclass=Model):
                     result[i][fname] = v
         return result
 
+    _sql_constraints: List[tuple] = []
+
+    @classmethod
+    def _sql_constraint_message(cls, error_str: str) -> Optional[str]:
+        """Match SQL integrity error to _sql_constraints error message."""
+        for name, _definition, message in (cls._sql_constraints or []):
+            constraint_name = f"{cls._table}_{name}"
+            if constraint_name in error_str:
+                return message
+        return None
+
+    @classmethod
+    def _run_python_constraints(cls: Type[T], record: "Recordset", vals: Dict[str, Any]) -> None:
+        """Run @api.constrains methods relevant to changed fields. Raises ValidationError on failure."""
+        changed_fields = set(vals.keys())
+        for name in dir(cls):
+            if name.startswith("__"):
+                continue
+            method = getattr(cls, name, None)
+            if callable(method) and hasattr(method, "_constrains"):
+                constrained = set(method._constrains)
+                if constrained & changed_fields:
+                    method(record)
+
     @classmethod
     def _sanitize_html_vals(cls: Type[T], vals: Dict[str, Any]) -> Dict[str, Any]:
         """Sanitize Html field values (strip script/style tags)."""
@@ -420,9 +733,25 @@ class ModelBase(metaclass=Model):
         return out
 
     @classmethod
+    def _decode_binary_vals(cls: Type[T], vals: Dict[str, Any]) -> Dict[str, Any]:
+        """Decode base64 strings to bytes for Binary fields (RPC sends base64)."""
+        from core.orm import fields as fmod
+        out = dict(vals)
+        for fname, val in vals.items():
+            field = getattr(cls, fname, None)
+            if isinstance(field, fmod.Binary) and isinstance(val, str):
+                try:
+                    out[fname] = base64.b64decode(val)
+                except Exception:
+                    pass
+        return out
+
+    @classmethod
     def create(cls: Type[T], vals: Dict[str, Any]) -> T:
         """Create a new record in DB."""
+        from core.orm.api import ValidationError
         vals = cls._sanitize_html_vals(vals)
+        vals = cls._decode_binary_vals(vals)
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
@@ -430,27 +759,62 @@ class ModelBase(metaclass=Model):
         table = cls._table
         stored = cls._get_stored_field_names()
         computed_stored = set(cls._get_stored_computed_fields())
+        related_stored = set(cls._get_stored_related_fields())
+        from core.orm import fields as fmod
+        o2m_fields = {k for k in dir(cls) if not k.startswith("_") and isinstance(getattr(cls, k, None), fmod.One2many)}
         vals_stored = {
             k: v for k, v in vals.items()
-            if k != "id" and k in stored and k not in computed_stored
+            if k != "id" and k in stored and k not in computed_stored and k not in related_stored and k not in o2m_fields
         }
         cols = [c for c in vals_stored if c in stored]
-        if cols:
-            col_list = ", ".join(f'"{c}"' for c in cols)
-            placeholders = ", ".join("%s" for _ in cols)
-            cr.execute(
-                f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders}) RETURNING id',
-                [vals_stored[c] for c in cols],
-            )
-        else:
-            cr.execute(f'INSERT INTO "{table}" DEFAULT VALUES RETURNING id')
+        try:
+            if cols:
+                col_list = ", ".join(f'"{c}"' for c in cols)
+                placeholders = ", ".join("%s" for _ in cols)
+                cr.execute(
+                    f'INSERT INTO "{table}" ({col_list}) VALUES ({placeholders}) RETURNING id',
+                    [vals_stored[c] for c in cols],
+                )
+            else:
+                cr.execute(f'INSERT INTO "{table}" DEFAULT VALUES RETURNING id')
+        except Exception as e:
+            msg = cls._sql_constraint_message(str(e))
+            if msg:
+                raise ValidationError(msg) from e
+            raise
         row = cr.fetchone()
         new_id = row["id"] if hasattr(row, "keys") else row[0]
         new_rec = cls.browse(new_id)
+        cls._run_python_constraints(new_rec, vals)
         computed_list = cls._compute_stored_values(new_rec)
         if computed_list and computed_list[0]:
             new_rec.write(computed_list[0])
-        from core.orm import fields as fmod
+        related_list = cls._compute_related_values(new_rec)
+        if related_list and related_list[0]:
+            new_rec.write(related_list[0])
+        for fname in o2m_fields:
+            lines = vals.get(fname)
+            if not isinstance(lines, (list, tuple)):
+                continue
+            field = getattr(cls, fname, None)
+            if not isinstance(field, fmod.One2many):
+                continue
+            comodel = getattr(field, "comodel", "")
+            inv_name = getattr(field, "inverse_name", "")
+            if not comodel or not inv_name:
+                continue
+            Comodel = env.get(comodel)
+            if not Comodel:
+                continue
+            for line in lines:
+                if not isinstance(line, dict):
+                    continue
+                line_vals = {k: v for k, v in line.items() if k != "id"}
+                line_vals[inv_name] = new_id
+                inv_extra = getattr(field, "inverse_extra", None)
+                if inv_extra and callable(inv_extra):
+                    line_vals.update(inv_extra(cls))
+                Comodel.create(line_vals)
         m2m_vals = {k: v for k, v in vals.items() if isinstance(getattr(cls, k, None), fmod.Many2many)}
         if m2m_vals:
             new_rec.write(m2m_vals)
@@ -465,6 +829,147 @@ class ModelBase(metaclass=Model):
         placeholders = ", ".join("%s" for _ in self._ids)
         cr.execute(f'DELETE FROM "{table}" WHERE id IN ({placeholders})', self._ids)
         return True
+
+    @classmethod
+    def copy(cls: Type[T], id: int, default: Optional[Dict[str, Any]] = None) -> T:
+        """Duplicate a record. Excludes One2many fields. Appends ' (copy)' to name/display_name (Phase 72)."""
+        if not id:
+            raise ValueError("copy requires id")
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env:
+            raise ValueError("copy requires env")
+        from core.orm import fields as fmod
+        o2m_fields = {k for k in dir(cls) if not k.startswith("_") and isinstance(getattr(cls, k, None), fmod.One2many)}
+        stored = cls._get_stored_field_names()
+        read_fields = ["id"] + [c for c in stored if c != "id"]
+        rows = cls.browse(id).read(read_fields)
+        if not rows:
+            raise ValueError(f"Record {id} not found")
+        computed_stored = set(cls._get_stored_computed_fields())
+        related_stored = set(cls._get_stored_related_fields())
+        vals = {
+            k: v for k, v in rows[0].items()
+            if k != "id" and k not in o2m_fields and k not in computed_stored and k not in related_stored
+        }
+        vals.pop("id", None)
+        for fname in ("name", "display_name"):
+            if fname in vals and vals[fname] and isinstance(vals[fname], str):
+                vals[fname] = vals[fname] + " (copy)"
+                break
+        if default:
+            vals.update(default)
+        return cls.create(vals)
+
+    @classmethod
+    def import_data(
+        cls: Type[T],
+        fields: List[str],
+        rows: List[List[Any]],
+    ) -> Dict[str, Any]:
+        """Import rows. fields[i] maps to row[i]. Returns {created, updated, errors} (Phase 86)."""
+        from core.orm import fields as fmod
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env:
+            return {"created": 0, "updated": 0, "errors": []}
+        result = {"created": 0, "updated": 0, "errors": []}
+        id_idx = -1
+        if "id" in fields:
+            id_idx = fields.index("id")
+        for row_idx, row in enumerate(rows):
+            if len(row) != len(fields):
+                result["errors"].append({"row": row_idx + 1, "field": "", "message": "Row length mismatch"})
+                continue
+            vals = {fields[i]: row[i] for i in range(len(fields))}
+
+            # Resolve Many2one text to ID
+            for fname in list(vals.keys()):
+                val = vals.get(fname)
+                if val is None or val == "" or val is False:
+                    continue
+                field = getattr(cls, fname, None)
+                if not isinstance(field, fmod.Many2one):
+                    continue
+                comodel = getattr(field, "comodel", "")
+                if not comodel:
+                    continue
+                if isinstance(val, (int, float)) and val == int(val):
+                    vals[fname] = int(val)
+                    continue
+                text = str(val).strip()
+                if not text:
+                    vals[fname] = False
+                    continue
+                Comodel = env.get(comodel)
+                if not Comodel:
+                    continue
+                matches = Comodel.name_search(text, [], "ilike", limit=2)
+                if len(matches) == 0:
+                    result["errors"].append({"row": row_idx + 1, "field": fname, "message": f"'{text}' not found"})
+                    continue
+                if len(matches) > 1:
+                    result["errors"].append({"row": row_idx + 1, "field": fname, "message": f"'{text}' ambiguous"})
+                    continue
+                vals[fname] = matches[0][0]
+
+            try:
+                if id_idx >= 0 and row[id_idx] and row[id_idx] not in (None, "", False):
+                    rid = int(row[id_idx])
+                    cls.browse(rid).write({k: v for k, v in vals.items() if k != "id"})
+                    result["updated"] += 1
+                else:
+                    create_vals = {k: v for k, v in vals.items() if k != "id"}
+                    cls.create(create_vals)
+                    result["created"] += 1
+            except Exception as e:
+                result["errors"].append({"row": row_idx + 1, "field": "", "message": str(e)})
+        return result
+
+    @classmethod
+    def onchange(cls: Type[T], field_name: str, vals: Dict[str, Any]) -> Dict[str, Any]:
+        """Run onchange handler for field if defined. Returns dict of values to update form."""
+        method_name = "_onchange_" + (field_name or "").replace(".", "_")
+        method = getattr(cls, method_name, None)
+        if callable(method):
+            try:
+                result = method(vals)
+                return dict(result) if result else {}
+            except Exception:
+                return {}
+        return {}
+
+    @classmethod
+    def name_get(cls: Type[T], ids: List[int]) -> List[Tuple[int, str]]:
+        """Return [(id, display_name), ...] for records (Phase 70)."""
+        if not ids:
+            return []
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env:
+            return [(i, str(i)) for i in ids]
+        rows = cls.browse(ids).read(["id", "name", "display_name"])
+        by_id = {r["id"]: (r.get("display_name") or r.get("name") or str(r["id"])) for r in rows}
+        return [(i, by_id.get(i, str(i))) for i in ids]
+
+    @classmethod
+    def name_search(
+        cls: Type[T],
+        name: str = "",
+        domain: Optional[List] = None,
+        operator: str = "ilike",
+        limit: int = 8,
+    ) -> List[Tuple[int, str]]:
+        """Search by name, return name_get format. Used for Many2one autocomplete (Phase 70)."""
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env:
+            return []
+        combined = list(domain or [])
+        if name and isinstance(name, str) and name.strip():
+            term = name.strip()
+            if operator == "ilike":
+                combined = combined + [("name", "ilike", f"%{term}%")]
+            else:
+                combined = combined + [("name", operator, term)]
+        recs = cls.search(domain=combined, limit=limit)
+        return cls.name_get(recs.ids) if recs.ids else []
 
     @classmethod
     def search(
@@ -505,6 +1010,32 @@ class ModelBase(metaclass=Model):
         return Recordset(cls, ids)
 
     @classmethod
+    def search_count(cls: Type[T], domain: Optional[List] = None) -> int:
+        """Return count of records matching domain."""
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        cr = env.cr if env and hasattr(env, "cr") else None
+        if not cr:
+            return 0
+        from core.orm.security import get_record_rules
+        model_name = getattr(cls, "_name", "")
+        uid = getattr(env, "uid", 1)
+        rule_domains = get_record_rules(model_name, uid, env=env)
+        combined = list(domain or [])
+        for rd in rule_domains:
+            combined = combined + rd
+        domain = combined
+        table = cls._table
+        where = "1=1"
+        params: List[Any] = []
+        if domain:
+            dom_where, dom_params = _domain_to_sql(domain, table, cr, cls)
+            where = dom_where
+            params = list(dom_params)
+        cr.execute(f'SELECT COUNT(*) FROM "{table}" WHERE {where}', params)
+        row = cr.fetchone()
+        return row["count"] if hasattr(row, "keys") else row[0]
+
+    @classmethod
     def search_read(
         cls: Type[T],
         domain: Optional[List] = None,
@@ -518,6 +1049,66 @@ class ModelBase(metaclass=Model):
         if not recs.ids:
             return []
         return cls.browse(recs.ids).read(fields)
+
+    @classmethod
+    def read_group(
+        cls: Type[T],
+        domain: Optional[List] = None,
+        fields: Optional[List[str]] = None,
+        groupby: Optional[List[str]] = None,
+        offset: int = 0,
+        limit: Optional[int] = None,
+        orderby: Optional[str] = None,
+        lazy: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """SQL GROUP BY with SUM/COUNT aggregation. Returns [{groupby_field: val, field: agg, __count: n}]."""
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        cr = env.cr if env and hasattr(env, "cr") else None
+        if not cr or not groupby:
+            return []
+        from core.orm.security import get_record_rules
+        model_name = getattr(cls, "_name", "")
+        uid = getattr(env, "uid", 1)
+        rule_domains = get_record_rules(model_name, uid, env=env)
+        combined = list(domain or [])
+        for rd in rule_domains:
+            combined = combined + rd
+        domain = combined
+        table = cls._table
+        stored = cls._get_stored_field_names()
+        groupby = list(groupby)
+        if lazy and len(groupby) > 1:
+            groupby = groupby[:1]
+        groupby_valid = [g for g in groupby if g in stored]
+        if not groupby_valid:
+            return []
+        fields = fields or []
+        measure_fields = [f for f in fields if f in stored and f != "id"]
+        where = "1=1"
+        params: List[Any] = []
+        if domain:
+            dom_where, dom_params = _domain_to_sql(domain, table, cr, cls)
+            where = dom_where
+            params = list(dom_params)
+        select_parts = [f'"{g}"' for g in groupby_valid]
+        for m in measure_fields:
+            select_parts.append(f'COALESCE(SUM("{m}"), 0) AS "{m}"')
+        select_parts.append("COUNT(*) AS __count")
+        group_clause = ", ".join(f'"{g}"' for g in groupby_valid)
+        order_clause = f" ORDER BY {orderby}" if orderby else ""
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        offset_clause = f" OFFSET {offset}" if offset else ""
+        query = f'SELECT {", ".join(select_parts)} FROM "{table}" WHERE {where} GROUP BY {group_clause}{order_clause}{limit_clause}{offset_clause}'
+        cr.execute(query, params)
+        rows = cr.fetchall()
+        result = []
+        for row in rows:
+            r = dict(row)
+            for g in groupby_valid:
+                if r.get(g) is None:
+                    r[g] = False
+            result.append(r)
+        return result
 
     @classmethod
     def read_ids(cls: Type[T], ids: List[int], fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:

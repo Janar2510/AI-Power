@@ -6,8 +6,64 @@
   const navbar = document.getElementById('navbar');
   if (!main) return;
 
+  function showToast(message, type) {
+    type = type || 'info';
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const el = document.createElement('div');
+    el.className = 'toast toast-' + type;
+    el.innerHTML = '<span>' + (message || '').replace(/</g, '&lt;') + '</span><button type="button" class="toast-close" aria-label="Close">&times;</button>';
+    container.appendChild(el);
+    const dismiss = function () {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(100%)';
+      setTimeout(function () { el.remove(); }, 200);
+    };
+    el.querySelector('.toast-close').onclick = dismiss;
+    setTimeout(dismiss, 4000);
+  }
+
   const rpc = window.Services && window.Services.rpc ? window.Services.rpc : (window.Session || { callKw: () => Promise.reject(new Error('RPC not loaded')) });
   const viewsSvc = window.Services && window.Services.views ? window.Services.views : null;
+
+  var actionStack = [];
+  var formDirty = false;
+  var lastHash = (window.location.hash || '#home').slice(1);
+
+  function pushBreadcrumb(label, hash) {
+    actionStack.push({ label: label, hash: hash });
+  }
+
+  function popBreadcrumbTo(index) {
+    if (index < actionStack.length) {
+      actionStack = actionStack.slice(0, index + 1);
+      var entry = actionStack[actionStack.length - 1];
+      if (entry) window.location.hash = entry.hash;
+    }
+  }
+
+  function renderBreadcrumbs() {
+    if (actionStack.length <= 1) return '';
+    var html = '<nav class="breadcrumbs" aria-label="Breadcrumb">';
+    actionStack.forEach(function (entry, i) {
+      if (i === actionStack.length - 1) {
+        html += '<span class="breadcrumb-item active">' + (entry.label || '').replace(/</g, '&lt;') + '</span>';
+      } else {
+        html += '<a class="breadcrumb-item" href="javascript:void(0)" data-bc-idx="' + i + '">' + (entry.label || '').replace(/</g, '&lt;') + '</a>';
+        html += '<span class="breadcrumb-sep">/</span>';
+      }
+    });
+    html += '</nav>';
+    return html;
+  }
+
+  function attachBreadcrumbHandlers() {
+    main.querySelectorAll('[data-bc-idx]').forEach(function (el) {
+      el.onclick = function () {
+        popBreadcrumbTo(parseInt(el.getAttribute('data-bc-idx'), 10));
+      };
+    });
+  }
 
   /** Map act_window res_model to hash route (convention: res.partner -> contacts) */
   function actionToRoute(action) {
@@ -15,6 +71,8 @@
     const m = (action.res_model || '').replace(/\./g, '_');
     if (m === 'res_partner') return 'contacts';
     if (m === 'crm_lead') return 'leads';
+    if (m === 'ir_attachment') return 'attachments';
+    if (m === 'res_users') return 'settings/users';
     return m || null;
   }
 
@@ -45,6 +103,8 @@
     if (action) return action.res_model || action.resModel;
     if (route === 'contacts') return 'res.partner';
     if (route === 'leads') return 'crm.lead';
+    if (route === 'attachments') return 'ir.attachment';
+    if (route === 'settings/users') return 'res.users';
     return null;
   }
 
@@ -58,6 +118,160 @@
       return Array.isArray(parsed) ? parsed : [];
     } catch (e) {}
     return [];
+  }
+
+  function parseFilterDomain(s) {
+    if (!s || typeof s !== 'string') return [];
+    const t = s.trim();
+    if (!t) return [];
+    try {
+      const json = t.replace(/\(/g, '[').replace(/\)/g, ']').replace(/'/g, '"');
+      const parsed = JSON.parse(json);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {}
+    return [];
+  }
+
+  function parseCSV(text) {
+    const rows = [];
+    const lines = text.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const row = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let j = 0; j < line.length; j++) {
+        const c = line[j];
+        if (c === '"') {
+          inQuotes = !inQuotes;
+        } else if ((c === ',' && !inQuotes) || (c === '\n' && !inQuotes)) {
+          row.push(cur.trim());
+          cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      row.push(cur.trim());
+      if (row.some(function (c) { return c; })) rows.push(row);
+    }
+    return rows;
+  }
+
+  function showImportModal(model, route) {
+    const cols = getListColumns(model);
+    const modelFields = ['id'].concat(cols.map(function (c) { return typeof c === 'object' ? c.name : c; }));
+    const overlay = document.createElement('div');
+    overlay.id = 'import-modal-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999';
+    let html = '<div id="import-modal" style="background:white;border-radius:8px;padding:var(--space-lg);max-width:600px;width:90%;max-height:90vh;overflow:auto">';
+    html += '<h3 style="margin-top:0">Import CSV</h3>';
+    html += '<p><input type="file" id="import-file" accept=".csv" style="padding:0.5rem"></p>';
+    html += '<div id="import-preview" style="display:none;margin:1rem 0">';
+    html += '<p><strong>Preview (first 5 rows)</strong></p>';
+    html += '<div id="import-preview-table"></div>';
+    html += '<p><strong>Column mapping</strong></p>';
+    html += '<div id="import-mapping"></div>';
+    html += '<p style="margin-top:1rem"><button type="button" id="import-do-btn" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Import</button>';
+    html += ' <button type="button" id="import-cancel-btn" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Cancel</button></p>';
+    html += '</div>';
+    html += '<div id="import-result" style="display:none"></div>';
+    html += '</div>';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    let csvHeaders = [];
+    let csvRows = [];
+    const fileInput = document.getElementById('import-file');
+    fileInput.onchange = function () {
+      const f = fileInput.files && fileInput.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = function () {
+        const parsed = parseCSV(r.result || '');
+        if (!parsed.length) { showToast('No rows in CSV', 'error'); return; }
+        csvHeaders = parsed[0];
+        csvRows = parsed.slice(1);
+        const preview = csvRows.slice(0, 5);
+        let tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem"><tr>';
+        csvHeaders.forEach(function (h) { tbl += '<th style="padding:0.35rem;border:1px solid #ddd;text-align:left">' + String(h).replace(/</g, '&lt;') + '</th>'; });
+        tbl += '</tr>';
+        preview.forEach(function (row) {
+          tbl += '<tr>';
+          row.forEach(function (c) { tbl += '<td style="padding:0.35rem;border:1px solid #eee">' + String(c || '').replace(/</g, '&lt;') + '</td>'; });
+          tbl += '</tr>';
+        });
+        tbl += '</table>';
+        document.getElementById('import-preview-table').innerHTML = tbl;
+        let mapHtml = '<table style="width:100%"><tr><th>CSV column</th><th>Map to field</th></tr>';
+        csvHeaders.forEach(function (h, i) {
+          mapHtml += '<tr><td style="padding:0.35rem">' + String(h).replace(/</g, '&lt;') + '</td><td><select class="import-map-select" data-csv-idx="' + i + '" style="width:100%;padding:0.35rem">';
+          mapHtml += '<option value="">-- Skip --</option>';
+          const autoMatch = modelFields.find(function (mf) { return mf.toLowerCase() === String(h).toLowerCase().replace(/\s/g, '_'); });
+          modelFields.forEach(function (mf) {
+            const sel = (autoMatch === mf || (!autoMatch && mf === h)) ? ' selected' : '';
+            mapHtml += '<option value="' + (mf || '').replace(/"/g, '&quot;') + '"' + sel + '>' + (mf || '').replace(/</g, '&lt;') + '</option>';
+          });
+          mapHtml += '</select></td></tr>';
+        });
+        mapHtml += '</table>';
+        document.getElementById('import-mapping').innerHTML = mapHtml;
+        document.getElementById('import-preview').style.display = 'block';
+      };
+      r.readAsText(f);
+    };
+    document.getElementById('import-do-btn').onclick = function () {
+      const selects = overlay.querySelectorAll('.import-map-select');
+      const csvIdxToField = {};
+      selects.forEach(function (s) {
+        const idx = parseInt(s.dataset.csvIdx, 10);
+        const f = s.value;
+        if (f) csvIdxToField[idx] = f;
+      });
+      const fieldSet = {};
+      const fields = [];
+      Object.keys(csvIdxToField).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); }).forEach(function (idx) {
+        const f = csvIdxToField[idx];
+        if (!fieldSet[f]) { fields.push(f); fieldSet[f] = true; }
+      });
+      if (!fields.length) { showToast('Map at least one column', 'error'); return; }
+      const orderedRows = csvRows.map(function (row) {
+        return fields.map(function (f) {
+          for (let i = 0; i < csvHeaders.length; i++) {
+            if (csvIdxToField[i] === f) return row[i] != null ? String(row[i]).trim() : '';
+          }
+          return '';
+        });
+      });
+      rpc.callKw(model, 'import_data', [fields, orderedRows], {})
+        .then(function (res) {
+          document.getElementById('import-preview').style.display = 'none';
+          const r = document.getElementById('import-result');
+          r.style.display = 'block';
+          r.innerHTML = '<p><strong>Import complete</strong></p><p>Created: ' + (res.created || 0) + ', Updated: ' + (res.updated || 0) + '</p>';
+          if (res.errors && res.errors.length) {
+            r.innerHTML += '<p style="color:#c00">Errors:</p><table style="width:100%;font-size:0.9rem"><tr><th>Row</th><th>Field</th><th>Message</th></tr>';
+            res.errors.forEach(function (e) {
+              r.innerHTML += '<tr><td>' + (e.row || '') + '</td><td>' + (e.field || '').replace(/</g, '&lt;') + '</td><td>' + (e.message || '').replace(/</g, '&lt;') + '</td></tr>';
+            });
+            r.innerHTML += '</table>';
+          }
+          r.innerHTML += '<p><button type="button" id="import-close-btn" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Close</button></p>';
+          document.getElementById('import-close-btn').onclick = function () {
+            overlay.remove();
+            loadRecords(model, route, currentListState.searchTerm);
+          };
+          if (!res.errors || !res.errors.length) {
+            showToast('Imported ' + (res.created || 0) + ' created, ' + (res.updated || 0) + ' updated', 'success');
+            setTimeout(function () {
+              overlay.remove();
+              loadRecords(model, route, currentListState.searchTerm);
+            }, 1500);
+          }
+        })
+        .catch(function (err) {
+          showToast(err.message || 'Import failed', 'error');
+        });
+    };
+    document.getElementById('import-cancel-btn').onclick = function () { overlay.remove(); };
   }
 
   function buildMenuTree(menus) {
@@ -131,7 +345,9 @@
       const v = viewsSvc.getView(model, 'list');
       if (v && v.columns && v.columns.length) return v.columns.map(c => (typeof c === 'object' ? c.name : c) || c);
     }
-    return model === 'crm.lead' ? ['name', 'type', 'stage_id', 'expected_revenue', 'tag_ids'] : ['name', 'is_company', 'email', 'phone', 'city', 'country_id', 'state_id'];
+    if (model === 'crm.lead') return ['name', 'type', 'stage_id', 'date_deadline', 'expected_revenue', 'tag_ids'];
+    if (model === 'res.users') return ['name', 'login', 'active'];
+    return ['name', 'is_company', 'email', 'phone', 'city', 'country_id', 'state_id'];
   }
 
   function getSearchFields(model) {
@@ -140,6 +356,11 @@
       if (v && v.search_fields && v.search_fields.length) return v.search_fields;
     }
     return ['name'];
+  }
+
+  function getReportName(model) {
+    const reportMap = { 'crm.lead': 'crm.lead_summary' };
+    return reportMap[model] || null;
   }
 
   function buildSearchDomain(model, searchTerm) {
@@ -152,8 +373,7 @@
     return ops.concat(terms);
   }
 
-  var _savedFilterId = 0;
-  function getSavedFilters(model) {
+  function getSavedFiltersFromStorage(model) {
     try {
       const raw = localStorage.getItem('erp_saved_filters_' + (model || '').replace(/\./g, '_'));
       if (!raw) return [];
@@ -161,18 +381,73 @@
       return Array.isArray(arr) ? arr : [];
     } catch (e) { return []; }
   }
+  function getSavedFilters(model) {
+    const sessionSvc = window.Services && window.Services.session;
+    if (!sessionSvc) return Promise.resolve(getSavedFiltersFromStorage(model));
+    return sessionSvc.getSessionInfo().then(function (info) {
+      if (!info || !info.uid) return getSavedFiltersFromStorage(model);
+      const domain = [['model_id', '=', model || ''], '|', ['user_id', '=', false], ['user_id', '=', info.uid]];
+      return rpc.callKw('ir.filters', 'search_read', [domain], { fields: ['id', 'name', 'domain'], limit: 100 })
+        .then(function (rows) {
+          return (rows || []).map(function (r) {
+            var dom = [];
+            try { dom = r.domain ? JSON.parse(r.domain) : []; } catch (e) {}
+            return { id: r.id, name: r.name || 'Filter', domain: dom };
+          });
+        })
+        .catch(function () { return getSavedFiltersFromStorage(model); });
+    }).catch(function () { return getSavedFiltersFromStorage(model); });
+  }
   function saveSavedFilter(model, name, domain) {
-    const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
-    const filters = getSavedFilters(model);
-    const id = 'f' + (++_savedFilterId) + Date.now();
-    filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
-    try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
-    return id;
+    const sessionSvc = window.Services && window.Services.session;
+    if (!sessionSvc) {
+      const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
+      const filters = getSavedFiltersFromStorage(model);
+      const id = 'f' + Date.now();
+      filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
+      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+      return Promise.resolve(id);
+    }
+    return sessionSvc.getSessionInfo().then(function (info) {
+      if (!info || !info.uid) {
+        const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
+        const filters = getSavedFiltersFromStorage(model);
+        const id = 'f' + Date.now();
+        filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
+        try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+        return id;
+      }
+      return rpc.callKw('ir.filters', 'create', [{
+        name: name || 'Filter',
+        model_id: model || '',
+        domain: JSON.stringify(domain || []),
+        user_id: info.uid
+      }], {}).then(function (rec) {
+        if (!rec) return null;
+        if (Array.isArray(rec) && rec.length) return rec[0];
+        return rec.ids ? rec.ids[0] : (rec.id != null ? rec.id : null);
+      }).catch(function () {
+        const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
+        const filters = getSavedFiltersFromStorage(model);
+        const id = 'f' + Date.now();
+        filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
+        try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+        return id;
+      });
+    });
   }
   function removeSavedFilter(model, id) {
-    const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
-    const filters = getSavedFilters(model).filter(function (f) { return f.id !== id; });
-    try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+    if (typeof id === 'string' && id.indexOf('f') === 0) {
+      const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
+      const filters = getSavedFiltersFromStorage(model).filter(function (f) { return f.id !== id; });
+      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+      return Promise.resolve();
+    }
+    return rpc.callKw('ir.filters', 'unlink', [[parseInt(id, 10)]], {}).catch(function () {
+      const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
+      const filters = getSavedFiltersFromStorage(model).filter(function (f) { return f.id !== id; });
+      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+    });
   }
 
   function getFormFields(model) {
@@ -180,13 +455,18 @@
       const v = viewsSvc.getView(model, 'form');
       if (v && v.fields && v.fields.length) return v.fields.map(f => (typeof f === 'object' ? f.name : f) || f);
     }
-    return model === 'crm.lead' ? ['name', 'type', 'partner_id', 'stage_id', 'expected_revenue', 'description', 'note_html', 'tag_ids', 'activity_ids'] : ['name', 'is_company', 'type', 'email', 'phone', 'street', 'street2', 'city', 'zip', 'country_id', 'state_id'];
+    if (model === 'crm.lead') return ['name', 'type', 'partner_id', 'stage_id', 'expected_revenue', 'description', 'note_html', 'tag_ids', 'activity_ids', 'message_ids'];
+    if (model === 'res.users') return ['name', 'login', 'active', 'group_ids'];
+    if (model === 'ir.attachment') return ['name', 'res_model', 'res_id', 'datas'];
+    return ['name', 'is_company', 'type', 'email', 'phone', 'street', 'street2', 'city', 'zip', 'country_id', 'state_id'];
   }
 
   function getTitle(route) {
     if (route === 'contacts') return 'Contacts';
     if (route === 'leads') return 'Leads';
-    return route || 'Records';
+    if (route === 'attachments') return 'Attachments';
+    if (route === 'settings/users') return 'Users';
+    return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records';
   }
 
   String.prototype.escapeHtml = function () {
@@ -196,19 +476,124 @@
   };
 
   function renderHome() {
+    actionStack = [];
     main.innerHTML = '<h2>Welcome</h2><p>Use the menu to navigate. <strong>Contacts</strong> and <strong>Leads</strong> are available.</p>';
   }
 
-  function renderSettingsStub() {
-    main.innerHTML = '<h2>Settings</h2><p style="margin-bottom:1rem">Manage your account and preferences.</p>';
-    main.innerHTML += '<div style="display:flex;flex-direction:column;gap:0.5rem">';
-    main.innerHTML += '<a href="#settings/apikeys" style="display:block;padding:0.75rem 1rem;border:1px solid var(--border-color,#ddd);border-radius:4px;text-decoration:none;color:inherit;max-width:280px">API Keys</a>';
-    main.innerHTML += '<p style="margin-top:0.5rem;color:var(--text-muted,#666);font-size:0.9rem">More settings coming soon.</p>';
+  function renderSettings() {
+    actionStack = [{ label: 'Settings', hash: 'settings' }];
+    main.innerHTML = '<h2>Settings</h2><p style="margin-bottom:var(--space-lg)">Manage your account and preferences.</p>';
+    main.innerHTML += '<div style="display:flex;flex-direction:column;gap:var(--space-md);max-width:480px">';
+    main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">General</h3><div id="settings-company"></div></div>';
+    main.innerHTML += '<a href="#settings/users" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Users</a>';
+    main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">System Parameters</h3><div id="settings-params"></div></div>';
+    main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">AI Configuration</h3><div id="settings-ai"></div></div>';
+    main.innerHTML += '<a href="#settings/apikeys" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">API Keys</a>';
     main.innerHTML += '</div>';
+    rpc.callKw('res.company', 'search_read', [[]], { fields: ['id', 'name'], limit: 1 })
+      .then(function (rows) {
+        const company = rows && rows[0];
+        const container = document.getElementById('settings-company');
+        if (!container) return;
+        if (!company) {
+          container.innerHTML = '<p style="color:var(--text-muted)">No company record.</p>';
+          return;
+        }
+        container.innerHTML = '<label style="display:block;margin-bottom:var(--space-xs)">Company name</label>';
+        container.innerHTML += '<input type="text" id="settings-company-name" value="' + (company.name || '').replace(/"/g, '&quot;') + '" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);width:100%;max-width:280px">';
+        container.innerHTML += '<button type="button" id="btn-save-company" style="margin-top:var(--space-sm);padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Save</button>';
+        const btn = document.getElementById('btn-save-company');
+        const inp = document.getElementById('settings-company-name');
+        if (btn && inp) {
+          btn.onclick = function () {
+            btn.disabled = true;
+            rpc.callKw('res.company', 'write', [[company.id], { name: inp.value.trim() }], {})
+              .then(function () { btn.disabled = false; showToast('Company saved', 'success'); })
+              .catch(function (err) { btn.disabled = false; showToast(err.message || 'Failed to save', 'error'); });
+          };
+        }
+      })
+      .catch(function () {
+        const c = document.getElementById('settings-company');
+        if (c) c.innerHTML = '<p style="color:var(--text-muted)">Could not load company.</p>';
+      });
+    rpc.callKw('ir.config_parameter', 'search_read', [[]], { fields: ['id', 'key', 'value'], limit: 50 })
+      .then(function (params) {
+        const container = document.getElementById('settings-params');
+        if (!container) return;
+        if (!params || !params.length) {
+          container.innerHTML = '<p style="color:var(--text-muted)">No parameters.</p>';
+          return;
+        }
+        let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Key</th><th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Value</th></tr></thead><tbody>';
+        params.forEach(function (p) {
+          tbl += '<tr data-id="' + (p.id || '') + '"><td style="padding:var(--space-sm);border-bottom:1px solid #eee">' + (p.key || '').replace(/</g, '&lt;') + '</td>';
+          tbl += '<td style="padding:var(--space-sm);border-bottom:1px solid #eee"><input type="text" class="param-value" data-key="' + (p.key || '').replace(/"/g, '&quot;') + '" value="' + (p.value || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"></td></tr>';
+        });
+        tbl += '</tbody></table>';
+        container.innerHTML = tbl;
+        container.querySelectorAll('.param-value').forEach(function (inp) {
+          inp.onblur = function () {
+            const key = inp.getAttribute('data-key');
+            if (!key) return;
+            rpc.callKw('ir.config_parameter', 'set_param', [key, inp.value], {})
+              .then(function () { showToast('Parameter saved', 'success'); })
+              .catch(function (err) { showToast(err.message || 'Failed to save', 'error'); });
+          };
+        });
+      })
+      .catch(function () {
+        const c = document.getElementById('settings-params');
+        if (c) c.innerHTML = '<p style="color:var(--text-muted)">Could not load parameters.</p>';
+      });
+    rpc.callKw('ir.config_parameter', 'search_read', [[['key', 'in', ['ai.openai_api_key', 'ai.llm_enabled', 'ai.llm_model']]]], { fields: ['key', 'value'] })
+      .then(function (params) {
+        const container = document.getElementById('settings-ai');
+        if (!container) return;
+        const byKey = {};
+        (params || []).forEach(function (p) { byKey[p.key] = (p.value || '').trim(); });
+        const apiKey = byKey['ai.openai_api_key'] || '';
+        const llmEnabled = (byKey['ai.llm_enabled'] || '0') === '1';
+        const llmModel = byKey['ai.llm_model'] || 'gpt-4o-mini';
+        let html = '<label style="display:block;margin-bottom:var(--space-xs)">OpenAI API Key</label>';
+        html += '<input type="password" id="ai-api-key" placeholder="sk-..." value="' + apiKey.replace(/"/g, '&quot;') + '" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);width:100%;max-width:320px;margin-bottom:var(--space-md)">';
+        html += '<label style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-md);cursor:pointer">';
+        html += '<input type="checkbox" id="ai-llm-enabled" ' + (llmEnabled ? 'checked' : '') + '> Enable LLM (conversational AI)';
+        html += '</label>';
+        html += '<label style="display:block;margin-bottom:var(--space-xs)">Model</label>';
+        html += '<select id="ai-llm-model" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);margin-bottom:var(--space-md)">';
+        html += '<option value="gpt-4o-mini"' + (llmModel === 'gpt-4o-mini' ? ' selected' : '') + '>gpt-4o-mini</option>';
+        html += '<option value="gpt-4o"' + (llmModel === 'gpt-4o' ? ' selected' : '') + '>gpt-4o</option>';
+        html += '<option value="gpt-4-turbo"' + (llmModel === 'gpt-4-turbo' ? ' selected' : '') + '>gpt-4-turbo</option>';
+        html += '</select>';
+        html += '<button type="button" id="btn-save-ai" style="padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Save</button>';
+        container.innerHTML = html;
+        const btn = document.getElementById('btn-save-ai');
+        if (btn) {
+          btn.onclick = function () {
+            const keyInp = document.getElementById('ai-api-key');
+            const enabledInp = document.getElementById('ai-llm-enabled');
+            const modelInp = document.getElementById('ai-llm-model');
+            if (!keyInp || !enabledInp || !modelInp) return;
+            btn.disabled = true;
+            Promise.all([
+              rpc.callKw('ir.config_parameter', 'set_param', ['ai.openai_api_key', keyInp.value], {}),
+              rpc.callKw('ir.config_parameter', 'set_param', ['ai.llm_enabled', enabledInp.checked ? '1' : '0'], {}),
+              rpc.callKw('ir.config_parameter', 'set_param', ['ai.llm_model', modelInp.value], {})
+            ]).then(function () { btn.disabled = false; showToast('AI configuration saved', 'success'); })
+              .catch(function (err) { btn.disabled = false; showToast(err.message || 'Failed to save', 'error'); });
+          };
+        }
+      })
+      .catch(function () {
+        const c = document.getElementById('settings-ai');
+        if (c) c.innerHTML = '<p style="color:var(--text-muted)">Could not load AI configuration.</p>';
+      });
   }
 
   function renderApiKeysSettings() {
-    main.innerHTML = '<h2>API Keys</h2><p>Loading...</p>';
+    actionStack = [{ label: 'Settings', hash: 'settings' }, { label: 'API Keys', hash: 'settings/apikeys' }];
+    main.innerHTML = renderBreadcrumbs() + '<h2>API Keys</h2><p>Loading...</p>';
     const sessionSvc = window.Services && window.Services.session;
     if (!sessionSvc) {
       main.innerHTML = '<h2>API Keys</h2><p class="error">Session not available.</p>';
@@ -249,19 +634,18 @@
               rpc.callKw('res.users.apikeys', 'generate', [info.uid, name])
                 .then(function (rawKey) {
                   btn.disabled = false;
-                  const msg = 'Copy your API key now. It will not be shown again:\n\n' + rawKey;
                   if (typeof navigator.clipboard !== 'undefined' && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(rawKey).then(function () {
-                      alert('API key generated and copied to clipboard.');
-                    }).catch(function () { alert(msg); });
+                      showToast('API key generated and copied to clipboard.', 'success');
+                    }).catch(function () { showToast('API key generated. Copy it now - it will not be shown again.', 'warning'); });
                   } else {
-                    alert(msg);
+                    showToast('API key generated. Copy it now - it will not be shown again.', 'warning');
                   }
                   renderApiKeysSettings();
                 })
                 .catch(function (err) {
                   btn.disabled = false;
-                  alert(err.message || 'Failed to generate key');
+                  showToast(err.message || 'Failed to generate key', 'error');
                 });
             };
           }
@@ -272,7 +656,7 @@
               if (!confirm('Revoke this API key? It will stop working immediately.')) return;
               rpc.callKw('res.users.apikeys', 'revoke', [[id]])
                 .then(function () { renderApiKeysSettings(); })
-                .catch(function (err) { alert(err.message || 'Failed to revoke'); });
+                .catch(function (err) { showToast(err.message || 'Failed to revoke', 'error'); });
             };
           });
         })
@@ -283,16 +667,24 @@
   }
 
   function getDisplayNames(model, colName, records) {
+    if (records && records.length && records[0][colName + '_display'] !== undefined) {
+      var map = {};
+      records.forEach(function (r) {
+        var v = r[colName];
+        if (v && !map[v]) map[v] = r[colName + '_display'] || v;
+      });
+      return Promise.resolve(map);
+    }
     const comodel = getMany2oneComodel(model, colName);
     if (!comodel) return Promise.resolve({});
     const ids = [];
     records.forEach(function (r) { const v = r[colName]; if (v) ids.push(v); });
     if (!ids.length) return Promise.resolve({});
     const uniq = ids.filter(function (x, i, a) { return a.indexOf(x) === i; });
-    const map = {};
-    return rpc.callKw(comodel, 'read', [uniq, ['id', 'name']])
+    var map = {};
+    return rpc.callKw(comodel, 'read', [uniq, ['id', 'name', 'display_name']])
       .then(function (rows) {
-        (rows || []).forEach(function (row) { map[row.id] = row.name || row.id; });
+        (rows || []).forEach(function (row) { map[row.id] = row.display_name || row.name || row.id; });
         return map;
       })
       .catch(function () { return {}; });
@@ -318,38 +710,74 @@
   }
 
   function renderViewSwitcher(route, currentView) {
-    const modes = getAvailableViewModes(route).filter(function (m) { return m === 'list' || m === 'kanban'; });
+    const modes = getAvailableViewModes(route).filter(function (m) { return m === 'list' || m === 'kanban' || m === 'graph' || m === 'calendar'; });
     if (modes.length < 2) return '';
+    const labels = { list: 'List', kanban: 'Kanban', graph: 'Graph', calendar: 'Calendar' };
     let html = '<span class="view-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
     modes.forEach(function (m) {
       const active = m === currentView;
-      html += '<button type="button" class="btn-view' + (active ? ' active' : '') + '" data-view="' + m + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (m === 'list' ? 'List' : 'Kanban') + '</button>';
+      html += '<button type="button" class="btn-view' + (active ? ' active' : '') + '" data-view="' + m + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (labels[m] || m) + '</button>';
     });
     return html + '</span>';
   }
 
-  function renderList(model, route, records, searchTerm) {
+  function renderList(model, route, records, searchTerm, totalCount, offset, limit, savedFiltersList) {
+    savedFiltersList = savedFiltersList || [];
     const cols = getListColumns(model);
     const title = getTitle(route);
-    const addLabel = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : 'Add';
+    const addLabel = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : route === 'settings/users' ? 'Add user' : 'Add';
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     const currentView = (currentListState.route === route && currentListState.viewType) || 'list';
+    const order = (currentListState.route === route && currentListState.order) || null;
+    actionStack = [{ label: title, hash: route }];
     let html = '<h2>' + title + '</h2>';
     html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
     html += renderViewSwitcher(route, currentView);
     html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
     html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    const savedFiltersList = getSavedFilters(model);
-    html += '<select id="list-saved-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">Filters</option>';
+    const searchView = viewsSvc && viewsSvc.getView(model, 'search');
+    const searchFilters = (searchView && searchView.filters) || [];
+    const searchGroupBys = (searchView && searchView.group_bys) || [];
+    const activeFilters = currentListState.activeSearchFilters || [];
+    const currentGroupBy = currentListState.groupBy || null;
+    searchFilters.forEach(function (f) {
+      const active = activeFilters.indexOf(f.name) >= 0;
+      html += '<button type="button" class="btn-search-filter' + (active ? ' active' : '') + '" data-filter="' + (f.name || '').replace(/"/g, '&quot;') + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (f.string || f.name || '').replace(/</g, '&lt;') + '</button>';
+    });
+    if (searchGroupBys.length) {
+      html += '<select id="list-group-by" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">Group by</option>';
+      searchGroupBys.forEach(function (g) {
+        html += '<option value="' + (g.group_by || '').replace(/"/g, '&quot;') + '"' + (currentGroupBy === g.group_by ? ' selected' : '') + '>' + (g.string || g.name || '').replace(/</g, '&lt;') + '</option>';
+      });
+      html += '</select>';
+    }
+    html += '<select id="list-saved-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">Saved filters</option>';
     savedFiltersList.forEach(function (f) {
-      html += '<option value="' + (f.id || '').replace(/"/g, '&quot;') + '"' + (currentListState.savedFilterId === f.id ? ' selected' : '') + '>' + (f.name || 'Filter').replace(/</g, '&lt;') + '</option>';
+      html += '<option value="' + (f.id != null ? String(f.id) : '').replace(/"/g, '&quot;') + '"' + (currentListState.savedFilterId == f.id ? ' selected' : '') + '>' + (f.name || 'Filter').replace(/</g, '&lt;') + '</option>';
     });
     html += '</select>';
     html += '<button type="button" id="btn-save-filter" style="padding:0.5rem 0.75rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Save</button>';
     if (model === 'crm.lead') {
       html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
     }
+    html += '<button type="button" id="btn-export" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Export</button>';
+    html += '<button type="button" id="btn-import" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Import</button>';
+    const reportName = getReportName(model);
+    if (reportName) html += '<button type="button" id="btn-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Print</button>';
     html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
+    const hasFacets = (activeFilters.length > 0 || currentGroupBy);
+    if (hasFacets) {
+      html += '<p class="facet-chips" style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:var(--space-sm);align-items:center">';
+      activeFilters.forEach(function (fname) {
+        const f = searchFilters.find(function (x) { return x.name === fname; });
+        html += '<span class="facet-chip" data-type="filter" data-name="' + (fname || '').replace(/"/g, '&quot;') + '" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--color-primary, #1a1a2e);color:white;border-radius:4px;font-size:0.85rem">' + (f ? (f.string || fname) : fname).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove" aria-label="Remove" style="background:none;border:none;color:white;cursor:pointer;padding:0;font-size:1rem;line-height:1">&times;</button></span>';
+      });
+      if (currentGroupBy) {
+        const g = searchGroupBys.find(function (x) { return x.group_by === currentGroupBy; });
+        html += '<span class="facet-chip" data-type="groupby" data-name="' + (currentGroupBy || '').replace(/"/g, '&quot;') + '" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--color-primary, #1a1a2e);color:white;border-radius:4px;font-size:0.85rem">Group: ' + (g ? (g.string || currentGroupBy) : currentGroupBy).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove" aria-label="Remove" style="background:none;border:none;color:white;cursor:pointer;padding:0;font-size:1rem;line-height:1">&times;</button></span>';
+      }
+      html += '</p>';
+    }
     if (!records || !records.length) {
       main.innerHTML = html + '<p>No records yet.</p>';
     } else {
@@ -361,11 +789,46 @@
         const f = typeof c === 'object' ? c.name : c;
         return getMany2manyInfo(model, f);
       });
+      const numericCols = ['expected_revenue', 'revenue', 'amount', 'quantity'];
       function renderTable(nameMap) {
         let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
-        cols.forEach(c => { tbl += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd">' + (typeof c === 'object' ? c.name || c : c) + '</th>'; });
-        tbl += '<th></th></tr></thead><tbody>';
-        records.forEach(r => {
+        cols.forEach(c => {
+          const f = typeof c === 'object' ? c.name : c;
+          const label = (typeof c === 'object' ? c.name || c : c);
+          const isSorted = order && (order.startsWith(f + ' ') || order.startsWith(f + ','));
+          const dir = isSorted && order.indexOf('desc') >= 0 ? 'desc' : 'asc';
+          const arrow = isSorted ? (dir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
+          tbl += '<th class="sortable-col" data-field="' + (f || '').replace(/"/g, '&quot;') + '" style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd;cursor:pointer;user-select:none">' + (label || '').replace(/</g, '&lt;') + arrow + '</th>';
+        });
+        tbl += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd"></th></tr></thead><tbody>';
+        const groupByField = currentListState.groupBy;
+        const groups = groupByField ? (function () {
+          const g = {};
+          (records || []).forEach(function (r) {
+            const k = r[groupByField] != null ? r[groupByField] : '__false__';
+            if (!g[k]) g[k] = [];
+            g[k].push(r);
+          });
+          return Object.keys(g).map(function (k) { return { key: k === '__false__' ? false : k, rows: g[k] }; });
+        })() : null;
+        function renderRow(r, isGroupHeader, isSubtotal) {
+          if (isGroupHeader) {
+            const gval = r;
+            const label = (nameMap && nameMap[groupByField] && gval != null) ? (nameMap[groupByField][gval] || gval) : (gval != null ? String(gval) : '(No value)');
+            tbl += '<tr class="group-header" style="background:var(--color-bg-secondary, #f0f0f0);font-weight:600"><td colspan="' + (cols.length + 1) + '" style="padding:0.5rem;border-bottom:1px solid #ddd">' + String(label).replace(/</g, '&lt;') + '</td></tr>';
+            return;
+          }
+          if (isSubtotal) {
+            tbl += '<tr class="group-subtotal" style="background:var(--color-bg-secondary, #f8f8f8);font-weight:500">';
+            cols.forEach(c => {
+              const f = typeof c === 'object' ? c.name : c;
+              const sum = r[f];
+              const isNum = numericCols.indexOf(f) >= 0;
+              tbl += '<td style="padding:0.5rem;border-bottom:1px solid #eee">' + (isNum && sum != null ? Number(sum).toLocaleString() : '').replace(/</g, '&lt;') + '</td>';
+            });
+            tbl += '<td style="padding:0.5rem;border-bottom:1px solid #eee"></td></tr>';
+            return;
+          }
           tbl += '<tr data-id="' + (r.id || '') + '">';
           cols.forEach(c => {
             const f = typeof c === 'object' ? c.name : c;
@@ -387,9 +850,37 @@
           });
           tbl += '<td style="padding:0.5rem"><a href="#' + route + '/edit/' + (r.id || '') + '" style="font-size:0.9rem;margin-right:0.5rem">Edit</a>';
           tbl += '<a href="#" class="btn-delete" data-id="' + (r.id || '') + '" style="font-size:0.9rem;color:#c00">Delete</a></td></tr>';
-        });
+        }
+        if (groups) {
+          groups.forEach(function (grp) {
+            renderRow(grp.key, true);
+            grp.rows.forEach(function (r) { renderRow(r, false); });
+            const subtotal = {};
+            numericCols.forEach(function (f) {
+              if (cols.some(function (c) { return (typeof c === 'object' ? c.name : c) === f; })) {
+                subtotal[f] = grp.rows.reduce(function (s, r) { return s + (Number(r[f]) || 0); }, 0);
+              }
+            });
+            if (Object.keys(subtotal).length) renderRow(subtotal, false, true);
+          });
+        } else {
+          records.forEach(r => { renderRow(r, false); });
+        }
         tbl += '</tbody></table>';
-        main.innerHTML = html + tbl;
+        const total = totalCount != null ? totalCount : (records ? records.length : 0);
+        const off = offset != null ? offset : 0;
+        const lim = limit != null ? limit : 80;
+        let pager = '';
+        if (total > 0 && records && records.length) {
+          const from = off + 1;
+          const to = Math.min(off + lim, total);
+          pager = '<p class="list-pager" style="margin-top:0.5rem;font-size:0.9rem;color:#666">';
+          pager += from + '-' + to + ' of ' + total + ' ';
+          pager += '<button type="button" class="btn-pager-prev" ' + (off <= 0 ? 'disabled' : '') + ' style="margin-left:0.5rem;padding:0.25rem 0.5rem;cursor:' + (off <= 0 ? 'not-allowed' : 'pointer') + '">Prev</button>';
+          pager += ' <button type="button" class="btn-pager-next" ' + (off + lim >= total ? 'disabled' : '') + ' style="margin-left:0.25rem;padding:0.25rem 0.5rem;cursor:' + (off + lim >= total ? 'not-allowed' : 'pointer') + '">Next</button>';
+          pager += '</p>';
+        }
+        main.innerHTML = html + tbl + pager;
       }
       const allCols = m2oCols.length || m2mCols.length;
       if (allCols) {
@@ -411,6 +902,43 @@
     }
     const btn = document.getElementById('btn-add');
     if (btn) btn.onclick = () => { window.location.hash = route + '/new'; };
+    const btnExport = document.getElementById('btn-export');
+    if (btnExport && records && records.length) {
+      btnExport.onclick = function () {
+        const tbl = main.querySelector('table');
+        if (!tbl) return;
+        const rows = tbl.querySelectorAll('tr');
+        const lines = [];
+        rows.forEach(function (tr) {
+          const cells = tr.querySelectorAll('td, th');
+          const vals = [];
+          cells.forEach(function (cell) {
+            const txt = (cell.textContent || '').trim().replace(/"/g, '""');
+            vals.push(txt.indexOf(',') >= 0 || txt.indexOf('"') >= 0 || txt.indexOf('\n') >= 0 ? '"' + txt + '"' : txt);
+          });
+          if (vals.length) lines.push(vals.join(','));
+        });
+        const csv = lines.join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (route || 'export') + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+    }
+    const btnImport = document.getElementById('btn-import');
+    if (btnImport) {
+      btnImport.onclick = function () { showImportModal(model, route); };
+    }
+    const btnPrint = document.getElementById('btn-print');
+    if (btnPrint && reportName && records && records.length) {
+      btnPrint.onclick = function () {
+        const ids = records.map(function (r) { return r.id; }).filter(function (x) { return x; });
+        if (ids.length) window.open('/report/html/' + reportName + '/' + ids.join(','), '_blank', 'noopener');
+      };
+    }
     const btnSearch = document.getElementById('btn-search');
     const searchInput = document.getElementById('list-search');
     if (btnSearch && searchInput) {
@@ -418,7 +946,7 @@
         const sf = document.getElementById('list-saved-filter');
         const stageEl = document.getElementById('list-stage-filter');
         const stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
-        loadRecords(model, route, searchInput.value.trim(), stageVal, null, sf && sf.value ? sf.value : null);
+        loadRecords(model, route, searchInput.value.trim(), stageVal, null, sf && sf.value ? sf.value : null, 0, null);
       };
       btnSearch.onclick = doSearch;
       searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
@@ -428,6 +956,65 @@
     });
     main.querySelectorAll('.btn-view').forEach(btn => {
       btn.onclick = () => { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
+    });
+    main.querySelectorAll('.btn-search-filter').forEach(btn => {
+      btn.onclick = function () {
+        const fname = btn.dataset.filter;
+        if (!fname) return;
+        const cur = currentListState.activeSearchFilters || [];
+        const idx = cur.indexOf(fname);
+        const next = idx >= 0 ? cur.filter(function (_, i) { return i !== idx; }) : cur.concat(fname);
+        currentListState.activeSearchFilters = next;
+        const si = document.getElementById('list-search');
+        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, currentListState.savedFilterId, 0, null);
+      };
+    });
+    const groupByEl = document.getElementById('list-group-by');
+    if (groupByEl) {
+      groupByEl.onchange = function () {
+        currentListState.groupBy = groupByEl.value || null;
+        const si = document.getElementById('list-search');
+        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, currentListState.savedFilterId, 0, null);
+      };
+    }
+    main.querySelectorAll('.facet-chip .facet-remove').forEach(btn => {
+      btn.onclick = function (e) {
+        e.preventDefault();
+        const chip = btn.closest('.facet-chip');
+        if (!chip) return;
+        const typ = chip.dataset.type;
+        const name = chip.dataset.name;
+        if (typ === 'filter') {
+          currentListState.activeSearchFilters = (currentListState.activeSearchFilters || []).filter(function (f) { return f !== name; });
+        } else if (typ === 'groupby') {
+          currentListState.groupBy = null;
+        }
+        const si = document.getElementById('list-search');
+        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, currentListState.savedFilterId, 0, null);
+      };
+    });
+    main.querySelectorAll('.sortable-col').forEach(th => {
+      th.onclick = function () {
+        const f = th.dataset.field;
+        if (!f) return;
+        const cur = (currentListState.route === route && currentListState.order) || '';
+        const nextDir = (cur.startsWith(f + ' ') && cur.indexOf('desc') < 0) ? 'desc' : 'asc';
+        loadRecords(model, route, searchTerm, stageFilter, null, currentListState.savedFilterId, 0, f + ' ' + nextDir);
+      };
+    });
+    main.querySelectorAll('.btn-pager-prev').forEach(btn => {
+      btn.onclick = function () {
+        if (btn.disabled) return;
+        const off = (currentListState.offset || 0) - (currentListState.limit || 80);
+        loadRecords(model, route, searchTerm, stageFilter, null, currentListState.savedFilterId, Math.max(0, off), null);
+      };
+    });
+    main.querySelectorAll('.btn-pager-next').forEach(btn => {
+      btn.onclick = function () {
+        if (btn.disabled) return;
+        const off = (currentListState.offset || 0) + (currentListState.limit || 80);
+        loadRecords(model, route, searchTerm, stageFilter, null, currentListState.savedFilterId, off, null);
+      };
     });
     if (model === 'crm.lead') {
       const filterEl = document.getElementById('list-stage-filter');
@@ -443,7 +1030,7 @@
             });
             filterEl.onchange = function () {
               const val = filterEl.value ? parseInt(filterEl.value, 10) : null;
-              loadRecords(model, route, document.getElementById('list-search').value.trim(), val, null, null);
+              loadRecords(model, route, document.getElementById('list-search').value.trim(), val, null, null, 0, null);
             };
           });
       }
@@ -453,7 +1040,7 @@
       savedFilterEl.onchange = function () {
         const fid = savedFilterEl.value || null;
         const si = document.getElementById('list-search');
-        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, fid);
+        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, fid, 0, null);
       };
     }
     const btnSaveFilter = document.getElementById('btn-save-filter');
@@ -469,18 +1056,19 @@
         const searchDom = buildSearchDomain(model, st);
         if (searchDom.length) domain = domain.concat(searchDom);
         if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
-        saveSavedFilter(model, name.trim(), domain);
-        loadRecords(model, route, st, stageFilter, null, null);
+        saveSavedFilter(model, name.trim(), domain).then(function () {
+          loadRecords(model, route, st, stageFilter, null, null, 0, null);
+        });
       };
     }
   }
 
-  let currentListState = { model: null, route: null, searchTerm: '', stageFilter: null, viewType: null, savedFilterId: null };
+  let currentListState = { model: null, route: null, searchTerm: '', stageFilter: null, viewType: null, savedFilterId: null, offset: 0, limit: 80, order: null, totalCount: 0, activeSearchFilters: [], groupBy: null };
 
   function deleteRecord(model, route, id) {
     rpc.callKw(model, 'unlink', [[parseInt(id, 10)]])
-      .then(() => loadRecords(model, route, currentListState.searchTerm))
-      .catch(err => { alert(err.message || 'Failed to delete'); });
+      .then(() => { showToast('Record deleted', 'success'); loadRecords(model, route, currentListState.searchTerm); })
+      .catch(err => { showToast(err.message || 'Failed to delete', 'error'); });
   }
 
   function getViewFieldDef(model, fname) {
@@ -498,13 +1086,15 @@
     return null;
   }
 
+  function getFieldMeta(model, fname) {
+    return viewsSvc ? viewsSvc.getFieldMeta(model, fname) : null;
+  }
+
   function getMany2oneComodel(model, fname) {
     const def = getViewFieldDef(model, fname);
     if (def && def.comodel) return def.comodel;
-    if (model === 'crm.lead' && fname === 'partner_id') return 'res.partner';
-    if (model === 'crm.lead' && fname === 'stage_id') return 'crm.stage';
-    if (model === 'res.partner' && fname === 'country_id') return 'res.country';
-    if (model === 'res.partner' && fname === 'state_id') return 'res.country.state';
+    const meta = getFieldMeta(model, fname);
+    if (meta && meta.comodel) return meta.comodel;
     return null;
   }
 
@@ -519,13 +1109,23 @@
   }
 
   function getSelectionOptions(model, fname) {
-    if (model === 'crm.lead' && fname === 'type') return [['lead', 'Lead'], ['opportunity', 'Opportunity']];
-    if (model === 'res.partner' && fname === 'type') return [['contact', 'Contact'], ['address', 'Address']];
+    const meta = getFieldMeta(model, fname);
+    if (meta && meta.selection && meta.selection.length) return meta.selection;
     return null;
   }
 
   function isBooleanField(model, fname) {
-    return model === 'res.partner' && fname === 'is_company';
+    const meta = getFieldMeta(model, fname);
+    if (meta) return meta.type === 'boolean';
+    return false;
+  }
+
+  function isBinaryField(model, fname) {
+    const def = getViewFieldDef(model, fname);
+    if (def && def.widget === 'binary') return true;
+    const meta = getFieldMeta(model, fname);
+    if (meta && meta.type === 'binary') return true;
+    return false;
   }
 
   function getSelectionLabel(model, fname, value) {
@@ -536,62 +1136,501 @@
   }
 
   function getOne2manyInfo(model, fname) {
-    if (model === 'crm.lead' && fname === 'activity_ids') return { comodel: 'crm.activity', inverse: 'lead_id' };
+    const meta = getFieldMeta(model, fname);
+    if (meta && meta.type === 'one2many' && meta.comodel) return { comodel: meta.comodel, inverse: meta.inverse_name || '' };
     return null;
+  }
+
+  function renderOne2manyRow(fname, lineFields, rowData, rowIndex) {
+    var id = rowData && rowData.id;
+    var dataAttrs = id ? ' data-o2m-id="' + id + '"' : ' data-o2m-new="1"';
+    var cells = lineFields.map(function (lf) {
+      var val = (rowData && rowData[lf]) || '';
+      return '<td style="padding:0.25rem"><input type="' + (lf === 'date_deadline' ? 'date' : 'text') + '" data-o2m-field="' + lf + '" value="' + (val || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;font-size:0.9rem"></td>';
+    }).join('');
+    return '<tr' + dataAttrs + '>' + cells + '<td style="padding:0.25rem"><button type="button" class="o2m-delete-row" style="padding:0.2rem 0.4rem;font-size:0.8rem;cursor:pointer;color:#c00">Delete</button></td></tr>';
+  }
+
+  function setupOne2manyAddButtons(form, model) {
+    form.querySelectorAll('[id^="o2m-add-"]').forEach(function (btn) {
+      var fname = btn.id.replace('o2m-add-', '');
+      var o2m = getOne2manyInfo(model, fname);
+      if (!o2m) return;
+      var lineFields = getOne2manyLineFields(model, fname);
+      var tbody = form.querySelector('#o2m-tbody-' + fname);
+      if (!tbody) return;
+      btn.onclick = function () {
+        tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(fname, lineFields, null, 0));
+        var lastRow = tbody.lastElementChild;
+        if (lastRow) {
+          var delBtn = lastRow.querySelector('.o2m-delete-row');
+          if (delBtn) delBtn.onclick = function () { lastRow.remove(); };
+        }
+      };
+    });
+    form.querySelectorAll('.o2m-delete-row').forEach(function (b) {
+      b.onclick = function () { b.closest('tr').remove(); };
+    });
+  }
+
+  function loadChatter(model, recordId, messageIds) {
+    const container = document.querySelector('.chatter-messages-list');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!messageIds || !messageIds.length) {
+      container.innerHTML = '<p style="color:var(--text-muted,#666);font-size:0.9rem">No messages yet.</p>';
+      return;
+    }
+    rpc.callKw('mail.message', 'search_read', [[['id', 'in', messageIds]]], {
+      fields: ['id', 'body', 'author_id', 'date'],
+      order: 'id asc'
+    }).then(function (rows) {
+      const authorIds = [];
+      rows.forEach(function (r) { if (r.author_id) authorIds.push(r.author_id); });
+      const uniq = authorIds.filter(function (x, i, a) { return a.indexOf(x) === i; });
+      const nameMap = {};
+      const renderRows = function () {
+        rows.forEach(function (r) {
+          const authorName = r.author_id ? (nameMap[r.author_id] || 'User #' + r.author_id) : 'Unknown';
+          const dateStr = r.date ? String(r.date).replace('T', ' ').slice(0, 16) : '';
+          const body = (r.body || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
+          container.insertAdjacentHTML('beforeend', '<div class="chatter-msg" style="padding:0.5rem 0;border-bottom:1px solid var(--border-color,#eee)"><div style="font-size:0.85rem;color:var(--text-muted,#666)">' + authorName + ' · ' + dateStr + '</div><div style="margin-top:0.25rem">' + body + '</div></div>');
+        });
+      };
+      if (uniq.length) {
+        return rpc.callKw('res.users', 'name_get', [uniq], {}).then(function (names) {
+          (names || []).forEach(function (n) { if (n && n[0]) nameMap[n[0]] = n[1] || ''; });
+          renderRows();
+        });
+      }
+      renderRows();
+    }).catch(function () {
+      container.innerHTML = '<p style="color:var(--text-muted,#666);font-size:0.9rem">Could not load messages.</p>';
+    });
+  }
+
+  function setupChatter(form, model, recordId) {
+    const chatterDiv = form.querySelector('#chatter-messages');
+    if (!chatterDiv || !recordId) return;
+    const sendBtn = form.querySelector('#chatter-send');
+    const inputEl = form.querySelector('#chatter-input');
+    if (sendBtn && inputEl) {
+      sendBtn.onclick = function () {
+        const body = (inputEl.value || '').trim();
+        if (!body) return;
+        sendBtn.disabled = true;
+        rpc.callKw(model, 'message_post', [[parseInt(recordId, 10)], body], {})
+          .then(function () {
+            sendBtn.disabled = false;
+            inputEl.value = '';
+            showToast('Message posted', 'success');
+            rpc.callKw(model, 'read', [[parseInt(recordId, 10)], ['message_ids']]).then(function (recs) {
+              if (recs && recs[0] && recs[0].message_ids) loadChatter(model, recordId, recs[0].message_ids);
+            });
+          })
+          .catch(function (err) {
+            sendBtn.disabled = false;
+            showToast(err.message || 'Failed to post', 'error');
+          });
+      };
+    }
+  }
+
+  function getOne2manyLineFields(model, fname) {
+    var o2m = getOne2manyInfo(model, fname);
+    if (!o2m) return [];
+    if (model === 'crm.lead' && fname === 'activity_ids') return ['summary', 'note', 'date_deadline', 'state'];
+    var meta = viewsSvc ? viewsSvc.getFieldsMeta(o2m.comodel) : null;
+    if (meta) {
+      var skip = ['id', (o2m.inverse || '').replace(/_id$/, '') + '_id'];
+      return Object.keys(meta).filter(function (k) { return skip.indexOf(k) < 0 && meta[k].type !== 'one2many' && meta[k].type !== 'many2many'; });
+    }
+    return ['name'];
   }
 
   function getMany2manyInfo(model, fname) {
     const def = getViewFieldDef(model, fname);
-    if (def && def.comodel) return { comodel: def.comodel };
-    if (model === 'crm.lead' && fname === 'tag_ids') return { comodel: 'crm.tag' };
+    if (def && def.comodel) {
+      const meta = getFieldMeta(model, fname);
+      if (meta && meta.type === 'many2many') return { comodel: def.comodel };
+      if (meta && meta.type === 'many2one') return null;
+      return { comodel: def.comodel };
+    }
+    const meta = getFieldMeta(model, fname);
+    if (meta && meta.type === 'many2many' && meta.comodel) return { comodel: meta.comodel };
     return null;
   }
 
+  function getFieldLabel(model, fname) {
+    const meta = getFieldMeta(model, fname);
+    if (meta && meta.string) return meta.string;
+    return fname.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  function isTextField(model, fname) {
+    const meta = getFieldMeta(model, fname);
+    if (meta) return meta.type === 'text' || meta.type === 'html';
+    return fname === 'description' || fname === 'note_html';
+  }
+
+  function parseDomain(str) {
+    if (!str || typeof str !== 'string') return null;
+    var s = str.trim();
+    if (s === '1' || s === 'True') return true;
+    if (s === '0' || s === 'False') return false;
+    try {
+      var norm = s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null').replace(/'/g, '"');
+      return JSON.parse(norm);
+    } catch (e) { return null; }
+  }
+
+  function evaluateDomain(domain, formVals) {
+    if (domain === true) return true;
+    if (domain === false) return false;
+    if (!Array.isArray(domain) || domain.length === 0) return false;
+    var op = domain[0];
+    if (op === '|' && domain.length >= 3) return evaluateDomain(domain[1], formVals) || evaluateDomain(domain[2], formVals);
+    if (op === '&' && domain.length >= 3) return evaluateDomain(domain[1], formVals) && evaluateDomain(domain[2], formVals);
+    if (domain.length >= 3 && typeof domain[0] === 'string') {
+      var field = domain[0], op2 = domain[1], value = domain[2];
+      var v = formVals[field];
+      if (op2 === '=') return v == value;
+      if (op2 === '!=') return v != value;
+      if (op2 === '>') return v > value;
+      if (op2 === '<') return v < value;
+      if (op2 === '>=') return v >= value;
+      if (op2 === '<=') return v <= value;
+      if (op2 === 'in') return Array.isArray(value) && value.indexOf(v) >= 0;
+      if (op2 === 'not in') return !Array.isArray(value) || value.indexOf(v) < 0;
+    }
+    return false;
+  }
+
+  function evaluateCondition(domainStr, formVals) {
+    var domain = parseDomain(domainStr);
+    return domain !== null ? evaluateDomain(domain, formVals) : false;
+  }
+
+  function applyAttrsToForm(form, model) {
+    var formVals = getFormVals(form, model);
+    form.querySelectorAll('.attr-field').forEach(function (wrapper) {
+      var fname = wrapper.getAttribute('data-fname');
+      var invStr = wrapper.getAttribute('data-invisible');
+      var roStr = wrapper.getAttribute('data-readonly');
+      var reqStr = wrapper.getAttribute('data-required-cond');
+      var inv = invStr ? evaluateCondition(invStr, formVals) : false;
+      var ro = roStr ? evaluateCondition(roStr, formVals) : false;
+      var req = reqStr ? evaluateCondition(reqStr, formVals) : false;
+      wrapper.classList.toggle('o-invisible', !!inv);
+      var inputs = wrapper.querySelectorAll('input:not([type="hidden"]), select, textarea');
+      var forRequired = wrapper.querySelector('[name="' + fname + '"]');
+      inputs.forEach(function (el) { el.disabled = !!ro; });
+      if (forRequired) forRequired.required = !!req;
+    });
+  }
+
+  function renderFieldHtml(model, f) {
+    const fname = typeof f === 'object' ? f.name : f;
+    const label = getFieldLabel(model, fname);
+    const widget = typeof f === 'object' ? f.widget : '';
+    if (widget === 'statusbar') {
+      var sbId = 'statusbar-' + fname + '-' + Math.random().toString(36).slice(2);
+      return '<p><label>' + label + '</label><div class="o-statusbar" id="' + sbId + '" data-fname="' + fname + '" data-comodel="' + (f.comodel || '') + '" data-clickable="1" style="margin-top:0.25rem;display:flex;align-items:center;gap:0;flex-wrap:wrap"></div><input type="hidden" name="' + fname + '"></p>';
+    }
+    const o2m = getOne2manyInfo(model, fname);
+    const m2m = getMany2manyInfo(model, fname);
+    if (fname === 'message_ids' && model === 'crm.lead') {
+      return '<p><label>' + label + '</label><div id="chatter-messages" class="o-chatter" data-model="' + model + '" style="margin-top:0.5rem;padding:var(--space-md,0.75rem);background:var(--color-bg,#f5f5f5);border-radius:var(--radius-md,8px);border:1px solid var(--border-color,#ddd)"><div class="chatter-messages-list" style="max-height:200px;overflow-y:auto;margin-bottom:var(--space-md,0.75rem)"></div><div class="chatter-compose"><textarea id="chatter-input" placeholder="Add a comment..." style="width:100%;min-height:60px;padding:0.5rem;border:1px solid var(--border-color,#ddd);border-radius:4px;resize:vertical"></textarea><button type="button" id="chatter-send" style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--color-primary,#1a1a2e);color:white;border:none;border-radius:4px;cursor:pointer">Send</button></div></div></p>';
+    }
+    if (o2m) {
+      var lineFields = getOne2manyLineFields(model, fname);
+      var headers = lineFields.map(function (lf) { return '<th style="text-align:left;padding:0.35rem">' + (lf.charAt(0).toUpperCase() + lf.slice(1)) + '</th>'; }).join('');
+      var rowHtml = lineFields.map(function (lf) { return '<td style="padding:0.25rem"><input type="text" data-o2m-field="' + lf + '" style="width:100%;padding:0.25rem;font-size:0.9rem" placeholder="' + lf + '"></td>'; }).join('');
+      var addId = 'o2m-add-' + fname;
+      return '<p><label>' + label + '</label><div id="o2m-' + fname + '" data-comodel="' + (o2m.comodel || '') + '" data-inverse="' + (o2m.inverse || '') + '" data-fname="' + fname + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px"><table style="width:100%;font-size:0.9rem"><thead><tr>' + headers + '<th style="width:1%"></th></tr></thead><tbody id="o2m-tbody-' + fname + '"></tbody></table><button type="button" id="' + addId + '" style="margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.85rem;cursor:pointer">Add</button></div></p>';
+    }
+    if (m2m) return '<p><label>' + label + '</label><div id="m2m-' + fname + '" data-comodel="' + (m2m.comodel || '') + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px;min-height:2em"></div></p>';
+    const meta = getFieldMeta(model, fname);
+    const required = (meta && meta.required) || fname === 'name';
+    const comodel = getMany2oneComodel(model, fname);
+    const selectionOpts = getSelectionOptions(model, fname);
+    const isBool = isBooleanField(model, fname);
+    const isBin = isBinaryField(model, fname);
+    const isTextarea = isTextField(model, fname);
+    const inputType = isBin ? 'binary' : (isBool ? 'boolean' : (fname === 'email' ? 'email' : isTextarea ? 'textarea' : selectionOpts ? 'selection' : (comodel ? 'many2one' : 'text')));
+    if (inputType === 'boolean') return '<p><label style="display:flex;align-items:center;gap:0.5rem"><input type="checkbox" name="' + fname + '"> ' + label + '</label></p>';
+    if (inputType === 'textarea') return '<p><label>' + label + (required ? ' *' : '') + '<br><textarea name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem;min-height:4em"></textarea></label></p>';
+    if (inputType === 'selection') {
+      let opts = '<option value="">--</option>';
+      selectionOpts.forEach(function (o) { opts += '<option value="' + (o[0] || '') + '">' + (o[1] || o[0]) + '</option>'; });
+      return '<p><label>' + label + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem">' + opts + '</select></label></p>';
+    }
+    if (inputType === 'many2one') {
+      const domainInfo = getMany2oneDomain(model, fname);
+      const depAttr = domainInfo ? ' data-depends-on="' + domainInfo.depField + '"' : '';
+      const wid = 'm2o-' + fname + '-' + Math.random().toString(36).slice(2);
+      return '<p><label>' + label + (required ? ' *' : '') + '</label><div class="m2one-widget" id="' + wid + '" data-comodel="' + (comodel || '') + '" data-fname="' + fname + '" data-domain="' + (domainInfo ? encodeURIComponent(JSON.stringify(domainInfo)) : '') + '"' + depAttr + ' style="margin-top:0.25rem;position:relative"><input type="text" class="m2one-input" placeholder="Search..." autocomplete="off" style="width:100%;padding:0.5rem"><input type="hidden" name="' + fname + '" class="m2one-value"><div class="m2one-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-radius:4px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 4px 8px rgba(0,0,0,0.1)"></div></div></p>';
+    }
+    if (inputType === 'binary') return '<p><label>' + label + '<br><input type="file" id="file-' + fname + '" data-field="' + fname + '" accept="*/*" style="width:100%;padding:0.5rem;margin-top:0.25rem"><input type="hidden" name="' + fname + '" id="hidden-' + fname + '"><span id="bin-status-' + fname + '" style="font-size:0.85rem;color:#666;margin-left:0.25rem"></span></label></p>';
+    return '<p><label>' + label + (required ? ' *' : '') + '<br><input type="' + inputType + '" name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem"></label></p>';
+  }
+
+  function renderFormTreeToHtml(model, children, opts) {
+    opts = opts || {};
+    var recordId = opts.recordId;
+    var route = opts.route || '';
+    var isNew = opts.isNew;
+    let html = '';
+    (children || []).forEach(function (c) {
+      if (c.type === 'header') {
+        html += '<div class="o-form-header">' + renderFormTreeToHtml(model, c.children || [], opts) + '</div>';
+      } else if (c.type === 'sheet') {
+        html += '<div class="o-form-sheet">' + renderFormTreeToHtml(model, c.children || [], opts) + '</div>';
+      } else if (c.type === 'button_box') {
+        html += '<div class="o-button-box">' + renderFormTreeToHtml(model, c.children || [], opts) + '</div>';
+      } else if (c.type === 'button') {
+        var btnName = c.name || '';
+        var btnStr = (c.string || btnName).replace(/</g, '&lt;');
+        html += '<button type="button" class="btn-action-object' + (c.class ? ' ' + c.class : '') + '" data-action="' + btnName + '" style="padding:0.35rem 0.75rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff;font-size:0.9rem">' + btnStr + '</button>';
+      } else if (c.type === 'field') {
+        var fieldHtml = renderFieldHtml(model, c);
+        var fname = c.name || '';
+        if ((c.invisible || c.readonly || c.required_cond) && fieldHtml) {
+          var ad = (c.invisible ? ' data-invisible="' + String(c.invisible).replace(/"/g, '&quot;') + '"' : '') + (c.readonly ? ' data-readonly="' + String(c.readonly).replace(/"/g, '&quot;') + '"' : '') + (c.required_cond ? ' data-required-cond="' + String(c.required_cond).replace(/"/g, '&quot;') + '"' : '');
+          html += '<div class="attr-field" data-fname="' + fname + '"' + ad + '>' + fieldHtml + '</div>';
+        } else if (fieldHtml) {
+          html += '<div class="attr-field" data-fname="' + fname + '">' + fieldHtml + '</div>';
+        }
+      }
+      else if (c.type === 'group') {
+        html += '<div class="form-group">';
+        if (c.string) html += '<div class="form-group-title">' + (c.string || '').replace(/</g, '&lt;') + '</div>';
+        html += renderFormTreeToHtml(model, c.children || [], opts);
+        html += '</div>';
+      } else if (c.type === 'notebook' && c.pages && c.pages.length) {
+        const nbId = 'nb-' + Math.random().toString(36).slice(2);
+        html += '<div class="form-notebook" id="' + nbId + '"><div class="notebook-tabs">';
+        c.pages.forEach(function (p, i) {
+          html += '<button type="button" class="notebook-tab' + (i === 0 ? ' active' : '') + '" data-page="' + i + '">' + (p.string || 'Tab').replace(/</g, '&lt;') + '</button>';
+        });
+        html += '</div>';
+        c.pages.forEach(function (p, i) {
+          html += '<div class="notebook-page' + (i === 0 ? ' active' : '') + '" data-page="' + i + '">' + renderFormTreeToHtml(model, p.children || [], opts) + '</div>';
+        });
+        html += '</div>';
+      }
+    });
+    return html;
+  }
+
   function renderForm(model, route, id) {
+    formDirty = false;
     const fields = getFormFields(model);
+    const formView = viewsSvc ? viewsSvc.getView(model, 'form') : null;
+    const children = formView && formView.children ? formView.children : null;
     const title = getTitle(route);
     const isNew = !id;
     const formTitle = isNew ? ('New ' + title.slice(0, -1)) : ('Edit ' + title.slice(0, -1));
-    let html = '<h2>' + formTitle + '</h2><form id="record-form" style="max-width:400px">';
-    fields.forEach(f => {
-      const fname = typeof f === 'object' ? f.name : f;
-      const o2m = getOne2manyInfo(model, fname);
-      const m2m = getMany2manyInfo(model, fname);
-      if (o2m) {
-        html += '<p><label>' + fname + '</label><div id="o2m-' + fname + '" data-comodel="' + (o2m.comodel || '') + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px;min-height:2em"></div></p>';
-        return;
-      }
-      if (m2m) {
-        html += '<p><label>' + fname + '</label><div id="m2m-' + fname + '" data-comodel="' + (m2m.comodel || '') + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px;min-height:2em"></div></p>';
-        return;
-      }
-      const required = fname === 'name';
-      const comodel = getMany2oneComodel(model, fname);
-      const selectionOpts = getSelectionOptions(model, fname);
-      const isBool = isBooleanField(model, fname);
-      const inputType = isBool ? 'boolean' : (fname === 'email' ? 'email' : (fname === 'description' || fname === 'note_html') ? 'textarea' : selectionOpts ? 'selection' : (comodel ? 'many2one' : 'text'));
-      if (inputType === 'boolean') {
-        html += '<p><label style="display:flex;align-items:center;gap:0.5rem"><input type="checkbox" name="' + fname + '"> ' + fname + '</label></p>';
-      } else if (inputType === 'textarea') {
-        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><textarea name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem;min-height:4em"></textarea></label></p>';
-      } else if (inputType === 'selection') {
-        let opts = '<option value="">--</option>';
-        selectionOpts.forEach(function (o) { opts += '<option value="' + (o[0] || '') + '">' + (o[1] || o[0]) + '</option>'; });
-        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem">' + opts + '</select></label></p>';
-      } else if (inputType === 'many2one') {
-        const domainInfo = getMany2oneDomain(model, fname);
-        const depAttr = domainInfo ? ' data-depends-on="' + domainInfo.depField + '"' : '';
-        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><select name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem" data-comodel="' + (comodel || '') + '"' + depAttr + '><option value="">--</option></select></label></p>';
-      } else {
-        html += '<p><label>' + fname + (required ? ' *' : '') + '<br><input type="' + inputType + '" name="' + fname + '" ' + (required ? 'required' : '') + ' style="width:100%;padding:0.5rem;margin-top:0.25rem"></label></p>';
-      }
-    });
+    if (actionStack.length === 0 || actionStack[actionStack.length - 1].hash !== route) {
+      if (actionStack.length === 0) pushBreadcrumb(title, route);
+      pushBreadcrumb(formTitle, isNew ? route + '/new' : route + '/edit/' + id);
+    }
+    let html = renderBreadcrumbs();
+    html += '<h2>' + formTitle + '</h2>';
+    html += '<div id="form-dirty-banner" class="form-dirty-banner" style="display:none">You have unsaved changes</div>';
+    html += '<form id="record-form" style="max-width:600px">';
+    if (children && children.length) {
+      html += renderFormTreeToHtml(model, children, { recordId: id, route: route, isNew: isNew });
+    } else {
+      fields.forEach(function (f) {
+        var fname = typeof f === 'object' ? f.name : f;
+        html += '<div class="attr-field" data-fname="' + (fname || '') + '">' + renderFieldHtml(model, f) + '</div>';
+      });
+    }
     html += '<p><button type="submit" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Save</button> ';
-    html += '<a href="#' + route + '" style="margin-left:0.5rem">Cancel</a></p></form>';
+    html += '<a href="#' + route + '" id="form-cancel" style="margin-left:0.5rem">Cancel</a>';
+    if (!isNew) {
+      html += ' <button type="button" id="btn-duplicate" style="margin-left:0.5rem;padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Duplicate</button>';
+      const reportName = getReportName(model);
+      if (reportName) html += ' <a href="/report/html/' + reportName + '/' + id + '" target="_blank" rel="noopener" id="btn-print-form" style="margin-left:0.5rem;padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff;text-decoration:none;color:inherit">Print</a>';
+      html += ' <a href="#" id="btn-delete-form" style="margin-left:0.5rem;font-size:0.9rem;color:#c00">Delete</a>';
+    }
+    html += '</p></form>';
     main.innerHTML = html;
     const form = document.getElementById('record-form');
+    fields.forEach(f => {
+      const fn = typeof f === 'object' ? f.name : f;
+      if (isBinaryField(model, fn)) {
+        const fileIn = document.getElementById('file-' + fn);
+        const hiddenIn = document.getElementById('hidden-' + fn);
+        const statusSpan = document.getElementById('bin-status-' + fn);
+        if (fileIn && hiddenIn) {
+          fileIn.onchange = function () {
+            const file = fileIn.files && fileIn.files[0];
+            if (!file) { hiddenIn.value = ''; if (statusSpan) statusSpan.textContent = ''; return; }
+            const r = new FileReader();
+            r.onload = function () {
+              const dataUrl = r.result;
+              const base64 = (dataUrl && dataUrl.indexOf(',') >= 0) ? dataUrl.split(',')[1] : '';
+              hiddenIn.value = base64;
+              if (statusSpan) statusSpan.textContent = file.name + ' (' + (file.size < 1024 ? file.size + ' B' : (file.size / 1024).toFixed(1) + ' KB') + ')';
+            };
+            r.readAsDataURL(file);
+          };
+        }
+      }
+    });
+    main.querySelectorAll('.btn-action-object').forEach(function (btn) {
+      var actionName = btn.getAttribute('data-action');
+      if (!actionName || isNew) return;
+      btn.onclick = function () {
+        btn.disabled = true;
+        rpc.callKw(model, actionName, [[parseInt(id, 10)]], {})
+          .then(function () {
+            btn.disabled = false;
+            showToast('Action completed', 'success');
+            renderForm(model, route, id);
+          })
+          .catch(function (err) {
+            btn.disabled = false;
+            showToast(err.message || 'Action failed', 'error');
+          });
+      };
+    });
+    main.querySelectorAll('.form-notebook').forEach(function (nb) {
+      const tabs = nb.querySelectorAll('.notebook-tab');
+      const pages = nb.querySelectorAll('.notebook-page');
+      tabs.forEach(function (tab, i) {
+        tab.onclick = function () {
+          tabs.forEach(function (t) { t.classList.remove('active'); });
+          pages.forEach(function (p) { p.classList.remove('active'); });
+          tab.classList.add('active');
+          const page = nb.querySelector('.notebook-page[data-page="' + i + '"]');
+          if (page) page.classList.add('active');
+        };
+      });
+    });
     const selects = form.querySelectorAll('select[data-comodel]');
+    const m2oneWidgets = form.querySelectorAll('.m2one-widget');
     const m2mDivs = form.querySelectorAll('[id^="m2m-"]');
+    const m2oneSearchDebounce = {};
+    const setupM2oneWidget = function (widget) {
+      const comodel = widget.dataset.comodel;
+      const fname = widget.dataset.fname;
+      if (!comodel) return;
+      const inputEl = widget.querySelector('.m2one-input');
+      const valueEl = widget.querySelector('.m2one-value');
+      const dropdownEl = widget.querySelector('.m2one-dropdown');
+      if (!inputEl || !valueEl || !dropdownEl) return;
+      const getDomain = function () {
+        try {
+          const d = widget.dataset.domain;
+          if (!d) return [];
+          const info = JSON.parse(decodeURIComponent(d));
+          const depVal = getFormFieldVal(info.depField);
+          return depVal ? [[info.depField, '=', depVal]] : [[info.depField, '=', 0]];
+        } catch (e) { return []; }
+      };
+      const doSearch = function () {
+        const term = (inputEl.value || '').trim();
+        const domain = getDomain();
+        rpc.callKw(comodel, 'name_search', [term, domain, 'ilike', 8], {})
+          .then(function (results) {
+            dropdownEl.innerHTML = '';
+            dropdownEl.style.display = results.length ? 'block' : 'none';
+            results.forEach(function (r) {
+              const id = r[0], name = r[1] || String(id);
+              const item = document.createElement('div');
+              item.className = 'm2one-dropdown-item';
+              item.style.cssText = 'padding:0.5rem;cursor:pointer';
+              item.textContent = name;
+              item.dataset.id = id;
+              item.dataset.name = name;
+              item.onmouseover = function () { item.style.background = '#f0f0f0'; };
+              item.onmouseout = function () { item.style.background = ''; };
+              item.onclick = function () {
+                valueEl.value = id;
+                inputEl.value = name;
+                dropdownEl.style.display = 'none';
+                inputEl.dataset.display = name;
+                form.querySelectorAll('.m2one-widget[data-depends-on="' + fname + '"]').forEach(function (w) {
+                  const v = w.querySelector('.m2one-value');
+                  const i = w.querySelector('.m2one-input');
+                  if (v) v.value = '';
+                  if (i) { i.value = ''; delete i.dataset.display; }
+                });
+                runServerOnchange(fname);
+              };
+              dropdownEl.appendChild(item);
+            });
+          })
+          .catch(function () { dropdownEl.style.display = 'none'; });
+      };
+      inputEl.onfocus = function () {
+        if (valueEl.value && inputEl.dataset.display) return;
+        if ((inputEl.value || '').trim().length >= 2) doSearch();
+        else if (!valueEl.value) {
+          rpc.callKw(comodel, 'name_search', ['', getDomain(), 'ilike', 8], {}).then(function (results) {
+            dropdownEl.innerHTML = '';
+            dropdownEl.style.display = results.length ? 'block' : 'none';
+            results.forEach(function (r) {
+              const item = document.createElement('div');
+              item.className = 'm2one-dropdown-item';
+              item.style.cssText = 'padding:0.5rem;cursor:pointer';
+              item.textContent = r[1] || String(r[0]);
+              item.dataset.id = r[0];
+              item.dataset.name = r[1] || String(r[0]);
+              item.onclick = function () {
+                valueEl.value = item.dataset.id;
+                inputEl.value = item.dataset.name;
+                inputEl.dataset.display = item.dataset.name;
+                dropdownEl.style.display = 'none';
+                runServerOnchange(fname);
+              };
+              dropdownEl.appendChild(item);
+            });
+          });
+        }
+      };
+      inputEl.oninput = function () {
+        const key = fname;
+        if (m2oneSearchDebounce[key]) clearTimeout(m2oneSearchDebounce[key]);
+        valueEl.value = '';
+        delete inputEl.dataset.display;
+        m2oneSearchDebounce[key] = setTimeout(function () {
+          m2oneSearchDebounce[key] = null;
+          if ((inputEl.value || '').trim().length >= 2) doSearch();
+          else dropdownEl.style.display = 'none';
+        }, 300);
+      };
+      inputEl.onblur = function () {
+        setTimeout(function () {
+          dropdownEl.style.display = 'none';
+          if (valueEl.value && !inputEl.dataset.display) {
+            rpc.callKw(comodel, 'name_get', [[parseInt(valueEl.value, 10)]], {}).then(function (res) {
+              if (res && res[0]) inputEl.dataset.display = res[0][1];
+            });
+          }
+        }, 200);
+      };
+      var depAttr = widget.getAttribute('data-depends-on');
+      if (depAttr) {
+        const depWidget = form.querySelector('.m2one-widget[data-fname="' + depAttr + '"]');
+        const depInput = depWidget ? depWidget.querySelector('.m2one-input') : form.querySelector('[name="' + depAttr + '"]');
+        if (depInput) {
+          depInput.addEventListener('input', function () {
+            valueEl.value = '';
+            inputEl.value = '';
+            delete inputEl.dataset.display;
+          });
+          depInput.addEventListener('change', function () {
+            valueEl.value = '';
+            inputEl.value = '';
+            delete inputEl.dataset.display;
+          });
+        }
+      }
+    };
     const getFormFieldVal = function (name) {
       const el = form.querySelector('[name="' + name + '"]');
       return el ? (el.value ? parseInt(el.value, 10) || el.value : null) : null;
@@ -608,6 +1647,75 @@
             sel.lastChild.textContent = o.name || o.id;
           });
         });
+    };
+    m2oneWidgets.forEach(function (w) { setupM2oneWidget(w); });
+    const statusbars = form.querySelectorAll('.o-statusbar');
+    const setupStatusbar = function (sb, options, currentVal, isNew) {
+      sb.innerHTML = '';
+      var clickable = sb.getAttribute('data-clickable') !== '0';
+      var fname = sb.dataset.fname;
+      var hiddenInput = form.querySelector('input[name="' + fname + '"]');
+      if (!hiddenInput) return;
+      var currentId = currentVal != null ? parseInt(currentVal, 10) : null;
+      if (currentId != null) hiddenInput.value = currentId;
+      var currentIdx = -1;
+      if (currentId != null) {
+        for (var i = 0; i < options.length; i++) {
+          if ((options[i].id != null ? options[i].id : options[i][0]) == currentId) { currentIdx = i; break; }
+        }
+      }
+      options.forEach(function (opt, idx) {
+        var item = document.createElement('span');
+        item.className = 'o-statusbar-item';
+        var optId = opt.id != null ? opt.id : opt[0];
+        var optName = opt.name != null ? opt.name : (opt[1] || opt[0]);
+        item.textContent = optName;
+        item.dataset.value = optId;
+        if (optId == currentId || (currentId == null && idx === 0)) item.classList.add('o-statusbar-item--active');
+        if (currentIdx >= 0 && idx < currentIdx) item.classList.add('o-statusbar-item--done');
+        if (clickable) {
+          item.style.cursor = 'pointer';
+          item.onclick = function () {
+            const val = parseInt(item.dataset.value, 10);
+            hiddenInput.value = val;
+            if (isNew) {
+              statusbars.forEach(function (s) {
+                if (s.dataset.fname === fname) {
+                  s.querySelectorAll('.o-statusbar-item').forEach(function (i) { i.classList.remove('o-statusbar-item--active'); });
+                  item.classList.add('o-statusbar-item--active');
+                }
+              });
+            } else {
+              rpc.callKw(model, 'write', [[parseInt(id, 10)], { [fname]: val }], {})
+                .then(function () {
+                  showToast('Stage updated', 'success');
+                  loadRecord(model, id).then(function (r) {
+                    if (r && r[0]) {
+                      var rec = r[0];
+                      statusbars.forEach(function (s) {
+                        if (s.dataset.fname === fname) {
+                          s.querySelectorAll('.o-statusbar-item').forEach(function (i) {
+                            i.classList.remove('o-statusbar-item--active', 'o-statusbar-item--done');
+                            if (parseInt(i.dataset.value, 10) === rec[fname]) i.classList.add('o-statusbar-item--active');
+                          });
+                        }
+                      });
+                    }
+                  });
+                })
+                .catch(function (err) { showToast(err.message || 'Failed to update', 'error'); });
+            }
+          };
+        }
+        sb.appendChild(item);
+        if (idx < options.length - 1) {
+          var sep = document.createElement('span');
+          sep.className = 'o-statusbar-sep';
+          sep.textContent = '>';
+          sep.style.margin = '0 0.25rem';
+          sb.appendChild(sep);
+        }
+      });
     };
     const loadOptions = function (formVals) {
       const promises = [];
@@ -639,7 +1747,48 @@
             })
         );
       });
+      statusbars.forEach(function (sb) {
+        var comodel = sb.dataset.comodel;
+        var fname = sb.dataset.fname;
+        var currentVal = formVals ? formVals[fname] : getFormFieldVal(fname);
+        if (comodel) {
+          promises.push(
+            rpc.callKw(comodel, 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence', limit: 50 })
+              .then(function (opts) {
+                setupStatusbar(sb, opts, currentVal, isNew);
+              })
+          );
+        } else {
+          var selOpts = getSelectionOptions(model, fname);
+          if (selOpts) {
+            setupStatusbar(sb, selOpts, currentVal, isNew);
+          }
+        }
+      });
       return Promise.all(promises);
+    };
+    const onchangeDebounce = {};
+    const runServerOnchange = function (fieldName) {
+      const key = fieldName || '';
+      if (onchangeDebounce[key]) clearTimeout(onchangeDebounce[key]);
+      onchangeDebounce[key] = setTimeout(function () {
+        onchangeDebounce[key] = null;
+        const vals = getFormVals(form, model);
+        rpc.callKw(model, 'onchange', [fieldName, vals], {}).then(function (updates) {
+          if (!updates || typeof updates !== 'object') return;
+          Object.keys(updates).forEach(function (n) {
+            const v = updates[n];
+            const el = form.querySelector('[name="' + n + '"]');
+            if (!el) return;
+            if (el.type === 'checkbox') {
+              el.checked = !!v;
+            } else {
+              el.value = v != null ? v : '';
+            }
+          });
+          applyAttrsToForm(form, model);
+        }).catch(function () {});
+      }, 300);
     };
     const setupDependsOnHandlers = function () {
       selects.forEach(function (sel) {
@@ -649,6 +1798,7 @@
         const depEl = form.querySelector('[name="' + domainInfo.depField + '"]');
         if (depEl) {
           depEl.onchange = function () {
+            runServerOnchange(domainInfo.depField);
             const depVal = getFormFieldVal(domainInfo.depField);
             loadSelectOptions(sel, depVal ? [[domainInfo.depField, '=', depVal]] : [[domainInfo.depField, '=', 0]])
               .then(function () {
@@ -659,6 +1809,15 @@
         }
       });
     };
+    const setupOnchangeHandlers = function () {
+      form.querySelectorAll('input[name], select[name], textarea[name]').forEach(function (el) {
+        if (el.type === 'file' || (el.name || '').indexOf('_cb') >= 0) return;
+        const fieldName = el.getAttribute('name');
+        if (!fieldName) return;
+        const ev = el.tagName === 'TEXTAREA' || (el.type === 'text' || el.type === 'email') ? 'blur' : 'change';
+        el.addEventListener(ev, function () { runServerOnchange(fieldName); });
+      });
+    };
     const setM2mChecked = function (fname, ids) {
       const idSet = (ids || []).map(function (x) { return String(x); });
       form.querySelectorAll('input[name="' + fname + '_cb"]').forEach(function (cb) {
@@ -666,14 +1825,63 @@
       });
     };
     if (isNew) {
-      loadOptions({}).then(setupDependsOnHandlers);
+      const action = getActionForRoute(route);
+      const context = (action && action.context) ? (typeof action.context === 'string' ? {} : action.context) : {};
+      const fieldNames = fields.map(function (f) { return typeof f === 'object' ? f.name : f; });
+      const applyDefaults = function (defaults) {
+        if (!defaults || typeof defaults !== 'object') return;
+        Object.keys(defaults).forEach(function (n) {
+          const m2m = getMany2manyInfo(model, n);
+          const m2oComodel = getMany2oneComodel(model, n);
+          if (m2m) {
+            setM2mChecked(n, Array.isArray(defaults[n]) ? defaults[n] : (defaults[n] ? [defaults[n]] : []));
+          } else if (m2oComodel) {
+            const widget = form.querySelector('.m2one-widget[data-fname="' + n + '"]');
+            if (widget) {
+              const vEl = widget.querySelector('.m2one-value');
+              const iEl = widget.querySelector('.m2one-input');
+              const id = defaults[n];
+              if (vEl) vEl.value = id != null ? String(id) : '';
+              if (iEl) {
+                if (id) {
+                  rpc.callKw(m2oComodel, 'name_get', [[parseInt(id, 10)]], {}).then(function (res) {
+                    if (res && res[0]) { iEl.value = res[0][1]; iEl.dataset.display = res[0][1]; }
+                  });
+                } else iEl.value = '';
+              }
+            }
+          } else {
+            const el = form.querySelector('[name="' + n + '"]');
+            if (el) {
+              if (el.type === 'checkbox') el.checked = !!defaults[n];
+              else el.value = defaults[n] != null ? String(defaults[n]) : '';
+            }
+          }
+        });
+      };
+      rpc.callKw(model, 'default_get', [fieldNames], { context: context })
+        .then(function (defaults) {
+          applyDefaults(defaults);
+          return loadOptions(defaults || {});
+        })
+        .then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); })
+        .catch(function () { loadOptions({}).then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); }); });
+      setupOne2manyAddButtons(form, model);
       form.onsubmit = (e) => { e.preventDefault(); createRecord(model, route, form); return false; };
     } else {
       loadRecord(model, id).then(function (r) {
         if (r && r[0]) {
           const rec = r[0];
-          return loadOptions({ country_id: rec.country_id, state_id: rec.state_id }).then(function () {
+          if (rec.name && actionStack.length > 0) {
+            actionStack[actionStack.length - 1].label = rec.name;
+            var bcNav = main.querySelector('.breadcrumbs');
+            if (bcNav) bcNav.outerHTML = renderBreadcrumbs();
+            attachBreadcrumbHandlers();
+          }
+          return loadOptions(rec).then(function () {
             setupDependsOnHandlers();
+            setupOnchangeHandlers();
+            applyAttrsToForm(form, model);
             const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el) el.value = v != null ? v : ''; };
             fields.forEach(f => {
             const n = typeof f === 'object' ? f.name : f;
@@ -681,28 +1889,50 @@
             const m2m = getMany2manyInfo(model, n);
             if (m2m) {
               setM2mChecked(n, rec[n]);
+            } else if (n === 'message_ids' && model === 'crm.lead') {
+              loadChatter(model, id, rec[n]);
+              setupChatter(form, model, id);
             } else if (o2m) {
               const div = form.querySelector('#o2m-' + n);
-              if (div && rec[n] && Array.isArray(rec[n]) && rec[n].length) {
+              const tbody = div && div.querySelector('#o2m-tbody-' + n);
+              if (tbody && rec[n] && Array.isArray(rec[n]) && rec[n].length) {
                 rpc.callKw(o2m.comodel, 'search_read', [[['id', 'in', rec[n]]]], { fields: ['id', 'name', 'note', 'date_deadline'] })
                   .then(function (rows) {
-                    if (rows.length) {
-                      let tbl = '<table style="width:100%;font-size:0.9rem"><thead><tr><th style="text-align:left">Name</th><th style="text-align:left">Note</th><th>Due</th></tr></thead><tbody>';
-                      rows.forEach(function (row) {
-                        tbl += '<tr><td>' + (row.name || '').replace(/</g, '&lt;') + '</td><td>' + (row.note || '').replace(/</g, '&lt;').substring(0, 50) + '</td><td>' + (row.date_deadline || '') + '</td></tr>';
-                      });
-                      div.innerHTML = tbl + '</tbody></table>';
-                    } else {
-                      div.textContent = 'No items';
-                    }
+                    var lineFields = getOne2manyLineFields(model, n);
+                    rows.forEach(function (row) {
+                      tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(n, lineFields, row, 0));
+                    });
+                    setupOne2manyAddButtons(form, model);
                   })
-                  .catch(function () { div.textContent = '—'; });
+                  .catch(function () { if (tbody) tbody.innerHTML = '<tr><td colspan="4">—</td></tr>'; });
               } else if (div) {
-                div.textContent = 'No items';
+                setupOne2manyAddButtons(form, model);
               }
             } else if (isBooleanField(model, n)) {
               const cb = form.querySelector('[name="' + n + '"][type="checkbox"]');
               if (cb) cb.checked = !!rec[n];
+            } else if (isBinaryField(model, n)) {
+              const statusSpan = document.getElementById('bin-status-' + n);
+              if (statusSpan && rec[n]) statusSpan.textContent = 'File attached';
+            } else if (getMany2oneComodel(model, n)) {
+              const widget = form.querySelector('.m2one-widget[data-fname="' + n + '"]');
+              if (widget) {
+                const vEl = widget.querySelector('.m2one-value');
+                const iEl = widget.querySelector('.m2one-input');
+                const id = rec[n];
+                if (vEl) vEl.value = id != null ? String(id) : '';
+                if (iEl) {
+                  const display = rec[n + '_display'];
+                  if (display) {
+                    iEl.value = display;
+                    iEl.dataset.display = display;
+                  } else if (id) {
+                    rpc.callKw(getMany2oneComodel(model, n), 'name_get', [[parseInt(id, 10)]], {}).then(function (res) {
+                      if (res && res[0]) { iEl.value = res[0][1]; iEl.dataset.display = res[0][1]; }
+                    });
+                  } else iEl.value = '';
+                }
+              }
             } else {
               set(n, rec[n]);
             }
@@ -711,7 +1941,22 @@
         }
       }).catch(function () {});
       form.onsubmit = (e) => { e.preventDefault(); updateRecord(model, route, id, form); return false; };
+      var btnDup = document.getElementById('btn-duplicate');
+      var btnDel = document.getElementById('btn-delete-form');
+      if (btnDup) btnDup.onclick = function () {
+        rpc.callKw(model, 'copy', [[parseInt(id, 10)]], {})
+          .then(function (newRec) {
+            var newId = typeof newRec === 'number' ? newRec : ((newRec && newRec.ids && newRec.ids[0]) || (newRec && newRec.id));
+            if (newId) {
+              showToast('Record duplicated', 'success');
+              window.location.hash = route + '/edit/' + newId;
+            }
+          })
+          .catch(function (err) { showToast(err.message || 'Failed to duplicate', 'error'); });
+      };
+      if (btnDel) btnDel.onclick = function (e) { e.preventDefault(); if (confirm('Delete this record?')) deleteRecord(model, route, id); };
     }
+    attachBreadcrumbHandlers();
   }
 
   function getFormVals(form, model) {
@@ -720,7 +1965,27 @@
     const vals = {};
     fields.forEach(f => {
       const n = typeof f === 'object' ? f.name : f;
-      if (getOne2manyInfo(model, n)) return;
+      if (n === 'message_ids') return;
+      const o2m = getOne2manyInfo(model, n);
+      if (o2m) {
+        var tbody = form.querySelector('#o2m-tbody-' + n);
+        if (tbody) {
+          var lineFields = getOne2manyLineFields(model, n);
+          var rows = [];
+          tbody.querySelectorAll('tr').forEach(function (tr) {
+            var row = {};
+            var id = tr.getAttribute('data-o2m-id');
+            if (id) row.id = parseInt(id, 10);
+            lineFields.forEach(function (lf) {
+              var inp = tr.querySelector('[data-o2m-field="' + lf + '"]');
+              if (inp) row[lf] = inp.value || (lf === 'date_deadline' ? null : '');
+            });
+            if (lineFields.length) rows.push(row);
+          });
+          vals[n] = rows;
+        }
+        return;
+      }
       const m2m = getMany2manyInfo(model, n);
       if (m2m) {
         const ids = [];
@@ -731,6 +1996,11 @@
       if (isBooleanField(model, n)) {
         const cb = form.querySelector('[name="' + n + '"][type="checkbox"]');
         vals[n] = cb ? !!cb.checked : false;
+        return;
+      }
+      if (isBinaryField(model, n)) {
+        const v = byName(n);
+        if (v) vals[n] = v;
         return;
       }
       let v = byName(n).trim();
@@ -753,40 +2023,113 @@
     form.insertAdjacentHTML('beforeend', '<p class="error" style="color:#c00;margin-top:0.5rem">' + msg.replace(/</g, '&lt;') + '</p>');
   }
 
+  function clearFieldErrors(form) {
+    form.querySelectorAll('.field-error').forEach(function (el) { el.classList.remove('field-error'); });
+    form.querySelectorAll('.field-error-msg').forEach(function (el) { el.remove(); });
+  }
+
+  function showFieldError(form, fname, msg) {
+    const wrapper = form.querySelector('[data-fname="' + fname + '"]');
+    if (!wrapper) return;
+    wrapper.classList.add('field-error');
+    const prev = wrapper.querySelector('.field-error-msg');
+    if (prev) prev.remove();
+    const errEl = document.createElement('span');
+    errEl.className = 'field-error-msg';
+    errEl.textContent = msg || 'Invalid';
+    wrapper.appendChild(errEl);
+  }
+
+  function validateRequiredFields(form, model) {
+    const fields = getFormFields(model);
+    const formVals = getFormVals(form, model);
+    const errors = [];
+    fields.forEach(function (f) {
+      const n = typeof f === 'object' ? f.name : f;
+      if (n === 'message_ids') return;
+      const meta = getFieldMeta(model, n);
+      const required = (meta && meta.required) || n === 'name';
+      if (!required) return;
+      const v = formVals[n];
+      const empty = v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
+      if (empty) errors.push({ fname: n, msg: (meta && meta.string) ? meta.string + ' is required' : n + ' is required' });
+    });
+    return { valid: errors.length === 0, errors: errors };
+  }
+
+  function setupFormDirtyTracking(form) {
+    formDirty = false;
+    var markDirty = function () { formDirty = true; updateDirtyBanner(); };
+    form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(function (el) {
+      el.addEventListener('change', markDirty);
+      el.addEventListener('input', markDirty);
+    });
+  }
+
+  function updateDirtyBanner() {
+    const banner = document.getElementById('form-dirty-banner');
+    if (!banner) return;
+    banner.style.display = formDirty ? 'block' : 'none';
+  }
+
+  function handleSaveError(form, model, err, btn) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+    if ((err.message || '').indexOf('Session expired') >= 0) { window.location.href = '/web/login'; return; }
+    showToast(err.message || 'Failed to save', 'error');
+    clearFieldErrors(form);
+    showFormError(form, err.message || 'Failed to save');
+    var msg = (err.message || '').toLowerCase();
+    var fields = getFormFields(model || []);
+    (fields || []).forEach(function (f) {
+      var n = typeof f === 'object' ? f.name : f;
+      if (n && msg.indexOf(n.toLowerCase()) >= 0) showFieldError(form, n, err.message || 'Invalid');
+    });
+  }
+
   function createRecord(model, route, form) {
-    const vals = getFormVals(form, model);
-    const requiredField = model === 'crm.lead' || model === 'res.partner' ? 'name' : 'name';
-    if (!vals[requiredField]) {
-      showFormError(form, 'Please enter ' + requiredField + '.');
+    clearFieldErrors(form);
+    var validation = validateRequiredFields(form, model);
+    if (!validation.valid) {
+      validation.errors.forEach(function (e) {
+        showFieldError(form, e.fname, e.msg);
+      });
+      showFormError(form, 'Please fill in all required fields.');
       return;
     }
+    const vals = getFormVals(form, model);
     const btn = form.querySelector('button[type="submit"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     rpc.callKw(model, 'create', [[vals]])
-      .then(() => { window.location.hash = route; loadRecords(model, route, currentListState.searchTerm); })
-      .catch(err => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-        if ((err.message || '').indexOf('Session expired') >= 0) { window.location.href = '/web/login'; return; }
-        showFormError(form, err.message || 'Failed to save');
-      });
+      .then(() => {
+        formDirty = false;
+        showToast('Record created', 'success');
+        window.location.hash = route;
+        loadRecords(model, route, currentListState.searchTerm);
+      })
+      .catch(err => handleSaveError(form, err, btn));
   }
 
   function updateRecord(model, route, id, form) {
-    const vals = getFormVals(form, model);
-    const requiredField = 'name';
-    if (!vals[requiredField]) {
-      showFormError(form, 'Please enter ' + requiredField + '.');
+    clearFieldErrors(form);
+    var validation = validateRequiredFields(form, model);
+    if (!validation.valid) {
+      validation.errors.forEach(function (e) {
+        showFieldError(form, e.fname, e.msg);
+      });
+      showFormError(form, 'Please fill in all required fields.');
       return;
     }
+    const vals = getFormVals(form, model);
     const btn = form.querySelector('button[type="submit"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     rpc.callKw(model, 'write', [[parseInt(id, 10)], vals])
-      .then(() => { window.location.hash = route; loadRecords(model, route, currentListState.searchTerm); })
-      .catch(err => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
-        if ((err.message || '').indexOf('Session expired') >= 0) { window.location.href = '/web/login'; return; }
-        showFormError(form, err.message || 'Failed to save');
-      });
+      .then(() => {
+        formDirty = false;
+        showToast('Record saved', 'success');
+        window.location.hash = route;
+        loadRecords(model, route, currentListState.searchTerm);
+      })
+      .catch(err => handleSaveError(form, model, err, btn));
   }
 
   function loadRecord(model, id) {
@@ -835,7 +2178,7 @@
     window.location.hash = route + (view && view !== 'list' ? '?view=' + view : '');
   }
 
-  function loadRecords(model, route, searchTerm, stageFilter, viewTypeOverride, savedFilterId) {
+  function loadRecords(model, route, searchTerm, stageFilter, viewTypeOverride, savedFilterId, offsetOverride, orderOverride) {
     const viewType = viewTypeOverride != null ? viewTypeOverride : getPreferredViewType(route);
     const cols = getListColumns(model);
     const fnames = cols.map(c => typeof c === 'object' ? c.name : c);
@@ -843,36 +2186,309 @@
     const title = getTitle(route);
     if (stageFilter === undefined && currentListState.route === route) stageFilter = currentListState.stageFilter;
     if (savedFilterId === undefined && currentListState.route === route) savedFilterId = currentListState.savedFilterId;
+    const offset = offsetOverride != null ? offsetOverride : (currentListState.route === route ? (currentListState.offset || 0) : 0);
+    const limit = currentListState.limit || 80;
+    const order = orderOverride != null ? orderOverride : (currentListState.route === route ? currentListState.order : null);
     const action = getActionForRoute(route);
     const actionDomain = action ? parseActionDomain(action.domain || '') : [];
-    let domain = actionDomain.slice();
-    const savedFilters = getSavedFilters(model);
-    const savedFilter = savedFilterId ? savedFilters.find(function (f) { return f.id === savedFilterId; }) : null;
-    if (savedFilter && savedFilter.domain && savedFilter.domain.length) {
-      domain = domain.concat(savedFilter.domain);
-    } else {
-      const searchDom = buildSearchDomain(model, searchTerm && searchTerm.trim() ? searchTerm.trim() : '');
-      if (searchDom.length) domain = domain.concat(searchDom);
-      if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
-    }
-    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: viewType, savedFilterId: savedFilterId || null };
+    const prevCal = (viewType === 'calendar' && currentListState.route === route) ? { calendarYear: currentListState.calendarYear, calendarMonth: currentListState.calendarMonth } : {};
+    const prevFilters = (currentListState.route === route) ? { activeSearchFilters: currentListState.activeSearchFilters || [], groupBy: currentListState.groupBy } : {};
+    currentListState = Object.assign({ model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: viewType, savedFilterId: savedFilterId || null, offset: offset, limit: limit, order: order, totalCount: 0, activeSearchFilters: [], groupBy: null }, prevCal, prevFilters);
     main.innerHTML = '<h2>' + title + '</h2><p>Loading...</p>';
-    rpc.callKw(model, 'search_read', [domain], { fields: fields, limit: 100 })
-      .then(records => {
+    getSavedFilters(model).then(function (savedFilters) {
+      let domain = actionDomain.slice();
+      const savedFilter = savedFilterId ? savedFilters.find(function (f) { return f.id == savedFilterId; }) : null;
+      if (savedFilter && savedFilter.domain && savedFilter.domain.length) {
+        domain = domain.concat(savedFilter.domain);
+      } else {
+        const searchDom = buildSearchDomain(model, searchTerm && searchTerm.trim() ? searchTerm.trim() : '');
+        if (searchDom.length) domain = domain.concat(searchDom);
+        if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
+      }
+      const searchView = viewsSvc && viewsSvc.getView(model, 'search');
+      const filters = (searchView && searchView.filters) || [];
+      (currentListState.activeSearchFilters || []).forEach(function (fname) {
+        const f = filters.find(function (x) { return x.name === fname && x.domain; });
+        if (f && f.domain) {
+          const fd = parseFilterDomain(f.domain);
+          if (fd.length) domain = domain.concat(fd);
+        }
+      });
+      if (viewType === 'graph' && viewsSvc && viewsSvc.getView(model, 'graph')) {
+        loadGraphData(model, route, domain, searchTerm, savedFilters);
+        return Promise.resolve();
+      }
+      const searchReadKw = { fields: fields, offset: offset, limit: limit };
+      const effectiveOrder = order || (currentListState.groupBy ? currentListState.groupBy : null);
+      if (effectiveOrder) searchReadKw.order = effectiveOrder;
+      const searchReadPromise = rpc.callKw(model, 'search_read', [domain], searchReadKw);
+      const searchCountPromise = rpc.callKw(model, 'search_count', [domain], {}).catch(function () { return null; });
+      return Promise.all([searchCountPromise, searchReadPromise]).then(function (results) {
+        const totalCount = results[0] != null ? results[0] : (results[1].length + offset);
+        const records = results[1];
+        currentListState.totalCount = totalCount;
         if (viewType === 'kanban' && model === 'crm.lead' && window.ViewRenderers && window.ViewRenderers.kanban) {
           renderKanban(model, route, records, searchTerm);
+        } else if (viewType === 'calendar' && model === 'crm.lead') {
+          renderCalendar(model, route, records, searchTerm);
         } else {
-          renderList(model, route, records, searchTerm);
+          renderList(model, route, records, searchTerm, totalCount, offset, limit, savedFilters);
         }
-      })
-      .catch(err => {
-        main.innerHTML = '<h2>' + title + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load') + '</p>';
       });
+    }).catch(err => {
+      main.innerHTML = '<h2>' + title + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load') + '</p>';
+    });
+  }
+
+  function loadGraphData(model, route, domain, searchTerm, savedFiltersList) {
+    const graphView = viewsSvc && viewsSvc.getView(model, 'graph');
+    if (!graphView || !graphView.fields || !graphView.fields.length) {
+      main.innerHTML = '<h2>' + getTitle(route) + '</h2><p>No graph view configured.</p>';
+      return;
+    }
+    const rowFields = (graphView.fields || []).filter(function (f) { return f.role === 'row'; });
+    const measureFields = (graphView.fields || []).filter(function (f) { return f.role === 'measure'; });
+    const groupby = rowFields.map(function (f) { return f.name; });
+    const fields = measureFields.map(function (f) { return f.name; });
+    if (!groupby.length || !fields.length) {
+      main.innerHTML = '<h2>' + getTitle(route) + '</h2><p>Graph view needs row and measure fields.</p>';
+      return;
+    }
+    const rowField = rowFields[0];
+    const comodel = rowField.comodel || null;
+    let labelMap = {};
+    rpc.callKw(model, 'read_group', [domain], { fields: fields, groupby: groupby })
+      .then(function (rows) {
+        const ids = (rows || []).map(function (r) { return r[groupby[0]]; }).filter(function (id) { return id; });
+        if (comodel && ids.length) {
+          return rpc.callKw(comodel, 'name_get', [ids])
+            .then(function (pairs) {
+              (pairs || []).forEach(function (p) { labelMap[p[0]] = p[1] || String(p[0]); });
+              return rows;
+            })
+            .catch(function () { return rows; });
+        }
+        return Promise.resolve(rows);
+      })
+      .then(function (rows) {
+        const labels = (rows || []).map(function (r) {
+          const v = r[groupby[0]];
+          return (comodel && labelMap && labelMap[v]) ? labelMap[v] : (v != null ? String(v) : '');
+        });
+        const groupLabels = {};
+        (rows || []).forEach(function (r, i) {
+          const v = r[groupby[0]];
+          if (v != null) groupLabels[v] = labels[i];
+        });
+        renderGraph(model, route, graphView, rows, groupby[0], fields, groupLabels, searchTerm, savedFiltersList);
+      })
+      .catch(function (err) {
+        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load graph') + '</p>';
+      });
+  }
+
+  function renderGraph(model, route, graphView, rows, groupbyField, measureFields, labelMap, searchTerm, savedFiltersList) {
+    savedFiltersList = savedFiltersList || [];
+    const title = getTitle(route);
+    const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
+    const currentView = 'graph';
+    actionStack = [{ label: title, hash: route }];
+    let graphType = (graphView && graphView.graph_type) || 'bar';
+    const labels = (rows || []).map(function (r) {
+      const v = r[groupbyField];
+      return (labelMap && v != null && labelMap[v]) ? labelMap[v] : (v != null ? String(v) : '');
+    });
+    const datasets = measureFields.map(function (m, idx) {
+      const colors = ['rgba(26,26,46,0.8)', 'rgba(70,130,180,0.8)', 'rgba(34,139,34,0.8)', 'rgba(218,165,32,0.8)'];
+      return {
+        label: m.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); }),
+        data: (rows || []).map(function (r) { return r[m] != null ? Number(r[m]) : 0; }),
+        backgroundColor: colors[idx % colors.length],
+        borderColor: colors[idx % colors.length].replace('0.8', '1'),
+        borderWidth: 1
+      };
+    });
+    let html = '<h2>' + title + '</h2>';
+    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+    html += renderViewSwitcher(route, currentView);
+    html += '<span class="graph-type-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
+    ['bar', 'line', 'pie'].forEach(function (t) {
+      const active = t === graphType;
+      html += '<button type="button" class="btn-graph-type' + (active ? ' active' : '') + '" data-type="' + t + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (t.charAt(0).toUpperCase() + t.slice(1)) + '</button>';
+    });
+    html += '</span>';
+    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+    if (model === 'crm.lead') {
+      html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+    }
+    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
+    html += '<div class="o-graph-container" style="position:relative;width:100%;max-width:800px;height:400px;margin:var(--space-md) 0;padding:var(--space-md)">';
+    html += '<canvas id="graph-canvas"></canvas>';
+    html += '</div>';
+    main.innerHTML = html;
+    currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: 'graph' };
+    main.querySelectorAll('.btn-view').forEach(function (btn) {
+      btn.onclick = function () { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
+    });
+    main.querySelectorAll('.btn-graph-type').forEach(function (btn) {
+      btn.onclick = function () {
+        graphType = btn.dataset.type;
+        renderGraph(model, route, Object.assign({}, graphView, { graph_type: graphType }), rows, groupbyField, measureFields, labelMap, searchTerm, savedFiltersList);
+      };
+    });
+    const btnAdd = document.getElementById('btn-add');
+    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    const btnSearch = document.getElementById('btn-search');
+    const searchInput = document.getElementById('list-search');
+    if (btnSearch && searchInput) {
+      const doSearch = function () {
+        const filterEl = document.getElementById('list-stage-filter');
+        const val = model === 'crm.lead' && filterEl && filterEl.value ? parseInt(filterEl.value, 10) : null;
+        loadRecords(model, route, searchInput.value.trim(), val, 'graph', null, 0, null);
+      };
+      btnSearch.onclick = doSearch;
+      searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
+    }
+    if (model === 'crm.lead') {
+      const filterEl = document.getElementById('list-stage-filter');
+      if (filterEl) {
+        rpc.callKw('crm.stage', 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence' })
+          .then(function (stages) {
+            stages.forEach(function (s) {
+              const opt = document.createElement('option');
+              opt.value = s.id;
+              opt.textContent = s.name || '';
+              if (s.id === stageFilter) opt.selected = true;
+              filterEl.appendChild(opt);
+            });
+            filterEl.onchange = function () {
+              const val = filterEl.value ? parseInt(filterEl.value, 10) : null;
+              loadRecords(model, route, searchInput.value.trim(), val, 'graph', null, 0, null);
+            };
+          });
+      }
+    }
+    const ctx = document.getElementById('graph-canvas');
+    if (!ctx || !window.Chart) {
+      main.querySelector('.o-graph-container').innerHTML = '<p>Chart.js not loaded. Refresh the page.</p>';
+      return;
+    }
+    const chartConfig = {
+      type: graphType,
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: graphType !== 'pie' ? { y: { beginAtZero: true } } : {}
+      }
+    };
+    if (graphType === 'pie' && datasets.length > 1) {
+      chartConfig.data.datasets = [{
+        label: measureFields[0],
+        data: datasets[0].data,
+        backgroundColor: datasets[0].backgroundColor,
+        borderColor: datasets[0].borderColor,
+        borderWidth: 1
+      }];
+    }
+    new window.Chart(ctx, chartConfig);
+  }
+
+  function renderCalendar(model, route, records, searchTerm) {
+    const calendarView = viewsSvc && viewsSvc.getView(model, 'calendar');
+    const dateField = (calendarView && calendarView.date_start) || 'date_deadline';
+    const stringField = (calendarView && calendarView.string) || 'name';
+    const title = getTitle(route);
+    actionStack = [{ label: title, hash: route }];
+    let calYear = (currentListState.route === route && currentListState.calendarYear) || new Date().getFullYear();
+    let calMonth = (currentListState.route === route && currentListState.calendarMonth) || (new Date().getMonth() + 1);
+    currentListState = { model: model, route: route, searchTerm: searchTerm || '', viewType: 'calendar', calendarYear: calYear, calendarMonth: calMonth };
+    const firstDay = new Date(calYear, calMonth - 1, 1);
+    const lastDay = new Date(calYear, calMonth, 0);
+    const startPad = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
+    const recordsByDate = {};
+    (records || []).forEach(function (r) {
+      const d = r[dateField];
+      if (!d) return;
+      const dateStr = typeof d === 'string' ? d.slice(0, 10) : (d && d.toISOString ? d.toISOString().slice(0, 10) : '');
+      if (!dateStr) return;
+      if (!recordsByDate[dateStr]) recordsByDate[dateStr] = [];
+      recordsByDate[dateStr].push(r);
+    });
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    let html = '<h2>' + title + '</h2>';
+    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+    html += renderViewSwitcher(route, 'calendar');
+    html += '<button type="button" id="cal-prev" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Prev</button>';
+    html += '<span id="cal-title" style="min-width:140px;font-weight:600">' + firstDay.toLocaleString('default', { month: 'long', year: 'numeric' }) + '</span>';
+    html += '<button type="button" id="cal-next" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Next</button>';
+    html += '<button type="button" id="cal-today" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Today</button>';
+    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
+    html += '<div class="o-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border-color);border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden">';
+    dayNames.forEach(function (dn) {
+      html += '<div style="padding:var(--space-sm);background:var(--color-bg);font-weight:600;font-size:0.85rem">' + dn + '</div>';
+    });
+    const totalCells = Math.ceil((startPad + daysInMonth) / 7) * 7;
+    for (var i = 0; i < totalCells; i++) {
+      const dayNum = i - startPad + 1;
+      const isEmpty = dayNum < 1 || dayNum > daysInMonth;
+      const dateStr = isEmpty ? '' : calYear + '-' + String(calMonth).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
+      const dayRecs = dateStr ? (recordsByDate[dateStr] || []) : [];
+      let cellContent = isEmpty ? '' : '<span style="font-size:0.9rem;color:var(--text-muted)">' + dayNum + '</span>';
+      dayRecs.forEach(function (rec) {
+        const label = (rec[stringField] || 'Untitled').replace(/</g, '&lt;').slice(0, 30);
+        cellContent += '<div style="margin-top:0.25rem"><a href="#' + route + '/edit/' + (rec.id || '') + '" style="display:block;padding:0.2rem 0.4rem;background:var(--color-primary);color:white;border-radius:4px;font-size:0.8rem;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + label + '</a></div>';
+      });
+      html += '<div style="min-height:80px;padding:var(--space-sm);background:#fff">' + cellContent + '</div>';
+    }
+    html += '</div>';
+    main.innerHTML = html;
+    main.querySelectorAll('.btn-view').forEach(function (btn) {
+      btn.onclick = function () { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
+    });
+    const btnAdd = document.getElementById('btn-add');
+    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    const doReload = function () {
+      const si = document.getElementById('list-search');
+      loadRecords(model, route, si ? si.value.trim() : '', null, 'calendar', null, 0, null);
+    };
+    const prevBtn = document.getElementById('cal-prev');
+    const nextBtn = document.getElementById('cal-next');
+    const todayBtn = document.getElementById('cal-today');
+    if (prevBtn) prevBtn.onclick = function () {
+      calMonth--; if (calMonth < 1) { calMonth = 12; calYear--; }
+      currentListState.calendarYear = calYear; currentListState.calendarMonth = calMonth;
+      doReload();
+    };
+    if (nextBtn) nextBtn.onclick = function () {
+      calMonth++; if (calMonth > 12) { calMonth = 1; calYear++; }
+      currentListState.calendarYear = calYear; currentListState.calendarMonth = calMonth;
+      doReload();
+    };
+    if (todayBtn) todayBtn.onclick = function () {
+      const now = new Date();
+      currentListState.calendarYear = now.getFullYear();
+      currentListState.calendarMonth = now.getMonth() + 1;
+      doReload();
+    };
+    const btnSearch = document.getElementById('btn-search');
+    const searchInput = document.getElementById('list-search');
+    if (btnSearch && searchInput) {
+      const doSearch = function () { loadRecords(model, route, searchInput.value.trim(), null, 'calendar', null, 0, null); };
+      btnSearch.onclick = doSearch;
+      searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
+    }
   }
 
   function renderKanban(model, route, records, searchTerm) {
     const title = getTitle(route);
-    const addLabel = route === 'leads' ? 'Add lead' : 'Add';
+    actionStack = [{ label: title, hash: route }];
+    const addLabel = route === 'leads' ? 'Add lead' : route === 'settings/users' ? 'Add user' : 'Add';
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     const currentView = (currentListState.route === route && currentListState.viewType) || 'kanban';
     const kanbanView = viewsSvc && viewsSvc.getView(model, 'kanban');
@@ -940,7 +2556,7 @@
               const stageVal = newStageId || false;
               rpc.callKw(model, 'write', [[parseInt(recordId, 10)], { stage_id: stageVal }])
                 .then(() => loadRecords(model, route, currentListState.searchTerm))
-                .catch(err => alert(err.message || 'Failed to update stage'));
+                .catch(err => showToast(err.message || 'Failed to update stage', 'error'));
             }
           });
         })
@@ -960,19 +2576,33 @@
     }
   }
 
+  function isFormRoute(hash) {
+    const dataRoutes = 'contacts|leads|attachments|settings\\/users';
+    return new RegExp('^(' + dataRoutes + ')\\/edit\\/\\d+$').test(hash) || new RegExp('^(' + dataRoutes + ')\\/new$').test(hash);
+  }
+
   function route() {
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
-    const editMatch = hash.match(/^(contacts|leads)\/edit\/(\d+)$/);
-    const newMatch = hash.match(/^(contacts|leads)\/new$/);
-    const listMatch = base.match(/^(contacts|leads)$/);
+    if (formDirty && isFormRoute(lastHash) && hash !== lastHash) {
+      if (!confirm('Leave without saving?')) {
+        window.location.hash = lastHash;
+        return;
+      }
+      formDirty = false;
+    }
+    lastHash = hash;
+    const dataRoutes = 'contacts|leads|attachments|settings/users';
+    const editMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/edit\\/(\\d+)$'));
+    const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
+    const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
     const settingsApiKeysMatch = hash.match(/^settings\/apikeys$/);
     const settingsIndexMatch = hash.match(/^settings\/?$/);
 
     if (settingsApiKeysMatch) {
       renderApiKeysSettings();
     } else if (settingsIndexMatch) {
-      renderSettingsStub();
+      renderSettings();
     } else if (listMatch) {
       const route = listMatch[1];
       const model = getModelForRoute(route);

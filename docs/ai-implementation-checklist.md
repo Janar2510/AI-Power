@@ -6,7 +6,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 - [ ] `ai_assistant` in `DEFAULT_SERVER_WIDE_MODULES` (core/tools/config.py)
 - [ ] `./erp-bin db init -d <db>` creates `ai_audit_log`, `ai_tool_definition`, `ai_prompt_template` tables
-- [ ] Routes: `GET /ai/tools`, `POST /ai/chat` registered (core/http/application.py)
+- [ ] Routes: `GET /ai/tools`, `POST /ai/chat`, `GET /ai/config` registered (core/http/application.py)
 
 ## Security
 
@@ -25,6 +25,14 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] ai.document.chunk model indexed (manual or on-write)
 - [ ] GET /ai/retrieve?q=query&limit=10 returns chunks (record rules applied)
 - [ ] /ai/chat with retrieve=true passes retrieved_doc_ids to audit
+
+## LLM Integration (Phase 88)
+
+- [ ] addons/ai_assistant/llm.py: call_llm() with OpenAI function-calling; tool_calls loop
+- [ ] ir.config_parameter: ai.openai_api_key, ai.llm_enabled, ai.llm_model
+- [ ] When ai.llm_enabled=1: /ai/chat accepts prompt without tool; uses call_llm with RAG context
+- [ ] Settings > AI Configuration: API key input, enable toggle, model selector
+- [ ] Chat panel: fetch /ai/config; prompt-only mode when LLM enabled; loading indicator
 
 ## Adding New Tools
 

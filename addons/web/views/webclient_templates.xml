@@ -16,6 +16,7 @@
       <main id="main">
         <div id="action-manager"></div>
       </main>
+      <div id="toast-container"></div>
       <aside id="chat-panel" class="chat-panel-hidden" aria-label="AI Assistant">
         <div class="chat-panel-header">
           <h3>AI Assistant</h3>
@@ -23,6 +24,7 @@
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-area">
+          <div class="chat-tool-row" style="display:flex;gap:var(--space-sm,0.5rem);margin-bottom:var(--space-sm,0.5rem);flex-wrap:wrap">
           <select id="chat-tool" class="chat-tool-select">
             <option value="search_records">Search records</option>
             <option value="summarise_recordset">Summarise records</option>
@@ -34,6 +36,7 @@
             <option value="res.partner">Contacts</option>
             <option value="crm.lead">Leads</option>
           </select>
+          </div>
           <input type="text" id="chat-query" class="chat-query-input" placeholder="Search term (optional) or record IDs for summarise" />
           <button type="button" id="chat-send" class="chat-send-btn">Send</button>
         </div>

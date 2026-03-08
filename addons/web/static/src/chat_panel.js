@@ -1,5 +1,5 @@
 /**
- * AI Chat Panel - Single-turn tool execution via /ai/chat
+ * AI Chat Panel - Tool execution or LLM via /ai/chat (Phase 88)
  */
 (function () {
   const panel = document.getElementById('chat-panel');
@@ -10,11 +10,37 @@
   const modelSelect = document.getElementById('chat-model');
   const queryInput = document.getElementById('chat-query');
   const sendBtn = document.getElementById('chat-send');
+  const inputArea = document.querySelector('.chat-input-area');
 
   if (!panel || !toggleBtn || !sendBtn) return;
 
+  let llmEnabled = false;
+
+  function fetchAiConfig() {
+    fetch('/ai/config', { credentials: 'include' })
+      .then(function (r) {
+        if (r.ok) return r.json();
+        return { llm_enabled: '0' };
+      })
+      .then(function (cfg) {
+        llmEnabled = (cfg && cfg.llm_enabled) === '1';
+        if (inputArea) {
+          const toolRow = inputArea.querySelector('.chat-tool-row');
+          if (toolRow) toolRow.style.display = llmEnabled ? 'none' : '';
+          if (queryInput) queryInput.placeholder = llmEnabled ? 'Ask anything... (e.g. Show me leads with high revenue)' : (toolSelect && toolSelect.value === 'search_records' ? 'Search term (optional)' : '');
+        }
+        updatePlaceholder();
+      })
+      .catch(function () { llmEnabled = false; });
+  }
+
   function updatePlaceholder() {
-    const t = toolSelect.value || 'search_records';
+    if (!queryInput) return;
+    if (llmEnabled) {
+      queryInput.placeholder = 'Ask anything... (e.g. Show me leads with high revenue)';
+      return;
+    }
+    const t = toolSelect ? toolSelect.value : 'search_records';
     if (t === 'summarise_recordset') queryInput.placeholder = 'Record IDs (comma-separated)';
     else if (t === 'draft_message') queryInput.placeholder = 'Record IDs (comma-separated)';
     else if (t === 'create_activity') queryInput.placeholder = 'lead_id,name,note (e.g. 1,Call back,Remind tomorrow)';
@@ -23,6 +49,7 @@
   }
 
   if (toolSelect) toolSelect.addEventListener('change', updatePlaceholder);
+  fetchAiConfig();
 
   function showPanel() {
     panel.classList.remove('chat-panel-hidden');
@@ -67,23 +94,47 @@
     return { model: modelVal };
   }
 
+  function appendLoading() {
+    const div = document.createElement('div');
+    div.className = 'chat-msg assistant chat-loading';
+    div.textContent = 'Thinking...';
+    div.dataset.loading = '1';
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return div;
+  }
+
+  function removeLoading(loadingEl) {
+    if (loadingEl && loadingEl.parentNode) loadingEl.remove();
+  }
+
   function send() {
-    const tool = (toolSelect.value || 'search_records').trim();
-    const model = modelSelect.value || 'res.partner';
-    const prompt = queryInput.value.trim() || ('Search ' + model);
+    const prompt = (queryInput && queryInput.value || '').trim();
+    const tool = (toolSelect && toolSelect.value || 'search_records').trim();
+    const model = (modelSelect && modelSelect.value || 'res.partner');
     const kwargs = buildKwargs(tool, model, prompt);
 
-    appendMessage('user', prompt || tool + ' on ' + model);
+    const userDisplay = prompt || (llmEnabled ? 'Ask' : tool + ' on ' + model);
+    if (!userDisplay && !llmEnabled) return;
+    if (llmEnabled && !prompt) return;
+
+    appendMessage('user', userDisplay);
     sendBtn.disabled = true;
+    const loadingEl = appendLoading();
+
+    const body = llmEnabled
+      ? { prompt: prompt, retrieve: true }
+      : { prompt: prompt || tool, tool: tool, kwargs: kwargs };
 
     fetch('/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ prompt: prompt || tool, tool: tool, kwargs: kwargs }),
+      body: JSON.stringify(body),
     })
       .then(function (r) {
         if (r.status === 401) {
+          removeLoading(loadingEl);
           appendMessage('assistant', 'Session expired. Please log in again.', true);
           return;
         }
@@ -91,6 +142,7 @@
       })
       .then(function (data) {
         sendBtn.disabled = false;
+        removeLoading(loadingEl);
         if (!data) return;
         if (data.error) {
           appendMessage('assistant', data.error, true);
@@ -102,6 +154,7 @@
       })
       .catch(function (err) {
         sendBtn.disabled = false;
+        removeLoading(loadingEl);
         appendMessage('assistant', err.message || 'Request failed', true);
       });
   }

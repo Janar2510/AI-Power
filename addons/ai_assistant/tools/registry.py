@@ -58,16 +58,14 @@ def draft_message(env, model: str, ids: List[int], fields: Optional[List[str]] =
 
 @_register("create_activity", "Create an activity/task linked to a lead")
 def create_activity(env, lead_id: int, name: str, note: Optional[str] = None) -> dict:
-    """Create crm.activity linked to crm.lead. Requires user confirmation for state-changing actions."""
+    """Create mail.activity linked to crm.lead via activity_schedule. Requires user confirmation."""
     try:
-        Activity = env["crm.activity"]
+        Lead = env["crm.lead"]
     except KeyError:
-        return {"error": "crm.activity model not available"}
-    vals = {"name": name or "Activity", "lead_id": lead_id}
-    if note:
-        vals["note"] = note
-    rec = Activity.create(vals)
-    return {"id": rec._ids[0] if rec and rec._ids else None, "message": "Activity created"}
+        return {"error": "crm.lead model not available"}
+    lead = Lead.browse(lead_id)
+    rec = lead.activity_schedule(summary=name or "Activity", note=note or "")
+    return {"id": rec.id if rec else None, "message": "Activity created"}
 
 
 @_register("propose_workflow_step", "Suggest next stage for a lead")

@@ -144,6 +144,24 @@ class Binary(Field):
     column_type = "bytea"
 
 
+class Related(Field):
+    """Related field - reads value through relational chain. MVP: single-level (rel_field.target_field)."""
+
+    type = "related"
+
+    def __init__(
+        self,
+        related: str = "",
+        store: bool = False,
+        string: str = "",
+        **kwargs,
+    ):
+        super().__init__(string=string, readonly=True, **kwargs)
+        self.related = related or ""
+        self.store = store
+        self.column_type = "varchar" if store else None
+
+
 class One2many(Field):
     """One2many - virtual inverse of Many2one. No DB column. Read-only MVP."""
 
@@ -154,12 +172,16 @@ class One2many(Field):
         self,
         comodel: str = "",
         inverse_name: str = "",
+        domain: Optional[Union[List, Callable[..., List]]] = None,
+        inverse_extra: Optional[Callable[..., dict]] = None,
         string: str = "",
         **kwargs,
     ):
         super().__init__(string=string, **kwargs)
         self.comodel = comodel
         self.inverse_name = inverse_name
+        self.domain = domain  # optional: list or callable(model_cls) -> list, merged with inverse when reading
+        self.inverse_extra = inverse_extra  # optional: callable(model_cls) -> dict, merged into line_vals when creating
 
 
 class Many2many(Field):

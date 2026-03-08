@@ -18,6 +18,7 @@ from .controller import _ROUTES
 from .request import Request
 from .rpc import dispatch_jsonrpc
 from .json2 import dispatch_json2, JSON2_RE
+from .report import handle_report
 
 # Load default routes (after all imports to avoid circular import)
 def _load_routes():
@@ -97,6 +98,12 @@ class Application:
 
     def __call__(self, environ: dict, start_response: Callable):
         request = Request(environ)
+
+        # Report routes: /report/html/<name>/<ids> or /report/pdf/<name>/<ids>
+        if request.path.startswith("/report/") and request.method == "GET":
+            resp = handle_report(request)
+            if resp is not None:
+                return resp(environ, start_response)
 
         # Route dispatch first for /web/ API paths (before static to avoid 404)
         match = _match_route(request.path, request.method)

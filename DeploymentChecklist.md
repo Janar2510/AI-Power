@@ -54,6 +54,48 @@
 - [ ] `erp-bin shell -d <db>` opens REPL with `env` and `registry`
 - [ ] From shell, `env['res.partner'].search_read([])` works
 
+## Phases 79–83 (Settings, ir.filters, Chatter, Calendar, Form UX)
+
+- [ ] Settings page: General (company name), Users link, System Parameters table, API Keys
+- [ ] Saved filters: Save/load from ir.filters (DB); localStorage fallback when RPC fails
+- [ ] Lead form: Chatter section with messages; Send posts via message_post
+- [ ] Leads: List | Kanban | Calendar view switcher; calendar month grid with date_deadline
+- [ ] Form: Required field validation before save; "You have unsaved changes" banner; confirm on navigation when dirty
+
+## Phase 84 (Graph view)
+
+- [ ] Leads: List | Kanban | Graph | Calendar view switcher; Graph shows bar/line/pie chart
+- [ ] Graph: read_group RPC; Chart.js from CDN; stage_id grouped, expected_revenue summed
+- [ ] Chart type switcher: Bar, Line, Pie buttons
+
+## Phase 85 (Search facets + group by)
+
+- [ ] Leads list: Filter buttons (Opportunities, Leads) toggleable; Group by Stage dropdown
+- [ ] Facet chips above list when filters/group-by active; removable via ×
+- [ ] Grouped list rows: group headers, subtotals for expected_revenue when grouped by Stage
+
+## Phase 86 (Import wizard)
+
+- [ ] Import button in list toolbar (next to Export)
+- [ ] CSV upload modal: file picker, preview, column mapping, Import/Cancel
+- [ ] import_data RPC creates/updates records; result summary (created/updated/errors)
+
+## Phase 87 (QWeb-style reports)
+
+- [ ] /report/html/crm.lead_summary/<ids> renders Jinja2 template with record data
+- [ ] /report/pdf/... converts to PDF (weasyprint) or falls back to HTML
+- [ ] Print button on lead form and list opens report in new tab
+
+## Phase 88 (AI LLM integration)
+
+- [ ] GET /ai/config returns llm_enabled, llm_model (auth required)
+- [ ] Settings > AI Configuration: OpenAI API key, Enable LLM toggle, Model selector (gpt-4o-mini, gpt-4o, gpt-4-turbo)
+- [ ] ir.config_parameter: ai.openai_api_key, ai.llm_enabled, ai.llm_model
+- [ ] When ai.llm_enabled=1: Chat panel shows prompt-only mode (no tool/model dropdown); POST /ai/chat with prompt uses OpenAI function-calling
+- [ ] RAG: retrieve_chunks injected into system message before LLM call
+- [ ] Chat panel: "Thinking..." loading indicator; tool/model row hidden when LLM enabled
+- [ ] pip install openai for LLM; OPENAI_API_KEY env or ai.openai_api_key in Settings
+
 ## Phase 28 (View Switcher)
 
 - [ ] Leads: List | Kanban toggle buttons above content
@@ -81,11 +123,56 @@
 - [ ] /web/load_views returns actions and menus from DB when authenticated
 - [ ] Navbar menus render from DB; runtime changes to actions/menus reflected on next load
 
-## Phases 51–54 (Action domain, search view, saved filters, computed fields)
+## Phases 69–73 (default_get, name_get, attrs, copy, statusbar)
+
+- [ ] default_get: New form pre-fills from field defaults and action context
+- [ ] name_get/name_search: Many2one fields use searchable input with autocomplete
+- [ ] Attrs: Fields with invisible/readonly/required conditions toggle on form change
+- [ ] Copy: Duplicate button in form; copy creates record with " (copy)" suffix
+- [ ] Statusbar: Leads form shows stage_id as clickable pipeline pills; click updates stage
+
+## Phases 74–78 (Form structure, activity mixin, server actions, export, design system)
+
+- [ ] Form structure: Leads form has header (statusbar) + sheet; button_box supported
+- [ ] mail.activity: Re-run `./erp-bin db init -d <db>` to create mail_activity table
+- [ ] Activity mixin: crm.lead.activity_ids now points to mail.activity; activity_schedule RPC
+- [ ] Mark Won button: Leads form header has Mark Won; click sets stage to Won
+- [ ] List export: Export button in list toolbar; CSV download with display names
+- [ ] CSS design system: --space-*, --card-gap, --color-* tokens; .o-card-gradient available
+
+## Phases 67–68 (One2many editable, multi-level Related)
+
+- [ ] One2many editable: Leads form activity_ids table has Add/Delete; create lead with activities; update lead adds/updates/removes activities
+- [ ] Multi-level Related: res.partner.country_code = Related("country_id.code"); search_read returns country_code; test_related_field_multi_level passes
+- [ ] Re-run `./erp-bin db init -d <db>` to add country_code column on res.partner
+
+## Phases 61–66 (fields_get, model/view inheritance, constraints, breadcrumbs, prefetch)
+
+- [ ] fields_get: RPC `fields_get` returns field metadata; /web/load_views includes `fields_meta` per model
+- [ ] Form labels: field.string from metadata (e.g. "Is a Company" not "is_company")
+- [ ] Selection options from metadata: no hardcoded helpers needed for new models
+- [ ] Model inheritance: `_inherit = "res.partner"` merges fields/methods; verify with `fields_get`
+- [ ] View inheritance: `inherit_id` + xpath extends views; positions: inside/after/before/replace
+- [ ] SQL constraints: `_sql_constraints` applied on db init; IntegrityError returns user-friendly message
+- [ ] Python constraints: `@api.constrains('field')` runs validation on create/write; raises ValidationError
+- [ ] Breadcrumbs: "Contacts / John Doe" trail on form; click list crumb returns to list; record name shown after load
+- [ ] Prefetch: search_read returns partner_id_display etc.; list view avoids extra RPC for Many2one names
+- [ ] Re-run `./erp-bin db init -d <db>` to apply new SQL constraints
+
+## Phases 56–60 (Pagination, toasts, form layout, related fields, onchange)
+
+- [ ] List views: pager "1-80 of N | Prev | Next"; sortable column headers (click toggles asc/desc)
+- [ ] Toast notifications: success/error/warning/info; auto-dismiss 4s; replaces alert()
+- [ ] Form layout: group (2-col grid), notebook (tabs), page; res.partner form has Contact group + Address tab
+- [ ] Related fields: crm.lead.partner_name from partner_id.name; stored on create/write
+- [ ] Onchange: changing country_id clears state_id; server _onchange_country_id; debounced RPC on field change/blur
+
+## Phases 51–55 (Action domain, search view, saved filters, computed fields, binary)
 
 - [ ] List views: action domain applied as default filter; search bar uses search_fields from XML
 - [ ] Saved filters: Filters dropdown in list; Save current search to localStorage
 - [ ] res.partner.display_name: stored computed field; search_read returns display_name
+- [ ] Attachments menu (Settings): ir.attachment list/form; file upload for datas field (base64)
 
 ## Phases 46–50 (Search operators, form metadata, ir.rule, ir.ui.view, menu visibility)
 

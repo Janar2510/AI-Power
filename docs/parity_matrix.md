@@ -25,7 +25,7 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | Module lifecycle (install/upgrade order) | `odoo/modules/loading.py` | `core/modules/` | done |
 | Access rights (ir.model.access) | `base/security/ir.model.access.csv` | `addons/base/security/` | done |
 | Record rules (default-allow) | `odoo/service/security.py` | `core/orm/security.py` | done |
-| Prefetch/cache heuristics | `odoo/orm/` | `core/orm/` | deferred |
+| Prefetch/cache heuristics | `odoo/orm/` | `core/orm/` _prefetch_many2one_display | done |
 | jsonrpc dispatch | `odoo/http.py` | `core/http/rpc.py` | done |
 | Asset bundling (include/remove/after) | `addons/web/__manifest__.py` | `core/modules/assets.py` | done |
 

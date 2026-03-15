@@ -1,5 +1,7 @@
 """Authentication - login, session check."""
 
+import secrets
+import time
 from typing import Optional, Tuple
 
 try:
@@ -27,6 +29,140 @@ from .session import (
 )
 
 _registries: dict = {}  # dbname -> Registry
+
+# TOTP pending: token -> {uid, db, expires} (Phase 125)
+_totp_pending: dict = {}
+_TOTP_PENDING_TTL = 300  # 5 minutes
+
+# TOTP setup: sid -> {secret, uid, db, login} (Phase 125)
+_totp_setup_store: dict = {}
+
+
+def user_has_totp_enabled(uid: int, db: str) -> bool:
+    """Check if user has TOTP enabled. Returns False if auth_totp not loaded or column missing."""
+    try:
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            cr.execute(
+                "SELECT totp_enabled FROM res_users WHERE id = %s",
+                (uid,),
+            )
+            row = cr.fetchone()
+            if row:
+                val = row.get("totp_enabled") if hasattr(row, "get") else row[0]
+                return bool(val)
+    except Exception:
+        pass
+    return False
+
+
+def create_totp_pending(uid: int, db: str) -> str:
+    """Create pending TOTP verification token. Returns token."""
+    token = secrets.token_urlsafe(32)
+    _totp_pending[token] = {"uid": uid, "db": db, "expires": time.time() + _TOTP_PENDING_TTL}
+    return token
+
+
+def get_totp_pending(token: str) -> Optional[Tuple[int, str]]:
+    """Get (uid, db) for valid pending token, or None. Clears expired entries."""
+    if not token:
+        return None
+    now = time.time()
+    for k, v in list(_totp_pending.items()):
+        if v.get("expires", 0) < now:
+            del _totp_pending[k]
+    p = _totp_pending.get(token)
+    if not p or p.get("expires", 0) < now:
+        return None
+    return (p["uid"], p["db"])
+
+
+def clear_totp_pending(token: str) -> None:
+    """Remove pending token."""
+    _totp_pending.pop(token, None)
+
+
+def generate_totp_secret() -> Optional[str]:
+    """Generate a new TOTP secret. Returns None if pyotp not installed."""
+    try:
+        import pyotp
+        return pyotp.random_base32()
+    except ImportError:
+        return None
+
+
+def get_totp_provision_uri(secret: str, login: str, issuer: str = "ERP Platform") -> Optional[str]:
+    """Get otpauth URI for QR code. Returns None if pyotp not installed."""
+    try:
+        import pyotp
+        return pyotp.totp.TOTP(secret).provisioning_uri(name=login, issuer_name=issuer)
+    except ImportError:
+        return None
+
+
+def verify_totp_code(uid: int, db: str, code: str, secret: Optional[str] = None) -> bool:
+    """Verify TOTP code. If secret provided, use it; else load from user. Requires pyotp."""
+    try:
+        import pyotp
+    except ImportError:
+        return False
+    try:
+        if not secret:
+            registry = _get_registry(db)
+            with get_cursor(db) as cr:
+                cr.execute("SELECT totp_secret FROM res_users WHERE id = %s", (uid,))
+                row = cr.fetchone()
+                if not row:
+                    return False
+                secret = row.get("totp_secret") if hasattr(row, "get") else row[0]
+        if not secret:
+            return False
+        totp = pyotp.TOTP(secret)
+        return totp.verify(code, valid_window=1)
+    except Exception:
+        return False
+
+
+def save_totp_to_user(uid: int, db: str, secret: str) -> bool:
+    """Save TOTP secret to user and enable. Returns True on success."""
+    try:
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            cr.execute(
+                "UPDATE res_users SET totp_secret = %s, totp_enabled = TRUE WHERE id = %s",
+                (secret, uid),
+            )
+        return True
+    except Exception:
+        return False
+
+
+def store_totp_setup(sid: str, secret: str, uid: int, db: str, login: str) -> None:
+    """Store TOTP setup state for session."""
+    _totp_setup_store[sid] = {"secret": secret, "uid": uid, "db": db, "login": login}
+
+
+def get_totp_setup(sid: str) -> Optional[dict]:
+    """Get TOTP setup state. Returns None if not found."""
+    return _totp_setup_store.get(sid)
+
+
+def clear_totp_setup(sid: str) -> None:
+    """Clear TOTP setup state."""
+    _totp_setup_store.pop(sid, None)
+
+
+def disable_totp_for_user(uid: int, db: str) -> bool:
+    """Disable TOTP for user. Returns True on success."""
+    try:
+        with get_cursor(db) as cr:
+            cr.execute(
+                "UPDATE res_users SET totp_secret = NULL, totp_enabled = FALSE WHERE id = %s",
+                (uid,),
+            )
+        return True
+    except Exception:
+        return False
 
 
 def hash_password(plain: str) -> str:

@@ -44,6 +44,7 @@
       </aside>
       <button type="button" id="chat-toggle" class="chat-toggle-btn" aria-label="Open AI Assistant">AI</button>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js" crossorigin="anonymous"></script>
     <script src="/web/static/src/session.js"></script>
     <script src="/web/static/src/main.js"></script>
   </body>

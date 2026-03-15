@@ -48,6 +48,14 @@
 - [ ] ai.audit.log, ai.document.chunk tables created (db init)
 - [ ] Chat panel: AI button in webclient
 
+## Phase 125 (Two-Factor Authentication TOTP)
+
+- [ ] addons/auth_totp loaded (core/tools/config.py DEFAULT_SERVER_WIDE_MODULES)
+- [ ] pip install pyotp qrcode (or requirements.txt)
+- [ ] Settings > Two-Factor Authentication: enable TOTP, scan QR code, confirm code
+- [ ] Login flow: when TOTP enabled, password login redirects to /web/login/totp for 6-digit code
+- [ ] Routes: /web/totp/status, /web/totp/begin_setup, /web/totp/confirm_setup, /web/totp/disable
+
 ## Phase 124 (AI Conversation Memory)
 
 - [ ] ai.conversation model stores user_id, messages JSON, model_context, active_id

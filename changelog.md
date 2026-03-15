@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.40.0 (Phase 125: Two-Factor Authentication TOTP)
+
+### Phase 125: Two-Factor Authentication (TOTP)
+- addons/auth_totp/: res.users totp_secret, totp_enabled; Settings > Two-Factor Authentication
+- core/http/auth.py: user_has_totp_enabled, create_totp_pending, verify_totp_code, save_totp_to_user, disable_totp_for_user, generate_totp_secret, get_totp_provision_uri
+- core/http/routes.py: /web/login redirects to /web/login/totp when TOTP enabled; /web/login/totp (GET form, POST verify); /web/totp/status, /web/totp/begin_setup, /web/totp/confirm_setup, /web/totp/disable
+- requirements.txt: pyotp>=2.9, qrcode>=7.4
+- tests/test_auth_totp_phase125.py: user_has_totp_enabled, save/verify/disable, login redirect when TOTP enabled
+
 ## 1.39.0 (Phase 124: AI Conversation Memory)
 
 ### Phase 124: AI Conversation Memory + Context

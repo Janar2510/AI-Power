@@ -645,6 +645,7 @@
     main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">Outgoing Mail Servers</h3><div id="settings-mail-servers"></div></div>';
     main.innerHTML += '<a href="#settings/dashboard-widgets" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Dashboard Widgets</a>';
     main.innerHTML += '<a href="#settings/apikeys" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">API Keys</a>';
+    main.innerHTML += '<a href="#settings/totp" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Two-Factor Authentication</a>';
     main.innerHTML += '</div>';
     rpc.callKw('res.company', 'search_read', [[]], { fields: ['id', 'name'], limit: 1 })
       .then(function (rows) {
@@ -949,6 +950,91 @@
           main.innerHTML = '<h2>API Keys</h2><p class="error">' + (err.message || 'Failed to load keys') + '</p>';
         });
     });
+  }
+
+  function renderTotpSettings() {
+    actionStack = [{ label: 'Settings', hash: 'settings' }, { label: 'Two-Factor Authentication', hash: 'settings/totp' }];
+    main.innerHTML = renderBreadcrumbs() + '<h2>Two-Factor Authentication</h2><p>Loading...</p>';
+    fetch('/web/totp/status', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        const enabled = data && data.enabled;
+        let html = '<h2>Two-Factor Authentication</h2><p style="margin-bottom:var(--space-lg)">Add an extra layer of security with TOTP (authenticator app).</p>';
+        html += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);max-width:400px">';
+        if (enabled) {
+          html += '<p style="color:var(--color-success,#080);margin-bottom:var(--space-md)">2FA is enabled.</p>';
+          html += '<button type="button" id="btn-totp-disable" style="padding:var(--space-sm) var(--space-lg);background:#c00;color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Disable 2FA</button>';
+        } else {
+          html += '<p style="margin-bottom:var(--space-md)">2FA is not enabled.</p>';
+          html += '<button type="button" id="btn-totp-begin" style="padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Enable 2FA</button>';
+          html += '<div id="totp-setup-area" style="display:none;margin-top:var(--space-lg)">';
+          html += '<p>Scan the QR code with your authenticator app.</p>';
+          html += '<div id="totp-qr"></div>';
+          html += '<p style="margin-top:var(--space-md)">Or enter this secret manually: <code id="totp-secret"></code></p>';
+          html += '<label style="display:block;margin-top:var(--space-md)">Enter the 6-digit code to confirm:</label>';
+          html += '<input type="text" id="totp-code" placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);width:100px;margin-top:var(--space-xs)">';
+          html += '<button type="button" id="btn-totp-confirm" style="display:block;margin-top:var(--space-sm);padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Confirm</button>';
+          html += '</div>';
+        }
+        html += '</div>';
+        main.innerHTML = renderBreadcrumbs() + html;
+        const btnBegin = document.getElementById('btn-totp-begin');
+        const btnDisable = document.getElementById('btn-totp-disable');
+        const btnConfirm = document.getElementById('btn-totp-confirm');
+        if (btnBegin) {
+          btnBegin.onclick = function () {
+            btnBegin.disabled = true;
+            fetch('/web/totp/begin_setup', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                btnBegin.disabled = false;
+                if (d.error) { showToast(d.error, 'error'); return; }
+                document.getElementById('totp-setup-area').style.display = 'block';
+                document.getElementById('totp-secret').textContent = d.secret || '';
+                const qrDiv = document.getElementById('totp-qr');
+                if (d.provision_uri && typeof QRCode !== 'undefined') {
+                  qrDiv.innerHTML = '';
+                  new QRCode(qrDiv, { text: d.provision_uri, width: 180, height: 180 });
+                } else if (d.provision_uri) {
+                  qrDiv.innerHTML = '<a href="' + d.provision_uri.replace(/"/g, '&quot;') + '" target="_blank">Open in authenticator</a>';
+                }
+              })
+              .catch(function (err) { btnBegin.disabled = false; showToast(err.message || 'Failed', 'error'); });
+          };
+        }
+        if (btnConfirm) {
+          btnConfirm.onclick = function () {
+            const code = (document.getElementById('totp-code').value || '').trim();
+            if (!code || code.length !== 6) { showToast('Enter 6-digit code', 'error'); return; }
+            btnConfirm.disabled = true;
+            fetch('/web/totp/confirm_setup', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) })
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                btnConfirm.disabled = false;
+                if (d.error) { showToast(d.error, 'error'); return; }
+                showToast('2FA enabled', 'success');
+                renderTotpSettings();
+              })
+              .catch(function (err) { btnConfirm.disabled = false; showToast(err.message || 'Failed', 'error'); });
+          };
+        }
+        if (btnDisable) {
+          btnDisable.onclick = function () {
+            if (!confirm('Disable two-factor authentication? Your account will be less secure.')) return;
+            fetch('/web/totp/disable', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                if (d.error) { showToast(d.error, 'error'); return; }
+                showToast('2FA disabled', 'success');
+                renderTotpSettings();
+              })
+              .catch(function (err) { showToast(err.message || 'Failed', 'error'); });
+          };
+        }
+      })
+      .catch(function () {
+        main.innerHTML = renderBreadcrumbs() + '<h2>Two-Factor Authentication</h2><p class="error">Failed to load status.</p>';
+      });
   }
 
   function getDisplayNames(model, colName, records) {
@@ -3444,11 +3530,14 @@
     const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
     const settingsApiKeysMatch = hash.match(/^settings\/apikeys$/);
+    const settingsTotpMatch = hash.match(/^settings\/totp$/);
     const settingsDashboardMatch = hash.match(/^settings\/dashboard-widgets$/);
     const settingsIndexMatch = hash.match(/^settings\/?$/);
 
     if (settingsApiKeysMatch) {
       renderApiKeysSettings();
+    } else if (settingsTotpMatch) {
+      renderTotpSettings();
     } else if (settingsDashboardMatch) {
       renderDashboardWidgets();
     } else if (settingsIndexMatch) {

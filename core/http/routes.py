@@ -26,6 +26,18 @@ from core.http.auth import (
     login_response_with_html,
     logout_response,
     _get_registry,
+    user_has_totp_enabled,
+    create_totp_pending,
+    get_totp_pending,
+    clear_totp_pending,
+    verify_totp_code,
+    generate_totp_secret,
+    get_totp_provision_uri,
+    save_totp_to_user,
+    disable_totp_for_user,
+    store_totp_setup,
+    get_totp_setup,
+    clear_totp_setup,
 )
 from core.sql_db import db_exists, get_cursor
 
@@ -61,6 +73,37 @@ LOGIN_HTML = """<!DOCTYPE html>
 </body>
 </html>"""
 
+TOTP_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ERP Platform - Two-Factor Authentication</title>
+<link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
+<style>
+  body {{ margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }}
+  .login-box {{ max-width: 320px; margin: 4rem auto; padding: 2rem; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+  .login-box h1 {{ margin-top: 0; }}
+  .login-box input {{ width: 100%; padding: 0.5rem; margin: 0.5rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 1.2rem; letter-spacing: 0.2em; text-align: center; }}
+  .login-box button {{ width: 100%; padding: 0.75rem; margin-top: 0.5rem; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }}
+  .login-box .error {{ color: #c00; font-size: 0.9rem; }}
+</style>
+</head>
+<body>
+<div class="login-box">
+  <h1>Two-Factor Authentication</h1>
+  <p>Enter the 6-digit code from your authenticator app.</p>
+  <form method="post" action="/web/login/totp">
+    <input type="text" name="code" placeholder="000000" maxlength="6" pattern="[0-9]{{6}}" autocomplete="one-time-code" required autofocus/>
+    <input type="hidden" name="db" value="{db}"/>
+    <button type="submit">Verify</button>
+  </form>
+  <p class="error">{error}</p>
+  <a href="/web/login?db={db}">Back to login</a>
+</div>
+</body>
+</html>"""
+
 
 @route("/health", auth="public", methods=["GET"])
 def health(request):
@@ -90,6 +133,11 @@ def login(request):
             )
         uid = authenticate(login_name, password, db)
         if uid:
+            if user_has_totp_enabled(uid, db):
+                token = create_totp_pending(uid, db)
+                resp = redirect(f"/web/login/totp?db={db}")
+                resp.set_cookie("erp_totp_pending", token, httponly=True, samesite="Lax", path="/", max_age=300)
+                return resp
             return login_response_with_html(
                 uid, db, _webclient_html(debug_assets=_is_debug_assets(request))
             )
@@ -101,6 +149,44 @@ def login(request):
     db = request.args.get("db", "erp")
     return Response(
         LOGIN_HTML.format(db=db, error=""),
+        content_type="text/html; charset=utf-8",
+    )
+
+
+@route("/web/login/totp", auth="public", methods=["GET", "POST"])
+def login_totp(request):
+    """TOTP verification - GET shows form, POST verifies code and completes login (Phase 125)."""
+    token = request.cookies.get("erp_totp_pending")
+    db = request.form.get("db", request.args.get("db", "erp")) if request.method == "POST" else request.args.get("db", "erp")
+    pending = get_totp_pending(token) if token else None
+    if not pending:
+        resp = redirect(f"/web/login?db={db}")
+        resp.delete_cookie("erp_totp_pending", path="/")
+        return resp
+    uid, db_from_pending = pending
+    if request.method == "POST":
+        db = request.form.get("db", db_from_pending)
+        code = (request.form.get("code") or "").strip()
+        if verify_totp_code(uid, db, code):
+            clear_totp_pending(token)
+            resp = Response(
+                _webclient_html(debug_assets=_is_debug_assets(request)),
+                content_type="text/html; charset=utf-8",
+            )
+            from core.http.auth import _get_user_company_id
+            from core.http.session import create_session
+            company_id = _get_user_company_id(uid, db)
+            sid = create_session(uid, db, company_id)
+            resp.set_cookie("erp_session", sid, httponly=True, samesite="Lax", path="/")
+            resp.delete_cookie("erp_totp_pending", path="/")
+            return resp
+        return Response(
+            TOTP_HTML.format(db=db, error="Invalid code. Please try again."),
+            content_type="text/html; charset=utf-8",
+            status=401,
+        )
+    return Response(
+        TOTP_HTML.format(db=db_from_pending, error=""),
         content_type="text/html; charset=utf-8",
     )
 
@@ -417,6 +503,79 @@ def _webclient_html(debug_assets: bool = False) -> str:
 {js_tags}
 </body>
 </html>"""
+
+
+@route("/web/totp/status", auth="user", methods=["GET"])
+def totp_status(request):
+    """Return TOTP status for current user (Phase 125)."""
+    import json
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    enabled = user_has_totp_enabled(uid, db)
+    return Response(json.dumps({"enabled": enabled}), content_type="application/json")
+
+
+@route("/web/totp/begin_setup", auth="user", methods=["POST"])
+def totp_begin_setup(request):
+    """Start TOTP setup - generate secret, return provision URI (Phase 125)."""
+    import json
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    sid = request.cookies.get("erp_session")
+    if uid is None or not sid:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    if user_has_totp_enabled(uid, db):
+        return Response('{"error": "TOTP already enabled"}', status=400, content_type="application/json")
+    secret = generate_totp_secret()
+    if not secret:
+        return Response('{"error": "pyotp not installed. Run: pip install pyotp"}', status=500, content_type="application/json")
+    with get_cursor(db) as cr:
+        cr.execute("SELECT login FROM res_users WHERE id = %s", (uid,))
+        row = cr.fetchone()
+        login = row.get("login", "user") if row else "user"
+    provision_uri = get_totp_provision_uri(secret, login)
+    store_totp_setup(sid, secret, uid, db, login)
+    return Response(json.dumps({"secret": secret, "provision_uri": provision_uri or ""}), content_type="application/json")
+
+
+@route("/web/totp/confirm_setup", auth="user", methods=["POST"])
+def totp_confirm_setup(request):
+    """Confirm TOTP setup - verify code and save (Phase 125)."""
+    import json
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    sid = request.cookies.get("erp_session")
+    if uid is None or not sid:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    data = request.get_json(force=True, silent=True) or {}
+    code = (data.get("code") or "").strip()
+    if not code:
+        return Response('{"error": "code required"}', status=400, content_type="application/json")
+    setup = get_totp_setup(sid)
+    if not setup or setup.get("uid") != uid:
+        return Response('{"error": "Setup not started. Call begin_setup first."}', status=400, content_type="application/json")
+    secret = setup.get("secret")
+    if not verify_totp_code(uid, db, code, secret=secret):
+        return Response('{"error": "Invalid code"}', status=400, content_type="application/json")
+    if save_totp_to_user(uid, db, secret):
+        clear_totp_setup(sid)
+        return Response(json.dumps({"ok": True}), content_type="application/json")
+    return Response('{"error": "Failed to save"}', status=500, content_type="application/json")
+
+
+@route("/web/totp/disable", auth="user", methods=["POST"])
+def totp_disable(request):
+    """Disable TOTP for current user (Phase 125)."""
+    import json
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    if disable_totp_for_user(uid, db):
+        return Response(json.dumps({"ok": True}), content_type="application/json")
+    return Response('{"error": "Failed to disable"}', status=500, content_type="application/json")
 
 
 @route("/", auth="user", methods=["GET"])

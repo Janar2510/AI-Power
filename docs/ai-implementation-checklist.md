@@ -44,6 +44,12 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] extract_fields(model, text) in registry: LLM extracts structured fields when enabled; fallback regex for email/phone
 - [ ] POST /ai/extract_fields returns {fields}; used by AI Fill button on lead/partner forms
 
+## Phase 124 (AI Conversation Memory)
+
+- [ ] ai.conversation model: user_id, messages (JSON), model_context, active_id
+- [ ] /ai/chat: conversation_id, model_context, active_id; loads prior messages; injects view context into system prompt
+- [ ] Chat panel: maintains conversation_id; "New" button; window.chatContext from main.js
+
 ## Adding New Tools
 
 1. Add tool function in `registry.py` (signature: `env, **kwargs`)

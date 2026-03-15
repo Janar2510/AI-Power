@@ -15,6 +15,7 @@
   if (!panel || !toggleBtn || !sendBtn) return;
 
   let llmEnabled = false;
+  let conversationId = null;
 
   function fetchAiConfig() {
     fetch('/ai/config', { credentials: 'include' })
@@ -122,8 +123,9 @@
     sendBtn.disabled = true;
     const loadingEl = appendLoading();
 
+    const ctx = (typeof window !== 'undefined' && window.chatContext) || {};
     const body = llmEnabled
-      ? { prompt: prompt, retrieve: true }
+      ? { prompt: prompt, retrieve: true, conversation_id: conversationId, model_context: ctx.model || '', active_id: ctx.active_id != null ? ctx.active_id : null }
       : { prompt: prompt || tool, tool: tool, kwargs: kwargs };
 
     fetch('/ai/chat', {
@@ -165,6 +167,15 @@
   });
 
   if (closeBtn) closeBtn.addEventListener('click', hidePanel);
+
+  const newConvBtn = document.getElementById('chat-new-conv');
+  if (newConvBtn) {
+    newConvBtn.addEventListener('click', function () {
+      conversationId = null;
+      if (messagesEl) messagesEl.innerHTML = '';
+      appendMessage('assistant', 'New conversation started.');
+    });
+  }
 
   sendBtn.addEventListener('click', send);
 

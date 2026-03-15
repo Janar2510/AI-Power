@@ -20,6 +20,7 @@
       <aside id="chat-panel" class="chat-panel-hidden" aria-label="AI Assistant">
         <div class="chat-panel-header">
           <h3>AI Assistant</h3>
+          <button type="button" id="chat-new-conv" class="chat-new-conv-btn" title="New conversation" style="margin-right:0.5rem;padding:0.2rem 0.5rem;font-size:0.85rem;background:transparent;border:1px solid rgba(255,255,255,0.5);border-radius:4px;color:inherit;cursor:pointer">New</button>
           <button type="button" id="chat-panel-close" class="chat-panel-close" aria-label="Close">×</button>
         </div>
         <div id="chat-messages" class="chat-messages"></div>

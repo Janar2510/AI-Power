@@ -77,6 +77,8 @@ def _parse_config(args: list[str]) -> dict:
             result["cors_origin"] = arg.split("=", 1)[1]
         elif arg.startswith("--session-store="):
             result["session_store"] = arg.split("=", 1)[1]
+        elif arg.startswith("--workers="):
+            result["workers"] = int(arg.split("=", 1)[1])
 
     return result
 

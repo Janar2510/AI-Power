@@ -48,6 +48,13 @@
 - [ ] ai.audit.log, ai.document.chunk tables created (db init)
 - [ ] Chat panel: AI button in webclient
 
+## Phase 124 (AI Conversation Memory)
+
+- [ ] ai.conversation model stores user_id, messages JSON, model_context, active_id
+- [ ] /ai/chat accepts conversation_id; loads prior messages; returns conversation_id
+- [ ] Chat panel: "New" button clears conversation; sends model_context/active_id from current view
+- [ ] window.chatContext set by main.js when viewing form/list
+
 ## Phase 123 (AI-Assisted Data Entry)
 
 - [ ] POST /ai/extract_fields (model, text) returns {fields}; auth required

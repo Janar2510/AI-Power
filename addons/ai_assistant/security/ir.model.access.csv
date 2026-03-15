@@ -4,3 +4,4 @@ access_ai_tool_definition_user,ai.tool.definition user,model_ai_tool_definition,
 access_ai_prompt_template_user,ai.prompt.template user,model_ai_prompt_template,,1,1,1,1
 access_ai_document_chunk_user,ai.document.chunk user,model_ai_document_chunk,,1,1,1,1
 access_ai_rag_reindex_admin,ai.rag.reindex admin,model_ai_rag_reindex,,1,0,0,0
+access_ai_conversation_user,ai.conversation user,model_ai_conversation,,1,1,1,1

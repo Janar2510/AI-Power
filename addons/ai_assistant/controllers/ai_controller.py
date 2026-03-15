@@ -2,6 +2,7 @@
 
 import json
 import hashlib
+from datetime import datetime, timezone
 
 from core.http.controller import route
 from core.http.auth import get_session_uid, get_session_db, _get_registry
@@ -146,6 +147,9 @@ def ai_chat(request: Request) -> Response:
         tool_name = data.get("tool", "").strip()
         tool_kwargs = data.get("kwargs", {})
         do_retrieve = data.get("retrieve", True)
+        conversation_id = data.get("conversation_id")
+        model_context = (data.get("model_context") or "").strip()
+        active_id = data.get("active_id")
 
         prompt_hash = hashlib.sha256(prompt.encode()).hexdigest() if prompt else ""
 
@@ -174,18 +178,56 @@ def ai_chat(request: Request) -> Response:
                 return Response(json.dumps({"result": result}), content_type="application/json")
 
             if llm_enabled and prompt:
-                # LLM mode: use OpenAI with RAG context
+                # LLM mode: use OpenAI with RAG context and optional conversation history
                 chunks = retrieve_chunks(env, prompt, limit=5) if do_retrieve else []
                 context_parts = [c.get("text", "") for c in chunks if c.get("text")]
                 system_content = "You are an AI assistant for an ERP system. Use the available tools to search, summarise, draft messages, create activities, and propose workflow steps."
+                if model_context and active_id is not None:
+                    system_content += f"\n\nUser is currently viewing {model_context} record id={active_id}. You may reference this context."
                 if context_parts:
                     context_text = "\n".join(p[:500] for p in context_parts)[:2000]
                     system_content += "\n\nRelevant context from the database:\n" + context_text
-                messages = [
-                    {"role": "system", "content": system_content},
-                    {"role": "user", "content": prompt},
-                ]
+                prior_messages = []
+                conv = None
+                out_conv_id = None
+                if conversation_id:
+                    try:
+                        Conv = env.get("ai.conversation")
+                        if Conv:
+                            conv = Conv.browse(int(conversation_id))
+                            rows = conv.read_ids([conv.id], ["user_id", "messages"]) if conv.ids else []
+                            if rows and rows[0].get("user_id") == uid:
+                                raw = rows[0].get("messages") or "[]"
+                                prior_messages = json.loads(raw) if isinstance(raw, str) else (raw or [])
+                            else:
+                                conv = None
+                    except (ValueError, KeyError, TypeError):
+                        conv = None
+                messages = [{"role": "system", "content": system_content}]
+                messages.extend(prior_messages[-20:])
+                messages.append({"role": "user", "content": prompt})
                 result = call_llm(env, messages, model=cfg.get("llm_model", "gpt-4o-mini"))
+                new_messages = prior_messages + [{"role": "user", "content": prompt}, {"role": "assistant", "content": result or ""}]
+                now = datetime.now(timezone.utc).isoformat()
+                try:
+                    Conv = env.get("ai.conversation")
+                    if Conv:
+                        payload = {
+                            "user_id": uid,
+                            "messages": json.dumps(new_messages[-50:]),
+                            "model_context": model_context or "",
+                            "active_id": int(active_id) if active_id is not None else None,
+                            "write_date": now,
+                        }
+                        if conv and conv.ids:
+                            conv.write(payload)
+                            out_conv_id = conv.id
+                        else:
+                            payload["create_date"] = now
+                            rec = Conv.create(payload)
+                            out_conv_id = rec.id if hasattr(rec, "id") else (rec.get("id") if isinstance(rec, dict) else None)
+                except Exception:
+                    out_conv_id = conversation_id if conversation_id else None
                 retrieved_doc_ids = json.dumps([{"model": c.get("model"), "res_id": c.get("res_id")} for c in chunks])
                 log_audit(
                     env,
@@ -194,7 +236,7 @@ def ai_chat(request: Request) -> Response:
                     outcome=(result or "")[:1000],
                     retrieved_doc_ids=retrieved_doc_ids,
                 )
-                return Response(json.dumps({"result": result}), content_type="application/json")
+                return Response(json.dumps({"result": result, "conversation_id": out_conv_id}), content_type="application/json")
 
             return Response(
                 json.dumps({"error": "tool required", "hint": "Select a tool or enable LLM in Settings > AI Configuration"}),

@@ -560,6 +560,7 @@
   };
 
   function renderHome() {
+    if (typeof window !== 'undefined') window.chatContext = {};
     renderDashboard();
   }
 
@@ -1007,6 +1008,7 @@
 
   function renderList(model, route, records, searchTerm, totalCount, offset, limit, savedFiltersList) {
     savedFiltersList = savedFiltersList || [];
+    if (typeof window !== 'undefined') window.chatContext = { model: model, active_id: null };
     const cols = getListColumns(model);
     const title = getTitle(route);
     const addLabel = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add';
@@ -1797,6 +1799,7 @@
 
   function renderForm(model, route, id) {
     formDirty = false;
+    if (typeof window !== 'undefined') window.chatContext = { model: model, active_id: id ? parseInt(id, 10) : null };
     const fields = getFormFields(model);
     const formView = viewsSvc ? viewsSvc.getView(model, 'form') : null;
     const children = formView && formView.children ? formView.children : null;

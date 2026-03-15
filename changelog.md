@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.39.0 (Phase 124: AI Conversation Memory)
+
+### Phase 124: AI Conversation Memory + Context
+- addons/ai_assistant/models/ai_conversation.py: ai.conversation (user_id, messages JSON, model_context, active_id)
+- addons/ai_assistant/controllers/ai_controller.py: /ai/chat accepts conversation_id, model_context, active_id; returns conversation_id; loads prior messages, injects view context
+- addons/web/static/src/chat_panel.js: conversationId state, "New" button, sends model_context/active_id from window.chatContext
+- addons/web/static/src/main.js: window.chatContext set in renderForm/renderList/renderHome
+- tests/test_ai_conversation_phase124.py: model CRUD, conversation_id in response, context injection
+
 ## 1.38.0 (Phase 123: AI-Assisted Data Entry)
 
 ### Phase 123: AI-Assisted Data Entry

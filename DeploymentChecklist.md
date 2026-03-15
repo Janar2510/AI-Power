@@ -48,6 +48,16 @@
 - [ ] ai.audit.log, ai.document.chunk tables created (db init)
 - [ ] Chat panel: AI button in webclient
 
+## Phase 120 (Multi-worker mode)
+
+- [ ] --workers=N starts N HTTP workers + 1 cron worker (prefork)
+- [ ] Cron worker runs ir.cron.run_due every 60s
+- [ ] SIGTERM triggers graceful shutdown
+
+## Phase 121 (Module scaffold CLI)
+
+- [ ] erp-bin scaffold <name> [dest] creates module with __manifest__.py, models, views, security, controllers
+
 ## Phase 125 (Two-Factor Authentication TOTP)
 
 - [ ] addons/auth_totp loaded (core/tools/config.py DEFAULT_SERVER_WIDE_MODULES)

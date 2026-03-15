@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.41.0 (Phases 120–121: Multi-Worker Tests, Scaffold Tests)
+
+### Phase 120: Multi-worker mode (tests)
+- tests/test_multi_worker_phase120.py: workers config parsing (default 0, --workers=N)
+
+### Phase 121: Module scaffold CLI (tests)
+- tests/test_scaffold_phase121.py: scaffold creates valid module structure, snake_case conversion
+
 ## 1.40.0 (Phase 125: Two-Factor Authentication TOTP)
 
 ### Phase 125: Two-Factor Authentication (TOTP)

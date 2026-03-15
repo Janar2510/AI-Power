@@ -9,7 +9,7 @@ from .module import (
     get_resource_path,
     resolve_load_order,
 )
-from .loader import load_module_graph, load_openerp_module
+from .loader import clear_loaded_addon_modules, load_module_graph, load_openerp_module
 from .registry import ModuleRegistry
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "get_modules",
     "get_modules_with_version",
     "get_resource_path",
+    "clear_loaded_addon_modules",
     "load_module_graph",
     "load_openerp_module",
     "ModuleRegistry",

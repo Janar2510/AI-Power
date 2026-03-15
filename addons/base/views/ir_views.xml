@@ -127,5 +127,48 @@
       <field name="view_mode">list,form</field>
     </record>
     <menuitem name="Attachments" id="menu_attachments" action="base.action_ir_attachment" parent="base.menu_settings" sequence="5"/>
+    <record model="ir.ui.view" id="ir_actions_server_form">
+      <field name="name">ir.actions.server form</field>
+      <field name="model">ir.actions.server</field>
+      <field name="arch" type="xml">
+        <form>
+          <field name="name"/>
+          <field name="state"/>
+          <field name="code" placeholder="env, record, records in scope"/>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="base_automation_list">
+      <field name="name">base.automation list</field>
+      <field name="model">base.automation</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="model_name"/>
+          <field name="trigger"/>
+          <field name="active"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="base_automation_form">
+      <field name="name">base.automation form</field>
+      <field name="model">base.automation</field>
+      <field name="arch" type="xml">
+        <form>
+          <field name="name"/>
+          <field name="model_name"/>
+          <field name="trigger"/>
+          <field name="filter_domain" placeholder="[['field','=','value']]"/>
+          <field name="action_server_id" comodel="ir.actions.server"/>
+          <field name="active"/>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_base_automation">
+      <field name="name">Automated Actions</field>
+      <field name="res_model">base.automation</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Automated Actions" id="menu_base_automation" action="base.action_base_automation" parent="base.menu_settings" sequence="20"/>
   </data>
 </odoo>

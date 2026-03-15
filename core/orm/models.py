@@ -6,6 +6,77 @@ from typing import Any, Dict, List, Optional, Type, TypeVar, Iterator, Union, Tu
 T = TypeVar("T", bound="ModelBase")
 
 
+def _trigger_dependant_recompute(
+    registry: Any,
+    written_model: str,
+    written_ids: List[int],
+    changed_fields: List[str],
+) -> None:
+    """Phase 100: When written_model's changed_fields are updated, recompute stored computed/related
+    on other models that depend on them (e.g. partner_id.name -> crm.lead.partner_name)."""
+    from core.orm import fields as fmod
+    changed_set = set(changed_fields)
+    if not changed_set or not written_ids:
+        return
+    env = getattr(registry, "_env", None)
+    if not env or not hasattr(env, "cr") or not env.cr:
+        return
+    for other_name, Other in registry._models.items():
+        if other_name == written_model:
+            continue
+        for fname in dir(Other):
+            if fname.startswith("_"):
+                continue
+            field = getattr(Other, fname, None)
+            if not isinstance(field, (fmod.Computed, fmod.Related)):
+                continue
+            if not getattr(field, "store", False):
+                continue
+            paths = []
+            if isinstance(field, fmod.Related) and getattr(field, "related", ""):
+                paths = [field.related]
+            elif isinstance(field, fmod.Computed):
+                paths = list(getattr(field, "depends", []) or [])
+                method = getattr(Other, getattr(field, "compute", ""), None)
+                if method and hasattr(method, "_depends"):
+                    paths = list(set(paths) | set(method._depends))
+            for path in paths:
+                parts = [p.strip() for p in path.split(".") if p.strip()]
+                if len(parts) < 2:
+                    continue
+                rel_field, comodel_field = parts[0], parts[1]
+                if comodel_field not in changed_set:
+                    continue
+                rel_obj = getattr(Other, rel_field, None)
+                if not isinstance(rel_obj, fmod.Many2one):
+                    continue
+                if getattr(rel_obj, "comodel", "") != written_model:
+                    continue
+                try:
+                    recs = Other.search([(rel_field, "in", written_ids)])
+                    if not recs or not recs._ids:
+                        continue
+                    computed_list = recs._model._compute_stored_values(recs)
+                    related_list = recs._model._compute_related_values(recs)
+                    computed_stored = set(recs._model._get_stored_computed_fields())
+                    related_stored = set(recs._model._get_stored_related_fields())
+                    table = recs._model._table
+                    cr = env.cr
+                    if not table or not cr:
+                        continue
+                    for i, rid in enumerate(recs._ids):
+                        to_write = {}
+                        if i < len(related_list) and related_list[i]:
+                            to_write.update({k: v for k, v in related_list[i].items() if k in related_stored})
+                        if i < len(computed_list) and computed_list[i]:
+                            to_write.update({k: v for k, v in computed_list[i].items() if k in computed_stored})
+                        if to_write:
+                            sets = ", ".join(f'"{k}" = %s' for k in to_write)
+                            cr.execute(f'UPDATE "{table}" SET {sets} WHERE id = %s', list(to_write.values()) + [rid])
+                except Exception:
+                    pass
+
+
 def _domain_to_sql(
     domain: List,
     table: str,
@@ -28,6 +99,8 @@ def _domain_to_sql(
     if len(domain) >= 3 and isinstance(domain[0], str) and isinstance(domain[1], str):
         fld, op, val = domain[0], domain[1], domain[2]
         if op == "=":
+            if val is False or val is None:
+                return f'"{fld}" IS NULL', []
             return f'"{fld}" = %s', [val]
         if op == "!=":
             return f'("{fld}" IS NULL OR "{fld}" != %s)', [val]
@@ -116,38 +189,42 @@ def _domain_to_sql(
 class Recordset:
     """Recordset - list of record IDs with model reference."""
 
-    def __init__(self, model: Type["ModelBase"], ids: Optional[List[int]] = None):
+    def __init__(self, model: Type["ModelBase"], ids: Optional[List[int]] = None, _env: Any = None):
         self._model = model
         self._ids = list(ids or [])
+        self._env = _env  # Phase 105: carry env to avoid registry._env drift (closed cursor)
 
     def read(self, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """Read all records in recordset."""
         if not self._ids:
             return []
-        env = getattr(self._model._registry, "_env", None) if self._model._registry else None
+        env = getattr(self, "_env", None) or (
+            getattr(self._model._registry, "_env", None) if self._model._registry else None
+        )
         if not env:
             return []
         rec = self._model(env, self._ids)
         return rec.read(fields)
 
     def unlink(self) -> bool:
-        """Delete all records in recordset."""
+        """Delete all records in recordset. Delegates to Model instance for cascade (Phase 100)."""
         if not self._ids:
             return True
-        env = getattr(self._model._registry, "_env", None) if self._model._registry else None
-        cr = env.cr if env and hasattr(env, "cr") else None
-        if not cr:
+        env = getattr(self, "_env", None) or (
+            getattr(self._model._registry, "_env", None) if self._model._registry else None
+        )
+        if not env:
             return True
-        table = self._model._table
-        placeholders = ", ".join("%s" for _ in self._ids)
-        cr.execute(f'DELETE FROM "{table}" WHERE id IN ({placeholders})', self._ids)
-        return True
+        rec = self._model(env, self._ids)
+        return rec._unlink_impl()
 
     def write(self, vals: Dict[str, Any]) -> bool:
         """Write vals to all records in recordset."""
         if not self._ids or not vals:
             return True
-        env = getattr(self._model._registry, "_env", None) if self._model._registry else None
+        env = getattr(self, "_env", None) or (
+            getattr(self._model._registry, "_env", None) if self._model._registry else None
+        )
         if not env:
             return True
         rec = self._model(env, self._ids)
@@ -174,8 +251,10 @@ class Recordset:
 
     @property
     def env(self) -> Any:
-        """Environment from registry."""
-        return getattr(self._model._registry, "_env", None) if self._model._registry else None
+        """Environment from recordset or registry."""
+        return getattr(self, "_env", None) or (
+            getattr(self._model._registry, "_env", None) if self._model._registry else None
+        )
 
     def __getattr__(self, name: str) -> Any:
         """Delegate model methods (e.g. activity_schedule) to Model, passing self as first arg."""
@@ -243,6 +322,9 @@ class ModelBase(metaclass=Model):
     def __iter__(self) -> Iterator["ModelBase"]:
         for rid in self._ids:
             yield self._model.browse(rid)
+
+    def __len__(self) -> int:
+        return len(self._ids)
 
     @property
     def _model(self) -> Type["ModelBase"]:
@@ -327,6 +409,8 @@ class ModelBase(metaclass=Model):
                 info["inverse_name"] = obj.inverse_name
             if hasattr(obj, "default") and obj.default is not None:
                 info["default"] = obj.default
+            if hasattr(obj, "currency_field") and obj.currency_field:
+                info["currency_field"] = obj.currency_field
             result[name] = info
         return result
 
@@ -441,16 +525,44 @@ class ModelBase(metaclass=Model):
         from core.orm.api import ValidationError
         if not vals or not self._ids:
             return True
+        env = getattr(self, "env", None)
+        if env and getattr(env, "uid", None):
+            allowed = self._model.search([("id", "in", self._ids)], operation="write")
+            allowed_ids = set(allowed.ids if hasattr(allowed, "ids") else [])
+            denied = [rid for rid in self._ids if rid not in allowed_ids]
+            if denied:
+                raise PermissionError(f"Access denied by record rule for write on {self._model._name}: {denied}")
+        vals = dict(vals)
+        from core.orm import fields as fmod
+        # Phase 100: inverse for computed fields - call inverse instead of direct write
+        for fname in list(vals.keys()):
+            field = getattr(self._model, fname, None)
+            if not isinstance(field, fmod.Computed) or not getattr(field, "inverse", None):
+                continue
+            inv = field.inverse
+            method = getattr(self._model, inv, None) if isinstance(inv, str) else inv
+            if callable(method):
+                for rec in self:
+                    if isinstance(inv, str):
+                        getattr(rec._model, inv)(rec, vals[fname])
+                    else:
+                        inv(rec, vals[fname])
+                del vals[fname]
+        if not vals:
+            return True
         vals = self._model._sanitize_html_vals(vals)
         vals = self._model._decode_binary_vals(vals)
         cr = self._get_cr()
         if not cr:
             self._cache.update(vals)
             return True
-        from core.orm import fields as fmod
         stored = self._get_stored_columns()
         related_stored = set(self._model._get_stored_related_fields())
-        vals_stored = {k: v for k, v in vals.items() if k in stored and k not in related_stored}
+        computed_stored = set(self._model._get_stored_computed_fields())
+        vals_stored = {
+            k: v for k, v in vals.items()
+            if k in stored and k not in related_stored and k not in computed_stored
+        }
         if vals_stored:
             table = self._model._table
             sets = ", ".join(f'"{k}" = %s' for k in vals_stored)
@@ -557,6 +669,15 @@ class ModelBase(metaclass=Model):
                         f'UPDATE "{table}" SET {sets} WHERE id = %s',
                         list(to_write.values()) + [rid],
                     )
+        # Phase 100: trigger recompute of dependant stored computed/related fields
+        registry = getattr(self._model, "_registry", None)
+        if registry and cr and vals_stored:
+            _trigger_dependant_recompute(registry, self._model._name, self._ids, list(vals_stored.keys()))
+        # Phase 119: base.automation on_write
+        env = getattr(self, "env", None)
+        if env and self._ids and vals:
+            from core.orm.automation import run_base_automation
+            run_base_automation(env, "on_write", self._model._name, self._ids, vals)
         return True
 
     @classmethod
@@ -818,13 +939,52 @@ class ModelBase(metaclass=Model):
         m2m_vals = {k: v for k, v in vals.items() if isinstance(getattr(cls, k, None), fmod.Many2many)}
         if m2m_vals:
             new_rec.write(m2m_vals)
+        # Phase 119: base.automation on_create
+        if env:
+            from core.orm.automation import run_base_automation
+            run_base_automation(env, "on_create", cls._name, [new_id], vals)
         return new_rec
 
-    def unlink(self) -> bool:
-        """Delete record(s) from DB."""
+    def _unlink_impl(self) -> bool:
+        """Delete record(s) from DB. Phase 100: ondelete=cascade deletes referencing records first."""
+        env = getattr(self, "env", None)
+        if env and getattr(env, "uid", None) and self._ids:
+            allowed = self._model.search([("id", "in", self._ids)], operation="unlink")
+            allowed_ids = set(allowed.ids if hasattr(allowed, "ids") else [])
+            denied = [rid for rid in self._ids if rid not in allowed_ids]
+            if denied:
+                raise PermissionError(f"Access denied by record rule for unlink on {self._model._name}: {denied}")
         cr = self._get_cr()
         if not cr or not self._ids:
             return True
+        from core.orm import fields as fmod
+        registry = getattr(self._model, "_registry", None)
+        if registry:
+            for other_name, Other in registry._models.items():
+                for fname in dir(Other):
+                    if fname.startswith("_"):
+                        continue
+                    field = getattr(Other, fname, None)
+                    if not isinstance(field, fmod.Many2one):
+                        continue
+                    if getattr(field, "comodel", "") != self._model._name:
+                        continue
+                    if getattr(field, "ondelete", "set null") != "cascade":
+                        continue
+                    try:
+                        env = getattr(self._model._registry, "_env", None)
+                        if not env or not hasattr(env, "cr"):
+                            continue
+                        refs = Other.search([(fname, "in", self._ids)])
+                        if refs and refs._ids:
+                            Other(env, refs._ids).unlink()
+                    except Exception:
+                        pass
+        # Phase 119: base.automation on_unlink (before delete)
+        env = getattr(self, "env", None)
+        if env and self._ids:
+            from core.orm.automation import run_base_automation
+            run_base_automation(env, "on_unlink", self._model._name, self._ids)
         table = self._model._table
         placeholders = ", ".join("%s" for _ in self._ids)
         cr.execute(f'DELETE FROM "{table}" WHERE id IN ({placeholders})', self._ids)
@@ -978,6 +1138,7 @@ class ModelBase(metaclass=Model):
         offset: int = 0,
         limit: Optional[int] = None,
         order: Optional[str] = None,
+        operation: str = "read",
     ) -> Recordset:
         """Search records. domain format: [('field','op','value'), ...]."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
@@ -987,10 +1148,10 @@ class ModelBase(metaclass=Model):
         from core.orm.security import get_record_rules
         model_name = getattr(cls, "_name", "")
         uid = getattr(env, "uid", 1)
-        rule_domains = get_record_rules(model_name, uid, env=env)
+        rule_domains = get_record_rules(model_name, uid, env=env, operation=operation)
         combined = list(domain or [])
         for rd in rule_domains:
-            combined = combined + rd
+            combined = combined + [rd]  # Each rule is one term (e.g. ['|', A, B])
         domain = combined
         table = cls._table
         where = "1=1"
@@ -1007,22 +1168,22 @@ class ModelBase(metaclass=Model):
             params,
         )
         ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
-        return Recordset(cls, ids)
+        return Recordset(cls, ids, _env=env)
 
     @classmethod
-    def search_count(cls: Type[T], domain: Optional[List] = None) -> int:
+    def search_count(cls: Type[T], domain: Optional[List] = None, env: Any = None, operation: str = "read") -> int:
         """Return count of records matching domain."""
-        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
             return 0
         from core.orm.security import get_record_rules
         model_name = getattr(cls, "_name", "")
         uid = getattr(env, "uid", 1)
-        rule_domains = get_record_rules(model_name, uid, env=env)
+        rule_domains = get_record_rules(model_name, uid, env=env, operation=operation)
         combined = list(domain or [])
         for rd in rule_domains:
-            combined = combined + rd
+            combined = combined + [rd]  # Each rule is one term (e.g. ['|', A, B])
         domain = combined
         table = cls._table
         where = "1=1"
@@ -1048,7 +1209,8 @@ class ModelBase(metaclass=Model):
         recs = cls.search(domain=domain, offset=offset, limit=limit, order=order)
         if not recs.ids:
             return []
-        return cls.browse(recs.ids).read(fields)
+        # Use recs.read() so env from search is preserved (Phase 105: avoids closed cursor)
+        return recs.read(fields)
 
     @classmethod
     def read_group(
@@ -1060,19 +1222,21 @@ class ModelBase(metaclass=Model):
         limit: Optional[int] = None,
         orderby: Optional[str] = None,
         lazy: bool = True,
+        env: Any = None,
+        operation: str = "read",
     ) -> List[Dict[str, Any]]:
         """SQL GROUP BY with SUM/COUNT aggregation. Returns [{groupby_field: val, field: agg, __count: n}]."""
-        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr or not groupby:
             return []
         from core.orm.security import get_record_rules
         model_name = getattr(cls, "_name", "")
         uid = getattr(env, "uid", 1)
-        rule_domains = get_record_rules(model_name, uid, env=env)
+        rule_domains = get_record_rules(model_name, uid, env=env, operation=operation)
         combined = list(domain or [])
         for rd in rule_domains:
-            combined = combined + rd
+            combined = combined + [rd]  # Each rule is one term (e.g. ['|', A, B])
         domain = combined
         table = cls._table
         stored = cls._get_stored_field_names()
@@ -1133,7 +1297,11 @@ class ModelBase(metaclass=Model):
         """Delete records by ids. Class-level API for RPC."""
         if not ids:
             return True
-        return cls.browse(ids).unlink()
+        return cls.browse(ids).unlink()  # Recordset.unlink -> _unlink_impl
+
+    def unlink(self) -> bool:
+        """Instance method: delete this recordset (delegates to _unlink_impl)."""
+        return self._unlink_impl()
 
 
 # Alias for API compatibility

@@ -6,7 +6,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 - [ ] `ai_assistant` in `DEFAULT_SERVER_WIDE_MODULES` (core/tools/config.py)
 - [ ] `./erp-bin db init -d <db>` creates `ai_audit_log`, `ai_tool_definition`, `ai_prompt_template` tables
-- [ ] Routes: `GET /ai/tools`, `POST /ai/chat`, `GET /ai/config` registered (core/http/application.py)
+- [ ] Routes: `GET /ai/tools`, `POST /ai/chat`, `GET /ai/config`, `POST /ai/nl_search`, `POST /ai/extract_fields` registered (core/http/application.py)
 
 ## Security
 
@@ -18,7 +18,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 - [ ] `addons/ai_assistant/tools/registry.py`: get_tools(), execute_tool(), log_audit()
 - [ ] Tools use ORM (search_read, read) under env with user uid
-- [ ] Available tools: search_records, summarise_recordset (extend as needed)
+- [ ] Available tools: search_records, summarise_recordset, nl_search (extend as needed)
 
 ## RAG Retrieval
 
@@ -33,6 +33,16 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] When ai.llm_enabled=1: /ai/chat accepts prompt without tool; uses call_llm with RAG context
 - [ ] Settings > AI Configuration: API key input, enable toggle, model selector
 - [ ] Chat panel: fetch /ai/config; prompt-only mode when LLM enabled; loading indicator
+
+## Phase 122 (AI Natural Language Search)
+
+- [ ] nl_search(model, query) in registry: LLM converts NL to domain when enabled; fallback ilike on name/email/description
+- [ ] POST /ai/nl_search returns {domain, results}; used by AI Search button in list views
+
+## Phase 123 (AI-Assisted Data Entry)
+
+- [ ] extract_fields(model, text) in registry: LLM extracts structured fields when enabled; fallback regex for email/phone
+- [ ] POST /ai/extract_fields returns {fields}; used by AI Fill button on lead/partner forms
 
 ## Adding New Tools
 

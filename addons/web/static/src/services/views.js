@@ -42,6 +42,12 @@
       return (_cache && _cache.fields_meta && _cache.fields_meta[model]) || null;
     },
 
+    /** Phase 110: report name by model from ir.actions.report (metadata-driven). */
+    getReportName(model) {
+      const reports = _cache && _cache.reports;
+      return (reports && reports[model]) || null;
+    },
+
     getFieldMeta(model, fname) {
       var meta = this.getFieldsMeta(model);
       return meta ? (meta[fname] || null) : null;

@@ -1,8 +1,10 @@
 """CRM Lead model."""
 
-from addons.base.models.mail_activity import MailActivityMixin
-from addons.base.models.mail_message import MailThreadMixin
-from core.orm import Model, fields
+from typing import Any, Dict
+
+from addons.mail.models.mail_activity import MailActivityMixin
+from addons.mail.models.mail_thread import MailThreadMixin
+from core.orm import Model, api, fields
 
 
 class CrmLead(MailActivityMixin, MailThreadMixin, Model):
@@ -10,19 +12,57 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
     _description = "Lead/Opportunity"
 
     name = fields.Char(required=True)
+    company_id = fields.Many2one("res.company", string="Company")
     type = fields.Selection(
         selection=[("lead", "Lead"), ("opportunity", "Opportunity")],
         string="Type",
         default="lead",
     )
     partner_id = fields.Many2one("res.partner", string="Contact")
-    partner_name = fields.Related("partner_id.name", store=True, string="Partner Name")
+    partner_name = fields.Computed(compute="_compute_partner_name", store=True, string="Partner Name")
+
+    @api.depends("partner_id.name")
+    def _compute_partner_name(self):
+        if not self:
+            return []
+        rows = self.read(["partner_id"])
+        partner_ids = list({r.get("partner_id") for r in rows if r.get("partner_id")})
+        if not partner_ids:
+            return [None] * len(self)
+        env = getattr(self, "env", None)
+        Partner = env.get("res.partner") if env else None
+        if not Partner:
+            return [None] * len(self)
+        names = {r["id"]: r.get("name") for r in Partner.browse(partner_ids).read(["id", "name"])}
+        return [names.get(r.get("partner_id")) if r.get("partner_id") else None for r in rows]
     stage_id = fields.Many2one("crm.stage", string="Stage")
     date_deadline = fields.Date(string="Deadline")
-    expected_revenue = fields.Float()
+    currency_id = fields.Many2one("res.currency", string="Currency")
+    expected_revenue = fields.Monetary(currency_field="currency_id", string="Expected Revenue")
     description = fields.Text()
     note_html = fields.Html(string="Notes")
     tag_ids = fields.Many2many("crm.tag", string="Tags")
+
+    def write(self, vals: Dict[str, Any]) -> bool:
+        """Override to notify bus when stage_id changes (Phase 92)."""
+        res = super().write(vals)
+        if res and "stage_id" in vals:
+            try:
+                env = getattr(self, "env", None)
+                if env:
+                    BusBus = env.get("bus.bus")
+                    if BusBus:
+                        uid = getattr(env, "uid", None)
+                        payload = {"type": "stage_change", "res_model": "crm.lead", "stage_id": vals["stage_id"]}
+                        for rid in (self.ids if hasattr(self, "ids") else [self.id] if hasattr(self, "id") else []):
+                            if rid:
+                                p = dict(payload, res_id=rid)
+                                BusBus.sendone(f"mail.message_crm.lead_{rid}", p)
+                                if uid:
+                                    BusBus.sendone(f"res.partner_{uid}", p)
+            except Exception:
+                pass
+        return res
 
     def action_mark_won(self):
         """Set stage to Won (Phase 76)."""

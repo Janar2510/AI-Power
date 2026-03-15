@@ -19,9 +19,27 @@ _REPORT_REGISTRY: Dict[str, tuple] = {
 }
 
 
-def _register_reports():
-    """Ensure report registry is populated from modules."""
-    pass  # Can be extended to load from ir.actions.report
+def _get_report_from_db(report_name: str, db: str, registry: Any) -> Optional[tuple]:
+    """Look up report metadata from ir.actions.report (Phase 110). Returns (model, template_path, fields) or None."""
+    try:
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=1)
+            Report = env.get("ir.actions.report")
+            if not Report:
+                return None
+            rows = Report.search_read([("report_name", "=", report_name)], ["model", "report_file", "fields_csv"], limit=1)
+            if not rows:
+                return None
+            r = rows[0]
+            model_name = r.get("model", "")
+            report_file = r.get("report_file", "")
+            if not model_name or not report_file:
+                return None
+            fields_csv = (r.get("fields_csv") or "").strip()
+            fields = [f.strip() for f in fields_csv.split(",") if f.strip()] if fields_csv else ["id", "name"]
+            return (model_name, report_file, fields)
+    except Exception:
+        return None
 
 
 def _load_template(module: str, rel_path: str) -> Optional[str]:
@@ -39,10 +57,18 @@ def _load_template(module: str, rel_path: str) -> Optional[str]:
 
 
 def _render_report_html(report_name: str, ids: List[int], request: Request) -> Optional[Response]:
-    """Render report as HTML. Returns Response or None."""
-    if report_name not in _REPORT_REGISTRY:
+    """Render report as HTML. Returns Response or None. Uses _REPORT_REGISTRY first, then ir.actions.report (Phase 110)."""
+    reg = None
+    if report_name in _REPORT_REGISTRY:
+        reg = _REPORT_REGISTRY[report_name]
+    else:
+        uid = get_session_uid(request)
+        db = get_session_db(request)
+        if uid is not None and db:
+            registry = _get_registry(db)
+            reg = _get_report_from_db(report_name, db, registry)
+    if not reg:
         return None
-    reg = _REPORT_REGISTRY[report_name]
     model_name, template_rel = reg[0], reg[1]
     report_fields = reg[2] if len(reg) > 2 else ["id", "name"]
     module = template_rel.split("/")[0]

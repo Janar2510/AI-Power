@@ -1,0 +1,10 @@
+# Web module - Estonian
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Dashboard"
+msgstr "Töölaud"
+
+msgid "Logout"
+msgstr "Logi välja"

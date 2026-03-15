@@ -1,7 +1,14 @@
 """Module command - list, load, install modules."""
 
 from core.db import init_schema
-from core.modules import get_manifest, get_modules, get_modules_with_version, load_module_graph, resolve_load_order
+from core.modules import (
+    clear_loaded_addon_modules,
+    get_manifest,
+    get_modules,
+    get_modules_with_version,
+    load_module_graph,
+    resolve_load_order,
+)
 from core.orm import Registry
 from core.orm.models import ModelBase
 from core.sql_db import db_exists, get_cursor
@@ -63,6 +70,7 @@ class Module(Command):
             to_load = resolve_load_order(list(expanded))
             registry = Registry(dbname)
             ModelBase._registry = registry
+            clear_loaded_addon_modules()
             load_module_graph(module_names=to_load)
             with get_cursor(dbname) as cr:
                 init_schema(cr, registry)

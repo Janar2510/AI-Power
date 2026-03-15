@@ -56,6 +56,8 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                         if r.get("type") == "graph" and isinstance(arch_dict, dict):
                             view_def["graph_type"] = arch_dict.get("graph_type", "bar")
                             view_def["fields"] = arch_dict.get("fields", [])
+                        if r.get("type") == "pivot" and isinstance(arch_dict, dict):
+                            view_def["fields"] = arch_dict.get("fields", [])
                         views.setdefault(model, []).append(view_def)
                     reg["views"] = views
     except Exception:
@@ -80,6 +82,28 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                         "context": r.get("context", "") or "",
                         "domain": r.get("domain", "") or "",
                         "type": "ir.actions.act_window",
+                    }
+                reg["actions"] = actions
+        except Exception:
+            pass
+    ActUrl = env.get("ir.actions.act_url")
+    if ActUrl:
+        try:
+            rows = ActUrl.search_read([], ["xml_id", "name", "url", "target"])
+            if rows:
+                actions = dict(reg.get("actions", {}))
+                for r in rows:
+                    xid = r.get("xml_id") or f"__{r.get('id')}"
+                    actions[xid] = {
+                        "id": xid,
+                        "name": r.get("name", ""),
+                        "res_model": "",
+                        "view_mode": [],
+                        "context": "",
+                        "domain": "",
+                        "type": "ir.actions.act_url",
+                        "url": r.get("url", ""),
+                        "target": r.get("target", "self"),
                     }
                 reg["actions"] = actions
         except Exception:
@@ -110,6 +134,21 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                         "sequence": r.get("sequence", 10),
                     })
                 reg["menus"] = menus_filtered
+        except Exception:
+            pass
+    # Phase 110: report actions from ir.actions.report (model -> report_name)
+    Report = env.get("ir.actions.report")
+    if Report:
+        try:
+            rows = Report.search_read([], ["model", "report_name"])
+            if rows:
+                reports: Dict[str, str] = {}
+                for r in rows:
+                    model = r.get("model", "")
+                    report_name = r.get("report_name", "")
+                    if model and report_name:
+                        reports[model] = report_name
+                reg["reports"] = reports
         except Exception:
             pass
     return reg
@@ -199,6 +238,8 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
                             view_def["string"] = arch.get("string", "")
                         if view_type == "graph" and isinstance(arch, dict):
                             view_def["graph_type"] = arch.get("graph_type", "bar")
+                            view_def["fields"] = arch.get("fields", [])
+                        if view_type == "pivot" and isinstance(arch, dict):
                             view_def["fields"] = arch.get("fields", [])
                         if view_type == "search" and isinstance(arch, dict):
                             view_def["filters"] = arch.get("filters", [])

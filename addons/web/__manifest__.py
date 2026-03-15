@@ -3,7 +3,7 @@
     "version": "1.0",
     "category": "Hidden",
     "description": "Web client core module.",
-    "depends": ["base"],
+    "depends": ["base", "bus"],
     "data": [
         "views/webclient_templates.xml",
     ],
@@ -12,6 +12,7 @@
             "web/static/src/scss/webclient.css",
             "web/static/src/services/rpc.js",
             "web/static/src/services/session.js",
+            "bus/static/src/bus_service.js",
             "web/static/src/services/action.js",
             "web/static/src/services/i18n.js",
             "web/static/src/services/registry.js",

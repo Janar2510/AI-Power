@@ -24,6 +24,7 @@ class ResPartner(Model):
     country_code = fields.Related("country_id.code", store=True, string="Country Code")
     state_id = fields.Many2one("res.country.state", string="State")
     parent_id = fields.Many2one("res.partner", string="Parent")
+    user_id = fields.Many2one("res.users", string="User")  # Portal user linked to this contact
     active = fields.Boolean(default=True)
     display_name = fields.Computed(compute="_compute_display_name", store=True, string="Display Name")
 

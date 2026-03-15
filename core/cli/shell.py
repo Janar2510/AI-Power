@@ -15,6 +15,38 @@ import code
 from psycopg2.extras import RealDictCursor
 
 from core.orm import Environment, Registry
+
+
+class _RollbackOnErrorCursor:
+    """Cursor wrapper that rolls back on execute failure to avoid 'current transaction is aborted'."""
+
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, query, vars=None):
+        try:
+            return self._cursor.execute(query, vars)
+        except Exception:
+            if hasattr(self._cursor, "connection"):
+                try:
+                    self._cursor.connection.rollback()
+                except Exception:
+                    pass
+            raise
+
+    def executemany(self, query, vars_list):
+        try:
+            return self._cursor.executemany(query, vars_list)
+        except Exception:
+            if hasattr(self._cursor, "connection"):
+                try:
+                    self._cursor.connection.rollback()
+                except Exception:
+                    pass
+            raise
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
 from core.orm.models import ModelBase
 from core.modules import load_module_graph
 from core.sql_db import get_connection
@@ -47,7 +79,8 @@ class Shell(Command):
 
         with get_connection(dbname) as conn:
             conn.autocommit = True
-            cr = conn.cursor(cursor_factory=RealDictCursor)
+            raw_cr = conn.cursor(cursor_factory=RealDictCursor)
+            cr = _RollbackOnErrorCursor(raw_cr)
             env = Environment(registry, cr=cr, uid=1)
 
             banner = (

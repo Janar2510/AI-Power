@@ -12,3 +12,12 @@ def constrains(*field_names):
         func._constrains = field_names
         return func
     return decorator
+
+
+def depends(*field_paths):
+    """Decorator: mark compute method as depending on given field paths (e.g. 'partner_id.name').
+    When those fields change on related records, stored computed values are recomputed (Phase 100)."""
+    def decorator(func):
+        func._depends = list(field_paths)
+        return func
+    return decorator

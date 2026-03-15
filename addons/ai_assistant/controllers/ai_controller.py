@@ -10,7 +10,7 @@ from core.sql_db import get_cursor
 from core.orm import Environment
 from werkzeug.wrappers import Response
 
-from ..tools.registry import get_tools, execute_tool, log_audit, retrieve_chunks
+from ..tools.registry import get_tools, execute_tool, log_audit, retrieve_chunks, nl_search, extract_fields
 from ..llm import call_llm
 
 
@@ -67,6 +67,69 @@ def ai_retrieve(request: Request) -> Response:
         registry.set_env(env)
         chunks = retrieve_chunks(env, q, limit=limit)
     return Response(json.dumps(chunks), content_type="application/json")
+
+
+@route("/ai/nl_search", auth="public", methods=["POST"])
+def ai_nl_search(request: Request) -> Response:
+    """Natural language search: convert query to domain and return results. Auth required."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
+    try:
+        data = request.get_json() or {}
+        model = (data.get("model") or "").strip()
+        query = (data.get("query") or "").strip()
+        limit = min(int(data.get("limit", 80)), 200)
+        if not model:
+            return Response(
+                json.dumps({"error": "model required"}),
+                status=400,
+                content_type="application/json",
+            )
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            result = nl_search(env, model=model, query=query, limit=limit)
+        return Response(json.dumps(result), content_type="application/json")
+    except Exception as e:
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            content_type="application/json",
+        )
+
+
+@route("/ai/extract_fields", auth="public", methods=["POST"])
+def ai_extract_fields(request: Request) -> Response:
+    """Extract structured fields from pasted text for a model. Auth required."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
+    try:
+        data = request.get_json() or {}
+        model = (data.get("model") or "").strip()
+        text = (data.get("text") or "").strip()
+        if not model:
+            return Response(
+                json.dumps({"error": "model required"}),
+                status=400,
+                content_type="application/json",
+            )
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            result = extract_fields(env, model=model, text=text)
+        return Response(json.dumps(result), content_type="application/json")
+    except Exception as e:
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            content_type="application/json",
+        )
 
 
 @route("/ai/chat", auth="public", methods=["POST"])

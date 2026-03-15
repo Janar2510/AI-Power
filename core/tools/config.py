@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 # Defaults (Odoo 19 parity)
-DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web", "crm", "ai_assistant"]
+DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web", "mail", "crm", "sale", "stock", "purchase", "account", "ai_assistant", "bus", "website"]
 REQUIRED_SERVER_WIDE_MODULES = ["base", "web"]
 
 
@@ -22,12 +22,15 @@ def _parse_config(args: list[str]) -> dict:
         "addons_path": [],
         "http_port": 8069,
         "gevent_port": 8072,
+        "gevent_websocket": False,
         "http_interface": "0.0.0.0",
         "proxy_mode": False,
         "dbfilter": "",
         "test_enable": False,
         "debug_assets": False,
         "config": "",
+        "cors_origin": "",
+        "session_store": "memory",
         "server_wide_modules": DEFAULT_SERVER_WIDE_MODULES.copy(),
         "db_host": os.environ.get("PGHOST", "localhost"),
         "db_port": int(os.environ.get("PGPORT", "5432")),
@@ -46,6 +49,8 @@ def _parse_config(args: list[str]) -> dict:
             result["http_port"] = int(arg.split("=", 1)[1])
         elif arg.startswith("--gevent-port="):
             result["gevent_port"] = int(arg.split("=", 1)[1])
+        elif arg == "--gevent-websocket":
+            result["gevent_websocket"] = True
         elif arg == "--proxy-mode":
             result["proxy_mode"] = True
         elif arg.startswith("--db-filter="):
@@ -68,6 +73,10 @@ def _parse_config(args: list[str]) -> dict:
             result["db_name"] = arg.split("=", 1)[1]
         elif arg.startswith("--api-key="):
             result["api_key"] = arg.split("=", 1)[1]
+        elif arg.startswith("--cors-origin="):
+            result["cors_origin"] = arg.split("=", 1)[1]
+        elif arg.startswith("--session-store="):
+            result["session_store"] = arg.split("=", 1)[1]
 
     return result
 

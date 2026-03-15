@@ -17,7 +17,14 @@ from core.modules import load_module_graph
 from core.tools import config
 
 from .request import Request
-from .session import create_session, get_session
+from .session import (
+    create_session,
+    get_session,
+    get_session_company_id,
+    set_session_company_id,
+    get_session_lang,
+    set_session_lang,
+)
 
 _registries: dict = {}  # dbname -> Registry
 
@@ -100,9 +107,48 @@ def get_session_db(request: Request) -> str:
     return config.get_config().get("db_name", "erp")
 
 
+def get_session_company_id_from_request(request: Request) -> Optional[int]:
+    """Get current company_id from session."""
+    sid = request.cookies.get("erp_session")
+    if not sid:
+        return None
+    return get_session_company_id(sid)
+
+
+def get_session_lang_from_request(request: Request) -> str:
+    """Get language from session. Default en_US."""
+    sid = request.cookies.get("erp_session")
+    if not sid:
+        return "en_US"
+    return get_session_lang(sid) or "en_US"
+
+
+def _get_user_company_id(uid: int, db: str) -> Optional[int]:
+    """Get user's company_id (current company) for session init."""
+    try:
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            User = env["res.users"]
+            rows = User.read_ids([uid], ["company_id"])
+            if rows and rows[0].get("company_id"):
+                return rows[0]["company_id"]
+            # Fallback: first company
+            Company = env.get("res.company")
+            if Company:
+                companies = Company.search([], limit=1)
+                if companies and companies.ids:
+                    return companies.ids[0]
+    except Exception:
+        pass
+    return None
+
+
 def login_response(uid: int, db: str, redirect_to: str = "/") -> Response:
     """Create response with session cookie (redirect)."""
-    sid = create_session(uid, db)
+    company_id = _get_user_company_id(uid, db)
+    sid = create_session(uid, db, company_id)
     resp = Response(status=302, headers={"Location": redirect_to})
     resp.set_cookie("erp_session", sid, httponly=True, samesite="Lax", path="/")
     return resp
@@ -111,7 +157,8 @@ def login_response(uid: int, db: str, redirect_to: str = "/") -> Response:
 def login_response_with_html(uid: int, db: str, html: str) -> Response:
     """Create response with session cookie and HTML body (no redirect).
     Avoids Safari/browser issues with cookie not being sent on 302 redirect."""
-    sid = create_session(uid, db)
+    company_id = _get_user_company_id(uid, db)
+    sid = create_session(uid, db, company_id)
     resp = Response(html, content_type="text/html; charset=utf-8")
     resp.set_cookie("erp_session", sid, httponly=True, samesite="Lax", path="/")
     return resp

@@ -117,3 +117,27 @@ class TestHTTP(unittest.TestCase):
         self.assertEqual(r.status_code, 401)
         data = json.loads(r.get_data(as_text=True))
         self.assertIn("Invalid apikey", data.get("message", ""))
+
+    def test_websocket_handler_registered(self):
+        """WebSocket handler is registered for /websocket/ (Phase 95)."""
+        from core.http.application import _websocket_handler
+        self.assertIsNotNone(_websocket_handler)
+        self.assertTrue(callable(_websocket_handler))
+
+    def test_health_endpoint_returns_ok(self):
+        """GET /health returns JSON with status and db (Phase 99)."""
+        r = self.client.get("/health")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.content_type, "application/json")
+        data = json.loads(r.get_data(as_text=True))
+        self.assertIn("status", data)
+        self.assertEqual(data["status"], "ok")
+        self.assertIn("db", data)
+        self.assertIsInstance(data["db"], bool)
+
+    def test_security_headers_present(self):
+        """Responses include X-Frame-Options and X-Content-Type-Options (Phase 99)."""
+        r = self.client.get("/health")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers.get("X-Frame-Options"), "SAMEORIGIN")
+        self.assertEqual(r.headers.get("X-Content-Type-Options"), "nosniff")

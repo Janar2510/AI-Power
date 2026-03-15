@@ -5,6 +5,7 @@
 - [ ] Follow docs/ai-rules.md for development and deployment decisions
 - [ ] Use odoo-parity skill when implementing parity features (see .agents/skills/odoo-parity)
 - [ ] Run tests: `python3 run_tests.py`
+- [ ] CI (Phase 113): `.github/workflows/ci.yml` runs unit tests on push/PR; E2E on main/master
 - [ ] Optional: run e2e tour: `pip install -r requirements-dev.txt && playwright install chromium && python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python -m pytest tests/e2e/ -v`
 - [ ] Install passlib: `pip install "passlib[bcrypt]>=1.7"`
 - [ ] Verify addons path: `./erp-bin module list`
@@ -43,9 +44,54 @@
 ## AI Module (Phases 9–12)
 
 - [ ] ai_assistant in server_wide_modules (core/tools/config.py)
-- [ ] /ai/tools, /ai/chat, /ai/retrieve routes registered
+- [ ] /ai/tools, /ai/chat, /ai/retrieve, /ai/nl_search, /ai/extract_fields routes registered
 - [ ] ai.audit.log, ai.document.chunk tables created (db init)
 - [ ] Chat panel: AI button in webclient
+
+## Phase 123 (AI-Assisted Data Entry)
+
+- [ ] POST /ai/extract_fields (model, text) returns {fields}; auth required
+- [ ] AI Fill button on new lead/partner forms; paste text to extract name, email, phone, description
+- [ ] When LLM enabled: OpenAI extracts structured fields; fallback: regex for email/phone
+
+## Phase 122 (AI Natural Language Search)
+
+- [ ] POST /ai/nl_search (model, query, limit) returns {domain, results}; auth required
+- [ ] AI Search button in list views (Contacts, Leads, etc.); converts NL query to domain via LLM or ilike fallback
+- [ ] When LLM enabled: OpenAI converts query to Odoo domain; fallback: ilike on name/email/description
+
+## Phase 118 (Accounting foundation)
+
+- [ ] addons/account loaded (depends: base, sale)
+- [ ] Default chart of accounts and journals (SALE, PURCH, MISC) seeded on db init via _load_account_data
+- [ ] sale.order.action_create_invoice creates account.move (customer invoice) with journal entries
+- [ ] Invoicing > Invoices, Invoicing > Configuration menus
+
+## Phase 117 (Purchase module)
+
+- [ ] addons/purchase loaded (depends: base, stock)
+- [ ] purchase.order.button_confirm creates stock.picking (incoming receipt) with stock.move lines
+- [ ] res.partner gains supplier_rank field
+- [ ] Purchase > Orders, Purchase > Products menus
+
+## Phase 116 (Inventory/Stock module)
+
+- [ ] addons/stock loaded (depends: base, sale)
+- [ ] sale.order.action_confirm creates stock.picking (delivery order) with stock.move lines
+- [ ] Default locations (Stock, Output, Vendors, Customers), warehouse, picking types seeded on db init
+- [ ] Inventory > Operations > Transfers, Configuration > Warehouses menus
+
+## Phase 114 (RAG bulk reindex cron)
+
+- [ ] ai.rag.reindex model registered; run() indexes res.partner and crm.lead into ai.document.chunk
+- [ ] "RAG bulk reindex" cron seeded on db init when ai_assistant loaded (60 min interval)
+- [ ] erp-bin cron -d &lt;db&gt; runs ai.rag.reindex.run (up to 500 records per run)
+
+## Phase 115 (Gevent WebSocket for production)
+
+- [ ] Run with --gevent-websocket for WebSocket support (same port as HTTP)
+- [ ] Install gevent: pip install gevent (optional; fallback to Werkzeug + longpolling if not installed)
+- [ ] Without --gevent-websocket: Werkzeug dev server returns 426 for /websocket/, client uses longpolling
 
 ## Phase 29 (CLI Shell + Module Install)
 
@@ -53,6 +99,14 @@
 - [ ] `erp-bin module install -d <db> -m crm` completes without errors
 - [ ] `erp-bin shell -d <db>` opens REPL with `env` and `registry`
 - [ ] From shell, `env['res.partner'].search_read([])` works
+
+## Phases 105–107 (RPC Stabilization, Dashboard, Portal Verification)
+
+- [ ] Phase 105: Contacts/Leads list/form flows no repeated call_kw 500s; test_rpc_read and test_report pass
+- [ ] RPC fix: search_read with fields in args+kwargs no longer returns 500; _merge_args_kwargs deduplicates params
+- [ ] CORS: If "access control checks" on call_kw, set `--cors-origin=http://<your-origin>` or ensure same origin (localhost vs 127.0.0.1); OPTIONS preflight now supported
+- [ ] Phase 106: Dashboard homepage and Settings > Dashboard Widgets work on fresh init and upgraded DB
+- [ ] Phase 107: Portal users see only allowed records; upgrade idempotent for base module
 
 ## Phases 79–83 (Settings, ir.filters, Chatter, Calendar, Form UX)
 
@@ -86,6 +140,32 @@
 - [ ] /report/pdf/... converts to PDF (weasyprint) or falls back to HTML
 - [ ] Print button on lead form and list opens report in new tab
 
+## Phase 110 (Report & action framework – metadata-driven)
+
+- [ ] ir.actions.report records seeded on db init and upgrade (_load_ir_actions_reports)
+- [ ] Report lookup uses ir.actions.report when registry is empty (metadata-driven)
+- [ ] /web/load_views returns reports map (model -> report_name) from ir.actions.report
+- [ ] Print button uses report name from registry when available
+
+## Phase 113 (Runtime and test harness)
+
+- [ ] CI: unit tests run in GitHub Actions with PostgreSQL service
+- [ ] E2E: Playwright tour runs on main/master (login, list, form)
+- [ ] Multi-db: session stores db; registry per DB; data isolation (test_multi_db_phase113)
+
+## Phase 112 (Minimal Sales module)
+
+- [ ] addons/sale: sale.order, sale.order.line, product.product
+- [ ] Sales menu: Orders, Products; list/form views
+- [ ] Orders form: order lines (product, qty, price, subtotal); Confirm/Cancel buttons
+
+## Phase 111 (Portal and collaboration)
+
+- [ ] /my/leads/<id> shows lead detail with messages, activities, attachments
+- [ ] Portal user can post message via /my/leads/<id>/message
+- [ ] /my/attachment/<id> serves attachment when user has access
+- [ ] Record rules: portal users read mail.message, mail.activity, ir.attachment for their leads
+
 ## Phase 88 (AI LLM integration)
 
 - [ ] GET /ai/config returns llm_enabled, llm_model (auth required)
@@ -95,6 +175,32 @@
 - [ ] RAG: retrieve_chunks injected into system message before LLM call
 - [ ] Chat panel: "Thinking..." loading indicator; tool/model row hidden when LLM enabled
 - [ ] pip install openai for LLM; OPENAI_API_KEY env or ai.openai_api_key in Settings
+
+## Phases 99–103 (Infrastructure, ORM Depth, Website, Migrations, Views)
+
+- [ ] Phase 99: Dockerfile, docker-compose, /health, security headers, CORS, persistent sessions
+- [ ] Phase 100: @api.depends recompute; Many2one ondelete cascade/set null; FK constraints
+- [ ] Phase 101: addons/website; /my portal; portal users see only own leads
+- [ ] Phase 102: erp-bin db upgrade -d <db> -m <module>; core/upgrade/; ir.module.module
+- [ ] Phase 103: Leads form tag_ids many2many_tags chip widget (add/remove tags via dropdown)
+- [ ] Phase 104: Html field contenteditable widget; Image field preview/upload; activity view grouping
+
+## Phases 94–98 (i18n, WebSocket, Monetary, Mail Module, Portal)
+
+- [ ] Phase 94: Navbar language selector; /web/translations; .po files in addons/base/i18n, addons/web/i18n
+- [ ] Phase 95: WebSocket at /websocket/; bus_service.js uses WS first, longpoll fallback
+- [ ] Phase 96: crm.lead expected_revenue is Monetary; currency_id in form; list formats monetary with 2 decimals
+- [ ] Phase 97: addons/mail module; mail models moved from base; crm depends on mail; mail in server_wide_modules
+- [ ] Phase 98: /web/signup creates portal users; base.group_portal; res.users.partner_id, res.partner.user_id; login page link to signup
+
+## Phase 93 (Dashboard homepage)
+
+- [ ] Home/Dashboard shows KPI cards (Open Leads, Expected Revenue, My Activities)
+- [ ] KPI cards link to filtered lists (#leads?domain=... for Open Leads)
+- [ ] Dashboard: Upcoming Activities, Quick Actions (New Lead, New Contact), Recent Items
+- [ ] Recent Items populated from sessionStorage when viewing lead/contact forms
+- [ ] Settings > Dashboard Widgets: list, add, edit, delete ir.dashboard.widget
+- [ ] ir.dashboard.widget table created on db init; default widgets from _load_dashboard_widgets
 
 ## Phase 28 (View Switcher)
 
@@ -189,7 +295,7 @@
 
 ## Phase 35 (Many2many + Html)
 
-- [ ] Leads form: tag_ids checkboxes (crm.tag options)
+- [ ] Leads form: tag_ids many2many_tags widget (chip UI for crm.tag; add via dropdown, remove via ×)
 - [ ] Leads form: note_html textarea
 - [ ] Html fields sanitized on write (script/style stripped)
 

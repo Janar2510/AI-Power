@@ -36,6 +36,7 @@ class MailActivity(Model):
 
     res_model = fields.Char(required=True, string="Related Model")
     res_id = fields.Integer(required=True, string="Related Record ID")
+    company_id = fields.Many2one("res.company", string="Company")
     summary = fields.Char(string="Summary")
     note = fields.Text()
     date_deadline = fields.Date(string="Due Date")

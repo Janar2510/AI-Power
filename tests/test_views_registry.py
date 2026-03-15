@@ -105,3 +105,36 @@ class TestViewsRegistry(unittest.TestCase):
         )
         self.assertIsNotNone(contacts_menu)
         self.assertEqual(contacts_menu["name"], "Contacts")
+
+    def test_load_views_registry_from_db_includes_url_actions(self):
+        """Phase 110: DB-backed registry should expose persisted URL actions too."""
+        class MockActWindow:
+            @classmethod
+            def search_read(cls, domain=None, fields=None, offset=0, limit=None, order=None):
+                return []
+
+        class MockActUrl:
+            @classmethod
+            def search_read(cls, domain=None, fields=None, offset=0, limit=None, order=None):
+                return [
+                    {
+                        "id": 2,
+                        "xml_id": "base.action_docs",
+                        "name": "Docs",
+                        "url": "#docs",
+                        "target": "self",
+                    },
+                ]
+
+        class MockEnv:
+            def get(self, name, default=None):
+                if name == "ir.actions.act_window":
+                    return MockActWindow
+                if name == "ir.actions.act_url":
+                    return MockActUrl
+                return default
+
+        reg = load_views_registry_from_db(MockEnv())
+        self.assertIn("base.action_docs", reg["actions"])
+        self.assertEqual(reg["actions"]["base.action_docs"]["type"], "ir.actions.act_url")
+        self.assertEqual(reg["actions"]["base.action_docs"]["url"], "#docs")

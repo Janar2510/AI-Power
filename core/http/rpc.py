@@ -1,5 +1,6 @@
 """Session-aware RPC dispatcher - call_kw / execute_kw for ORM."""
 
+import inspect
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -69,42 +70,74 @@ _CLASS_METHODS = frozenset({
 })
 
 
+def _merge_args_kwargs(fn: Any, args: List, kwargs: Dict) -> tuple:
+    """Remove from kwargs any params already provided positionally to avoid 'multiple values' errors."""
+    try:
+        sig = inspect.signature(fn)
+        params = [p for p in sig.parameters if p not in ("self", "cls")]
+        # Skip *args, **kwargs, etc.
+        positional_names = []
+        for p in params:
+            par = sig.parameters.get(p)
+            if par is None:
+                break
+            if par.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                break
+            positional_names.append(p)
+        # Remove from kwargs any key that is filled by args
+        filtered = dict(kwargs)
+        for i, name in enumerate(positional_names):
+            if i < len(args) and name in filtered:
+                del filtered[name]
+        return args, filtered
+    except (ValueError, TypeError):
+        return args, kwargs
+
+
 def _call_kw(uid: int, db: str, model: str, method: str, args: List, kwargs: Dict) -> Any:
     """Execute model method with user context."""
     if model is None or not str(model).strip():
         raise ValueError("Model name is required")
     registry = _get_registry(db)
-    with get_cursor(db) as cr:
-        env = Environment(registry, cr=cr, uid=uid)
-        registry.set_env(env)
-        Model = env.get(model)
-        if Model is None:
-            raise ValueError(f"Model {model!r} not found. Available: {list(registry.keys())}")
-        fn = getattr(Model, method, None)
-        if method == "read" and hasattr(Model, "read_ids"):
-            fn = getattr(Model, "read_ids")
-        elif method == "write" and hasattr(Model, "write_ids"):
-            fn = getattr(Model, "write_ids")
-        elif method == "search_count" and fn is None:
-            # Fallback for models that may not have search_count (e.g. before Phase 56)
-            search_fn = getattr(Model, "search", None)
-            if search_fn:
-                domain = args[0] if args else []
-                return len(search_fn(domain))
-        if fn is None:
-            raise ValueError(f"Model {model} has no method {method}")
-        try:
-            if method not in _CLASS_METHODS:
-                # Recordset method: first arg is ids
-                ids = args[0] if args else []
-                recs = Model.browse(ids)
-                return getattr(recs, method)(*args[1:], **kwargs)
-            return fn(*args, **kwargs)
-        except Exception as e:
-            from core.orm.api import ValidationError
-            if isinstance(e, ValidationError):
-                raise UserError(str(e)) from e
-            raise
+    try:
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            Model = env.get(model)
+            if Model is None:
+                raise ValueError(f"Model {model!r} not found. Available: {list(registry.keys())}")
+            fn = getattr(Model, method, None)
+            if method == "read" and hasattr(Model, "read_ids"):
+                fn = getattr(Model, "read_ids")
+            elif method == "write" and hasattr(Model, "write_ids"):
+                fn = getattr(Model, "write_ids")
+            elif method == "search_count" and fn is None:
+                # Fallback for models that may not have search_count (e.g. before Phase 56)
+                search_fn = getattr(Model, "search", None)
+                if search_fn:
+                    domain = args[0] if args else []
+                    return len(search_fn(domain))
+            if fn is None:
+                raise ValueError(f"Model {model} has no method {method}")
+            try:
+                if method not in _CLASS_METHODS:
+                    # Recordset method: first arg is ids; carry env to avoid closed cursor (Phase 105)
+                    ids = args[0] if args else []
+                    from core.orm.models import Recordset
+                    recs = Recordset(Model, ids, _env=env)
+                    recs_method = getattr(recs, method)
+                    rargs, rkwargs = _merge_args_kwargs(recs_method, args[1:], kwargs)
+                    return recs_method(*rargs, **rkwargs)
+                rargs, rkwargs = _merge_args_kwargs(fn, args, kwargs)
+                return fn(*rargs, **rkwargs)
+            except Exception as e:
+                from core.orm.api import ValidationError
+                if isinstance(e, ValidationError):
+                    raise UserError(str(e)) from e
+                raise
+    finally:
+        # Clear stale env so no code reuses a closed cursor (Phase 105)
+        registry.set_env(None)
 
 
 def dispatch_jsonrpc(request: Request) -> Response:

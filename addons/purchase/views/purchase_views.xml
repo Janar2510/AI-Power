@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="purchase_order_search">
+      <field name="name">purchase.order search</field>
+      <field name="model">purchase.order</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="name"/>
+          <field name="partner_id"/>
+          <filter name="draft" string="Draft" domain="[('state','=','draft')]"/>
+          <filter name="purchase" string="Purchase Order" domain="[('state','=','purchase')]"/>
+        </search>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="purchase_order_list">
+      <field name="name">purchase.order list</field>
+      <field name="model">purchase.order</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="purchase_order_form">
+      <field name="name">purchase.order form</field>
+      <field name="model">purchase.order</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="button_confirm" string="Confirm" type="object"/>
+            <button name="action_cancel" string="Cancel" type="object"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="state"/>
+            <field name="order_line">
+              <list>
+                <field name="product_id" comodel="product.product"/>
+                <field name="name"/>
+                <field name="product_qty"/>
+                <field name="price_unit"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_purchase_order">
+      <field name="name">Purchase Orders</field>
+      <field name="res_model">purchase.order</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_purchase_product">
+      <field name="name">Vendor Products</field>
+      <field name="res_model">product.product</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Purchase" id="menu_purchase_root" sequence="14"/>
+    <menuitem name="Orders" id="menu_purchase_order" action="purchase.action_purchase_order" parent="purchase.menu_purchase_root" sequence="10"/>
+    <menuitem name="Products" id="menu_purchase_product" action="purchase.action_purchase_product" parent="purchase.menu_purchase_root" sequence="20"/>
+  </data>
+</odoo>

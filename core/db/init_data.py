@@ -7,7 +7,9 @@ _logger = logging.getLogger("erp.db")
 
 def load_default_data(env) -> None:
     """Load default records (stages, sequences, company, groups, etc.) when tables are empty."""
+    _load_ir_module_module(env)
     _load_ir_actions_menus(env)
+    _load_ir_actions_reports(env)
     _load_ir_rules(env)
     _load_ir_ui_views(env)
     _load_res_currency(env)
@@ -15,6 +17,8 @@ def load_default_data(env) -> None:
     _load_res_country_state(env)
     _load_res_lang(env)
     _load_res_company(env)
+    _load_stock_data(env)
+    _load_account_data(env)
 
     try:
         Groups = env.get("res.groups")
@@ -27,6 +31,10 @@ def load_default_data(env) -> None:
             if not group_public:
                 Groups.create({"name": "Public", "full_name": "base.group_public"})
                 _logger.info("Created default res.groups: base.group_public")
+            group_portal = Groups.search([("full_name", "=", "base.group_portal")])
+            if not group_portal:
+                Groups.create({"name": "Portal", "full_name": "base.group_portal"})
+                _logger.info("Created default res.groups: base.group_portal")
     except Exception as e:
         _logger.warning("Could not load default groups: %s", e)
 
@@ -57,7 +65,11 @@ def load_default_data(env) -> None:
     try:
         IrSequence = env.get("ir.sequence")
         if IrSequence:
-            for code, name in [("crm.lead", "Lead/Opportunity Reference")]:
+            for code, name in [
+                ("crm.lead", "Lead/Opportunity Reference"),
+                ("stock.picking", "Transfer Reference"),
+                ("account.move", "Journal Entry Reference"),
+            ]:
                 existing = IrSequence.search([("code", "=", code)])
                 if not existing:
                     IrSequence.create({"code": code, "name": name, "number_next": 0})
@@ -78,10 +90,46 @@ def load_default_data(env) -> None:
                 "active": True,
             })
             _logger.info("Created cron: Transient model vacuum")
+        if IrCron and not IrCron.search([("model", "=", "mail.mail")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Process email queue",
+                "model": "mail.mail",
+                "method": "process_email_queue",
+                "interval_minutes": 5,
+                "next_run": (datetime.utcnow() + timedelta(minutes=2)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: Process email queue")
+        if IrCron and env.get("ai.rag.reindex") and not IrCron.search([("model", "=", "ai.rag.reindex")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "RAG bulk reindex",
+                "model": "ai.rag.reindex",
+                "method": "run",
+                "interval_minutes": 60,
+                "next_run": (datetime.utcnow() + timedelta(minutes=10)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: RAG bulk reindex")
     except Exception as e:
         _logger.warning("Could not create transient vacuum cron: %s", e)
 
     assign_admin_groups(env)
+    _load_dashboard_widgets(env)
+    _load_ir_translations(env)
+
+
+def _load_ir_module_module(env) -> None:
+    """Seed ir.module.module with installed modules and versions (Phase 102)."""
+    try:
+        IrModule = env.get("ir.module.module")
+        if not IrModule:
+            return
+        IrModule.sync_discovered_modules()
+        _logger.info("Seeded ir.module.module")
+    except Exception as e:
+        _logger.warning("Could not load ir.module.module: %s", e)
 
 
 def _load_ir_actions_menus(env) -> None:
@@ -129,6 +177,41 @@ def _load_ir_actions_menus(env) -> None:
         _logger.warning("Could not load ir.actions/menus: %s", e)
 
 
+def _load_ir_actions_reports(env) -> None:
+    """Seed ir.actions.report from default definitions (Phase 110). Metadata-driven report lookup."""
+    try:
+        Report = env.get("ir.actions.report")
+        if not Report:
+            return
+        defaults = [
+            {
+                "xml_id": "crm.report_lead_summary",
+                "name": "Lead Summary",
+                "model": "crm.lead",
+                "report_name": "crm.lead_summary",
+                "report_file": "crm/report/lead_summary.html",
+                "fields_csv": "id,name,type,stage_id,expected_revenue,date_deadline,description",
+            },
+        ]
+        for d in defaults:
+            existing = Report.search([("report_name", "=", d["report_name"])])
+            vals = {
+                "xml_id": d.get("xml_id", ""),
+                "name": d["name"],
+                "model": d["model"],
+                "report_name": d["report_name"],
+                "report_file": d["report_file"],
+                "fields_csv": d.get("fields_csv", "id,name"),
+            }
+            if existing:
+                Report.browse(existing.ids[0]).write(vals)
+            else:
+                Report.create(vals)
+        _logger.info("Loaded ir.actions.report defaults")
+    except Exception as e:
+        _logger.warning("Could not load ir.actions.report: %s", e)
+
+
 def _load_ir_rules(env) -> None:
     """Seed ir.rule from security/ir_rule.xml files (persistent)."""
     try:
@@ -159,6 +242,12 @@ def _load_ir_rules(env) -> None:
                         model_ref = None
                         domain_force = ""
                         name = ""
+                        groups_ref = ""
+                        active = True
+                        perm_read = True
+                        perm_write = True
+                        perm_create = True
+                        perm_unlink = True
                         for f in rec.findall("{*}field"):
                             fn = f.get("name")
                             if fn == "model_id":
@@ -169,6 +258,18 @@ def _load_ir_rules(env) -> None:
                                 domain_force = (f.text or "").strip()
                             elif fn == "name":
                                 name = (f.text or "").strip()
+                            elif fn in ("groups", "groups_ref"):
+                                groups_ref = (f.text or "").strip()
+                            elif fn == "active":
+                                active = (f.text or "").strip() not in ("0", "false", "False")
+                            elif fn == "perm_read":
+                                perm_read = (f.text or "").strip() not in ("0", "false", "False")
+                            elif fn == "perm_write":
+                                perm_write = (f.text or "").strip() not in ("0", "false", "False")
+                            elif fn == "perm_create":
+                                perm_create = (f.text or "").strip() not in ("0", "false", "False")
+                            elif fn == "perm_unlink":
+                                perm_unlink = (f.text or "").strip() not in ("0", "false", "False")
                         if model_ref and domain_force:
                             existing = IrRule.search([("xml_id", "=", full_xml_id)])
                             vals = {
@@ -176,6 +277,12 @@ def _load_ir_rules(env) -> None:
                                 "name": name or full_xml_id,
                                 "model": model_ref,
                                 "domain_force": domain_force,
+                                "groups_ref": groups_ref,
+                                "active": active,
+                                "perm_read": perm_read,
+                                "perm_write": perm_write,
+                                "perm_create": perm_create,
+                                "perm_unlink": perm_unlink,
                             }
                             if existing:
                                 IrRule.browse(existing.ids[0]).write(vals)
@@ -241,8 +348,27 @@ def _load_res_currency(env) -> None:
         for name, symbol, rate in [("EUR", "€", 1.0), ("USD", "$", 1.1), ("GBP", "£", 0.86)]:
             Currency.create({"name": name, "symbol": symbol, "rate": rate})
         _logger.info("Created default res.currency records")
+        _load_res_currency_rates(env)
     except Exception as e:
         _logger.warning("Could not load default currencies: %s", e)
+
+
+def _load_res_currency_rates(env) -> None:
+    """Load default currency rates (Phase 96)."""
+    try:
+        from datetime import date
+        Rate = env.get("res.currency.rate")
+        Currency = env.get("res.currency")
+        if not Rate or not Currency or Rate.search([]):
+            return
+        today = date.today().isoformat()
+        for name, rate in [("EUR", 1.0), ("USD", 1.1), ("GBP", 0.86)]:
+            cur = Currency.search([("name", "=", name)], limit=1)
+            if cur and cur.ids:
+                Rate.create({"currency_id": cur.ids[0], "name": today, "rate": rate})
+        _logger.info("Created default res.currency.rate records")
+    except Exception as e:
+        _logger.warning("Could not load currency rates: %s", e)
 
 
 def _load_res_country(env) -> None:
@@ -327,6 +453,122 @@ def _load_res_company(env) -> None:
         _logger.warning("Could not load default company: %s", e)
 
 
+def _load_ir_translations(env) -> None:
+    """Load translations from .po files into ir.translation (Phase 94)."""
+    try:
+        Translation = env.get("ir.translation")
+        if not Translation or Translation.search([], limit=1):
+            return
+        from core.tools import config
+        from core.tools.translate import discover_po_files, load_po_file
+
+        paths = config.get_addons_paths()
+        if not paths:
+            return
+        addons_path = paths[0]
+        for module, lang, po_path in discover_po_files(addons_path):
+            for mod, l, src, val in load_po_file(po_path, module, lang):
+                if src and val:
+                    existing = Translation.search([["module", "=", mod], ["lang", "=", l], ["src", "=", src]], limit=1)
+                    if not existing:
+                        Translation.create({"module": mod, "lang": l, "src": src, "value": val, "type": "code"})
+        _logger.info("Loaded translations from .po files")
+    except Exception as e:
+        _logger.warning("Could not load translations: %s", e)
+
+
+def _load_dashboard_widgets(env) -> None:
+    """Load default dashboard widgets (Phase 93)."""
+    try:
+        Widget = env.get("ir.dashboard.widget")
+        CrmStage = env.get("crm.stage")
+        if not Widget:
+            return
+        if Widget.search([]):
+            return
+        won_ids = []
+        if CrmStage:
+            won_stages = CrmStage.search([("is_won", "=", True)])
+            won_ids = won_stages.ids if won_stages else []
+        domain_open = "[('stage_id','not in',%s)]" % won_ids if won_ids else "[]"
+        widgets = [
+            {"name": "Open Leads", "model": "crm.lead", "domain": domain_open, "aggregate": "count", "sequence": 1},
+            {"name": "Expected Revenue", "model": "crm.lead", "domain": "[]", "measure_field": "expected_revenue", "aggregate": "sum", "sequence": 2},
+            {"name": "My Activities", "model": "mail.activity", "domain": "[('user_id','=',uid)]", "aggregate": "count", "sequence": 3},
+        ]
+        for w in widgets:
+            Widget.create(w)
+        _logger.info("Created default dashboard widgets")
+    except Exception as e:
+        _logger.warning("Could not load dashboard widgets: %s", e)
+
+
+def _load_account_data(env) -> None:
+    """Load default chart of accounts and journals (Phase 118)."""
+    try:
+        Account = env.get("account.account")
+        Journal = env.get("account.journal")
+        if not Account or not Journal:
+            return
+        for code, name, acc_type in [
+            ("1000", "Receivable", "asset_receivable"),
+            ("2000", "Payable", "liability_payable"),
+            ("4000", "Sales", "income"),
+            ("6000", "Purchases", "expense"),
+            ("10000", "Bank", "asset_cash"),
+        ]:
+            if not Account.search([("code", "=", code)]):
+                Account.create({"code": code, "name": name, "account_type": acc_type})
+        if not Journal.search([("code", "=", "SALE")]):
+            Journal.create({"name": "Sales", "code": "SALE", "type": "sale"})
+        if not Journal.search([("code", "=", "PURCH")]):
+            Journal.create({"name": "Purchase", "code": "PURCH", "type": "purchase"})
+        if not Journal.search([("code", "=", "MISC")]):
+            Journal.create({"name": "Miscellaneous", "code": "MISC", "type": "general"})
+        _logger.info("Created default account accounts and journals")
+    except Exception as e:
+        _logger.warning("Could not load account data: %s", e)
+
+
+def _load_stock_data(env) -> None:
+    """Load default stock locations, warehouse, picking types (Phase 116)."""
+    try:
+        Location = env.get("stock.location")
+        Warehouse = env.get("stock.warehouse")
+        PickingType = env.get("stock.picking.type")
+        if not Location or not Warehouse or not PickingType:
+            return
+        if PickingType.search([("code", "=", "outgoing")]):
+            return  # already seeded
+        stock_loc = Location.create({"name": "Stock", "type": "internal"})
+        output_loc = Location.create({"name": "Output", "location_id": stock_loc.id, "type": "internal"})
+        supplier_loc = Location.create({"name": "Vendors", "type": "supplier"})
+        customer_loc = Location.create({"name": "Customers", "type": "customer"})
+        wh = Warehouse.create({
+            "name": "Main Warehouse",
+            "code": "WH",
+            "lot_stock_id": stock_loc.id,
+            "wh_output_stock_loc_id": output_loc.id,
+        })
+        PickingType.create({
+            "name": "Delivery Orders",
+            "code": "outgoing",
+            "warehouse_id": wh.id,
+            "default_location_src_id": stock_loc.id,
+            "default_location_dest_id": customer_loc.id,
+        })
+        PickingType.create({
+            "name": "Receipts",
+            "code": "incoming",
+            "warehouse_id": wh.id,
+            "default_location_src_id": supplier_loc.id,
+            "default_location_dest_id": stock_loc.id,
+        })
+        _logger.info("Created default stock locations and picking types")
+    except Exception as e:
+        _logger.warning("Could not load stock data: %s", e)
+
+
 def assign_admin_groups(env) -> None:
     """Assign base.group_user and company to admin user. Call after admin creation."""
     try:
@@ -340,7 +582,9 @@ def assign_admin_groups(env) -> None:
                 company = Company.search([])
                 updates = {}
                 if company and company.ids:
-                    updates["company_id"] = company.ids[0]
+                    cid = company.ids[0]
+                    updates["company_id"] = cid
+                    updates["company_ids"] = [(6, 0, [cid])]
                 if group_user and group_user.ids:
                     updates["group_ids"] = [(6, 0, group_user.ids)]
                 if updates:

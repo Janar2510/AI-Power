@@ -61,6 +61,17 @@ class Float(Field):
     column_type = "double precision"
 
 
+class Monetary(Field):
+    """Monetary field - stores amount, paired with currency_field (default currency_id)."""
+
+    type = "monetary"
+    column_type = "numeric"
+
+    def __init__(self, currency_field: str = "currency_id", string: str = "", **kwargs):
+        super().__init__(string=string, **kwargs)
+        self.currency_field = currency_field
+
+
 class Boolean(Field):
     """Boolean field."""
 
@@ -91,9 +102,16 @@ class Many2one(Field):
     type = "many2one"
     column_type = "integer"
 
-    def __init__(self, comodel: str = "", string: str = "", **kwargs):
+    def __init__(
+        self,
+        comodel: str = "",
+        string: str = "",
+        ondelete: str = "set null",
+        **kwargs,
+    ):
         super().__init__(string=string, **kwargs)
         self.comodel = comodel
+        self.ondelete = ondelete  # 'set null' or 'cascade'
 
 
 class Selection(Field):
@@ -128,12 +146,16 @@ class Computed(Field):
         self,
         compute: Optional[str] = None,
         store: bool = False,
+        depends: Optional[List[str]] = None,
+        inverse: Optional[Callable] = None,
         string: str = "",
         **kwargs,
     ):
         super().__init__(string=string, readonly=True, **kwargs)
         self.compute = compute or ""
         self.store = store
+        self.depends = depends or []
+        self.inverse = inverse
         self.column_type = "varchar" if store else None
 
 
@@ -142,6 +164,24 @@ class Binary(Field):
 
     type = "binary"
     column_type = "bytea"
+
+
+class Image(Field):
+    """Image field - extends Binary with max_width, max_height (Phase 103)."""
+
+    type = "image"
+    column_type = "bytea"
+
+    def __init__(
+        self,
+        max_width: Optional[int] = None,
+        max_height: Optional[int] = None,
+        string: str = "",
+        **kwargs,
+    ):
+        super().__init__(string=string, **kwargs)
+        self.max_width = max_width
+        self.max_height = max_height
 
 
 class Related(Field):

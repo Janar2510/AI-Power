@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.rule" id="mail_message_company">
+      <field name="name">mail.message company</field>
+      <field name="model_id">model_mail_message</field>
+      <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+    <record model="ir.rule" id="mail_activity_company">
+      <field name="name">mail.activity company</field>
+      <field name="model_id">model_mail_activity</field>
+      <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    </record>
+  </data>
+</odoo>

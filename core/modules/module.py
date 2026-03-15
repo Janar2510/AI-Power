@@ -117,28 +117,57 @@ def get_module_dependencies(module_name: str) -> List[str]:
     return manifest.get("depends", [])
 
 
+def expand_module_dependencies(module_names: List[str]) -> List[str]:
+    """Return module_names plus all discovered recursive dependencies."""
+    if not module_names:
+        return []
+    available = set(get_modules())
+    expanded: List[str] = []
+    seen: set = set()
+
+    def visit(name: str) -> None:
+        if name in seen or name not in available:
+            return
+        seen.add(name)
+        try:
+            deps = get_module_dependencies(name)
+        except Exception:
+            deps = []
+        for dep in deps:
+            visit(dep)
+        expanded.append(name)
+
+    for name in module_names:
+        visit(name)
+    return expanded
+
+
 def resolve_load_order(module_names: List[str]) -> List[str]:
     """Resolve dependencies and return load order (topological sort)."""
     if not module_names:
         return []
-
+    module_names = expand_module_dependencies(module_names)
     all_deps: Dict[str, List[str]] = {}
-    for name in module_names:
-        try:
-            all_deps[name] = get_module_dependencies(name)
-        except Exception:
-            all_deps[name] = []
-
+    visiting: set = set()
     result: List[str] = []
     visited: set = set()
 
     def visit(node: str) -> None:
         if node in visited:
             return
+        if node in visiting:
+            raise ValueError(f"Cyclic module dependency detected at {node}")
+        visiting.add(node)
+        if node not in all_deps:
+            try:
+                all_deps[node] = get_module_dependencies(node)
+            except Exception:
+                all_deps[node] = []
         visited.add(node)
         for dep in all_deps.get(node, []):
             if dep in module_names:
                 visit(dep)
+        visiting.discard(node)
         result.append(node)
 
     for name in module_names:

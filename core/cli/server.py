@@ -31,10 +31,33 @@ class Server(Command):
 
         http_port = config.get_config().get("http_port", 8069)
         http_interface = config.get_config().get("http_interface", "0.0.0.0")
+        gevent_websocket = config.get_config().get("gevent_websocket", False)
 
         app = Application()
-        _logger.info("HTTP service listening on %s:%s", http_interface, http_port)
 
+        if gevent_websocket:
+            try:
+                from gevent.pywsgi import WSGIServer
+                _logger.info(
+                    "HTTP + WebSocket (gevent) listening on %s:%s",
+                    http_interface,
+                    http_port,
+                )
+                server = WSGIServer((http_interface, http_port), app)
+                server.serve_forever()
+            except ImportError:
+                _logger.warning(
+                    "gevent not installed; falling back to Werkzeug (WebSocket will use longpolling). "
+                    "Install: pip install gevent"
+                )
+                self._run_werkzeug(http_interface, http_port, app)
+        else:
+            _logger.info("HTTP service listening on %s:%s", http_interface, http_port)
+            self._run_werkzeug(http_interface, http_port, app)
+
+    def _run_werkzeug(
+        self, http_interface: str, http_port: int, app: Application
+    ) -> None:
         from werkzeug.serving import run_simple
         run_simple(
             http_interface,

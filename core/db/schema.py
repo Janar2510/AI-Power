@@ -25,7 +25,7 @@ def _get_model_fields(model_class: Type[ModelBase]) -> Dict[str, fields.Field]:
 
 
 def _column_def(field: fields.Field) -> str:
-    """Get SQL column definition for a field."""
+    """Get SQL column definition for a field. Many2one uses INTEGER; FK constraints added separately."""
     col_type = getattr(field, "column_type", "varchar")
     if col_type == "varchar":
         size = getattr(field, "size", None)
@@ -46,6 +46,8 @@ def _column_def(field: fields.Field) -> str:
         return "INTEGER"
     if col_type == "bytea":
         return "BYTEA"
+    if col_type == "numeric":
+        return "NUMERIC(16,2)"
     return "VARCHAR(255)"
 
 
@@ -128,6 +130,48 @@ def create_many2many_table(cursor: Any, relation: str, column1: str, column2: st
     _logger.info("Created relation table %s", relation)
 
 
+def _apply_many2one_fk_constraints(cursor: Any, registry: Any) -> None:
+    """Add FK constraints for Many2one fields (Phase 100: ondelete)."""
+    for model_name, model_class in registry._models.items():
+        table = getattr(model_class, "_table", None)
+        if not table or not table_exists(cursor, table):
+            continue
+        for fname, field in _get_model_fields(model_class).items():
+            if not isinstance(field, fields.Many2one):
+                continue
+            comodel = getattr(field, "comodel", "")
+            if not comodel:
+                continue
+            ref_table = comodel.replace(".", "_")
+            if not table_exists(cursor, ref_table):
+                continue
+            constraint_name = f"{table}_{fname}_fkey"
+            cursor.execute(
+                "SELECT 1 FROM information_schema.table_constraints "
+                "WHERE constraint_name = %s AND table_schema = 'public'",
+                (constraint_name,),
+            )
+            if cursor.fetchone():
+                continue
+            ondelete = getattr(field, "ondelete", "set null")
+            od = "CASCADE" if ondelete == "cascade" else "SET NULL"
+            savepoint = f"fk_{table}_{fname}"
+            try:
+                cursor.execute(f"SAVEPOINT {savepoint}")
+                cursor.execute(
+                    f'ALTER TABLE "{table}" ADD CONSTRAINT "{constraint_name}" '
+                    f'FOREIGN KEY ("{fname}") REFERENCES "{ref_table}" (id) ON DELETE {od}'
+                )
+                cursor.execute(f"RELEASE SAVEPOINT {savepoint}")
+                _logger.info("Added FK %s.%s -> %s ON DELETE %s", table, fname, ref_table, od)
+            except Exception as e:
+                _logger.warning("Could not add FK %s.%s: %s", table, fname, e)
+                try:
+                    cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                except Exception:
+                    pass
+
+
 def _apply_sql_constraints(cursor: Any, model_class: Type[ModelBase]) -> None:
     """Create SQL constraints defined in model._sql_constraints."""
     constraints = getattr(model_class, "_sql_constraints", None)
@@ -171,5 +215,6 @@ def init_schema(cursor: Any, registry: Any) -> None:
             table2 = comodel.replace(".", "_") if comodel else "unknown"
             create_many2many_table(cursor, rel, col1, col2, table, table2)
     add_missing_columns(cursor, registry)
+    _apply_many2one_fk_constraints(cursor, registry)
     for model_name, model_class in registry._models.items():
         _apply_sql_constraints(cursor, model_class)

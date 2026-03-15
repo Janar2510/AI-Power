@@ -144,6 +144,153 @@ def index_record_for_rag(env, model: str, res_id: int) -> None:
         Chunk.create(vals)
 
 
+@_register("nl_search", "Search records by natural language query; returns domain and results")
+def nl_search(env, model: str, query: str, limit: int = 10, use_llm: bool = True) -> Dict[str, Any]:
+    """
+    Natural language search: convert query to ORM domain and return results.
+    When LLM enabled: uses LLM to convert NL to domain.
+    Fallback: ilike on name/description.
+    """
+    domain: List = []
+    if use_llm:
+        try:
+            domain = _nl_to_domain_llm(env, model, query)
+        except Exception:
+            domain = []
+    if not domain:
+        domain = _nl_to_domain_fallback(model, query)
+    try:
+        Model = env[model]
+    except KeyError:
+        return {"domain": domain, "results": []}
+    fields = ["id", "name"]
+    if model == "res.partner":
+        fields = ["id", "name", "email", "phone", "city"]
+    elif model == "crm.lead":
+        fields = ["id", "name", "stage_id", "expected_revenue", "description"]
+    records = Model.search_read(domain, fields or ["name", "id"], limit=limit)
+    return {"domain": domain, "results": records}
+
+
+def _nl_to_domain_fallback(model: str, query: str) -> List:
+    """Fallback: ilike on name and description."""
+    if not query or not str(query).strip():
+        return []
+    q = str(query).strip()
+    if model == "res.partner":
+        return ["|", ["name", "ilike", q], ["email", "ilike", q]]
+    if model == "crm.lead":
+        return ["|", ["name", "ilike", q], ["description", "ilike", q]]
+    return [["name", "ilike", q]]
+
+
+def _nl_to_domain_llm(env, model: str, query: str) -> List:
+    """Use LLM to convert natural language to ORM domain. Returns [] on failure."""
+    try:
+        from ..llm import _get_api_key
+        from ..controllers.ai_controller import _get_llm_config
+        cfg = _get_llm_config(env)
+        if (cfg.get("llm_enabled") or "0") != "1":
+            return []
+        key = _get_api_key(env)
+        if not key:
+            return []
+        from openai import OpenAI
+        client = OpenAI(api_key=key)
+        model_name = cfg.get("llm_model", "gpt-4o-mini")
+        prompt = f"""Convert this search query to an Odoo domain for model {model}.
+Query: "{query}"
+Return ONLY a JSON array. Examples:
+- "contacts named John" -> [["name","ilike","John"]]
+- "leads with revenue over 1000" -> [["expected_revenue",">",1000]]
+- "partners in Berlin" -> [["city","ilike","Berlin"]]
+Return only the JSON array, no other text."""
+        resp = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = (resp.choices[0].message.content or "").strip()
+        if not content:
+            return []
+        parsed = json.loads(content)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+
+@_register("extract_fields", "Extract structured fields from pasted text for a model (AI-assisted data entry)")
+def extract_fields(env, model: str, text: str, use_llm: bool = True) -> Dict[str, Any]:
+    """
+    Extract structured field values from pasted text (e.g. email signature, lead description).
+    When LLM enabled: uses OpenAI to extract name, email, phone, etc.
+    Fallback: simple regex for email/phone.
+    """
+    if not text or not str(text).strip():
+        return {"fields": {}, "error": None}
+    t = str(text).strip()
+    if use_llm:
+        try:
+            result = _extract_fields_llm(env, model, t)
+            if result:
+                return {"fields": result, "error": None}
+        except Exception:
+            pass
+    return {"fields": _extract_fields_fallback(model, t), "error": None}
+
+
+def _extract_fields_fallback(model: str, text: str) -> Dict[str, str]:
+    """Fallback: regex for email and phone."""
+    import re
+    result: Dict[str, str] = {}
+    email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text)
+    if email_match:
+        result["email"] = email_match.group(0)
+    phone_match = re.search(r"[\+]?[(]?[0-9]{2,4}[)]?[-\s\.]?[0-9]{2,4}[-\s\.]?[0-9]{2,6}", text)
+    if phone_match:
+        result["phone"] = phone_match.group(0).strip()
+    return result
+
+
+def _extract_fields_llm(env, model: str, text: str) -> Optional[Dict[str, Any]]:
+    """Use LLM to extract structured fields. Returns None on failure."""
+    try:
+        from ..llm import _get_api_key
+        from ..controllers.ai_controller import _get_llm_config
+        cfg = _get_llm_config(env)
+        if (cfg.get("llm_enabled") or "0") != "1":
+            return None
+        key = _get_api_key(env)
+        if not key:
+            return None
+        from openai import OpenAI
+        client = OpenAI(api_key=key)
+        model_name = cfg.get("llm_model", "gpt-4o-mini")
+        if model == "res.partner":
+            fields_desc = "name, email, phone, street, city, country, description"
+        elif model == "crm.lead":
+            fields_desc = "name, email, phone, description, expected_revenue (number)"
+        else:
+            fields_desc = "name, email, phone, description"
+        prompt = f"""Extract structured fields from this text for model {model}.
+Supported fields: {fields_desc}
+Return ONLY a JSON object with field names as keys and string values (or number for expected_revenue). Omit fields not found.
+Text:
+{text[:2000]}
+
+Return only the JSON object, no other text."""
+        resp = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        content = (resp.choices[0].message.content or "").strip()
+        if not content:
+            return None
+        parsed = json.loads(content)
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
 def retrieve_chunks(env, query: str, limit: int = 10) -> List[Dict]:
     """Retrieve document chunks by text search. Applies record rules: only returns chunks for records user can read."""
     if not query or not str(query).strip():

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="sale_order_search">
+      <field name="name">sale.order search</field>
+      <field name="model">sale.order</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="name"/>
+          <field name="partner_id"/>
+          <filter name="draft" string="Quotation" domain="[('state','=','draft')]"/>
+          <filter name="sale" string="Sales" domain="[('state','=','sale')]"/>
+        </search>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="sale_order_list">
+      <field name="name">sale.order list</field>
+      <field name="model">sale.order</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="date_order"/>
+          <field name="state"/>
+          <field name="amount_total"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="sale_order_form">
+      <field name="name">sale.order form</field>
+      <field name="model">sale.order</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="action_confirm" string="Confirm" type="object"/>
+            <button name="action_cancel" string="Cancel" type="object"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="date_order"/>
+            <field name="state"/>
+            <field name="currency_id" comodel="res.currency"/>
+            <field name="amount_total"/>
+            <field name="order_line">
+              <list>
+                <field name="product_id" comodel="product.product"/>
+                <field name="name"/>
+                <field name="product_uom_qty"/>
+                <field name="price_unit"/>
+                <field name="price_subtotal"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_sale_order">
+      <field name="name">Sales Orders</field>
+      <field name="res_model">sale.order</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Sales" id="menu_sale_root" sequence="15"/>
+    <menuitem name="Orders" id="menu_sale_order" action="sale.action_sale_order" parent="sale.menu_sale_root" sequence="10"/>
+    <menuitem name="Products" id="menu_product_product" action="sale.action_product_product" parent="sale.menu_sale_root" sequence="20"/>
+  </data>
+</odoo>

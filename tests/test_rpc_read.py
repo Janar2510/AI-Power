@@ -48,6 +48,21 @@ class TestRpcRead(unittest.TestCase):
         self.assertIn("name", row)
         self.assertIn("code", row)
 
+    def test_search_read_no_duplicate_fields_error(self):
+        """search_read with fields in both args and kwargs must not raise 'multiple values' (RPC fix)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        # Client sends args=[domain, fields] and kwargs={fields, limit} - RPC must deduplicate
+        result = _call_kw(1, self.db, "mail.activity", "search_read", [
+            [["user_id", "=", 1]],
+            ["res_model", "res_id", "summary", "date_deadline", "state"],
+        ], {
+            "fields": ["res_model", "res_id", "summary", "date_deadline", "state"],
+            "limit": 10,
+        })
+        self.assertIsInstance(result, list)
+        self.assertGreaterEqual(len(result), 0)
+
     def test_search_read_with_in_operator(self):
         """search_read with domain [('id','in',[1,2,3])] returns matching rows (Phase 38)."""
         if not self._has_db:
@@ -321,6 +336,22 @@ class TestRpcRead(unittest.TestCase):
             self.assertIn("expected_revenue", row)
             self.assertIsInstance(row["__count"], int)
 
+    def test_pivot_read_group_multi_groupby(self):
+        """read_group with lazy=False returns rows with multiple groupby dimensions (Phase 89)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        result = _call_kw(1, self.db, "crm.lead", "read_group", [[]], {
+            "fields": ["expected_revenue"],
+            "groupby": ["stage_id", "type"],
+            "lazy": False,
+        })
+        self.assertIsInstance(result, list)
+        for row in result:
+            self.assertIn("stage_id", row)
+            self.assertIn("type", row)
+            self.assertIn("expected_revenue", row)
+            self.assertIn("__count", row)
+
     def test_import_data_creates_records(self):
         """import_data creates records from fields and rows (Phase 86)."""
         if not self._has_db:
@@ -338,3 +369,165 @@ class TestRpcRead(unittest.TestCase):
         names = {r["name"] for r in rows}
         self.assertIn(name1, names)
         self.assertIn(name2, names)
+
+    def test_multi_company_record_rule(self):
+        """Create lead in company A, search as user with only company B returns empty (Phase 90)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        # Create company B
+        comp_b = _call_kw(1, self.db, "res.company", "create", [{"name": "Company B"}], {})
+        cid_b = comp_b.ids[0] if comp_b.ids else getattr(comp_b, "id", None)
+        if not cid_b:
+            self.skipTest("Could not create company B")
+        # Create user with only company B
+        user_b = _call_kw(1, self.db, "res.users", "create", [{
+            "name": "User B",
+            "login": "user_b_phase90",
+            "password": "x",
+            "company_id": cid_b,
+            "company_ids": [(6, 0, [cid_b])],
+        }], {})
+        uid_b = user_b.ids[0] if user_b.ids else getattr(user_b, "id", None)
+        if not uid_b:
+            self.skipTest("Could not create user B")
+        # Admin (uid=1) has company 1. Create lead with company_id=1
+        lead = _call_kw(1, self.db, "crm.lead", "create", [{
+            "name": "Lead in Company A",
+            "company_id": 1,
+        }], {})
+        lead_id = lead.ids[0] if lead.ids else getattr(lead, "id", None)
+        self.assertIsInstance(lead_id, int)
+        # User B (company B only) should NOT see this lead
+        rows = _call_kw(uid_b, self.db, "crm.lead", "search_read", [[["id", "=", lead_id]]], {"fields": ["id", "name"]})
+        self.assertEqual(len(rows), 0, "User with company B only must not see lead in company A")
+
+    def test_mail_send_with_mock(self):
+        """Post message with send_as_email creates mail.mail; mock SMTP (Phase 91)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        import unittest.mock as mock
+        partner = _call_kw(1, self.db, "res.partner", "create", [{"name": "EmailTestPartner", "email": "test@example.com"}], {})
+        partner_id = partner.ids[0] if partner.ids else getattr(partner, "id", None)
+        self.assertIsInstance(partner_id, int)
+        lead = _call_kw(1, self.db, "crm.lead", "create", [{"name": "EmailTestLead", "partner_id": partner_id}], {})
+        lead_id = lead.ids[0] if lead.ids else getattr(lead, "id", None)
+        self.assertIsInstance(lead_id, int)
+        with mock.patch("smtplib.SMTP") as mock_smtp:
+            mock_conn = mock.MagicMock()
+            mock_smtp.return_value = mock_conn
+            _call_kw(1, self.db, "crm.lead", "message_post", [[lead_id], "Test email body"], {"send_as_email": True})
+            mail_records = _call_kw(1, self.db, "mail.mail", "search_read", [[["res_model", "=", "crm.lead"], ["res_id", "=", lead_id]]], {"fields": ["id", "email_to", "state", "body_html"]})
+            self.assertGreater(len(mail_records), 0, "mail.mail should be created when send_as_email=True")
+            self.assertEqual(mail_records[0]["email_to"], "test@example.com")
+            self.assertEqual(mail_records[0]["state"], "outgoing")
+
+    def test_bus_sendone_and_poll(self):
+        """bus.bus.sendone creates record; search_read returns it (Phase 92)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        rec = _call_kw(1, self.db, "bus.bus", "create", [{"channel": "test_channel", "message": '{"foo":"bar"}'}], {})
+        rec_id = rec.ids[0] if rec.ids else getattr(rec, "id", None)
+        self.assertIsInstance(rec_id, int)
+        rows = _call_kw(1, self.db, "bus.bus", "search_read", [[["channel", "=", "test_channel"], ["id", ">", 0]]], {"fields": ["id", "channel", "message"], "limit": 5})
+        self.assertGreater(len(rows), 0)
+        self.assertEqual(rows[0]["channel"], "test_channel")
+        import json
+        msg = json.loads(rows[0].get("message") or "{}")
+        self.assertEqual(msg.get("foo"), "bar")
+
+    def test_dashboard_widget_get_data(self):
+        """ir.dashboard.widget get_data returns id, name, value, trend (Phase 93)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        widgets = _call_kw(1, self.db, "ir.dashboard.widget", "search_read", [[]], {"fields": ["id"], "limit": 5})
+        if not widgets:
+            self.skipTest("No dashboard widgets; run: ./erp-bin db init -d _test_rpc_read")
+        ids = [w["id"] for w in widgets]
+        data = _call_kw(1, self.db, "ir.dashboard.widget", "get_data", [ids], {})
+        self.assertIsInstance(data, list)
+        self.assertEqual(len(data), len(ids))
+        for d in data:
+            self.assertIn("id", d)
+            self.assertIn("name", d)
+            self.assertIn("value", d)
+            self.assertIn("trend", d)
+
+    def test_i18n_translation_lookup(self):
+        """ir.translation + _() returns translated string (Phase 94)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        from core.tools.translate import _, _set_lang, load_translations_from_db
+        from core.orm import Environment, Registry
+        from core.sql_db import get_cursor
+
+        _call_kw(1, self.db, "ir.translation", "create", [{
+            "module": "base",
+            "lang": "et_EE",
+            "src": "Contacts",
+            "value": "Kontaktid",
+            "type": "code",
+        }], {})
+        from core.http.auth import _get_registry
+        reg = _get_registry(self.db)
+        with get_cursor(self.db) as cr:
+            env = Environment(reg, cr=cr, uid=1)
+            reg.set_env(env)
+            _set_lang("et_EE")
+            load_translations_from_db(env)
+            result = _("Contacts")
+        self.assertEqual(result, "Kontaktid")
+
+    def test_monetary_field_currency_convert(self):
+        """Monetary field stores amount; res.currency._convert converts between currencies (Phase 96)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        currencies = _call_kw(1, self.db, "res.currency", "search_read", [[]], {"fields": ["id", "name", "rate"], "limit": 5})
+        eur = next((c for c in currencies if c.get("name") == "EUR"), None)
+        usd = next((c for c in currencies if c.get("name") == "USD"), None)
+        if not eur or not usd:
+            self.skipTest("EUR/USD currencies not found; run: ./erp-bin db init -d _test_rpc_read")
+        eur_id, usd_id = eur["id"], usd["id"]
+        lead = _call_kw(1, self.db, "crm.lead", "create", [{
+            "name": "Monetary test lead",
+            "type": "opportunity",
+            "currency_id": eur_id,
+            "expected_revenue": 1000.50,
+        }], {})
+        lead_id = lead.ids[0] if lead.ids else getattr(lead, "id", None)
+        self.assertIsInstance(lead_id, int)
+        rows = _call_kw(1, self.db, "crm.lead", "search_read", [[["id", "=", lead_id]]], {"fields": ["expected_revenue", "currency_id"]})
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["expected_revenue"], 1000.50)
+        self.assertEqual(rows[0]["currency_id"], eur_id)
+        converted = _call_kw(1, self.db, "res.currency", "_convert", [[eur_id], 100.0, usd_id], {})
+        self.assertIsInstance(converted, (int, float))
+        self.assertGreater(converted, 0, "_convert must return positive amount")
+
+    def test_signup_creates_portal_user(self):
+        """POST to /web/signup creates portal user with base.group_portal (Phase 98)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        from werkzeug.test import Client
+        from core.http import Application
+        app = Application()
+        client = Client(app)
+        r = client.post(
+            "/web/signup",
+            data={
+                "name": "Portal Test User",
+                "email": "portal@test.example",
+                "login": "portal_test_" + str(__import__("time").time()).replace(".", ""),
+                "password": "testpass123",
+                "db": self.db,
+            },
+        )
+        self.assertEqual(r.status_code, 200, "Signup should succeed")
+        self.assertIn(b"Account created", r.data)
+        users = _call_kw(1, self.db, "res.users", "search_read", [[["login", "=like", "portal_test_%"]]], {"fields": ["id", "login", "partner_id"], "limit": 5})
+        self.assertGreater(len(users), 0, "Portal user should exist")
+        user = users[0]
+        groups = _call_kw(1, self.db, "res.groups", "search_read", [[["full_name", "=", "base.group_portal"]]], {"fields": ["id"]})
+        self.assertGreater(len(groups), 0)
+        gids = _call_kw(1, self.db, "res.users", "read", [[user["id"]], ["group_ids"]], {})
+        self.assertGreater(len(gids), 0)
+        self.assertIn(groups[0]["id"], gids[0].get("group_ids", []), "User should have group_portal")

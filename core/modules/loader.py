@@ -13,6 +13,13 @@ from .module import get_manifest, get_module_path, get_modules, resolve_load_ord
 _logger = logging.getLogger("erp.modules")
 
 
+def clear_loaded_addon_modules() -> None:
+    """Clear cached addon packages so models register against the current registry."""
+    to_clear = [name for name in list(sys.modules) if name.startswith("addons.")]
+    for name in to_clear:
+        del sys.modules[name]
+
+
 def _ensure_addons_on_path() -> None:
     """Ensure project root (addons parent) is on sys.path."""
     from core.tools import config

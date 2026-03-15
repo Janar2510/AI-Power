@@ -35,3 +35,8 @@ class TestModules(unittest.TestCase):
     def test_resolve_load_order(self):
         order = resolve_load_order(["demo_module", "base"])
         self.assertLess(order.index("base"), order.index("demo_module"))
+
+    def test_resolve_load_order_expands_missing_dependencies(self):
+        order = resolve_load_order(["my_module"])
+        self.assertIn("base", order)
+        self.assertLess(order.index("base"), order.index("my_module"))

@@ -7,7 +7,7 @@ from core.db import init_schema
 from core.db.init_data import load_default_data, assign_admin_groups
 from core.orm import Registry, Environment
 from core.orm.models import ModelBase
-from core.modules import load_module_graph
+from core.modules import clear_loaded_addon_modules, load_module_graph
 from core.tools import config
 from core.http.auth import hash_password
 
@@ -21,10 +21,11 @@ class Db(Command):
         parser = self.parser
         parser.add_argument(
             "action",
-            choices=["create", "init", "list", "drop"],
-            help="create, init, list, or drop database",
+            choices=["create", "init", "list", "drop", "upgrade"],
+            help="create, init, list, drop, or upgrade database",
         )
         parser.add_argument("-d", "--database", help="Database name")
+        parser.add_argument("-m", "--module", help="Module(s) to upgrade (comma-separated)")
 
         parsed = parser.parse_args(args)
         dbname = parsed.database or config.get_config().get("db_name", "erp")
@@ -37,6 +38,8 @@ class Db(Command):
             self._list()
         elif parsed.action == "drop":
             self._drop(dbname)
+        elif parsed.action == "upgrade":
+            self._upgrade(dbname, parsed.module)
 
     def _create(self, dbname: str) -> None:
         """Create database."""
@@ -54,6 +57,7 @@ class Db(Command):
             print(f"Database {dbname} created.")
         registry = Registry(dbname)
         ModelBase._registry = registry
+        clear_loaded_addon_modules()
         load_module_graph()
         with get_cursor(dbname) as cr:
             init_schema(cr, registry)
@@ -108,3 +112,18 @@ class Db(Command):
         cur.close()
         conn.close()
         print(f"Database {dbname} dropped.")
+
+    def _upgrade(self, dbname: str, module_arg: str = None) -> None:
+        """Run migrations for module(s). Phase 102."""
+        if not db_exists(dbname):
+            print(f"Database {dbname} does not exist.")
+            return
+        config.parse_config(["--addons-path=addons"])
+        module_names = None
+        if module_arg:
+            module_names = [m.strip() for m in module_arg.split(",") if m.strip()]
+        from core.upgrade import run_upgrade
+        with get_cursor(dbname) as cr:
+            run_upgrade(cr, dbname, module_names)
+            cr.connection.commit()
+        print(f"Database {dbname} upgraded.")

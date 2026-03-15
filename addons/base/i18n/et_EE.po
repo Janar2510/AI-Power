@@ -1,0 +1,16 @@
+# Base module - Estonian
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Contacts"
+msgstr "Kontaktid"
+
+msgid "Leads"
+msgstr "Müügivihjed"
+
+msgid "Settings"
+msgstr "Seaded"
+
+msgid "Home"
+msgstr "Avaleht"

@@ -1,12 +1,18 @@
-"""Minimal product model for sale orders (Phase 112)."""
+"""Product variant model (Phase 112, 155). Inherits from product.template."""
 
 from core.orm import Model, fields
 
 
 class ProductProduct(Model):
     _name = "product.product"
-    _description = "Product"
+    _description = "Product Variant"
+    _inherits = {"product.template": "product_template_id"}
 
-    name = fields.Char(required=True)
-    list_price = fields.Float(string="Sales Price", default=0.0)
-    categ_id = fields.Many2one("product.category", string="Category")
+    product_template_id = fields.Many2one("product.template", string="Template", required=True, ondelete="cascade")
+    attribute_value_ids = fields.Many2many(
+        "product.attribute.value",
+        "product_product_attribute_value_rel",
+        "product_id",
+        "value_id",
+        string="Variant Values",
+    )

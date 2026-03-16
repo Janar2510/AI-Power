@@ -36,6 +36,11 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
         names = {r["id"]: r.get("name") for r in Partner.browse(partner_ids).read(["id", "name"])}
         return [names.get(r.get("partner_id")) if r.get("partner_id") else None for r in rows]
     stage_id = fields.Many2one("crm.stage", string="Stage")
+    priority = fields.Selection(
+        selection=[("0", "Low"), ("1", "Normal"), ("2", "High"), ("3", "Urgent")],
+        string="Priority",
+        default="1",
+    )
     date_deadline = fields.Date(string="Deadline")
     currency_id = fields.Many2one("res.currency", string="Currency")
     expected_revenue = fields.Monetary(currency_field="currency_id", string="Expected Revenue")

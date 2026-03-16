@@ -60,6 +60,7 @@
         <kanban default_group_by="stage_id">
           <field name="name"/>
           <field name="stage_id"/>
+          <field name="priority" widget="priority"/>
           <field name="expected_revenue"/>
           <templates>
             <t t-name="kanban-box">

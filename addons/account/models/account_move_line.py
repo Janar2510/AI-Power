@@ -12,4 +12,6 @@ class AccountMoveLine(Model):
     name = fields.Char(string="Label")
     debit = fields.Float(string="Debit", default=0.0)
     credit = fields.Float(string="Credit", default=0.0)
+    amount_currency = fields.Float(string="Amount Currency", default=0.0)
+    currency_id = fields.Many2one("res.currency", string="Currency")
     partner_id = fields.Many2one("res.partner", string="Partner")

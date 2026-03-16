@@ -116,6 +116,55 @@
 - [ ] Settings > Technical > Sequences (ir.sequence list/form)
 - [ ] tests/test_server_actions_phase119.py passes
 
+## Phase 157 (Portal Signup + Invoice Portal)
+
+- [ ] /web/signup creates portal users (Phase 98)
+- [ ] /my/invoices lists customer invoices for portal user's partner
+- [ ] /my/invoices/<id> detail + PDF download
+- [ ] Portal record rule: account.move (out_invoice, partner_id)
+- [ ] tests/test_portal_signup_phase157.py passes
+
+## Phase 155 (Product Variants)
+
+- [ ] product.template, product.attribute, product.attribute.value, product.template.attribute.line
+- [ ] product.product _inherits product.template; attribute_value_ids for variant values
+- [ ] Shop product detail shows variant selector when template has attribute lines
+- [ ] tests/test_product_variant_phase155.py passes
+
+## Phase 154 (Multi-Currency Conversion)
+
+- [ ] res.currency.convert(amount, from_id, to_id, date) uses res.currency.rate
+- [ ] sale.order, purchase.order have currency_id (default from company)
+- [ ] purchase.order.amount_total computed from order_line (stored)
+- [ ] account.move/account.move.line: currency_id, amount_currency for multi-currency invoices
+- [ ] tests/test_currency_phase154.py passes
+
+## Phase 161 (Expense Module)
+
+- [ ] addons/hr_expense loaded (depends: base, hr, account)
+- [ ] hr.expense, hr.expense.sheet models; workflow: draft → submit → approve → done
+- [ ] action_done creates account.move (expense debit, payable credit)
+- [ ] ir.sequence hr.expense.sheet seeded on db init
+- [ ] tests/test_hr_expense_phase161.py passes
+
+## Phase 160 (Advanced Form Widgets)
+
+- [ ] priority (stars), progressbar, phone, email, url widgets in form/list
+- [ ] crm.lead.priority, project.task.priority/progress, res.partner.mobile/website
+- [ ] tests/test_widgets_phase160.py passes
+
+## Phase 159 (Webhooks)
+
+- [ ] ir.webhook model (model_name, trigger, url, secret); ir.webhook.log
+- [ ] run_webhooks on create/write/unlink; HMAC-SHA256 in X-Webhook-Signature
+- [ ] tests/test_webhook_phase159.py passes
+
+## Phase 158 (Gantt View)
+
+- [ ] Gantt view for project.task (date_start, date_deadline) and mrp.production (date_start, date_finished)
+- [ ] loadGanttData, renderGanttView in main.js
+- [ ] tests/test_gantt_phase158.py passes
+
 ## Phase 153 (MRP Manufacturing)
 
 - [ ] addons/mrp loaded (depends: base, stock, sale)

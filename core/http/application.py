@@ -45,6 +45,10 @@ def _load_routes():
         import addons.website.controllers  # noqa: F401 - registers /website, /my, /my/leads, /my/profile
     except ImportError:
         pass
+    try:
+        import addons.payment.controllers  # noqa: F401 - registers /payment/process, /payment/status, /payment/callback
+    except ImportError:
+        pass
 
 _logger = logging.getLogger("erp.http")
 

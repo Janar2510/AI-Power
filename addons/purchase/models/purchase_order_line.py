@@ -1,6 +1,6 @@
-"""Purchase order line (Phase 117)."""
+"""Purchase order line (Phase 117, 154)."""
 
-from core.orm import Model, fields
+from core.orm import Model, api, fields
 
 
 class PurchaseOrderLine(Model):
@@ -12,3 +12,11 @@ class PurchaseOrderLine(Model):
     name = fields.Char(string="Description")
     product_qty = fields.Float(string="Quantity", default=1.0)
     price_unit = fields.Float(string="Unit Price", default=0.0)
+    price_subtotal = fields.Computed(compute="_compute_price_subtotal", string="Subtotal")
+
+    @api.depends("product_qty", "price_unit")
+    def _compute_price_subtotal(self):
+        if not self:
+            return []
+        rows = self.read(["product_qty", "price_unit"])
+        return [r.get("product_qty", 0) * r.get("price_unit", 0) for r in rows]

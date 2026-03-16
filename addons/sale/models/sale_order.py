@@ -11,11 +11,22 @@ class SaleOrder(Model):
 
     @classmethod
     def create(cls, vals):
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
         if vals.get("name") == "New" or not vals.get("name"):
-            env = getattr(cls._registry, "_env", None) if cls._registry else None
             IrSequence = env.get("ir.sequence") if env else None
             next_val = IrSequence.next_by_code("sale.order") if IrSequence else None
             vals = dict(vals, name=f"SO/{next_val:05d}" if next_val is not None else "New")
+        if env and ("currency_id" not in vals or not vals.get("currency_id")):
+            Company = env.get("res.company")
+            if Company:
+                companies = Company.search([], limit=1)
+                if companies.ids:
+                    cdata = Company.browse(companies.ids[0]).read(["currency_id"])[0]
+                    cid = cdata.get("currency_id")
+                    if isinstance(cid, (list, tuple)) and cid:
+                        cid = cid[0]
+                    if cid:
+                        vals = dict(vals, currency_id=cid)
         return super().create(vals)
     partner_id = fields.Many2one("res.partner", string="Customer", required=True)
     date_order = fields.Datetime(string="Order Date", default=lambda self: self._default_date_order())
@@ -28,7 +39,7 @@ class SaleOrder(Model):
         string="Status",
         default="draft",
     )
-    currency_id = fields.Many2one("res.currency", string="Currency")
+    currency_id = fields.Many2one("res.currency", string="Currency")  # Defaults from company (Phase 154)
     amount_total = fields.Computed(compute="_compute_amount_total", string="Total")
     order_line = fields.One2many(
         "sale.order.line",

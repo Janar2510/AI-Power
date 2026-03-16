@@ -19,6 +19,7 @@ class AccountMove(Model):
         return super().create(vals)
     journal_id = fields.Many2one("account.journal", string="Journal", required=True)
     partner_id = fields.Many2one("res.partner", string="Partner")
+    currency_id = fields.Many2one("res.currency", string="Currency")
     state = fields.Selection(
         selection=[
             ("draft", "Draft"),

@@ -1,6 +1,6 @@
-"""Purchase order (Phase 117)."""
+"""Purchase order (Phase 117, 154)."""
 
-from core.orm import Model, fields
+from core.orm import Model, api, fields
 
 
 class PurchaseOrder(Model):
@@ -18,6 +18,8 @@ class PurchaseOrder(Model):
             vals = dict(vals, name=f"PO/{next_val:05d}" if next_val is not None else "New")
         return super().create(vals)
     partner_id = fields.Many2one("res.partner", string="Vendor", required=True)
+    currency_id = fields.Many2one("res.currency", string="Currency")
+    amount_total = fields.Computed(compute="_compute_amount_total", store=True, string="Total")
     state = fields.Selection(
         selection=[
             ("draft", "Draft"),
@@ -32,6 +34,41 @@ class PurchaseOrder(Model):
         "order_id",
         string="Order Lines",
     )
+
+    @api.depends("order_line.product_qty", "order_line.price_unit")
+    def _compute_amount_total(self):
+        if not self:
+            return []
+        result = []
+        for rec in self:
+            lines = rec.order_line
+            if not lines:
+                result.append(0.0)
+                continue
+            rows = lines.read(["product_qty", "price_unit"])
+            total = sum(r.get("product_qty", 0) * r.get("price_unit", 0) for r in rows)
+            result.append(total)
+        return result
+
+    @classmethod
+    def create(cls, vals):
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if vals.get("name") == "New" or not vals.get("name"):
+            IrSequence = env.get("ir.sequence") if env else None
+            next_val = IrSequence.next_by_code("purchase.order") if IrSequence else None
+            vals = dict(vals, name=f"PO/{next_val:05d}" if next_val is not None else "New")
+        if env and ("currency_id" not in vals or not vals.get("currency_id")):
+            Company = env.get("res.company")
+            if Company:
+                companies = Company.search([], limit=1)
+                if companies.ids:
+                    cdata = Company.browse(companies.ids[0]).read(["currency_id"])[0]
+                    cid = cdata.get("currency_id")
+                    if isinstance(cid, (list, tuple)) and cid:
+                        cid = cid[0]
+                    if cid:
+                        vals = dict(vals, currency_id=cid)
+        return super().create(vals)
 
     def button_confirm(self):
         """Confirm order and create incoming stock.picking."""

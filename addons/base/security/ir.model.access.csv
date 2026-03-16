@@ -23,6 +23,8 @@ access_ir_actions_act_url,access_ir_actions_act_url,model_ir_actions_act_url,,1,
 access_ir_actions_report,access_ir_actions_report,model_ir_actions_report,,1,1,1,1
 access_ir_actions_server,access_ir_actions_server,model_ir_actions_server,,1,1,1,1
 access_base_automation,access_base_automation,model_base_automation,,1,1,1,1
+access_ir_webhook,access_ir_webhook,model_ir_webhook,,1,1,1,1
+access_ir_webhook_log,access_ir_webhook_log,model_ir_webhook_log,,1,1,1,1
 access_ir_rule,access_ir_rule,model_ir_rule,,1,1,1,1
 access_ir_module_module,access_ir_module_module,model_ir_module_module,,1,1,1,1
 access_ir_ui_menu,access_ir_ui_menu,model_ir_ui_menu,,1,1,1,1

@@ -23,6 +23,8 @@ class MrpProduction(Model):
         default="draft",
         readonly=True,
     )
+    date_start = fields.Datetime(string="Start Date")
+    date_finished = fields.Datetime(string="Finished Date")
     move_ids = fields.One2many("stock.move", "production_id", string="Moves")
 
     @classmethod

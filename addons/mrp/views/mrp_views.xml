@@ -33,6 +33,13 @@
         </form>
       </field>
     </record>
+    <record model="ir.ui.view" id="mrp_production_gantt">
+      <field name="name">mrp.production gantt</field>
+      <field name="model">mrp.production</field>
+      <field name="arch" type="xml">
+        <gantt date_start="date_start" date_stop="date_finished" default_group_by="state"/>
+      </field>
+    </record>
     <record model="ir.ui.view" id="mrp_production_list">
       <field name="name">mrp.production list</field>
       <field name="model">mrp.production</field>
@@ -62,6 +69,8 @@
             <field name="bom_id" comodel="mrp.bom"/>
             <field name="product_qty"/>
             <field name="state"/>
+            <field name="date_start"/>
+            <field name="date_finished"/>
             <field name="move_ids">
               <list>
                 <field name="product_id" comodel="product.product"/>
@@ -104,7 +113,7 @@
     <record model="ir.actions.act_window" id="action_mrp_production">
       <field name="name">Manufacturing Orders</field>
       <field name="res_model">mrp.production</field>
-      <field name="view_mode">list,form</field>
+      <field name="view_mode">gantt,list,form</field>
     </record>
     <record model="ir.actions.act_window" id="action_mrp_bom">
       <field name="name">Bills of Materials</field>

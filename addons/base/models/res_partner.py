@@ -16,6 +16,8 @@ class ResPartner(Model):
     )
     email = fields.Char()
     phone = fields.Char()
+    mobile = fields.Char()
+    website = fields.Char(string="Website URL")
     street = fields.Char()
     street2 = fields.Char(string="Street 2")
     city = fields.Char()

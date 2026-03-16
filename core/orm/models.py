@@ -12,8 +12,9 @@ def _trigger_dependant_recompute(
     written_ids: List[int],
     changed_fields: List[str],
 ) -> None:
-    """Phase 100: When written_model's changed_fields are updated, recompute stored computed/related
-    on other models that depend on them (e.g. partner_id.name -> crm.lead.partner_name)."""
+    """Phase 100/154: When written_model's changed_fields are updated, recompute stored computed/related
+    on other models that depend on them. Supports Many2one (e.g. partner_id.name) and One2many
+    (e.g. order_line.product_qty -> purchase.order.amount_total)."""
     from core.orm import fields as fmod
     changed_set = set(changed_fields)
     if not changed_set or not written_ids:
@@ -48,14 +49,32 @@ def _trigger_dependant_recompute(
                 if comodel_field not in changed_set:
                     continue
                 rel_obj = getattr(Other, rel_field, None)
-                if not isinstance(rel_obj, fmod.Many2one):
+                if isinstance(rel_obj, fmod.Many2one) and getattr(rel_obj, "comodel", "") == written_model:
+                    parent_ids = written_ids  # written records reference parent via rel_field
+                    recs = Other.search([(rel_field, "in", written_ids)])
+                elif isinstance(rel_obj, fmod.One2many) and getattr(rel_obj, "comodel", "") == written_model:
+                    inv_name = getattr(rel_obj, "inverse_name", "")
+                    if not inv_name:
+                        continue
+                    Written = env.get(written_model)
+                    if not Written:
+                        continue
+                    rows = Written.browse(written_ids).read([inv_name])
+                    parent_ids = []
+                    for r in rows:
+                        v = r.get(inv_name)
+                        if isinstance(v, (list, tuple)) and v:
+                            parent_ids.append(v[0])
+                        elif isinstance(v, int):
+                            parent_ids.append(v)
+                    if not parent_ids:
+                        continue
+                    recs = Other.search([("id", "in", parent_ids)])
+                else:
                     continue
-                if getattr(rel_obj, "comodel", "") != written_model:
+                if not recs or not recs._ids:
                     continue
                 try:
-                    recs = Other.search([(rel_field, "in", written_ids)])
-                    if not recs or not recs._ids:
-                        continue
                     computed_list = recs._model._compute_stored_values(recs)
                     related_list = recs._model._compute_related_values(recs)
                     computed_stored = set(recs._model._get_stored_computed_fields())
@@ -425,6 +444,52 @@ class ModelBase(metaclass=Model):
         """Get cursor from env if available."""
         env = getattr(self._registry, "_env", None) if self._registry else None
         return env.cr if env and hasattr(env, "cr") else None
+
+    def __getattribute__(self, name: str) -> Any:
+        """Phase 154: Resolve One2many/Many2many to recordset when accessing from a record."""
+        from core.orm import fields as fmod
+        # Avoid recursion: use object.__getattribute__ for internal attrs
+        if name.startswith("_") or name in ("env", "ids", "id", "_model"):
+            return object.__getattribute__(self, name)
+        field = getattr(object.__getattribute__(self, "_model"), name, None)
+        if isinstance(field, fmod.One2many):
+            inv_name = getattr(field, "inverse_name", "")
+            comodel = getattr(field, "comodel", "")
+            ids = object.__getattribute__(self, "_ids")
+            if comodel and inv_name and ids:
+                env = getattr(self, "env", None)
+                Comodel = env.get(comodel) if env else None
+                if Comodel:
+                    domain = [(inv_name, "=", ids[0])]
+                    extra = getattr(field, "domain", None)
+                    if extra:
+                        d = extra(object.__getattribute__(self, "_model")) if callable(extra) else (extra or [])
+                        domain = d + domain
+                    recs = Comodel.search(domain)
+                    return Recordset(Comodel, recs.ids if hasattr(recs, "ids") else recs._ids, _env=env)
+            env = getattr(self, "env", None)
+            Comodel = env.get(comodel) if env and comodel else None
+            return Recordset(Comodel, [], _env=env) if Comodel else Recordset(object.__getattribute__(self, "_model"), [], _env=env)
+        if isinstance(field, fmod.Many2many):
+            rel = getattr(field, "relation", "")
+            col1 = getattr(field, "column1", "left_id")
+            col2 = getattr(field, "column2", "right_id")
+            ids = object.__getattribute__(self, "_ids")
+            if rel and ids:
+                env = getattr(self, "env", None)
+                cr = env.cr if env and hasattr(env, "cr") else None
+                Comodel = env.get(getattr(field, "comodel", "")) if env else None
+                if cr and Comodel:
+                    try:
+                        cr.execute(f'SELECT "{col2}" FROM "{rel}" WHERE "{col1}" = %s', (ids[0],))
+                        row_ids = [r[col2] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
+                        return Recordset(Comodel, row_ids, _env=env)
+                    except Exception:
+                        pass
+            env = getattr(self, "env", None)
+            Comodel = env.get(getattr(field, "comodel", "")) if env else None
+            return Recordset(Comodel, [], _env=env) if Comodel else Recordset(object.__getattribute__(self, "_model"), [], _env=env)
+        return object.__getattribute__(self, name)
 
     def _get_stored_columns(self) -> List[str]:
         """Return field names that have a DB column (excludes One2many, Many2many)."""
@@ -805,6 +870,12 @@ class ModelBase(metaclass=Model):
         if env and self._ids and vals:
             from core.orm.automation import run_base_automation
             run_base_automation(env, "on_write", self._model._name, self._ids, vals)
+            try:
+                from addons.base.models import ir_webhook
+                if hasattr(ir_webhook, "run_webhooks"):
+                    ir_webhook.run_webhooks(env, "on_write", self._model._name, self._ids, vals)
+            except Exception:
+                pass
         return True
 
     @classmethod
@@ -1011,6 +1082,11 @@ class ModelBase(metaclass=Model):
         from core.orm.api import ValidationError
         vals = cls._sanitize_html_vals(vals)
         vals = cls._decode_binary_vals(vals)
+        # Merge default values for stored fields not in vals (Phase 161)
+        defaults = cls.default_get(list(cls._get_stored_field_names()), getattr(cls._registry, "_context", None))
+        for k, v in defaults.items():
+            if k not in vals and v is not None:
+                vals[k] = v
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
@@ -1107,6 +1183,16 @@ class ModelBase(metaclass=Model):
         if env:
             from core.orm.automation import run_base_automation
             run_base_automation(env, "on_create", cls._name, [new_id], vals)
+            try:
+                from addons.base.models import ir_webhook
+                if hasattr(ir_webhook, "run_webhooks"):
+                    ir_webhook.run_webhooks(env, "on_create", cls._name, [new_id], vals)
+            except Exception:
+                pass
+        # Phase 154: trigger dependant recompute for parent models (e.g. order_line.product_qty)
+        registry = getattr(cls, "_registry", None)
+        if registry and env and env.cr and vals_stored:
+            _trigger_dependant_recompute(registry, cls._name, [new_id], list(vals_stored.keys()))
         return new_rec
 
     def _unlink_impl(self) -> bool:
@@ -1149,6 +1235,12 @@ class ModelBase(metaclass=Model):
         if env and self._ids:
             from core.orm.automation import run_base_automation
             run_base_automation(env, "on_unlink", self._model._name, self._ids)
+            try:
+                from addons.base.models import ir_webhook
+                if hasattr(ir_webhook, "run_webhooks"):
+                    ir_webhook.run_webhooks(env, "on_unlink", self._model._name, self._ids)
+            except Exception:
+                pass
         table = self._model._table
         placeholders = ", ".join("%s" for _ in self._ids)
         cr.execute(f'DELETE FROM "{table}" WHERE id IN ({placeholders})', self._ids)

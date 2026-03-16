@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.52.0 (Phases 154–161: Multi-Currency, Variants, Payment, Portal, Gantt, Webhooks, Widgets, Expenses)
+
+### Phase 161: Expense module
+- addons/hr_expense/: new addon (hr.expense, hr.expense.sheet)
+- Workflow: draft → submit → approve → done; action_done creates account.move
+- core/db/init_data.py: ir.sequence hr.expense.sheet; hr_expense in DEFAULT_SERVER_WIDE_MODULES
+- core/orm/models.py: create() merges default_get for stored fields (Phase 161)
+- tests/test_hr_expense_phase161.py
+
+### Phase 160: Advanced form widgets
+- addons/web/static/src/main.js: priority, progressbar, phone, email, url widgets in renderFieldHtml
+- crm.lead: priority Selection; project.task: priority, progress; res.partner: mobile, website
+- tests/test_widgets_phase160.py
+
+### Phase 159: Webhooks + event bus
+- addons/base/models/ir_webhook.py: ir.webhook, ir.webhook.log
+- core/orm/models.py: run_webhooks on create/write/unlink; HMAC-SHA256; async delivery
+- tests/test_webhook_phase159.py
+
+### Phase 158: Gantt view
+- addons/web/static/src/main.js: loadGanttData, renderGanttView (date_start/date_end bars)
+- project.task: date_start; mrp.production: date_start, date_finished
+- project_views.xml, mrp_views.xml: gantt view definitions
+- tests/test_gantt_phase158.py
+
+### Phase 157: Portal signup + invoice portal
+- core/orm/security.py: portal record rule for account.move (out_invoice, partner_id)
+- addons/website/controllers/website.py: /my/invoices, /my/invoices/<id>, PDF download link
+- Portal nav: My Invoices link
+- tests/test_portal_signup_phase157.py
+
+### Phase 156: Payment integration
+- addons/payment/: new addon (payment.provider, payment.transaction)
+- Demo and manual providers; checkout form payment selector
+- /payment/process, /payment/status/<ref>, /payment/callback
+- core/db/init_data.py: _load_payment_providers
+- tests/test_payment_phase156.py
+
+### Phase 155: Product variants
+- addons/sale/models/product_template.py: product.template (name, list_price, categ_id, attribute_line_ids)
+- addons/sale/models/product_attribute.py: product.attribute, product.attribute.value, product.template.attribute.line
+- addons/sale/models/product_product.py: _inherits product.template, attribute_value_ids Many2many
+- addons/website/controllers/website.py: variant selector on /shop/product/<id> when template has attributes
+- tests/test_product_variant_phase155.py
+
+### Phase 154: Multi-currency conversion
+- addons/base/models/res_currency.py: `convert(amount, from_currency_id, to_currency_id, date)` method using res.currency.rate
+- core/orm/models.py: _trigger_dependant_recompute supports One2many (order_line.product_qty); trigger on create; ModelBase __getattribute__ resolves One2many/Many2many to recordset
+- addons/sale/models/sale_order.py: currency_id defaults from company
+- addons/purchase/models/purchase_order.py: currency_id, amount_total (stored computed), _compute_amount_total from order_line
+- addons/purchase/models/purchase_order_line.py: price_subtotal (computed)
+- addons/account/models/account_move.py: currency_id
+- addons/account/models/account_move_line.py: amount_currency, currency_id
+- addons/account/models/sale_order.py: action_create_invoice passes currency_id; multi-currency lines with amount_currency
+- tests/test_currency_phase154.py: convert, SO default currency, PO amount_total
+
 ## 1.50.0 (Phases 152–153: Server Action Fix, Technical Settings, MRP)
 
 ### Phase 152: Server action fix + Technical settings UI

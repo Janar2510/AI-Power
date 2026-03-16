@@ -61,6 +61,7 @@ PORTAL_MY_HTML = """<!DOCTYPE html>
   <a href="/my">Dashboard</a>
   <a href="/my/leads">My Leads</a>
   <a href="/my/orders">My Orders</a>
+  <a href="/my/invoices">My Invoices</a>
   <a href="/my/profile">My Profile</a>
   <a href="/web/logout">Logout</a>
 </div>
@@ -176,7 +177,7 @@ def shop_index(request):
 
 @route("/shop/product/<int:product_id>", auth="public", methods=["GET"])
 def shop_product_detail(request, product_id):
-    """Product detail page (Phase 141)."""
+    """Product detail page (Phase 141, 155). Variant selector when template has attributes."""
     db = get_session_db(request)
     if not db:
         return Response(SHOP_HTML.format(content="<h1>Product</h1><p>Database not configured.</p>"), content_type="text/html; charset=utf-8")
@@ -186,20 +187,56 @@ def shop_product_detail(request, product_id):
         env = Environment(registry, cr=cr, uid=1)
         registry.set_env(env)
         Product = env.get("product.product")
+        Template = env.get("product.template")
+        TemplateLine = env.get("product.template.attribute.line")
         if not Product:
             return Response(SHOP_HTML.format(content="<h1>Product</h1><p>Not found.</p>"), content_type="text/html; charset=utf-8")
-        products = Product.search_read([("id", "=", product_id)], ["id", "name", "list_price", "categ_id"])
+        products = Product.search_read(
+            [("id", "=", product_id)],
+            ["id", "name", "list_price", "categ_id", "product_template_id", "attribute_value_ids"],
+        )
         if not products:
             return Response(SHOP_HTML.format(content="<h1>Product</h1><p>Product not found.</p>"), content_type="text/html; charset=utf-8")
         p = products[0]
         name = (p.get("name") or "").replace("<", "&lt;")
         price = p.get("list_price")
         price_str = f"{price:,.2f}" if price is not None else "0.00"
+        template_id = p.get("product_template_id")
+        if isinstance(template_id, (list, tuple)) and template_id:
+            template_id = template_id[0]
+        variant_html = ""
+        add_product_id = product_id
+        if template_id and Template and TemplateLine:
+            lines = TemplateLine.search_read([("template_id", "=", template_id)], ["attribute_id", "value_ids"])
+            if lines:
+                variants = Product.search_read(
+                    [("product_template_id", "=", template_id)],
+                    ["id", "name", "list_price", "attribute_value_ids"],
+                )
+                if len(variants) > 1:
+                    AttrValue = env.get("product.attribute.value")
+                    value_names = {}
+                    if AttrValue:
+                        for v in variants:
+                            for vid in (v.get("attribute_value_ids") or []):
+                                if vid and vid not in value_names:
+                                    rows = AttrValue.search_read([("id", "=", vid)], ["name"])
+                                    if rows:
+                                        value_names[vid] = rows[0].get("name", str(vid))
+                    variant_html = '<div class="variant-selector" style="margin:1rem 0;"><label>Variant:</label> '
+                    for v in variants:
+                        vid = v.get("id")
+                        vvals = v.get("attribute_value_ids") or []
+                        vlabel = ", ".join(value_names.get(x, str(x)) for x in vvals) if vvals else f"#{vid}"
+                        sel = " selected" if vid == product_id else ""
+                        variant_html += f'<a href="/shop/product/{vid}" class="variant-opt"{sel}>{vlabel}</a> '
+                    variant_html += "</div>"
         content = f"""
         <h1>{name}</h1>
         <p><a href="/shop">&larr; Back to shop</a></p>
         <div class="price">{price_str}</div>
-        <a href="/shop/cart?add={product_id}" class="btn-add-cart">Add to Cart</a>
+        {variant_html}
+        <a href="/shop/cart?add={add_product_id}" class="btn-add-cart">Add to Cart</a>
         """
         return Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
 
@@ -282,7 +319,7 @@ def shop_cart(request):
 
 @route("/shop/checkout", auth="public", methods=["GET", "POST"])
 def shop_checkout(request):
-    """Checkout - address form, create sale.order (Phase 142)."""
+    """Checkout - address form, payment provider, create sale.order + payment.transaction (Phase 142, 156)."""
     cart = _get_cart_from_request(request)
     if not cart:
         return redirect("/shop/cart")
@@ -295,8 +332,9 @@ def shop_checkout(request):
         email = request.form.get("email", "").strip()
         street = request.form.get("street", "").strip()
         city = request.form.get("city", "").strip()
+        provider = request.form.get("provider", "demo")
         if not name or not email:
-            content = '<h1>Checkout</h1><p style="color:#c00">Name and email are required.</p>' + _checkout_form(name, email, street, city)
+            content = '<h1>Checkout</h1><p style="color:#c00">Name and email are required.</p>' + _checkout_form(name, email, street, city, provider)
             return Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
         registry = _get_registry(db)
         with get_cursor(db) as cr:
@@ -324,15 +362,19 @@ def shop_checkout(request):
             products = Product.search_read([("id", "in", [c["product_id"] for c in cart])], ["id", "name", "list_price"])
             pmap = {p["id"]: p for p in products}
             line_vals = []
+            total = 0
             for c in cart:
                 p = pmap.get(c["product_id"])
                 if not p:
                     continue
+                qty = c.get("qty", 1)
+                price = p.get("list_price") or 0
+                total += price * qty
                 line_vals.append({
                     "product_id": p["id"],
                     "name": p.get("name", ""),
-                    "product_uom_qty": c.get("qty", 1),
-                    "price_unit": p.get("list_price") or 0,
+                    "product_uom_qty": qty,
+                    "price_unit": price,
                 })
             if not line_vals:
                 return redirect("/shop/cart")
@@ -342,20 +384,50 @@ def shop_checkout(request):
             })
             order_id = order.id if hasattr(order, "id") else (order.ids[0] if order.ids else None)
             order.action_confirm()
-        r = redirect(f"/shop/confirmation?order={order_id}")
-        r.set_cookie("erp_cart", "", max_age=0)
-        return r
-    content = '<h1>Checkout</h1><p><a href="/shop/cart">&larr; Back to cart</a></p>' + _checkout_form("", "", "", "")
+            currency_id = None
+            if order_id and hasattr(Order, "read_ids"):
+                odata = Order.read_ids([order_id], ["currency_id"])
+                if odata:
+                    cid = odata[0].get("currency_id")
+                    currency_id = cid[0] if isinstance(cid, (list, tuple)) and cid else cid
+            r = redirect(f"/shop/confirmation?order={order_id}")
+            r.set_cookie("erp_cart", "", max_age=0)
+            Provider = env.get("payment.provider")
+            Transaction = env.get("payment.transaction")
+            if Provider and Transaction and total > 0:
+                import secrets
+                providers = Provider.search_read([("code", "=", provider), ("state", "in", ["enabled", "test"])], ["id", "code"])
+                if not providers:
+                    providers = Provider.search_read([("state", "in", ["enabled", "test"])], ["id", "code"], limit=1)
+                if providers:
+                    ref = f"PAY-{secrets.token_hex(4).upper()}"
+                    Transaction.create({
+                        "provider_id": providers[0]["id"],
+                        "amount": total,
+                        "currency_id": currency_id,
+                        "partner_id": partner_id,
+                        "sale_order_id": order_id,
+                        "reference": ref,
+                        "state": "done" if providers[0].get("code") == "demo" else "pending",
+                    })
+                    if providers[0].get("code") == "manual":
+                        r = redirect(f"/payment/status/{ref}")
+            return r
+    content = '<h1>Checkout</h1><p><a href="/shop/cart">&larr; Back to cart</a></p>' + _checkout_form("", "", "", "", "demo")
     return Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
 
 
-def _checkout_form(name, email, street, city):
+def _checkout_form(name, email, street, city, provider="demo"):
     return f'''
     <form method="post" style="max-width:400px;margin-top:1rem">
       <p><label>Name *<br/><input type="text" name="name" value="{html.escape(name)}" style="width:100%;padding:0.5rem" required/></label></p>
       <p><label>Email *<br/><input type="email" name="email" value="{html.escape(email)}" style="width:100%;padding:0.5rem" required/></label></p>
       <p><label>Address<br/><input type="text" name="street" value="{html.escape(street)}" style="width:100%;padding:0.5rem" placeholder="Street"/></label></p>
       <p><label>City<br/><input type="text" name="city" value="{html.escape(city)}" style="width:100%;padding:0.5rem"/></label></p>
+      <p><label>Payment<br/><select name="provider" style="width:100%;padding:0.5rem">
+        <option value="demo"{" selected" if provider == "demo" else ""}>Demo (instant)</option>
+        <option value="manual"{" selected" if provider == "manual" else ""}>Bank Transfer</option>
+      </select></label></p>
       <button type="submit" class="btn-add-cart" style="margin-top:1rem">Place Order</button>
     </form>
     '''
@@ -435,6 +507,98 @@ def portal_my_orders(request):
             oid = r.get("id", "")
             html += f'<tr><td><a href="/my/orders/{oid}">{name}</a></td><td>{total_str}</td><td>{state}</td><td>{date_order}</td></tr>'
         html += "</table>"
+        return Response(PORTAL_MY_HTML.format(content=html), content_type="text/html; charset=utf-8")
+
+
+@route("/my/invoices", auth="portal", methods=["GET"])
+def portal_my_invoices(request):
+    """List customer invoices where partner_id = current user's partner (Phase 157)."""
+    uid, db = _require_portal_session(request)
+    if uid is None:
+        return redirect("/web/login")
+    registry = _get_registry(db)
+    if not _is_portal_user(registry, db, uid):
+        return redirect("/")
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        User = env.get("res.users")
+        Move = env.get("account.move")
+        if not User or not Move:
+            content = "<h1>My Invoices</h1><p>Accounting module not available.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        rows = User.read_ids([uid], ["partner_id"])
+        partner_id = rows[0].get("partner_id") if rows else None
+        if not partner_id:
+            content = "<h1>My Invoices</h1><p>No contact linked to your account.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        pid = partner_id[0] if isinstance(partner_id, (list, tuple)) and partner_id else partner_id
+        moves = Move.search([("move_type", "=", "out_invoice"), ("partner_id", "=", pid)], order="id desc", limit=50)
+        if not moves or not moves.ids:
+            content = "<h1>My Invoices</h1><p>No invoices yet.</p><p><a href=\"/shop\">Browse shop</a></p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        move_rows = Move.browse(moves.ids).read(["name", "partner_id", "state", "invoice_origin", "line_ids"])
+        html = "<h1>My Invoices</h1><table><tr><th>Number</th><th>Origin</th><th>Status</th><th></th></tr>"
+        for r in move_rows:
+            name = (r.get("name") or "").replace("<", "&lt;")
+            origin = (r.get("invoice_origin") or "").replace("<", "&lt;")
+            state = (r.get("state") or "").replace("<", "&lt;")
+            mid = r.get("id", "")
+            html += f'<tr><td><a href="/my/invoices/{mid}">{name}</a></td><td>{origin}</td><td>{state}</td>'
+            html += f'<td><a href="/report/pdf/account.report_invoice/{mid}">PDF</a></td></tr>'
+        html += "</table>"
+        return Response(PORTAL_MY_HTML.format(content=html), content_type="text/html; charset=utf-8")
+
+
+@route("/my/invoices/<int:move_id>", auth="portal", methods=["GET"])
+def portal_my_invoice_detail(request, move_id):
+    """View single invoice detail (Phase 157)."""
+    uid, db = _require_portal_session(request)
+    if uid is None:
+        return redirect("/web/login")
+    registry = _get_registry(db)
+    if not _is_portal_user(registry, db, uid):
+        return redirect("/")
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        User = env.get("res.users")
+        Move = env.get("account.move")
+        Line = env.get("account.move.line")
+        if not User or not Move:
+            content = "<h1>Invoice</h1><p>Not found.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        rows = User.read_ids([uid], ["partner_id"])
+        partner_id = rows[0].get("partner_id") if rows else None
+        if not partner_id:
+            content = "<h1>Invoice</h1><p>No contact linked.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        pid = partner_id[0] if isinstance(partner_id, (list, tuple)) and partner_id else partner_id
+        allowed = Move.search([("id", "=", move_id), ("move_type", "=", "out_invoice"), ("partner_id", "=", pid)])
+        if not allowed or move_id not in (allowed.ids if hasattr(allowed, "ids") else []):
+            content = "<h1>Invoice</h1><p>Invoice not found or access denied.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        m = Move.browse(move_id).read(["name", "partner_id", "state", "invoice_origin", "line_ids"])[0]
+        name = (m.get("name") or "").replace("<", "&lt;")
+        state = (m.get("state") or "").replace("<", "&lt;")
+        origin = (m.get("invoice_origin") or "").replace("<", "&lt;")
+        line_ids = m.get("line_ids") or []
+        if isinstance(line_ids, (list, tuple)) and line_ids:
+            lines = Line.browse(line_ids).read(["name", "debit", "credit"]) if Line else []
+        else:
+            lines = []
+        html = f"<h1>Invoice {name}</h1><p><a href=\"/my/invoices\">&larr; Back to invoices</a></p>"
+        html += f"<p><strong>Origin:</strong> {origin} | <strong>Status:</strong> {state}</p>"
+        html += '<table><tr><th>Description</th><th>Debit</th><th>Credit</th></tr>'
+        for ln in lines:
+            ln_name = (ln.get("name") or "").replace("<", "&lt;")
+            debit = ln.get("debit") or 0
+            credit = ln.get("credit") or 0
+            html += f"<tr><td>{ln_name}</td><td>{debit:,.2f}</td><td>{credit:,.2f}</td></tr>"
+        html += "</table>"
+        html += f'<p><a href="/report/pdf/account.report_invoice/{move_id}">Download PDF</a></p>'
         return Response(PORTAL_MY_HTML.format(content=html), content_type="text/html; charset=utf-8")
 
 

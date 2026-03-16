@@ -1341,9 +1341,9 @@
   }
 
   function renderViewSwitcher(route, currentView) {
-    const modes = getAvailableViewModes(route).filter(function (m) { return m === 'list' || m === 'kanban' || m === 'graph' || m === 'calendar' || m === 'activity' || m === 'pivot'; });
+    const modes = getAvailableViewModes(route).filter(function (m) { return m === 'list' || m === 'kanban' || m === 'graph' || m === 'calendar' || m === 'activity' || m === 'pivot' || m === 'gantt'; });
     if (modes.length < 2) return '';
-    const labels = { list: 'List', kanban: 'Kanban', graph: 'Graph', pivot: 'Pivot', calendar: 'Calendar', activity: 'Activity' };
+    const labels = { list: 'List', kanban: 'Kanban', graph: 'Graph', pivot: 'Pivot', calendar: 'Calendar', activity: 'Activity', gantt: 'Gantt' };
     let html = '<span class="view-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
     modes.forEach(function (m) {
       const active = m === currentView;
@@ -2065,6 +2065,24 @@
     const fname = typeof f === 'object' ? f.name : f;
     const label = getFieldLabel(model, fname);
     const widget = typeof f === 'object' ? f.widget : '';
+    if (widget === 'priority') {
+      const selectionOpts = getSelectionOptions(model, fname) || [['0', 'Low'], ['1', 'Normal'], ['2', 'High'], ['3', 'Urgent']];
+      let opts = '';
+      selectionOpts.forEach(function (o) { opts += '<option value="' + (o[0] || '') + '">' + (o[1] || o[0]) + '</option>'; });
+      return '<p><label>' + label + '</label><div class="priority-widget" data-fname="' + fname + '" style="margin-top:0.25rem;display:flex;gap:0.25rem;align-items:center"><span class="priority-stars" style="font-size:1.2rem;color:#f0ad4e">&#9733;&#9733;&#9733;&#9733;</span><select name="' + fname + '" style="width:auto;padding:0.25rem">' + opts + '</select></div></p>';
+    }
+    if (widget === 'progressbar') {
+      return '<p><label>' + label + '</label><div class="progressbar-widget" style="margin-top:0.25rem;display:flex;align-items:center;gap:0.5rem"><div style="flex:1;height:8px;background:#eee;border-radius:4px;overflow:hidden"><div class="progressbar-fill" style="height:100%;background:var(--color-primary,#1a1a2e);width:0%;transition:width 0.2s"></div></div><input type="number" name="' + fname + '" min="0" max="100" step="0.1" style="width:60px;padding:0.25rem"></div></p>';
+    }
+    if (widget === 'phone' || ((fname === 'phone' || fname === 'mobile') && !widget)) {
+      return '<p><label>' + label + '</label><div style="margin-top:0.25rem"><input type="text" name="' + fname + '" style="width:100%;padding:0.5rem"><a class="phone-link" href="#" style="font-size:0.9rem;margin-left:0.25rem;display:inline-block;margin-top:0.25rem" target="_blank">Call</a></div></p>';
+    }
+    if (widget === 'email' || (fname === 'email' && !widget)) {
+      return '<p><label>' + label + '</label><div style="margin-top:0.25rem"><input type="email" name="' + fname + '" style="width:100%;padding:0.5rem"><a class="email-link" href="#" style="font-size:0.9rem;margin-left:0.25rem;display:inline-block;margin-top:0.25rem" target="_blank">Send</a></div></p>';
+    }
+    if (widget === 'url' || (fname === 'website' && !widget)) {
+      return '<p><label>' + label + '</label><div style="margin-top:0.25rem"><input type="url" name="' + fname + '" placeholder="https://" style="width:100%;padding:0.5rem"><a class="url-link" href="#" style="font-size:0.9rem;margin-left:0.25rem;display:inline-block;margin-top:0.25rem" target="_blank">Open</a></div></p>';
+    }
     if (widget === 'statusbar') {
       var sbId = 'statusbar-' + fname + '-' + Math.random().toString(36).slice(2);
       return '<p><label>' + label + '</label><div class="o-statusbar" id="' + sbId + '" data-fname="' + fname + '" data-comodel="' + (f.comodel || '') + '" data-clickable="1" style="margin-top:0.25rem;display:flex;align-items:center;gap:0;flex-wrap:wrap"></div><input type="hidden" name="' + fname + '"></p>';
@@ -3187,6 +3205,10 @@
         loadActivityData(model, route, domain, searchTerm, savedFilters);
         return Promise.resolve();
       }
+      if (viewType === 'gantt' && (model === 'project.task' || model === 'mrp.production')) {
+        loadGanttData(model, route, domain, searchTerm, savedFilters);
+        return Promise.resolve();
+      }
       const searchReadKw = { fields: fields, offset: offset, limit: limit };
       const effectiveOrder = order || (currentListState.groupBy ? currentListState.groupBy : null);
       if (effectiveOrder) searchReadKw.order = effectiveOrder;
@@ -3239,6 +3261,70 @@
     }).catch(function () {
       main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error" style="color:#c00">Failed to load activities.</p>';
     });
+  }
+
+  function loadGanttData(model, route, domain, searchTerm, savedFiltersList) {
+    const searchDom = buildSearchDomain(model, searchTerm || '');
+    const fullDomain = (domain || []).concat(searchDom || []);
+    const dateStart = model === 'project.task' ? 'date_start' : 'date_start';
+    const dateStop = model === 'project.task' ? 'date_deadline' : 'date_finished';
+    const groupBy = model === 'project.task' ? 'project_id' : 'state';
+    const fields = ['id', 'name', dateStart, dateStop, groupBy];
+    rpc.callKw(model, 'search_read', [fullDomain], { fields: fields, limit: 200 })
+      .then(function (records) {
+        renderGanttView(model, route, records, searchTerm, savedFiltersList || [], dateStart, dateStop, groupBy);
+      })
+      .catch(function () {
+        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error" style="color:#c00">Failed to load Gantt data.</p>';
+      });
+  }
+
+  function renderGanttView(model, route, records, searchTerm, savedFiltersList, dateStart, dateStop, groupBy) {
+    const title = getTitle(route);
+    const currentView = 'gantt';
+    const addLabel = route === 'tasks' ? 'Add task' : route === 'manufacturing' ? 'Add MO' : 'Add';
+    actionStack = [{ label: title, hash: route }];
+    let html = '<h2>' + title + '</h2>';
+    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+    html += renderViewSwitcher(route, currentView);
+    html += '<div role="search" style="display:inline-flex;gap:0.25rem"><input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button></div>';
+    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
+    const now = new Date();
+    const rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+    const totalDays = Math.ceil((rangeEnd - rangeStart) / (24 * 60 * 60 * 1000));
+    const dayWidth = 24;
+    const timelineWidth = totalDays * dayWidth;
+    html += '<div class="gantt-view" style="overflow-x:auto"><table role="grid" style="width:100%;border-collapse:collapse;min-width:600px"><thead><tr><th style="text-align:left;padding:0.5rem;min-width:180px">Name</th><th style="padding:0.25rem;min-width:' + timelineWidth + 'px">' + rangeStart.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) + ' – ' + rangeEnd.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) + '</th></tr></thead><tbody>';
+    (records || []).forEach(function (r) {
+      const startVal = r[dateStart];
+      const stopVal = r[dateStop];
+      const startDate = startVal ? new Date(startVal) : rangeStart;
+      const stopDate = stopVal ? new Date(stopVal) : (startVal ? new Date(startVal) : rangeEnd);
+      const left = Math.max(0, Math.floor((startDate - rangeStart) / (24 * 60 * 60 * 1000)) * dayWidth);
+      const width = Math.max(dayWidth, Math.ceil((stopDate - startDate) / (24 * 60 * 60 * 1000)) * dayWidth);
+      const name = (r.name || '—').replace(/</g, '&lt;');
+      html += '<tr><td style="padding:0.5rem;border-bottom:1px solid #eee"><a href="#' + route + '/edit/' + (r.id || '') + '" style="text-decoration:none;color:inherit;font-weight:500">' + name + '</a></td><td style="padding:0.25rem;border-bottom:1px solid #eee;position:relative;min-width:' + timelineWidth + 'px;height:28px"><div style="position:absolute;left:' + left + 'px;width:' + width + 'px;height:20px;background:var(--color-primary,#1a1a2e);border-radius:4px;top:4px" title="' + (startVal || '') + ' – ' + (stopVal || '') + '"></div></td></tr>';
+    });
+    html += '</tbody></table></div>';
+    if (!records || !records.length) {
+      html = html.replace('</div>', '<p style="color:var(--text-muted);margin:1rem 0">No records with dates.</p></div>');
+    }
+    main.innerHTML = html;
+    currentListState = { model: model, route: route, searchTerm: searchTerm || '', viewType: 'gantt' };
+    main.querySelectorAll('.btn-view').forEach(function (btn) {
+      btn.onclick = function () { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
+    });
+    const btnAdd = document.getElementById('btn-add');
+    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    const btnSearch = document.getElementById('btn-search');
+    const searchInput = document.getElementById('list-search');
+    if (btnSearch && searchInput) {
+      const doSearch = function () { loadRecords(model, route, searchInput.value.trim(), null, 'gantt', null, 0, null); };
+      btnSearch.onclick = doSearch;
+      searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
+    }
   }
 
   function renderActivityMatrix(model, route, records, activityTypes, activities, searchTerm, savedFiltersList, userId) {

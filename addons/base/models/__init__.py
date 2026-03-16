@@ -19,6 +19,7 @@ from . import ir_config_parameter
 from . import ir_actions
 from . import ir_actions_server
 from . import base_automation
+from . import ir_webhook
 from . import ir_rule
 from . import ir_module_module
 from . import ir_ui_view

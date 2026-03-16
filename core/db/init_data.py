@@ -21,6 +21,7 @@ def load_default_data(env) -> None:
     _load_mrp_data(env)
     _load_account_data(env)
     _load_product_demo(env)
+    _load_payment_providers(env)
 
     try:
         Groups = env.get("res.groups")
@@ -96,6 +97,7 @@ def load_default_data(env) -> None:
                 ("sale.order", "Sales Order Reference"),
                 ("purchase.order", "Purchase Order Reference"),
                 ("mrp.production", "Manufacturing Order Reference"),
+                ("hr.expense.sheet", "Expense Report Reference"),
             ]:
                 existing = IrSequence.search([("code", "=", code)])
                 if not existing:
@@ -622,6 +624,19 @@ def _load_product_demo(env) -> None:
         _logger.info("Created demo products for shop")
     except Exception as e:
         _logger.warning("Could not load product demo: %s", e)
+
+
+def _load_payment_providers(env) -> None:
+    """Load demo and manual payment providers (Phase 156)."""
+    try:
+        Provider = env.get("payment.provider")
+        if not Provider or Provider.search([]):
+            return
+        Provider.create({"name": "Demo", "code": "demo", "state": "enabled"})
+        Provider.create({"name": "Bank Transfer", "code": "manual", "state": "enabled"})
+        _logger.info("Created payment providers (demo, manual)")
+    except Exception as e:
+        _logger.warning("Could not load payment providers: %s", e)
 
 
 def _load_mrp_data(env) -> None:

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 # Defaults (Odoo 19 parity)
-DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web", "mail", "crm", "sale", "stock", "purchase", "account", "ai_assistant", "auth_totp", "bus", "website"]
+DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web", "mail", "project", "crm", "fetchmail", "hr", "knowledge", "sale", "stock", "purchase", "account", "ai_assistant", "auth_totp", "bus", "website"]
 REQUIRED_SERVER_WIDE_MODULES = ["base", "web"]
 
 
@@ -28,6 +28,7 @@ def _parse_config(args: list[str]) -> dict:
         "dbfilter": "",
         "test_enable": False,
         "debug_assets": False,
+        "debug_profiling": False,
         "config": "",
         "cors_origin": "",
         "session_store": "memory",
@@ -38,6 +39,7 @@ def _parse_config(args: list[str]) -> dict:
         "db_password": os.environ.get("PGPASSWORD", ""),
         "db_name": os.environ.get("PGDATABASE", "erp"),
         "api_key": os.environ.get("API_KEY", ""),
+        "backup_dir": os.environ.get("ERP_BACKUP_DIR", ""),
     }
 
     for arg in args:
@@ -59,6 +61,8 @@ def _parse_config(args: list[str]) -> dict:
             result["test_enable"] = True
         elif arg == "--debug=assets" or arg == "debug=assets":
             result["debug_assets"] = True
+        elif arg == "--debug=profiling" or arg == "debug=profiling":
+            result["debug_profiling"] = True
         elif arg.startswith("-c=") or arg.startswith("--config="):
             result["config"] = arg.split("=", 1)[1]
         elif arg.startswith("--db-host="):
@@ -79,6 +83,8 @@ def _parse_config(args: list[str]) -> dict:
             result["session_store"] = arg.split("=", 1)[1]
         elif arg.startswith("--workers="):
             result["workers"] = int(arg.split("=", 1)[1])
+        elif arg.startswith("--backup-dir="):
+            result["backup_dir"] = arg.split("=", 1)[1].strip()
 
     return result
 

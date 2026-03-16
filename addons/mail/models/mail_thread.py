@@ -55,6 +55,35 @@ class MailThreadMixin:
                     BusBus.sendone(f"res.partner_{uid}", payload)
         except Exception:
             pass
+        try:
+            MailNotification = env.get("mail.notification")
+            if MailNotification:
+                Partner = env.get("res.partner")
+                User = env.get("res.users")
+                rows = self.read(["partner_id"])
+                if rows and rows[0].get("partner_id"):
+                    pid = rows[0]["partner_id"]
+                    pid = pid[0] if isinstance(pid, (list, tuple)) else pid
+                    if not pid:
+                        pass
+                    else:
+                        author_partner = None
+                        if uid and User:
+                            urows = User.read_ids([uid], ["partner_id"])
+                            if urows and urows[0].get("partner_id"):
+                                author_partner = urows[0]["partner_id"]
+                                author_partner = author_partner[0] if isinstance(author_partner, (list, tuple)) else author_partner
+                        if pid != author_partner:
+                            partner = Partner.browse([pid])
+                            if partner and partner.read(["user_id"]) and partner.read(["user_id"])[0].get("user_id"):
+                                MailNotification.create({
+                                    "res_partner_id": pid,
+                                    "mail_message_id": msg.ids[0] if msg.ids else msg.id,
+                                    "is_read": False,
+                                    "notification_type": "inbox",
+                                })
+        except Exception:
+            pass
         if send_as_email:
             email_to = self._get_email_to_for_post()
             if email_to:

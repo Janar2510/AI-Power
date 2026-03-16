@@ -27,6 +27,9 @@ def _get_model_fields(model_class: Type[ModelBase]) -> Dict[str, fields.Field]:
 def _column_def(field: fields.Field) -> str:
     """Get SQL column definition for a field. Many2one uses INTEGER; FK constraints added separately."""
     col_type = getattr(field, "column_type", "varchar")
+    if col_type == "vector":
+        dims = getattr(field, "dimensions", None) or getattr(field, "size", 1536)
+        return f"vector({dims})"
     if col_type == "varchar":
         size = getattr(field, "size", None)
         if size:
@@ -196,8 +199,18 @@ def _apply_sql_constraints(cursor: Any, model_class: Type[ModelBase]) -> None:
             _logger.warning("Could not add constraint %s on %s: %s", constraint_name, table, e)
 
 
+def _ensure_pgvector_extension(cursor: Any) -> None:
+    """Enable pgvector extension if available (Phase 136)."""
+    try:
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        _logger.info("pgvector extension enabled")
+    except Exception as e:
+        _logger.warning("pgvector extension not available: %s", e)
+
+
 def init_schema(cursor: Any, registry: Any) -> None:
     """Create tables for all registered models; add missing columns; create Many2many tables."""
+    _ensure_pgvector_extension(cursor)
     for model_name, model_class in registry._models.items():
         if hasattr(model_class, "_table") and model_class._table:
             create_table(cursor, model_class)

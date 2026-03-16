@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_fetchmail_server_admin,fetchmail.server.admin,model_fetchmail_server,base.group_user,1,1,1,1
+access_mail_alias_admin,mail.alias.admin,model_mail_alias,base.group_user,1,1,1,1

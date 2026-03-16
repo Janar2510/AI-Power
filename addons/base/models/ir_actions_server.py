@@ -27,32 +27,35 @@ class IrActionsServer(Model):
         """Execute server action. records = recordset that triggered (for object_write/code)."""
         records = records or (self.env.get("res.partner").browse([]) if self.env else None)
         for action in self:
-            if action.state == "code" and action.code:
-                self._run_code(action, records)
-            elif action.state == "object_write" and records:
+            data = action.read(["state", "code"]) or [{}]
+            vals = data[0] if data else {}
+            state = vals.get("state")
+            code = vals.get("code")
+            if state == "code" and code:
+                self._run_code(action, records, code)
+            elif state == "object_write" and records:
                 self._run_object_write(action, records)
             # object_create, multi, email: defer
 
-    def _run_code(self, action, records):
+    def _run_code(self, action, records, code: str = ""):
         """Execute Python code with env, record(s) in scope."""
         env = getattr(self, "env", None)
         if not env:
             return
-        # Get code from recordset (self) since we're iterating over server actions
-        code = ""
-        if self.ids:
-            data = self.read(["code"])
-            if data:
-                code = data[0].get("code") or ""
+        code = (code or "").strip()
         if not code:
             return
-        rec = records.browse(records.ids[0]) if records and records.ids else None
+        rec = next(iter(records), None) if records and records.ids else None
         safe_builtins = {
             "env": env,
             "record": rec,
             "records": records,
             "log": lambda msg: None,
         }
+        if not records or not records.ids:
+            import logging
+            logging.getLogger("erp.actions").warning("Server action: records empty, skipping")
+            return
         import builtins
         exec_globals = {"__builtins__": builtins.__dict__, **safe_builtins}
         try:
@@ -63,5 +66,7 @@ class IrActionsServer(Model):
 
     def _run_object_write(self, action, records):
         """Write to records. Uses code if present, else no-op."""
-        if action.code:
-            self._run_code(action, records)
+        data = action.read(["code"]) or [{}]
+        code = (data[0].get("code") or "").strip() if data else ""
+        if code:
+            self._run_code(action, records, code)

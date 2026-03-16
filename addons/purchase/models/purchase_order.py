@@ -8,6 +8,15 @@ class PurchaseOrder(Model):
     _description = "Purchase Order"
 
     name = fields.Char(string="Order Reference", required=True, default="New")
+
+    @classmethod
+    def create(cls, vals):
+        if vals.get("name") == "New" or not vals.get("name"):
+            env = getattr(cls._registry, "_env", None) if cls._registry else None
+            IrSequence = env.get("ir.sequence") if env else None
+            next_val = IrSequence.next_by_code("purchase.order") if IrSequence else None
+            vals = dict(vals, name=f"PO/{next_val:05d}" if next_val is not None else "New")
+        return super().create(vals)
     partner_id = fields.Many2one("res.partner", string="Vendor", required=True)
     state = fields.Selection(
         selection=[

@@ -9,11 +9,10 @@ from core.http.auth import hash_password
 class ResUsers(Model):
     _name = "res.users"
     _description = "User"
+    _inherits = {"res.partner": "partner_id"}  # Phase 126: delegate name, email, etc. to partner
 
     login = fields.Char(required=True)
     password = fields.Char()
-    name = fields.Char(required=True)
-    email = fields.Char(string="Email")
     active = fields.Boolean(default=True)
     partner_id = fields.Many2one("res.partner", string="Contact")
     company_id = fields.Many2one("res.company", string="Company")

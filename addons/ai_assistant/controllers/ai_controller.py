@@ -206,7 +206,7 @@ def ai_chat(request: Request) -> Response:
                 messages = [{"role": "system", "content": system_content}]
                 messages.extend(prior_messages[-20:])
                 messages.append({"role": "user", "content": prompt})
-                result = call_llm(env, messages, model=cfg.get("llm_model", "gpt-4o-mini"))
+                result, tool_chain = call_llm(env, messages, model=cfg.get("llm_model", "gpt-4o-mini"))
                 new_messages = prior_messages + [{"role": "user", "content": prompt}, {"role": "assistant", "content": result or ""}]
                 now = datetime.now(timezone.utc).isoformat()
                 try:
@@ -232,7 +232,7 @@ def ai_chat(request: Request) -> Response:
                 log_audit(
                     env,
                     prompt_hash=prompt_hash,
-                    tool_calls=json.dumps([{"tool": "llm", "kwargs": {}}]),
+                    tool_calls=json.dumps(tool_chain) if tool_chain else json.dumps([{"tool": "llm", "kwargs": {}}]),
                     outcome=(result or "")[:1000],
                     retrieved_doc_ids=retrieved_doc_ids,
                 )

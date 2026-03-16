@@ -312,8 +312,19 @@ def load_views(request):
             registry["fields_meta"] = fields_meta
     except Exception:
         registry = load_views_registry()
+
+    def _json_safe(obj):
+        """Recursively replace non-JSON-serializable values (e.g. callables)."""
+        if callable(obj):
+            return None
+        if isinstance(obj, dict):
+            return {k: _json_safe(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [_json_safe(x) for x in obj]
+        return obj
+
     return Response(
-        json.dumps(registry),
+        json.dumps(_json_safe(registry)),
         content_type="application/json",
     )
 

@@ -1,4 +1,5 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_product_category_user,product.category user,model_product_category,,1,1,1,1
 access_product_product_user,product.product user,model_product_product,,1,1,1,1
 access_sale_order_user,sale.order user,model_sale_order,,1,1,1,1
 access_sale_order_line_user,sale.order.line user,model_sale_order_line,,1,1,1,1

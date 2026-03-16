@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Sale Order</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #333; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+    .total { font-weight: bold; text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Sale Order</h1>
+  {% for r in records %}
+  <p><strong>Order:</strong> {{ r.name or 'N/A' }} | <strong>Partner:</strong> {{ r.partner_id[1] if r.partner_id is iterable and r.partner_id|length > 1 else r.partner_id }} | <strong>Date:</strong> {{ r.date_order or '' }} | <strong>State:</strong> {{ r.state or '' }}</p>
+  <table>
+    <thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr></thead>
+    <tbody>
+      {% for line in (r.order_line or []) %}
+      <tr><td>{{ line.get('name', '') }}</td><td>{{ line.get('product_uom_qty', 0) }}</td><td>{{ line.get('price_unit', 0) }}</td><td>{{ line.get('price_subtotal', 0) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="total">Total: {{ r.amount_total or 0 }}</p>
+  {% endfor %}
+</body>
+</html>

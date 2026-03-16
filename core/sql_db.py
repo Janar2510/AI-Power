@@ -79,6 +79,11 @@ def get_connection(dbname: Optional[str] = None) -> Generator[PgConnection, None
         params["dbname"] = dbname
     conn = psycopg2.connect(**params)
     try:
+        try:
+            from pgvector.psycopg2 import register_vector
+            register_vector(conn)
+        except ImportError:
+            pass
         yield conn
     finally:
         conn.close()
@@ -86,10 +91,17 @@ def get_connection(dbname: Optional[str] = None) -> Generator[PgConnection, None
 
 @contextmanager
 def get_cursor(dbname: Optional[str] = None) -> Generator[Any, None, None]:
-    """Get a cursor with RealDictCursor (rows as dicts). Commits on success."""
+    """Get a cursor with RealDictCursor (rows as dicts). Commits on success.
+    When debug_profiling: wraps cursor to record query count and timing (Phase 144)."""
     with get_connection(dbname) as conn:
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
+            if config.get_config().get("debug_profiling"):
+                try:
+                    from core.profiling import wrap_cursor_for_profiling
+                    wrap_cursor_for_profiling(cur)
+                except ImportError:
+                    pass
             yield cur
             conn.commit()
         except Exception:

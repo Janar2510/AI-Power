@@ -1,5 +1,190 @@
 # Changelog
 
+## 1.50.0 (Phases 152–153: Server Action Fix, Technical Settings, MRP)
+
+### Phase 152: Server action fix + Technical settings UI
+- addons/base/models/ir_actions_server.py: fix action.state/action.code (use read() instead of field access)
+- addons/base/views/ir_views.xml: Settings > Technical submenu (Scheduled Actions, Server Actions, Sequences)
+- addons/web/static/src/main.js: routes for cron, server_actions, sequences
+- tests/test_server_actions_phase119.py: passes (automation on_create sets description)
+- addons/stock/models/stock_move_quant.py: fix super().write() → ModelBase.write() for inheritance
+
+### Phase 153: MRP module (Manufacturing)
+- addons/mrp/: new addon (depends: base, stock, sale)
+- mrp.bom, mrp.bom.line: Bill of materials with components
+- mrp.production: Manufacturing order (MO/00001, etc); workflow: draft → confirmed → progress → done
+- mrp.workcenter: Work centers (name, capacity, time_start, time_stop)
+- addons/mrp/models/stock_location.py: extend with type "production"
+- addons/mrp/models/stock_move.py: production_id Many2one
+- action_confirm: create stock moves (raw: internal→production, finished: production→internal)
+- action_done: validate moves, update quants
+- core/db/init_data.py: mrp.production sequence, _load_mrp_data (production location)
+- tests/test_mrp_phase153.py
+
+## 1.49.0 (Phases 146–147: Document Sequences, Discuss)
+
+### Phase 146: Document sequence integration
+- addons/sale/models/sale_order.py: create() assigns SO/00001 via ir.sequence
+- addons/purchase/models/purchase_order.py: create() assigns PO/00001, PO/00002...
+- addons/account/models/account_move.py: create() assigns INV/00001...
+- core/db/init_data.py: seed ir.sequence for sale.order, purchase.order
+
+### Phase 147: Discuss module (mail.channel)
+- addons/mail/models/mail_channel.py: mail.channel (name, channel_type, message_ids, channel_member_ids)
+- addons/mail/models/mail_channel_member.py: mail.channel.member (channel_id, user_id)
+- addons/mail/controllers/discuss.py: /discuss/channel/list, create, /channel/<id>/messages, /channel/<id>/post
+- addons/web/static/src/main.js: Discuss nav link, channel list, message thread, compose box, real-time via bus
+
+### Phase 149: HR Leave Management
+- addons/hr/models/hr_leave_type.py: hr.leave.type (name, allocation_type, color, max_leaves, sequence)
+- addons/hr/models/hr_leave.py: hr.leave (employee_id, leave_type_id, date_from, date_to, number_of_days, state: draft/confirm/validate/refuse)
+- addons/hr/models/hr_leave_allocation.py: hr.leave.allocation
+- Workflow: action_confirm, action_validate, action_refuse, action_draft
+- Calendar view for leaves (date_from), list/form views
+
+### Phase 148: Notification center
+- addons/mail/models/mail_notification.py: mail.notification (res_partner_id, mail_message_id, is_read, notification_type)
+- mail_thread.message_post and mail.channel.message_post create notifications for followers
+- addons/mail/controllers/discuss.py: /mail/notifications, /mail/notifications/mark_read
+- addons/web/static/src/main.js: bell icon in navbar, unread badge, dropdown with notification list, mark all read
+
+## 1.47.0 (Phases 144–145: Profiling, Backup/Restore)
+
+### Bugfix: load_views 500 (JSON serialization)
+- core/http/routes.py: _json_safe() sanitizes registry before json.dumps; replaces callables (e.g. field defaults) with None to fix "Object of type function is not JSON serializable"
+
+### Phase 144: Profiling + performance monitoring
+- core/profiling.py: request timing, ORM query count and timing via contextvars
+- core/tools/config.py: --debug=profiling flag
+- core/sql_db.py: wrap cursor to record queries when debug_profiling
+- core/http/application.py: X-Response-Time-Ms, X-Query-Count, X-Query-Time-Ms headers when profiling
+
+### Phase 145: Automated backup/restore cron
+- addons/base/models/db_backup.py: base.db.backup.run() cron hook (pg_dump)
+- core/db/init_data.py: seed "Database backup" cron (daily, 1440 min)
+- core/cli/db.py: backup, restore actions; --backup-dir, -f for restore
+- core/tools/config.py: backup_dir, ERP_BACKUP_DIR env, ir.config_parameter db.backup_dir
+
+## 1.46.0 (Phase 143: Shop E2E, Order Email, My Orders)
+
+### Phase 143a: Shop E2E tests
+- tests/e2e/test_shop_tour.py: Playwright tour (shop → product → cart → checkout → confirmation)
+- core/db/init_data.py: _load_product_demo creates Widget A/B/C when no products exist (enables E2E)
+
+### Phase 143b: Order confirmation email
+- addons/sale/models/sale_order.py: action_confirm calls _send_order_confirmation_email
+- Creates mail.mail (outgoing) with order details; cron process_email_queue sends
+
+### Phase 143c: Customer order history
+- addons/website/controllers/website.py: /my/orders, /my/orders/<id> portal routes
+- Portal nav: My Orders link
+- core/orm/security.py: portal record rule for sale.order (partner_id = user's partner)
+
+## 1.45.0 (Phase 142: Cart + Checkout)
+
+### Phase 142: Cart + checkout
+- addons/website/controllers/website.py: /shop/cart (view, add, remove via query params; cart in erp_cart cookie)
+- /shop/checkout: address form (name, email, street, city); creates res.partner for guests; creates sale.order with order_line; action_confirm
+- /shop/confirmation: thank-you page; cart cookie cleared on checkout
+- Cart stored in base64-encoded JSON cookie (anonymous checkout supported)
+
+## 1.44.0 (Phases 133–134: Dark mode, Accessibility)
+
+### Phase 141: Website shop (product catalog)
+- addons/sale/models/product_category.py: product.category (name, parent_id)
+- addons/sale/models/product_product.py: categ_id Many2one
+- addons/website/controllers/website.py: /shop (product grid, category filter), /shop/product/<id> (detail, Add to Cart)
+- Public routes; no auth required
+
+### Phase 140: AI analytics dashboard
+- addons/ai_assistant/tools/registry.py: analyze_data(model, measure, groupby, use_llm) tool
+- Uses read_group; when use_llm: LLM generates NL summary of KPIs
+- addons/web/static/src/main.js: Dashboard "AI Insights" card; fetches crm.lead expected_revenue by stage_id
+
+### Phase 139: AI-assisted workflows (suggest next actions)
+- addons/ai_assistant/tools/registry.py: suggest_next_actions(model, record_id) tool
+- addons/web/static/src/main.js: form sidebar "AI Suggestions" panel for crm.lead and project.task (non-new)
+- Fetches suggestions on form load; displays labels (Schedule call, Move stage, Draft email)
+
+### Phase 138: Knowledge base module
+- addons/knowledge/: knowledge.article (name, body_html, category_id, author_id, is_published), knowledge.category
+- list/form views; Knowledge menu (Articles, Categories)
+- RAG indexing: knowledge.article on create/write; index_record_for_rag fields_map; strip HTML for body_html
+- knowledge in DEFAULT_SERVER_WIDE_MODULES; routes articles, knowledge_categories
+
+### Phase 137: Multi-step AI planning (ReAct tool chaining)
+- addons/ai_assistant/llm.py: call_llm returns (result, tool_chain); tool_chain captures full chain for audit
+- addons/ai_assistant/controllers/ai_controller.py: log_audit receives tool_chain from call_llm
+- Loop already present: max_iter=5, sequential tool execution, results fed back
+
+### Phase 136: Vector embeddings for RAG
+- core/orm/fields.py: VectorField(dimensions=1536) for pgvector
+- core/db/schema.py: CREATE EXTENSION vector; _column_def handles vector type
+- core/sql_db.py: register_vector(conn) when pgvector installed
+- addons/ai_assistant/models/ai_document_chunk.py: embedding column (vector 1536)
+- addons/ai_assistant/tools/registry.py: _get_embedding() via OpenAI text-embedding-3-small; index_record_for_rag embeds on write; retrieve_chunks uses cosine similarity (<=>) when embeddings exist, else ilike fallback
+
+### Phase 135: Activity view (dedicated view type)
+- core/data/xml_loader.py: Parse `<activity>` view arch
+- addons/mail/models/mail_activity_type.py: mail.activity.type (name, sequence)
+- addons/mail/models/mail_activity.py: activity_type_id Many2one; activity_schedule accepts activity_type_id
+- core/db/init_data.py: Seed Call, Meeting, Email activity types
+- addons/project/views/project_views.xml: project.task activity view; view_mode activity,kanban,list,form
+- addons/web/static/src/main.js: Activity matrix (records x activity types); schedule from cell; view switcher includes Activity; tasks route support
+
+### Phase 134: Keyboard navigation + ARIA accessibility
+- addons/web/static/src/main.js: List row navigation (ArrowUp/ArrowDown/Enter); ARIA roles (grid, row, columnheader, gridcell); role="search" on search; nav role="navigation"; form Save button id="btn-save"
+- Import modal: role="dialog", aria-modal, focus trap (Tab cycles), Escape to close, initial focus on file input
+- Global shortcuts: Alt+N new record (on list), Alt+S save (on form)
+- addons/web/static/src/scss/webclient.css: :focus-visible outline for keyboard navigation
+
+### Phase 133: Dark mode toggle
+- addons/web/static/src/scss/webclient.css: :root[data-theme="dark"] color overrides
+- addons/web/static/src/main.js: Theme toggle in navbar; localStorage.erp_theme; prefers-color-scheme auto-detect; apply theme on init to avoid flash
+
+## 1.43.0 (Project module)
+
+### Project module
+- addons/project/: project.project, project.task, project.task.type
+- project.project: name, description, partner_id
+- project.task: name, project_id, stage_id, user_ids, date_deadline, description; MailActivityMixin, MailThreadMixin
+- project.task.type: name, sequence, fold (Backlog, In Progress, Done seeded on db init)
+- Views: list, form, kanban for projects and tasks; actions; menus (Project > Projects, Project > Tasks)
+- core/tools/config.py: project in DEFAULT_SERVER_WIDE_MODULES (after mail, before crm)
+- core/db/init_data.py: project.task.type stages (Backlog, In Progress, Done) seeded on db init
+
+## 1.42.0 (Phases 126–127: _inherits, Recordset Utils)
+
+### Phase 131: Project module
+- addons/project/: project.project, project.task, project.task.type
+- list/form/kanban views; Project menu (Projects, Tasks)
+- project in DEFAULT_SERVER_WIDE_MODULES; default stages: Backlog, In Progress, Done
+
+### Phase 130: Email inbound (fetchmail)
+- addons/fetchmail/: fetchmail.server (IMAP), mail.alias (email -> model mapping)
+- fetch_mail() connects via IMAP, fetches unseen, creates crm.lead from alias
+- run_fetchmail cron; fetchmail in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_fetchmail_phase130.py
+
+### Phase 129: Module scaffold (complete Phase 121)
+- core/cli/scaffold.py, templates/default/: erp-bin scaffold <name> [dest] creates full module skeleton
+- Jinja2 templates for manifest, models, views, security, controllers; snake_case conversion
+
+### Phase 128: Multi-worker prefork (complete Phase 120)
+- core/cli/server.py: --workers=N uses gunicorn when installed; N HTTP workers + 1 cron worker; graceful shutdown
+- Falls back to single process when gunicorn not installed
+- requirements.txt: note for pip install gunicorn
+
+### Phase 127: Recordset utility methods
+- core/orm/models.py: Recordset.mapped(), filtered(), sorted(), exists(), ensure_one()
+- mapped: field name (list or comodel recordset for Many2one) or callable
+- tests/test_recordset_phase127.py
+
+### Phase 126: _inherits delegation inheritance
+- core/orm/models.py: _inherits dict {parent_model: fk_field}; create() auto-creates parent; read() delegates inherited fields; write() propagates to parent
+- addons/base/models/res_users.py: _inherits = {"res.partner": "partner_id"}; name, email removed (delegated to partner)
+- tests/test_inherits_phase126.py: res.users create creates partner; write propagates to partner
+
 ## 1.41.0 (Phases 120–121: Multi-Worker Tests, Scaffold Tests)
 
 ### Phase 120: Multi-worker mode (tests)

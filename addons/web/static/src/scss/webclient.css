@@ -24,8 +24,30 @@
   --radius-md: 8px;
 }
 
+/* Phase 133: Dark mode */
+:root[data-theme="dark"] {
+  --color-bg: #1a1a2e;
+  --color-navbar: #0f0f1a;
+  --color-text: #e0e0e0;
+  --color-primary: #4a9eff;
+  --color-success: #4caf50;
+  --color-danger: #f44336;
+  --color-warning: #ff9800;
+  --text-muted: #9e9e9e;
+  --border-color: #333;
+}
+
 * {
   box-sizing: border-box;
+}
+
+/* Phase 134: focus-visible for keyboard navigation */
+:focus {
+  outline: none;
+}
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 body {

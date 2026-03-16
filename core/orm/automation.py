@@ -65,6 +65,7 @@ def _run_automation_impl(env, trigger, model_name, record_ids, vals):
     Automation = env.get("base.automation")
     ServerAction = env.get("ir.actions.server")
     if not Automation or not ServerAction:
+        _logger.debug("base.automation: Automation or ServerAction not loaded")
         return
     try:
         rules = Automation.search([
@@ -73,6 +74,7 @@ def _run_automation_impl(env, trigger, model_name, record_ids, vals):
             ("active", "=", True),
         ])
         if not rules or not rules.ids:
+            _logger.debug("base.automation: no rules for %s %s", model_name, trigger)
             return
         for rule in rules:
             domain = _parse_domain(rule.read(["filter_domain"])[0].get("filter_domain"))
@@ -84,7 +86,11 @@ def _run_automation_impl(env, trigger, model_name, record_ids, vals):
             if not action_id:
                 continue
             action = ServerAction.browse(action_id)
-            records = env.get(model_name).browse(matching_ids)
+            Model = env.get(model_name)
+            if not Model:
+                continue
+            from core.orm.models import Recordset
+            records = Recordset(Model, matching_ids, _env=env)
             try:
                 action.run(records)
             except Exception as e:

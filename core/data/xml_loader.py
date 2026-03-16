@@ -206,6 +206,11 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
                     fd["comodel"] = comodel
                 fields.append(fd)
         return {"type": "pivot", "fields": fields}
+    if tag == "activity":
+        date_deadline = node.get("date_deadline", "")
+        string = node.get("string", "Activities")
+        fields = [f.get("name", "") for f in node.findall("field") if f.get("name")]
+        return {"type": "activity", "date_deadline": date_deadline, "string": string, "fields": fields}
     return {"type": tag}
 
 

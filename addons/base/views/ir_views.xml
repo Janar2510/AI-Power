@@ -170,5 +170,88 @@
       <field name="view_mode">list,form</field>
     </record>
     <menuitem name="Automated Actions" id="menu_base_automation" action="base.action_base_automation" parent="base.menu_settings" sequence="20"/>
+    <menuitem name="Technical" id="menu_technical" parent="base.menu_settings" sequence="50"/>
+    <record model="ir.ui.view" id="ir_cron_list">
+      <field name="name">ir.cron list</field>
+      <field name="model">ir.cron</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="model"/>
+          <field name="method"/>
+          <field name="interval_minutes"/>
+          <field name="next_run"/>
+          <field name="active"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="ir_cron_form">
+      <field name="name">ir.cron form</field>
+      <field name="model">ir.cron</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="model"/>
+            <field name="method"/>
+            <field name="interval_minutes"/>
+            <field name="next_run"/>
+            <field name="active"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_ir_cron">
+      <field name="name">Scheduled Actions</field>
+      <field name="res_model">ir.cron</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Scheduled Actions" id="menu_ir_cron" action="base.action_ir_cron" parent="base.menu_technical" sequence="10"/>
+    <record model="ir.ui.view" id="ir_actions_server_list">
+      <field name="name">ir.actions.server list</field>
+      <field name="model">ir.actions.server</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_ir_actions_server">
+      <field name="name">Server Actions</field>
+      <field name="res_model">ir.actions.server</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Server Actions" id="menu_ir_actions_server" action="base.action_ir_actions_server" parent="base.menu_technical" sequence="20"/>
+    <record model="ir.ui.view" id="ir_sequence_list">
+      <field name="name">ir.sequence list</field>
+      <field name="model">ir.sequence</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="code"/>
+          <field name="name"/>
+          <field name="number_next"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="ir_sequence_form">
+      <field name="name">ir.sequence form</field>
+      <field name="model">ir.sequence</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="code"/>
+            <field name="name"/>
+            <field name="number_next"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_ir_sequence">
+      <field name="name">Sequences</field>
+      <field name="res_model">ir.sequence</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Sequences" id="menu_ir_sequence" action="base.action_ir_sequence" parent="base.menu_technical" sequence="30"/>
   </data>
 </odoo>

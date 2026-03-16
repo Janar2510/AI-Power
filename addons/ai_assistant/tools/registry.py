@@ -68,6 +68,39 @@ def create_activity(env, lead_id: int, name: str, note: Optional[str] = None) ->
     return {"id": rec.id if rec else None, "message": "Activity created"}
 
 
+@_register("suggest_next_actions", "Suggest next actions for a record (Phase 139)")
+def suggest_next_actions(env, model: str, record_id: int) -> List[Dict[str, str]]:
+    """Suggest next actions based on record state. User must confirm; no auto-execution."""
+    try:
+        Model = env[model]
+    except KeyError:
+        return []
+    if model not in ("crm.lead", "project.task"):
+        return []
+    records = Model.read_ids([record_id], ["name", "stage_id", "expected_revenue", "description", "date_deadline"])
+    if not records:
+        return []
+    r = records[0]
+    stage_name = ""
+    if r.get("stage_id"):
+        try:
+            Stage = env["crm.stage"] if model == "crm.lead" else env["project.task.type"]
+            stages = Stage.search_read([["id", "=", r["stage_id"]]], ["name"])
+            stage_name = stages[0]["name"] if stages else ""
+        except KeyError:
+            pass
+    suggestions = []
+    if model == "crm.lead":
+        if not stage_name or stage_name in ("New", "Qualified"):
+            suggestions.append({"action": "schedule_activity", "label": "Schedule a call", "type": "Call"})
+        suggestions.append({"action": "change_stage", "label": "Move to next stage", "type": "workflow"})
+        suggestions.append({"action": "draft_message", "label": "Draft email to contact", "type": "Email"})
+    elif model == "project.task":
+        suggestions.append({"action": "schedule_activity", "label": "Schedule activity", "type": "Meeting"})
+        suggestions.append({"action": "change_stage", "label": "Move to next stage", "type": "workflow"})
+    return suggestions[:5]
+
+
 @_register("propose_workflow_step", "Suggest next stage for a lead")
 def propose_workflow_step(env, model: str, ids: List[int]) -> str:
     """Suggest next workflow stage for crm.lead. Read-only."""
@@ -99,6 +132,58 @@ def propose_workflow_step(env, model: str, ids: List[int]) -> str:
     return "\n".join(suggestions)
 
 
+@_register("analyze_data", "Analyze data: read_group by measure and groupby, return NL summary (Phase 140)")
+def analyze_data(env, model: str, measure: str = "expected_revenue", groupby: Optional[str] = "stage_id", use_llm: bool = True) -> str:
+    """Read grouped data and optionally use LLM to generate NL insights."""
+    try:
+        Model = env[model]
+    except KeyError:
+        return "Model not found"
+    if model not in ("crm.lead", "sale.order"):
+        return "analyze_data supports crm.lead and sale.order only"
+    measure_field = measure or ("expected_revenue" if model == "crm.lead" else "amount_total")
+    groupby_field = groupby or ("stage_id" if model == "crm.lead" else "state")
+    try:
+        rows = Model.read_group([], [measure_field], [groupby_field], lazy=False)
+    except Exception as e:
+        return f"Error reading data: {e}"
+    if not rows:
+        return "No data to analyze"
+    summary_lines = []
+    total = 0
+    for r in rows:
+        val = r.get(measure_field, 0) or 0
+        total += float(val) if isinstance(val, (int, float)) else 0
+        key = r.get(groupby_field)
+        label = key if isinstance(key, str) else (r.get(groupby_field + "_display") or str(key))
+        summary_lines.append(f"{label}: {val}")
+    text_data = "\n".join(summary_lines) + f"\nTotal: {total}"
+    if not use_llm:
+        return text_data
+    try:
+        from ..llm import _get_api_key
+        from ..controllers.ai_controller import _get_llm_config
+        cfg = _get_llm_config(env)
+        if (cfg.get("llm_enabled") or "0") != "1":
+            return text_data
+        key = _get_api_key(env)
+        if not key:
+            return text_data
+        from openai import OpenAI
+        client = OpenAI(api_key=key)
+        model_name = cfg.get("llm_model", "gpt-4o-mini")
+        prompt = f"""Summarize this business data in 2-3 sentences. Highlight key insights or trends.
+Data ({model}, {measure_field} by {groupby_field}):
+{text_data}
+
+Brief summary:"""
+        resp = client.chat.completions.create(model=model_name, messages=[{"role": "user", "content": prompt}])
+        content = (resp.choices[0].message.content or "").strip()
+        return content or text_data
+    except Exception:
+        return text_data
+
+
 @_register("summarise_recordset", "Summarise a recordset by model")
 def summarise_recordset(env, model: str, ids: List[int], fields: Optional[List[str]] = None) -> str:
     """Summarise records - read and return text summary."""
@@ -113,8 +198,30 @@ def summarise_recordset(env, model: str, ids: List[int], fields: Optional[List[s
     return json.dumps(records, indent=2)
 
 
+def _get_embedding(env, text: str) -> Optional[List[float]]:
+    """Get embedding vector for text via OpenAI text-embedding-3-small. Returns None on failure."""
+    if not text or not str(text).strip():
+        return None
+    try:
+        from ..llm import _get_api_key
+        key = _get_api_key(env)
+        if not key:
+            return None
+        from openai import OpenAI
+        client = OpenAI(api_key=key)
+        resp = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=text[:8000],
+        )
+        if resp.data and len(resp.data) > 0:
+            return resp.data[0].embedding
+    except Exception:
+        pass
+    return None
+
+
 def index_record_for_rag(env, model: str, res_id: int) -> None:
-    """Index a record for RAG retrieval. Upserts ai.document.chunk."""
+    """Index a record for RAG retrieval. Upserts ai.document.chunk. Phase 136: embeds on write."""
     try:
         Chunk = env["ai.document.chunk"]
         M = env[model]
@@ -123,6 +230,7 @@ def index_record_for_rag(env, model: str, res_id: int) -> None:
     fields_map = {
         "res.partner": ["name", "is_company", "type", "email", "phone", "street", "street2", "city", "zip"],
         "crm.lead": ["name", "description", "expected_revenue"],
+        "knowledge.article": ["name", "body_html"],
     }
     fields = fields_map.get(model, ["name"])
     try:
@@ -132,12 +240,21 @@ def index_record_for_rag(env, model: str, res_id: int) -> None:
     if not records:
         return
     r = records[0]
-    parts = [str(r.get(f, "") or "") for f in fields]
+    import re
+    parts = []
+    for f in fields:
+        v = r.get(f, "") or ""
+        if isinstance(v, str) and "<" in v and ">" in v:
+            v = re.sub(r"<[^>]+>", " ", v)
+        parts.append(str(v).strip())
     text = " ".join(p for p in parts if p).strip()
     if not text:
         text = str(res_id)
-    existing = Chunk.search_read([("model", "=", model), ("res_id", "=", res_id)], ["id"])
+    embedding = _get_embedding(env, text)
     vals = {"model": model, "res_id": res_id, "text": text}
+    if embedding is not None:
+        vals["embedding"] = embedding
+    existing = Chunk.search_read([("model", "=", model), ("res_id", "=", res_id)], ["id"])
     if existing:
         Chunk.browse(existing[0]["id"]).write(vals)
     else:
@@ -292,18 +409,40 @@ Return only the JSON object, no other text."""
 
 
 def retrieve_chunks(env, query: str, limit: int = 10) -> List[Dict]:
-    """Retrieve document chunks by text search. Applies record rules: only returns chunks for records user can read."""
+    """Retrieve document chunks. Phase 136: uses cosine similarity when embeddings exist; else text ilike."""
     if not query or not str(query).strip():
         return []
     try:
         Chunk = env["ai.document.chunk"]
     except KeyError:
         return []
-    chunks = Chunk.search_read(
-        domain=[("text", "ilike", str(query).strip())],
-        fields=["id", "model", "res_id", "text"],
-        limit=limit * 2,
-    )  # fetch extra to allow for filtering
+    q = str(query).strip()
+    embedding = _get_embedding(env, q)
+    cr = getattr(env, "cr", None) if env else None
+    if embedding is not None and cr is not None:
+        try:
+            table = getattr(Chunk, "_table", "ai_document_chunk")
+            cr.execute(
+                f'''SELECT id, model, res_id, text FROM "{table}"
+                WHERE embedding IS NOT NULL
+                ORDER BY embedding <=> %s
+                LIMIT %s''',
+                (embedding, limit * 2),
+            )
+            rows = cr.fetchall()
+            chunks = [dict(r) if hasattr(r, "keys") else {"id": r[0], "model": r[1], "res_id": r[2], "text": r[3]} for r in rows]
+        except Exception:
+            chunks = Chunk.search_read(
+                domain=[("text", "ilike", q)],
+                fields=["id", "model", "res_id", "text"],
+                limit=limit * 2,
+            )
+    else:
+        chunks = Chunk.search_read(
+            domain=[("text", "ilike", q)],
+            fields=["id", "model", "res_id", "text"],
+            limit=limit * 2,
+        )
     result = []
     for c in chunks:
         model_name = c.get("model")

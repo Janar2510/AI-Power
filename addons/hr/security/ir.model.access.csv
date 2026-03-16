@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_department,hr.department,model_hr_department,,1,1,1,1
+access_hr_job,hr.job,model_hr_job,,1,1,1,1
+access_hr_employee,hr.employee,model_hr_employee,,1,1,1,1
+access_hr_leave_type,hr.leave.type,model_hr_leave_type,,1,1,1,1
+access_hr_leave,hr.leave,model_hr_leave,,1,1,1,1
+access_hr_leave_allocation,hr.leave.allocation,model_hr_leave_allocation,,1,1,1,1

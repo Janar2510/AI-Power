@@ -69,7 +69,8 @@ def _render_report_html(report_name: str, ids: List[int], request: Request) -> O
             reg = _get_report_from_db(report_name, db, registry)
     if not reg:
         return None
-    model_name, template_rel = reg[0], reg[1]
+    model_name = reg[0]
+    template_rel = reg[1]
     report_fields = reg[2] if len(reg) > 2 else ["id", "name"]
     module = template_rel.split("/")[0]
     template_path = "/".join(template_rel.split("/")[1:])
@@ -91,6 +92,28 @@ def _render_report_html(report_name: str, ids: List[int], request: Request) -> O
         records = Model.browse(ids).read(report_fields) if ids else []
         if not ids and not records:
             records = []
+        for rec in records:
+            for f in report_fields:
+                val = rec.get(f)
+                if not val or not isinstance(val, (list, tuple)) or not val:
+                    continue
+                first = val[0]
+                if f == "order_line" and model_name == "sale.order":
+                    Line = env.get("sale.order.line")
+                    if Line and isinstance(first, int):
+                        rec[f] = Line.read_ids(list(val), ["name", "product_uom_qty", "price_unit", "price_subtotal"])
+                elif f == "order_line" and model_name == "purchase.order":
+                    Line = env.get("purchase.order.line")
+                    if Line and isinstance(first, int):
+                        rec[f] = Line.read_ids(list(val), ["name", "product_qty", "price_unit"])
+                elif f == "line_ids" and model_name == "account.move":
+                    Line = env.get("account.move.line")
+                    if Line and isinstance(first, int):
+                        rec[f] = Line.read_ids(list(val), ["name", "account_id", "debit", "credit"])
+                elif f == "move_ids" and model_name == "stock.picking":
+                    Move = env.get("stock.move")
+                    if Move and isinstance(first, int):
+                        rec[f] = Move.read_ids(list(val), ["name", "product_uom_qty"])
 
     try:
         from jinja2 import Template

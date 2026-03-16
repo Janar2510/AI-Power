@@ -221,7 +221,7 @@ def dispatch_jsonrpc(request: Request) -> Response:
                     result = result.ids
                 elif isinstance(result, ModelBase):
                     result = result.id if result.id is not None else result.ids
-                if model_name in ("res.partner", "crm.lead") and method_name in ("create", "write", "copy"):
+                if model_name in ("res.partner", "crm.lead", "knowledge.article") and method_name in ("create", "write", "copy"):
                     try:
                         from addons.ai_assistant.tools.registry import index_record_for_rag
                         registry = _get_registry(db)

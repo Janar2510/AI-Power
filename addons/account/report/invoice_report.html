@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Invoice</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #333; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+    .total { font-weight: bold; text-align: right; }
+  </style>
+</head>
+<body>
+  <h1>Invoice</h1>
+  {% for r in records %}
+  <p><strong>Number:</strong> {{ r.name or 'N/A' }} | <strong>Partner:</strong> {{ r.partner_id[1] if r.partner_id is iterable and r.partner_id|length > 1 else r.partner_id }} | <strong>Origin:</strong> {{ r.invoice_origin or '' }} | <strong>State:</strong> {{ r.state or '' }}</p>
+  <table>
+    <thead><tr><th>Account</th><th>Name</th><th>Debit</th><th>Credit</th></tr></thead>
+    <tbody>
+      {% for line in (r.line_ids or []) %}
+      <tr><td>{{ line.get('account_id', '') }}</td><td>{{ line.get('name', '') }}</td><td>{{ line.get('debit', 0) }}</td><td>{{ line.get('credit', 0) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+</body>
+</html>

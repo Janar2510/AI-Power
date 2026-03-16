@@ -58,7 +58,7 @@ class TestAiLlm(unittest.TestCase):
             mock_cfg.return_value = {"llm_enabled": "1", "llm_model": "gpt-4o-mini"}
             with patch("addons.ai_assistant.controllers.ai_controller.retrieve_chunks", return_value=[]):
                 with patch("addons.ai_assistant.controllers.ai_controller.call_llm") as mock_llm:
-                    mock_llm.return_value = "Mocked LLM response for testing."
+                    mock_llm.return_value = ("Mocked LLM response for testing.", [])
                     req = self._make_request("/ai/chat", method="POST", data={"prompt": "Show me leads"})
                     from addons.ai_assistant.controllers.ai_controller import ai_chat
                     r = ai_chat(req)

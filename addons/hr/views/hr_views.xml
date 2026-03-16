@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="hr_department_list">
+      <field name="name">hr.department list</field>
+      <field name="model">hr.department</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="manager_id" comodel="hr.employee"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_department_form">
+      <field name="name">hr.department form</field>
+      <field name="model">hr.department</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="manager_id" comodel="hr.employee"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_job_list">
+      <field name="name">hr.job list</field>
+      <field name="model">hr.job</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_job_form">
+      <field name="name">hr.job form</field>
+      <field name="model">hr.job</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_employee_list">
+      <field name="name">hr.employee list</field>
+      <field name="model">hr.employee</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="department_id" comodel="hr.department"/>
+          <field name="job_id" comodel="hr.job"/>
+          <field name="work_email"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_employee_form">
+      <field name="name">hr.employee form</field>
+      <field name="model">hr.employee</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="department_id" comodel="hr.department"/>
+            <field name="job_id" comodel="hr.job"/>
+            <field name="work_email"/>
+            <field name="user_id" comodel="res.users"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_department">
+      <field name="name">Departments</field>
+      <field name="res_model">hr.department</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_job">
+      <field name="name">Job Positions</field>
+      <field name="res_model">hr.job</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_employee">
+      <field name="name">Employees</field>
+      <field name="res_model">hr.employee</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.ui.view" id="hr_leave_type_list">
+      <field name="name">hr.leave.type list</field>
+      <field name="model">hr.leave.type</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="allocation_type"/>
+          <field name="max_leaves"/>
+          <field name="sequence"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_leave_type_form">
+      <field name="name">hr.leave.type form</field>
+      <field name="model">hr.leave.type</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="allocation_type"/>
+            <field name="color"/>
+            <field name="max_leaves"/>
+            <field name="sequence"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_leave_list">
+      <field name="name">hr.leave list</field>
+      <field name="model">hr.leave</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="employee_id" comodel="hr.employee"/>
+          <field name="leave_type_id" comodel="hr.leave.type"/>
+          <field name="date_from"/>
+          <field name="date_to"/>
+          <field name="number_of_days"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_leave_form">
+      <field name="name">hr.leave form</field>
+      <field name="model">hr.leave</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="action_confirm" string="Submit" type="object" class="btn-primary"/>
+            <button name="action_validate" string="Approve" type="object" class="btn-primary"/>
+            <button name="action_refuse" string="Refuse" type="object"/>
+            <button name="action_draft" string="Reset to Draft" type="object"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="employee_id" comodel="hr.employee"/>
+            <field name="leave_type_id" comodel="hr.leave.type"/>
+            <field name="date_from"/>
+            <field name="date_to"/>
+            <field name="number_of_days"/>
+            <field name="state"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_leave_calendar">
+      <field name="name">hr.leave calendar</field>
+      <field name="model">hr.leave</field>
+      <field name="arch" type="xml">
+        <calendar date_start="date_from" string="name"/>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_leave_allocation_list">
+      <field name="name">hr.leave.allocation list</field>
+      <field name="model">hr.leave.allocation</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="employee_id" comodel="hr.employee"/>
+          <field name="leave_type_id" comodel="hr.leave.type"/>
+          <field name="number_of_days"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_leave_allocation_form">
+      <field name="name">hr.leave.allocation form</field>
+      <field name="model">hr.leave.allocation</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="employee_id" comodel="hr.employee"/>
+            <field name="leave_type_id" comodel="hr.leave.type"/>
+            <field name="number_of_days"/>
+            <field name="state"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_leave_type">
+      <field name="name">Leave Types</field>
+      <field name="res_model">hr.leave.type</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_leave">
+      <field name="name">Leaves</field>
+      <field name="res_model">hr.leave</field>
+      <field name="view_mode">calendar,list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_leave_allocation">
+      <field name="name">Allocations</field>
+      <field name="res_model">hr.leave.allocation</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="HR" id="menu_hr_root" sequence="26"/>
+    <menuitem name="Employees" id="menu_hr_employee" action="action_hr_employee" parent="menu_hr_root" sequence="10"/>
+    <menuitem name="Leaves" id="menu_hr_leave" action="action_hr_leave" parent="menu_hr_root" sequence="15"/>
+    <menuitem name="Leave Types" id="menu_hr_leave_type" action="action_hr_leave_type" parent="menu_hr_root" sequence="16"/>
+    <menuitem name="Allocations" id="menu_hr_leave_allocation" action="action_hr_leave_allocation" parent="menu_hr_root" sequence="17"/>
+    <menuitem name="Departments" id="menu_hr_department" action="action_hr_department" parent="menu_hr_root" sequence="20"/>
+    <menuitem name="Job Positions" id="menu_hr_job" action="action_hr_job" parent="menu_hr_root" sequence="30"/>
+  </data>
+</odoo>

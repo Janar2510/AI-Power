@@ -18,7 +18,9 @@ def load_default_data(env) -> None:
     _load_res_lang(env)
     _load_res_company(env)
     _load_stock_data(env)
+    _load_mrp_data(env)
     _load_account_data(env)
+    _load_product_demo(env)
 
     try:
         Groups = env.get("res.groups")
@@ -39,6 +41,19 @@ def load_default_data(env) -> None:
         _logger.warning("Could not load default groups: %s", e)
 
     try:
+        TaskType = env.get("project.task.type")
+        if TaskType and not TaskType.search([]):
+            for name, seq, fold in [
+                ("Backlog", 1, False),
+                ("In Progress", 2, False),
+                ("Done", 3, True),
+            ]:
+                TaskType.create({"name": name, "sequence": seq, "fold": fold})
+            _logger.info("Created default project.task.type records")
+    except Exception as e:
+        _logger.warning("Could not load default project.task.type: %s", e)
+
+    try:
         Stage = env.get("crm.stage")
         if Stage and not Stage.search([]):
             for name, seq, is_won, fold in [
@@ -52,6 +67,15 @@ def load_default_data(env) -> None:
             _logger.info("Created default crm.stage records")
     except Exception as e:
         _logger.warning("Could not load default crm.stage: %s", e)
+
+    try:
+        ActivityType = env.get("mail.activity.type")
+        if ActivityType and not ActivityType.search([]):
+            for name, seq in [("Call", 1), ("Meeting", 2), ("Email", 3)]:
+                ActivityType.create({"name": name, "sequence": seq})
+            _logger.info("Created default mail.activity.type records")
+    except Exception as e:
+        _logger.warning("Could not load default mail.activity.type: %s", e)
 
     try:
         Tag = env.get("crm.tag")
@@ -69,6 +93,9 @@ def load_default_data(env) -> None:
                 ("crm.lead", "Lead/Opportunity Reference"),
                 ("stock.picking", "Transfer Reference"),
                 ("account.move", "Journal Entry Reference"),
+                ("sale.order", "Sales Order Reference"),
+                ("purchase.order", "Purchase Order Reference"),
+                ("mrp.production", "Manufacturing Order Reference"),
             ]:
                 existing = IrSequence.search([("code", "=", code)])
                 if not existing:
@@ -101,6 +128,17 @@ def load_default_data(env) -> None:
                 "active": True,
             })
             _logger.info("Created cron: Process email queue")
+        if IrCron and env.get("fetchmail.server") and not IrCron.search([("model", "=", "fetchmail.server")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Fetch incoming emails",
+                "model": "fetchmail.server",
+                "method": "run_fetchmail",
+                "interval_minutes": 5,
+                "next_run": (datetime.utcnow() + timedelta(minutes=1)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: Fetch incoming emails")
         if IrCron and env.get("ai.rag.reindex") and not IrCron.search([("model", "=", "ai.rag.reindex")]):
             from datetime import datetime, timedelta
             IrCron.create({
@@ -112,6 +150,17 @@ def load_default_data(env) -> None:
                 "active": True,
             })
             _logger.info("Created cron: RAG bulk reindex")
+        if IrCron and env.get("base.db.backup") and not IrCron.search([("model", "=", "base.db.backup")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Database backup",
+                "model": "base.db.backup",
+                "method": "run",
+                "interval_minutes": 1440,  # daily
+                "next_run": (datetime.utcnow() + timedelta(minutes=60)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: Database backup")
     except Exception as e:
         _logger.warning("Could not create transient vacuum cron: %s", e)
 
@@ -191,6 +240,38 @@ def _load_ir_actions_reports(env) -> None:
                 "report_name": "crm.lead_summary",
                 "report_file": "crm/report/lead_summary.html",
                 "fields_csv": "id,name,type,stage_id,expected_revenue,date_deadline,description",
+            },
+            {
+                "xml_id": "sale.report_saleorder",
+                "name": "Sale Order",
+                "model": "sale.order",
+                "report_name": "sale.report_saleorder",
+                "report_file": "sale/report/sale_order_report.html",
+                "fields_csv": "id,name,partner_id,date_order,state,amount_total,order_line",
+            },
+            {
+                "xml_id": "account.report_invoice",
+                "name": "Invoice",
+                "model": "account.move",
+                "report_name": "account.report_invoice",
+                "report_file": "account/report/invoice_report.html",
+                "fields_csv": "id,name,partner_id,journal_id,move_type,state,invoice_origin,line_ids",
+            },
+            {
+                "xml_id": "purchase.report_purchaseorder",
+                "name": "Purchase Order",
+                "model": "purchase.order",
+                "report_name": "purchase.report_purchaseorder",
+                "report_file": "purchase/report/purchase_order_report.html",
+                "fields_csv": "id,name,partner_id,state,order_line",
+            },
+            {
+                "xml_id": "stock.report_deliveryslip",
+                "name": "Delivery Slip",
+                "model": "stock.picking",
+                "report_name": "stock.report_deliveryslip",
+                "report_file": "stock/report/delivery_slip_report.html",
+                "fields_csv": "id,name,partner_id,location_id,location_dest_id,origin,state,move_ids",
             },
         ]
         for d in defaults:
@@ -528,6 +609,35 @@ def _load_account_data(env) -> None:
         _logger.info("Created default account accounts and journals")
     except Exception as e:
         _logger.warning("Could not load account data: %s", e)
+
+
+def _load_product_demo(env) -> None:
+    """Load demo products for shop (Phase 143). Ensures E2E shop tests have products."""
+    try:
+        Product = env.get("product.product")
+        if not Product or Product.search([]):
+            return
+        for name, price in [("Widget A", 9.99), ("Widget B", 19.50), ("Widget C", 4.99)]:
+            Product.create({"name": name, "list_price": price})
+        _logger.info("Created demo products for shop")
+    except Exception as e:
+        _logger.warning("Could not load product demo: %s", e)
+
+
+def _load_mrp_data(env) -> None:
+    """Create production location for MRP (Phase 153)."""
+    try:
+        Location = env.get("stock.location")
+        if not Location:
+            return
+        # Check if production type exists (mrp extends stock.location)
+        existing = Location.search([("type", "=", "production")])
+        if existing.ids:
+            return  # already seeded
+        Location.create({"name": "Production", "type": "production"})
+        _logger.info("Created MRP production location")
+    except Exception as e:
+        _logger.warning("Could not load MRP data: %s", e)
 
 
 def _load_stock_data(env) -> None:

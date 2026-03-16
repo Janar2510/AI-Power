@@ -36,6 +36,7 @@ class MailActivity(Model):
 
     res_model = fields.Char(required=True, string="Related Model")
     res_id = fields.Integer(required=True, string="Related Record ID")
+    activity_type_id = fields.Many2one("mail.activity.type", string="Activity Type")
     company_id = fields.Many2one("res.company", string="Company")
     summary = fields.Char(string="Summary")
     note = fields.Text()
@@ -73,7 +74,12 @@ class MailActivityMixin:
     )
 
     def activity_schedule(
-        self, summary: str, date_deadline: Any = None, note: str = "", user_id: int = None
+        self,
+        summary: str,
+        date_deadline: Any = None,
+        note: str = "",
+        user_id: int = None,
+        activity_type_id: int = None,
     ) -> "MailActivity":
         """Schedule an activity on this record. date_deadline defaults to today."""
         env = getattr(self, "env", None)
@@ -96,4 +102,6 @@ class MailActivityMixin:
         }
         if user_id is not None:
             vals["user_id"] = user_id
+        if activity_type_id is not None:
+            vals["activity_type_id"] = activity_type_id
         return MailActivity.create(vals)

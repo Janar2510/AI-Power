@@ -38,6 +38,10 @@ def _load_routes():
     except ImportError:
         pass
     try:
+        import addons.mail.controllers  # noqa: F401 - registers /discuss/channel/*
+    except ImportError:
+        pass
+    try:
         import addons.website.controllers  # noqa: F401 - registers /website, /my, /my/leads, /my/profile
     except ImportError:
         pass
@@ -58,6 +62,7 @@ def _needs_cors(path: str) -> bool:
         "/json/2/" in path or path == "/jsonrpc" or path.startswith("/web/dataset/")
         or path == "/web/session/get_session_info" or path == "/web/load_views"
         or path.startswith("/web/translations") or path.startswith("/web/session/")
+        or path.startswith("/discuss/") or path.startswith("/mail/notifications")
     )
 
 
@@ -77,6 +82,7 @@ def _is_safe_local_origin(origin: str) -> bool:
 def _add_security_headers(start_response: Callable, environ: dict) -> Callable:
     """Wrap start_response to add security headers to every response."""
     proxy_mode = config.get_config().get("proxy_mode", False)
+    debug_profiling = config.get_config().get("debug_profiling", False)
     cors_origin = config.get_config().get("cors_origin", "")
     path = environ.get("PATH_INFO") or ""
     method = environ.get("REQUEST_METHOD", "")
@@ -84,6 +90,16 @@ def _add_security_headers(start_response: Callable, environ: dict) -> Callable:
     def custom_start_response(status, headers, exc_info=None):
         for name, value in _SECURITY_HEADERS:
             headers.append((name, value))
+        if debug_profiling:
+            try:
+                from core.profiling import get_profiling_stats
+                stats = get_profiling_stats()
+                if stats.get("request_ms") is not None:
+                    headers.append(("X-Response-Time-Ms", f"{stats['request_ms']:.2f}"))
+                headers.append(("X-Query-Count", str(stats.get("query_count", 0))))
+                headers.append(("X-Query-Time-Ms", f"{stats.get('query_time_ms', 0):.2f}"))
+            except ImportError:
+                pass
         if proxy_mode:
             headers.append(("Strict-Transport-Security", "max-age=31536000; includeSubDomains"))
         # CORS: cors_origin > same-host reflect > safe local origin (localhost/127.0.0.1)
@@ -176,6 +192,12 @@ class Application:
         _load_routes()
 
     def __call__(self, environ: dict, start_response: Callable):
+        if config.get_config().get("debug_profiling"):
+            try:
+                from core.profiling import init_request_profiling
+                init_request_profiling()
+            except ImportError:
+                pass
         request = Request(environ)
         # WebSocket: use raw start_response (simple-websocket needs it; wrapping causes "write() before start_response")
         if request.path == "/websocket/" and request.method == "GET":

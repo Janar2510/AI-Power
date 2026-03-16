@@ -1,6 +1,9 @@
 """Database management commands."""
 
+import os
+import subprocess
 import sys
+from datetime import datetime
 
 from core.sql_db import create_database, db_exists, get_cursor
 from core.db import init_schema
@@ -21,11 +24,13 @@ class Db(Command):
         parser = self.parser
         parser.add_argument(
             "action",
-            choices=["create", "init", "list", "drop", "upgrade"],
-            help="create, init, list, drop, or upgrade database",
+            choices=["create", "init", "list", "drop", "upgrade", "backup", "restore"],
+            help="create, init, list, drop, upgrade, backup, or restore database",
         )
         parser.add_argument("-d", "--database", help="Database name")
         parser.add_argument("-m", "--module", help="Module(s) to upgrade (comma-separated)")
+        parser.add_argument("-f", "--file", help="Backup file for restore")
+        parser.add_argument("-o", "--output", help="Output path for backup")
 
         parsed = parser.parse_args(args)
         dbname = parsed.database or config.get_config().get("db_name", "erp")
@@ -40,6 +45,10 @@ class Db(Command):
             self._drop(dbname)
         elif parsed.action == "upgrade":
             self._upgrade(dbname, parsed.module)
+        elif parsed.action == "backup":
+            self._backup(dbname, parsed.output)
+        elif parsed.action == "restore":
+            self._restore(dbname, parsed.file)
 
     def _create(self, dbname: str) -> None:
         """Create database."""
@@ -127,3 +136,72 @@ class Db(Command):
             run_upgrade(cr, dbname, module_names)
             cr.connection.commit()
         print(f"Database {dbname} upgraded.")
+
+    def _backup(self, dbname: str, output_path: str = None) -> None:
+        """Backup database with pg_dump (Phase 145)."""
+        if not db_exists(dbname):
+            print(f"Database {dbname} does not exist.", file=sys.stderr)
+            sys.exit(1)
+        cfg = config.get_config()
+        if not output_path:
+            backup_dir = cfg.get("backup_dir") or os.environ.get("ERP_BACKUP_DIR", ".")
+            os.makedirs(backup_dir, exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            output_path = os.path.join(backup_dir, f"{dbname}_{timestamp}.sql")
+        try:
+            result = subprocess.run(
+                [
+                    "pg_dump",
+                    "-h", str(cfg.get("db_host", "localhost")),
+                    "-p", str(cfg.get("db_port", 5432)),
+                    "-U", str(cfg.get("db_user", "postgres")),
+                    "-d", dbname,
+                    "-f", output_path,
+                    "--no-owner",
+                    "--no-acl",
+                ],
+                env={**os.environ, "PGPASSWORD": str(cfg.get("db_password", ""))},
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            if result.returncode != 0:
+                print(f"pg_dump failed: {result.stderr}", file=sys.stderr)
+                sys.exit(1)
+            print(f"Backup saved to {output_path}")
+        except FileNotFoundError:
+            print("pg_dump not found; install PostgreSQL client tools", file=sys.stderr)
+            sys.exit(1)
+
+    def _restore(self, dbname: str, filepath: str = None) -> None:
+        """Restore database from pg_dump file (Phase 145)."""
+        if not filepath or not os.path.isfile(filepath):
+            print("Usage: erp-bin db restore -d <db> -f <backup.sql>", file=sys.stderr)
+            sys.exit(1)
+        cfg = config.get_config()
+        if db_exists(dbname):
+            print(f"Database {dbname} exists. Drop it first: erp-bin db drop -d {dbname}", file=sys.stderr)
+            sys.exit(1)
+        create_database(dbname)
+        try:
+            result = subprocess.run(
+                [
+                    "psql",
+                    "-h", str(cfg.get("db_host", "localhost")),
+                    "-p", str(cfg.get("db_port", 5432)),
+                    "-U", str(cfg.get("db_user", "postgres")),
+                    "-d", dbname,
+                    "-f", filepath,
+                ],
+                env={**os.environ, "PGPASSWORD": str(cfg.get("db_password", ""))},
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            if result.returncode != 0:
+                print(f"psql restore failed: {result.stderr}", file=sys.stderr)
+                sys.exit(1)
+            print(f"Database {dbname} restored from {filepath}")
+        except FileNotFoundError:
+            print("psql not found; install PostgreSQL client tools", file=sys.stderr)
+            sys.exit(1)

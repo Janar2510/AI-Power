@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="project_project_search">
+      <field name="name">project.project search</field>
+      <field name="model">project.project</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="name"/>
+          <field name="description"/>
+        </search>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="project_project_list">
+      <field name="name">project.project list</field>
+      <field name="model">project.project</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="description"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="project_project_form">
+      <field name="name">project.project form</field>
+      <field name="model">project.project</field>
+      <field name="arch" type="xml">
+        <form>
+          <header/>
+          <sheet>
+            <field name="name"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="description"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="project_project_kanban">
+      <field name="name">project.project kanban</field>
+      <field name="model">project.project</field>
+      <field name="arch" type="xml">
+        <kanban>
+          <field name="name"/>
+          <field name="partner_id"/>
+          <templates>
+            <t t-name="kanban-box">
+              <div class="oe_kanban_card"><field name="name"/><field name="partner_id"/></div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="project_task_search">
+      <field name="name">project.task search</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="name"/>
+          <field name="description"/>
+          <filter name="group_stage" string="Stage" context="{'group_by': 'stage_id'}"/>
+        </search>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="project_task_list">
+      <field name="name">project.task list</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="project_id" comodel="project.project"/>
+          <field name="stage_id" comodel="project.task.type"/>
+          <field name="user_ids" comodel="res.users" widget="many2many_tags"/>
+          <field name="date_deadline"/>
+          <field name="description"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="project_task_form">
+      <field name="name">project.task form</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <field name="stage_id" comodel="project.task.type" widget="statusbar"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="project_id" comodel="project.project"/>
+            <field name="stage_id" comodel="project.task.type"/>
+            <field name="user_ids" comodel="res.users" widget="many2many_tags"/>
+            <field name="date_deadline"/>
+            <field name="description"/>
+            <field name="activity_ids"/>
+            <field name="message_ids"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="project_task_kanban">
+      <field name="name">project.task kanban</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <kanban default_group_by="stage_id">
+          <field name="name"/>
+          <field name="stage_id"/>
+          <field name="date_deadline"/>
+          <templates>
+            <t t-name="kanban-box">
+              <div class="oe_kanban_card"><field name="name"/><field name="date_deadline"/></div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_project_project">
+      <field name="name">Projects</field>
+      <field name="res_model">project.project</field>
+      <field name="view_mode">kanban,list,form</field>
+    </record>
+    <record model="ir.ui.view" id="project_task_activity">
+      <field name="name">project.task activity</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <activity string="Activities" date_deadline="date_deadline">
+          <field name="activity_ids"/>
+        </activity>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_project_task">
+      <field name="name">Tasks</field>
+      <field name="res_model">project.task</field>
+      <field name="view_mode">activity,kanban,list,form</field>
+    </record>
+    <menuitem name="Project" id="menu_project_root" sequence="25"/>
+    <menuitem name="Projects" id="menu_project_projects" action="action_project_project" parent="menu_project_root" sequence="10"/>
+    <menuitem name="Tasks" id="menu_project_tasks" action="action_project_task" parent="menu_project_root" sequence="20"/>
+  </data>
+</odoo>

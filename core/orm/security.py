@@ -198,6 +198,15 @@ def get_record_rules(model_name: str, uid: int, env: Any = None, operation: str 
                                         out.append([["partner_id", "=", partner_id]])
                             except Exception:
                                 pass
+                        if model_name == "sale.order" and env and uid:
+                            try:
+                                db = getattr(env.registry, "db_name", None) if hasattr(env, "registry") else None
+                                if db and _user_has_group(env, uid, "base.group_portal"):
+                                    partner_id = _get_partner_id(env, uid)
+                                    if partner_id:
+                                        out.append([["partner_id", "=", partner_id]])
+                            except Exception:
+                                pass
                         if model_name in ("mail.message", "mail.activity", "ir.attachment") and env and uid:
                             try:
                                 db = getattr(env.registry, "db_name", None) if hasattr(env, "registry") else None
@@ -234,6 +243,16 @@ def get_record_rules(model_name: str, uid: int, env: Any = None, operation: str 
             out.append(domain)
     # Phase 101: portal users see only crm.lead where partner_id = their partner
     if model_name == "crm.lead" and env and uid:
+        try:
+            db = getattr(env.registry, "db_name", None) if hasattr(env, "registry") else None
+            if db and _user_has_group(env, uid, "base.group_portal"):
+                partner_id = _get_partner_id(env, uid)
+                if partner_id:
+                    out.append([["partner_id", "=", partner_id]])
+        except Exception:
+            pass
+    # Phase 143: portal users see only sale.order where partner_id = their partner
+    if model_name == "sale.order" and env and uid:
         try:
             db = getattr(env.registry, "db_name", None) if hasattr(env, "registry") else None
             if db and _user_has_group(env, uid, "base.group_portal"):

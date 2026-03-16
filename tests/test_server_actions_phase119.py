@@ -31,7 +31,6 @@ class TestServerActionsPhase119(unittest.TestCase):
 
     def test_automation_on_create_sets_description(self):
         """Create automation rule, create lead, verify description set by automation."""
-        self.skipTest("TODO: server action exec records.write() needs cursor/env context")
         if not self._has_db:
             self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
         parse_config(["--addons-path=" + self._addons_path])

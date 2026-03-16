@@ -8,6 +8,15 @@ class SaleOrder(Model):
     _description = "Sales Order"
 
     name = fields.Char(string="Order Reference", required=True, default="New")
+
+    @classmethod
+    def create(cls, vals):
+        if vals.get("name") == "New" or not vals.get("name"):
+            env = getattr(cls._registry, "_env", None) if cls._registry else None
+            IrSequence = env.get("ir.sequence") if env else None
+            next_val = IrSequence.next_by_code("sale.order") if IrSequence else None
+            vals = dict(vals, name=f"SO/{next_val:05d}" if next_val is not None else "New")
+        return super().create(vals)
     partner_id = fields.Many2one("res.partner", string="Customer", required=True)
     date_order = fields.Datetime(string="Order Date", default=lambda self: self._default_date_order())
     state = fields.Selection(
@@ -47,8 +56,55 @@ class SaleOrder(Model):
         return result
 
     def action_confirm(self):
-        """Confirm the order (draft -> sale)."""
+        """Confirm the order (draft -> sale). Sends order confirmation email (Phase 143)."""
         self.write({"state": "sale"})
+        self._send_order_confirmation_email()
+
+    def _send_order_confirmation_email(self):
+        """Create mail.mail for order confirmation. Queued for cron to send."""
+        if not self or not self.ids:
+            return
+        env = getattr(self, "env", None)
+        if not env:
+            return
+        MailMail = env.get("mail.mail")
+        Partner = env.get("res.partner")
+        if not MailMail or not Partner:
+            return
+        for rec in self:
+            rows = rec.read(["partner_id", "name", "amount_total", "order_line"])
+            if not rows:
+                continue
+            r = rows[0]
+            partner_id = r.get("partner_id")
+            if not partner_id:
+                continue
+            # Handle Many2one from read: can be (id, name) or raw id
+            if isinstance(partner_id, (list, tuple)) and partner_id:
+                pid = partner_id[0]
+            else:
+                pid = partner_id
+            partners = Partner.read_ids([pid], ["name", "email"])
+            if not partners or not partners[0].get("email"):
+                continue
+            email_to = str(partners[0]["email"]).strip()
+            order_name = r.get("name") or f"Order #{rec.id}"
+            amount = r.get("amount_total") or 0
+            line_count = len(r.get("order_line") or [])
+            body = f"""<p>Thank you for your order.</p>
+<p><strong>Order:</strong> {order_name}</p>
+<p><strong>Total:</strong> {amount:,.2f}</p>
+<p><strong>Items:</strong> {line_count}</p>
+<p>We will process your order shortly.</p>"""
+            MailMail.create({
+                "email_from": "noreply@localhost",
+                "email_to": email_to,
+                "subject": f"Order confirmation: {order_name}",
+                "body_html": body,
+                "state": "outgoing",
+                "res_model": "sale.order",
+                "res_id": rec.id,
+            })
 
     def action_cancel(self):
         """Cancel the order."""

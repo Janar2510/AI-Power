@@ -83,6 +83,21 @@ _TOOL_SCHEMAS = {
             },
         },
     },
+    "suggest_next_actions": {
+        "type": "function",
+        "function": {
+            "name": "suggest_next_actions",
+            "description": "Suggest next actions for a record (schedule activity, change stage, draft email)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "record_id": {"type": "integer"},
+                },
+                "required": ["model", "record_id"],
+            },
+        },
+    },
 }
 
 
@@ -109,26 +124,28 @@ def call_llm(
     messages: List[Dict[str, str]],
     model: str = "gpt-4o-mini",
     api_key: Optional[str] = None,
-) -> str:
+) -> tuple:
     """
-    Call OpenAI chat completions with function calling.
-    Executes tool_calls, feeds results back, returns final assistant message.
+    Call OpenAI chat completions with function calling (Phase 137: ReAct tool chaining).
+    Executes tool_calls, feeds results back, loops up to max_iter.
+    Returns (result_str, tool_chain) where tool_chain is list of {tool, kwargs, result} for audit.
     """
     from ..tools.registry import execute_tool
 
     key = api_key or _get_api_key(env)
     if not key:
-        return "LLM not configured: set OPENAI_API_KEY or ai.openai_api_key in Settings."
+        return ("LLM not configured: set OPENAI_API_KEY or ai.openai_api_key in Settings.", [])
 
     try:
         from openai import OpenAI
     except ImportError:
-        return "OpenAI package not installed. Run: pip install openai"
+        return ("OpenAI package not installed. Run: pip install openai", [])
 
     client = OpenAI(api_key=key)
     tools = _get_tools_for_llm()
     max_iter = 5
     current_messages = list(messages)
+    tool_chain: List[Dict[str, Any]] = []
 
     for _ in range(max_iter):
         response = client.chat.completions.create(
@@ -138,11 +155,10 @@ def call_llm(
         )
         choice = response.choices[0] if response.choices else None
         if not choice:
-            return "No response from LLM"
+            return ("No response from LLM", tool_chain)
         msg = choice.message
         if not hasattr(msg, "tool_calls") or not msg.tool_calls:
-            return (msg.content or "").strip()
-        # Build one assistant message with ALL tool_calls, then all tool responses
+            return ((msg.content or "").strip(), tool_chain)
         tool_calls_list = []
         tool_results = []
         for tc in msg.tool_calls:
@@ -159,8 +175,9 @@ def call_llm(
                 result_str = json.dumps(result) if not isinstance(result, str) else result
             except Exception as e:
                 result_str = f"Error: {e}"
+            tool_chain.append({"tool": name, "kwargs": kwargs, "result": (result_str or "")[:500]})
             tool_results.append((tc_id, result_str))
         current_messages.append({"role": "assistant", "content": None, "tool_calls": tool_calls_list})
         for tc_id, result_str in tool_results:
             current_messages.append({"role": "tool", "tool_call_id": tc_id, "content": result_str})
-    return "Max iterations reached."
+    return ("Max iterations reached.", tool_chain)

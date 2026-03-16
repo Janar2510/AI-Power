@@ -159,6 +159,18 @@ class Computed(Field):
         self.column_type = "varchar" if store else None
 
 
+class Vector(Field):
+    """Vector field for pgvector - stores embedding for semantic search (Phase 136)."""
+
+    type = "vector"
+    column_type = "vector"
+
+    def __init__(self, dimensions: int = 1536, string: str = "", **kwargs):
+        super().__init__(string=string, **kwargs)
+        self.dimensions = dimensions
+        self.size = dimensions  # schema uses size for vector dims
+
+
 class Binary(Field):
     """Binary field - stored as bytea in PostgreSQL."""
 

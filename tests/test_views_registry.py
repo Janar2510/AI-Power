@@ -35,6 +35,17 @@ class TestViewsRegistry(unittest.TestCase):
         self.assertIsNotNone(list_view)
         self.assertIn("stage_id", [c.get("name") for c in list_view["columns"]])
 
+    def test_load_views_registry_has_project(self):
+        registry = load_views_registry()
+        self.assertIn("project.project", registry.get("views", {}))
+        self.assertIn("project.task", registry.get("views", {}))
+        task_views = registry["views"]["project.task"]
+        list_view = next((v for v in task_views if v["type"] == "list"), None)
+        self.assertIsNotNone(list_view)
+        self.assertIn("stage_id", [c.get("name") for c in list_view["columns"]])
+        self.assertIn("project.action_project_project", registry.get("actions", {}))
+        self.assertIn("project.action_project_task", registry.get("actions", {}))
+
     def test_load_views_registry_has_actions(self):
         registry = load_views_registry()
         self.assertIn("actions", registry)

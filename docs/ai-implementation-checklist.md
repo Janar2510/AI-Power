@@ -26,6 +26,12 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] GET /ai/retrieve?q=query&limit=10 returns chunks (record rules applied)
 - [ ] /ai/chat with retrieve=true passes retrieved_doc_ids to audit
 
+## Phase 136 (Vector embeddings)
+
+- [ ] pgvector extension; ai.document.chunk.embedding (vector 1536)
+- [ ] index_record_for_rag: embeds via OpenAI text-embedding-3-small on write
+- [ ] retrieve_chunks: cosine similarity when embeddings exist; ilike fallback
+
 ## LLM Integration (Phase 88)
 
 - [ ] addons/ai_assistant/llm.py: call_llm() with OpenAI function-calling; tool_calls loop

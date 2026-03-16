@@ -256,6 +256,84 @@ class Recordset:
             getattr(self._model._registry, "_env", None) if self._model._registry else None
         )
 
+    def mapped(self, func: Union[str, Any]) -> Union["Recordset", List[Any]]:
+        """Phase 127: Map recordset by field name or callable. Many2one returns comodel recordset; else list."""
+        if not self._ids:
+            return Recordset(self._model, [])
+        if isinstance(func, str):
+            from core.orm import fields as fmod
+            field = getattr(self._model, func, None)
+            rows = self.read([func])
+            vals = [r.get(func) for r in rows]
+            if isinstance(field, fmod.Many2one):
+                ids = list(dict.fromkeys(v for v in vals if v))
+                comodel = getattr(field, "comodel", "")
+                env = self._env or getattr(self._model._registry, "_env", None)
+                Comodel = env.get(comodel) if env and comodel else None
+                if Comodel:
+                    return Recordset(Comodel, ids, _env=self._env)
+                return Recordset(self._model, [])
+            return vals
+        if callable(func):
+            result = []
+            for rec in self:
+                out = func(rec)
+                if isinstance(out, (list, tuple)):
+                    result.extend(out)
+                else:
+                    result.append(out)
+            return result
+        return Recordset(self._model, [])
+
+    def filtered(self, func: Any) -> "Recordset":
+        """Phase 127: Filter recordset by callable. Returns recordset of same model."""
+        if not self._ids or not callable(func):
+            return Recordset(self._model, [])
+        keep = []
+        for rec in self:
+            if func(rec):
+                keep.append(rec.id if hasattr(rec, "id") else rec._ids[0])
+        return Recordset(self._model, keep, _env=self._env)
+
+    def sorted(self, key: Any = None, reverse: bool = False) -> "Recordset":
+        """Phase 127: Sort recordset. key can be field name (str) or callable."""
+        if not self._ids:
+            return Recordset(self._model, [])
+        if isinstance(key, str):
+            rows = self.read([key])
+            id_to_val = {self._ids[i]: rows[i].get(key) for i in range(len(self._ids))}
+            sorted_ids = sorted(self._ids, key=lambda i: id_to_val.get(i), reverse=reverse)
+        elif callable(key):
+            recs = list(self)
+            sorted_recs = sorted(recs, key=key, reverse=reverse)
+            sorted_ids = [r.id for r in sorted_recs if r.id]
+        else:
+            sorted_ids = list(self._ids)
+            if reverse:
+                sorted_ids.reverse()
+        return Recordset(self._model, sorted_ids, _env=self._env)
+
+    def exists(self) -> "Recordset":
+        """Phase 127: Return recordset of records that still exist in DB."""
+        if not self._ids:
+            return Recordset(self._model, [])
+        env = self._env or getattr(self._model._registry, "_env", None)
+        if not env or not hasattr(env, "cr") or not env.cr:
+            return Recordset(self._model, self._ids, _env=self._env)
+        table = self._model._table
+        placeholders = ", ".join("%s" for _ in self._ids)
+        env.cr.execute(f'SELECT id FROM "{table}" WHERE id IN ({placeholders})', self._ids)
+        found = [r["id"] if hasattr(r, "keys") else r[0] for r in env.cr.fetchall()]
+        return Recordset(self._model, found, _env=self._env)
+
+    def ensure_one(self) -> "ModelBase":
+        """Phase 127: Ensure exactly one record; return it. Raise if empty or multiple."""
+        if len(self._ids) == 0:
+            raise ValueError(f"Expected singleton: {self._model._name}()")
+        if len(self._ids) > 1:
+            raise ValueError(f"Expected singleton: {self._model._name}({len(self._ids)} records)")
+        return self._model.browse(self._ids[0])
+
     def __getattr__(self, name: str) -> Any:
         """Delegate model methods (e.g. activity_schedule) to Model, passing self as first arg."""
         if hasattr(self._model, name):
@@ -272,6 +350,7 @@ class Model(type):
 
     _name: str = ""
     _inherit: str = ""
+    _inherits: Dict[str, str] = {}  # Phase 126: {parent_model: fk_field} delegation
     _description: str = ""
     _table: Optional[str] = None
     _registry: Optional[Any] = None
@@ -285,6 +364,10 @@ class Model(type):
     def __init__(cls, name: str, bases: tuple, attrs: dict):
         super().__init__(name, bases, attrs)
         inherit = getattr(cls, "_inherit", "")
+        inherits = getattr(cls, "_inherits", None) or {}
+        if not isinstance(inherits, dict):
+            inherits = {}
+        cls._inherits = inherits
         if inherit and not cls._name and cls._registry:
             cls._registry.merge_model(inherit, cls, attrs)
         elif cls._name and cls._registry:
@@ -415,7 +498,7 @@ class ModelBase(metaclass=Model):
         return result
 
     def read(self, fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:
-        """Read field values from DB or cache (instance API)."""
+        """Read field values from DB or cache (instance API). Phase 126: _inherits delegates to parent."""
         # Prefer cursor from instance env (avoids registry._env drift in RPC/cursor context)
         cr = None
         if hasattr(self, "env") and self.env and hasattr(self.env, "cr"):
@@ -426,11 +509,21 @@ class ModelBase(metaclass=Model):
             return [{"id": rid, **self._cache} for rid in self._ids]
         table = self._model._table
         requested = fields or ["id"]
+        inherits = getattr(self._model, "_inherits", None) or {}
+        inherited_requested = {}  # parent_model -> [field names]
+        for parent_model, fk_field in inherits.items():
+            parent_fields = self._model._get_inherited_fields(parent_model)
+            for f in requested:
+                if f in parent_fields:
+                    inherited_requested.setdefault(parent_model, []).append(f)
+        own_requested = [c for c in requested if c not in {f for flist in inherited_requested.values() for f in flist}]
         stored = self._get_stored_columns()
-        cols = [c for c in requested if c in stored]
+        cols = [c for c in own_requested if c in stored]
         if not cols:
             cols = ["id"]
-        # id is implicit (every table has it); include when requested
+        for parent_model, fk_field in inherits.items():
+            if parent_model in inherited_requested and fk_field not in cols:
+                cols.append(fk_field)
         if "id" in requested and "id" not in cols:
             cols = ["id"] + cols
         col_list = ", ".join(f'"{c}"' for c in cols)
@@ -439,6 +532,27 @@ class ModelBase(metaclass=Model):
         cr.execute(query, self._ids)
         raw_rows = cr.fetchall()
         rows = [dict(row) for row in raw_rows]
+        for parent_model, fk_field in inherits.items():
+            if parent_model not in inherited_requested:
+                continue
+            parent_fields = inherited_requested[parent_model]
+            env = getattr(self, "env", None)
+            Parent = env.get(parent_model) if env else None
+            if not Parent:
+                continue
+            fk_ids = [r.get(fk_field) for r in rows if r.get(fk_field)]
+            if not fk_ids:
+                for r in rows:
+                    for f in parent_fields:
+                        r[f] = None
+                continue
+            parent_rows = Parent.browse(fk_ids).read(parent_fields + ["id"])
+            by_id = {r["id"]: r for r in parent_rows}
+            for r in rows:
+                pid = r.get(fk_field)
+                pr = by_id.get(pid) if pid else None
+                for f in parent_fields:
+                    r[f] = pr.get(f) if pr else None
         from core.orm import fields as fmod
         for fname in requested:
             if fname in cols:
@@ -521,7 +635,7 @@ class ModelBase(metaclass=Model):
                     row[fname + "_display"] = None
 
     def write(self, vals: Dict[str, Any]) -> bool:
-        """Write field values to DB."""
+        """Write field values to DB. Phase 126: _inherits propagates to parent."""
         from core.orm.api import ValidationError
         if not vals or not self._ids:
             return True
@@ -533,6 +647,19 @@ class ModelBase(metaclass=Model):
             if denied:
                 raise PermissionError(f"Access denied by record rule for write on {self._model._name}: {denied}")
         vals = dict(vals)
+        inherits = getattr(self._model, "_inherits", None) or {}
+        for parent_model, fk_field in inherits.items():
+            parent_fields = self._model._get_inherited_fields(parent_model)
+            parent_vals = {k: v for k, v in vals.items() if k in parent_fields}
+            if parent_vals:
+                Parent = env.get(parent_model) if env else None
+                if Parent:
+                    rows = self.read([fk_field])
+                    fk_ids = list(dict.fromkeys(r.get(fk_field) for r in rows if r.get(fk_field)))
+                    if fk_ids:
+                        Parent.browse(fk_ids).write(parent_vals)
+                for k in parent_vals:
+                    vals.pop(k, None)
         from core.orm import fields as fmod
         # Phase 100: inverse for computed fields - call inverse instead of direct write
         for fname in list(vals.keys()):
@@ -868,8 +995,19 @@ class ModelBase(metaclass=Model):
         return out
 
     @classmethod
+    def _get_inherited_fields(cls, parent_model: str) -> set:
+        """Phase 126: Return field names that belong to parent model (for _inherits)."""
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env:
+            return set()
+        Parent = env.get(parent_model)
+        if not Parent:
+            return set()
+        return set(Parent._get_stored_field_names()) | set(Parent._get_stored_computed_fields()) | set(Parent._get_stored_related_fields())
+
+    @classmethod
     def create(cls: Type[T], vals: Dict[str, Any]) -> T:
-        """Create a new record in DB."""
+        """Create a new record in DB. Phase 126: _inherits creates parent first."""
         from core.orm.api import ValidationError
         vals = cls._sanitize_html_vals(vals)
         vals = cls._decode_binary_vals(vals)
@@ -877,6 +1015,32 @@ class ModelBase(metaclass=Model):
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
             return cls.browse(1)
+        # Phase 126: _inherits - create parent(s) first, set fk in vals
+        inherits = getattr(cls, "_inherits", None) or {}
+        for parent_model, fk_field in inherits.items():
+            parent_fields = cls._get_inherited_fields(parent_model)
+            parent_vals = {k: v for k, v in vals.items() if k in parent_fields}
+            fk_val = vals.get(fk_field)
+            if not fk_val or fk_val is False:
+                Parent = env.get(parent_model)
+                if Parent:
+                    if not parent_vals and parent_model == "res.partner" and fk_field == "partner_id":
+                        parent_vals = {"name": vals.get("login", "User")}
+                    if parent_vals or parent_model == "res.partner":
+                        parent_rec = Parent.create(parent_vals)
+                        pid = parent_rec.id if hasattr(parent_rec, "id") else (parent_rec.ids[0] if parent_rec.ids else None)
+                        if pid:
+                            vals = dict(vals)
+                            vals[fk_field] = pid
+                            for k in parent_vals:
+                                vals.pop(k, None)
+            elif fk_val and parent_vals:
+                Parent = env.get(parent_model)
+                if Parent:
+                    Parent.browse([fk_val] if isinstance(fk_val, int) else fk_val).write(parent_vals)
+                vals = dict(vals)
+                for k in parent_vals:
+                    vals.pop(k, None)
         table = cls._table
         stored = cls._get_stored_field_names()
         computed_stored = set(cls._get_stored_computed_fields())

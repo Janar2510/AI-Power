@@ -13,9 +13,27 @@ class ProductProduct(Model):
 
     @api.depends()
     def _compute_qty_available(self):
-        """Compute quantity from done stock moves. Stock location = internal type."""
+        """Compute quantity from stock.quant when available, else from done moves (Phase 150)."""
         if not self:
             return []
+        try:
+            Quant = self.env.get("stock.quant")
+            Location = self.env.get("stock.location")
+        except (KeyError, AttributeError):
+            return [0.0] * len(self)
+        if Quant and Location:
+            stock_locs = Location.search_read([("type", "=", "internal")], ["id"])
+            stock_ids = [r["id"] for r in stock_locs]
+            if stock_ids:
+                result = []
+                for rec in self:
+                    pid = rec.ids[0] if hasattr(rec, "ids") and rec.ids else getattr(rec, "id", None)
+                    rows = Quant.search_read(
+                        [("product_id", "=", pid), ("location_id", "in", stock_ids)],
+                        ["quantity"],
+                    )
+                    result.append(sum(r.get("quantity", 0) for r in rows))
+                return result
         try:
             Location = self.env["stock.location"]
             Move = self.env["stock.move"]

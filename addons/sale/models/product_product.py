@@ -9,3 +9,4 @@ class ProductProduct(Model):
 
     name = fields.Char(required=True)
     list_price = fields.Float(string="Sales Price", default=0.0)
+    categ_id = fields.Many2one("product.category", string="Category")

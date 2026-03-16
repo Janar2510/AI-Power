@@ -99,7 +99,7 @@ class TestAiConversationPhase124(unittest.TestCase):
         from addons.ai_assistant.controllers import ai_controller
         with patch.object(ai_controller, "_get_llm_config", return_value={"llm_enabled": "1", "llm_model": "gpt-4o-mini"}):
             with patch.object(ai_controller, "retrieve_chunks", return_value=[]):
-                with patch.object(ai_controller, "call_llm", return_value="Hello!"):
+                with patch.object(ai_controller, "call_llm", return_value=("Hello!", [])):
                     req = self._make_request("/ai/chat", method="POST", data={"prompt": "Hi"})
                     r = ai_controller.ai_chat(req)
         self.assertEqual(r.status_code, 200, r.get_data(as_text=True))
@@ -115,7 +115,7 @@ class TestAiConversationPhase124(unittest.TestCase):
         from addons.ai_assistant.controllers import ai_controller
         with patch.object(ai_controller, "_get_llm_config", return_value={"llm_enabled": "1", "llm_model": "gpt-4o-mini"}):
             with patch.object(ai_controller, "retrieve_chunks", return_value=[]):
-                with patch.object(ai_controller, "call_llm", return_value="Got it.") as mock_llm:
+                with patch.object(ai_controller, "call_llm", return_value=("Got it.", [])) as mock_llm:
                     req = self._make_request("/ai/chat", method="POST", data={
                         "prompt": "What am I viewing?",
                         "conversation_id": 999,

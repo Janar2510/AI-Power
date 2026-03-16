@@ -39,6 +39,8 @@
 - [ ] Verify static assets serve from /<module>/static/
 - [ ] Verify Contacts list loads (login, click Contacts)
 - [ ] Verify Leads list loads (login, click Leads)
+- [ ] Verify Project > Projects and Project > Tasks menus load
+- [ ] Verify Knowledge > Articles and Knowledge > Categories menus load
 - [ ] Verify AI tools: `GET /ai/tools` returns 401 when not authenticated; returns tool list when session present
 
 ## AI Module (Phases 9–12)
@@ -105,6 +107,24 @@
 - [ ] sale.order.action_confirm creates stock.picking (delivery order) with stock.move lines
 - [ ] Default locations (Stock, Output, Vendors, Customers), warehouse, picking types seeded on db init
 - [ ] Inventory > Operations > Transfers, Configuration > Warehouses menus
+
+## Phase 152 (Server Action Fix + Technical Settings)
+
+- [ ] base.automation on_create triggers server action; records.write() in code executes correctly
+- [ ] Settings > Technical > Scheduled Actions (ir.cron list/form)
+- [ ] Settings > Technical > Server Actions (ir.actions.server list/form)
+- [ ] Settings > Technical > Sequences (ir.sequence list/form)
+- [ ] tests/test_server_actions_phase119.py passes
+
+## Phase 153 (MRP Manufacturing)
+
+- [ ] addons/mrp loaded (depends: base, stock, sale)
+- [ ] Manufacturing > Orders, Bills of Materials, Work Centers menus
+- [ ] mrp.production: create() assigns MO/00001 via ir.sequence
+- [ ] action_confirm creates stock moves (raw: internal→production, finished: production→internal)
+- [ ] action_done validates moves and updates stock.quant
+- [ ] Production location created on db init (_load_mrp_data)
+- [ ] tests/test_mrp_phase153.py passes
 
 ## Phase 114 (RAG bulk reindex cron)
 
@@ -198,6 +218,13 @@
 - [ ] ir.config_parameter: ai.openai_api_key, ai.llm_enabled, ai.llm_model
 - [ ] When ai.llm_enabled=1: Chat panel shows prompt-only mode (no tool/model dropdown); POST /ai/chat with prompt uses OpenAI function-calling
 - [ ] RAG: retrieve_chunks injected into system message before LLM call
+
+## Phase 136 (Vector embeddings for RAG)
+
+- [ ] pip install pgvector (optional; enables semantic search)
+- [ ] PostgreSQL: CREATE EXTENSION vector (run on db init)
+- [ ] ai.document.chunk.embedding column (vector 1536); index_record_for_rag embeds via OpenAI text-embedding-3-small
+- [ ] retrieve_chunks: cosine similarity (<=>) when embeddings exist; ilike fallback otherwise
 - [ ] Chat panel: "Thinking..." loading indicator; tool/model row hidden when LLM enabled
 - [ ] pip install openai for LLM; OPENAI_API_KEY env or ai.openai_api_key in Settings
 
@@ -206,6 +233,33 @@
 - [ ] Phase 99: Dockerfile, docker-compose, /health, security headers, CORS, persistent sessions
 - [ ] Phase 100: @api.depends recompute; Many2one ondelete cascade/set null; FK constraints
 - [ ] Phase 101: addons/website; /my portal; portal users see only own leads
+
+## Phase 144 (Profiling)
+
+- [ ] Run with --debug=profiling for request timing and ORM query stats
+- [ ] Response headers: X-Response-Time-Ms, X-Query-Count, X-Query-Time-Ms
+
+## Phase 145 (Backup/Restore)
+
+- [ ] Set --backup-dir=PATH or ERP_BACKUP_DIR env for cron backups
+- [ ] ir.config_parameter db.backup_dir alternative
+- [ ] erp-bin db backup -d &lt;db&gt; [-o path]; erp-bin db restore -d &lt;db&gt; -f &lt;file&gt;
+- [ ] "Database backup" cron runs daily when base.db.backup loaded
+
+## Phase 143 (Shop E2E, Order Email, My Orders)
+
+- [ ] /shop E2E: pytest tests/e2e/test_shop_tour.py (shop → cart → checkout → confirmation)
+- [ ] Order confirmation: sale.order.action_confirm creates mail.mail; cron sends
+- [ ] /my/orders: portal users see their orders; /my/orders/<id> order detail
+- [ ] Portal nav: My Orders link
+- [ ] Demo products: db init seeds Widget A/B/C when no products exist
+
+## Phase 142 (Website shop cart + checkout)
+
+- [ ] /shop/cart: view cart, add via ?add=&lt;product_id&gt;, remove via ?remove=&lt;product_id&gt;
+- [ ] Cart stored in erp_cart cookie (base64 JSON); anonymous checkout supported
+- [ ] /shop/checkout: address form (name, email, street, city); creates res.partner for guests; creates sale.order with order_line; action_confirm
+- [ ] /shop/confirmation: thank-you page; cart cookie cleared on checkout
 - [ ] Phase 102: erp-bin db upgrade -d <db> -m <module>; core/upgrade/; ir.module.module
 - [ ] Phase 103: Leads form tag_ids many2many_tags chip widget (add/remove tags via dropdown)
 - [ ] Phase 104: Html field contenteditable widget; Image field preview/upload; activity view grouping

@@ -50,7 +50,7 @@ class SaleOrder(Model):
                 continue
             IrSequence = self.env.get("ir.sequence")
             next_val = IrSequence.next_by_code("account.move") if IrSequence else None
-            move_name = f"INV/{next_val}" if next_val is not None else "New"
+            move_name = f"INV/{next_val:05d}" if next_val is not None else "New"
             partner_id = order.read(["partner_id"])[0].get("partner_id") if order.ids else None
             move_vals = {
                 "name": move_name,

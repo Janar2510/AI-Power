@@ -1,5 +1,9 @@
 """Website and portal controllers (Phase 101)."""
 
+import html
+import json
+import base64
+
 from werkzeug.wrappers import Response
 from werkzeug.utils import redirect
 
@@ -25,6 +29,7 @@ WEBSITE_HOME_HTML = """<!DOCTYPE html>
 <div class="hero">
   <h1>Welcome</h1>
   <p>ERP Platform - Manage your business.</p>
+  <a href="/shop">Shop</a>
   <a href="/web/login">Log in</a>
   <a href="/web/signup">Create account</a>
 </div>
@@ -55,6 +60,7 @@ PORTAL_MY_HTML = """<!DOCTYPE html>
 <div class="portal-nav">
   <a href="/my">Dashboard</a>
   <a href="/my/leads">My Leads</a>
+  <a href="/my/orders">My Orders</a>
   <a href="/my/profile">My Profile</a>
   <a href="/web/logout">Logout</a>
 </div>
@@ -83,6 +89,289 @@ def _is_portal_user(registry, db, uid):
         return False
 
 
+SHOP_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Shop - ERP Platform</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
+  .shop-nav { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; gap: 1rem; align-items: center; }
+  .shop-nav a { color: white; text-decoration: none; }
+  .shop-content { max-width: 1100px; margin: 2rem auto; padding: 0 1rem; }
+  .shop-content h1 { margin-top: 0; }
+  .category-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .category-bar a { padding: 0.35rem 0.75rem; background: white; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #333; font-size: 0.9rem; }
+  .category-bar a:hover, .category-bar a.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.5rem; }
+  .product-card { background: white; border-radius: 8px; padding: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); text-decoration: none; color: inherit; display: block; transition: box-shadow 0.2s; }
+  .product-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .product-card .name { font-weight: 600; margin-bottom: 0.25rem; }
+  .product-card .price { color: #1a1a2e; font-size: 1.1rem; }
+  .product-detail { max-width: 600px; margin: 2rem auto; padding: 0 1rem; background: white; border-radius: 8px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .product-detail h1 { margin-top: 0; }
+  .product-detail .price { font-size: 1.5rem; font-weight: 600; margin: 1rem 0; }
+  .btn-add-cart { display: inline-block; padding: 0.75rem 1.5rem; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 1rem; }
+  .btn-add-cart:hover { background: #2a2a4e; }
+</style>
+</head>
+<body>
+<div class="shop-nav">
+  <a href="/website">Home</a>
+  <a href="/shop">Shop</a>
+  <a href="/shop/cart">Cart</a>
+</div>
+<div class="shop-content">
+  {content}
+</div>
+</body>
+</html>"""
+
+
+@route("/shop", auth="public", methods=["GET"])
+def shop_index(request):
+    """Public shop - product catalog with category filter (Phase 141)."""
+    db = get_session_db(request)
+    if not db:
+        return Response(SHOP_HTML.format(content="<h1>Shop</h1><p>Database not configured.</p>"), content_type="text/html; charset=utf-8")
+    registry = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=1)
+        registry.set_env(env)
+        Product = env.get("product.product")
+        Category = env.get("product.category")
+        if not Product:
+            return Response(SHOP_HTML.format(content="<h1>Shop</h1><p>Products not available.</p>"), content_type="text/html; charset=utf-8")
+        category_id = request.args.get("category", type=int)
+        domain = []
+        if category_id and Category:
+            domain = [("categ_id", "=", category_id)]
+        products = Product.search_read(domain, ["id", "name", "list_price", "categ_id"], limit=100)
+        categories = []
+        if Category:
+            categories = Category.search_read([], ["id", "name"], limit=50)
+        cat_html = ""
+        if categories:
+            cat_html = '<div class="category-bar"><a href="/shop">All</a>'
+            for c in categories:
+                active = ' class="active"' if category_id == c.get("id") else ""
+                cat_html += f'<a href="/shop?category={c.get("id")}"{active}>{(c.get("name") or "").replace("<", "&lt;")}</a>'
+            cat_html += "</div>"
+        grid_html = '<h1>Products</h1>' + cat_html
+        if not products:
+            grid_html += "<p>No products yet.</p>"
+        else:
+            grid_html += '<div class="product-grid">'
+            for p in products:
+                name = (p.get("name") or "").replace("<", "&lt;")
+                price = p.get("list_price")
+                price_str = f"{price:,.2f}" if price is not None else "0.00"
+                pid = p.get("id", "")
+                grid_html += f'<a href="/shop/product/{pid}" class="product-card"><div class="name">{name}</div><div class="price">{price_str}</div></a>'
+            grid_html += "</div>"
+        return Response(SHOP_HTML.format(content=grid_html), content_type="text/html; charset=utf-8")
+
+
+@route("/shop/product/<int:product_id>", auth="public", methods=["GET"])
+def shop_product_detail(request, product_id):
+    """Product detail page (Phase 141)."""
+    db = get_session_db(request)
+    if not db:
+        return Response(SHOP_HTML.format(content="<h1>Product</h1><p>Database not configured.</p>"), content_type="text/html; charset=utf-8")
+    registry = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=1)
+        registry.set_env(env)
+        Product = env.get("product.product")
+        if not Product:
+            return Response(SHOP_HTML.format(content="<h1>Product</h1><p>Not found.</p>"), content_type="text/html; charset=utf-8")
+        products = Product.search_read([("id", "=", product_id)], ["id", "name", "list_price", "categ_id"])
+        if not products:
+            return Response(SHOP_HTML.format(content="<h1>Product</h1><p>Product not found.</p>"), content_type="text/html; charset=utf-8")
+        p = products[0]
+        name = (p.get("name") or "").replace("<", "&lt;")
+        price = p.get("list_price")
+        price_str = f"{price:,.2f}" if price is not None else "0.00"
+        content = f"""
+        <h1>{name}</h1>
+        <p><a href="/shop">&larr; Back to shop</a></p>
+        <div class="price">{price_str}</div>
+        <a href="/shop/cart?add={product_id}" class="btn-add-cart">Add to Cart</a>
+        """
+        return Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
+
+
+def _get_cart_from_request(request):
+    """Parse cart from erp_cart cookie. Returns list of {product_id, qty}."""
+    raw = request.cookies.get("erp_cart") or "[]"
+    try:
+        decoded = base64.b64decode(raw).decode() if raw else "[]"
+        data = json.loads(decoded)
+    except Exception:
+        try:
+            data = json.loads(raw)
+        except Exception:
+            data = []
+    return data if isinstance(data, list) else []
+
+
+def _cart_response(content, cart=None):
+    """Build response with optional Set-Cookie for cart."""
+    r = Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
+    if cart is not None:
+        r.set_cookie("erp_cart", base64.b64encode(json.dumps(cart).encode()).decode(), max_age=86400 * 7)
+    return r
+
+
+@route("/shop/cart", auth="public", methods=["GET"])
+def shop_cart(request):
+    """Cart page - view, add, remove, update qty (Phase 142)."""
+    add_id = request.args.get("add", type=int)
+    remove_id = request.args.get("remove", type=int)
+    cart = _get_cart_from_request(request)
+    db = get_session_db(request)
+    if add_id:
+        found = next((c for c in cart if c.get("product_id") == add_id), None)
+        if found:
+            found["qty"] = found.get("qty", 1) + 1
+        else:
+            cart.append({"product_id": add_id, "qty": 1})
+    if remove_id:
+        cart = [c for c in cart if c.get("product_id") != remove_id]
+    if not db:
+        return _cart_response("<h1>Cart</h1><p>Database not configured.</p>", cart)
+    registry = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=1)
+        registry.set_env(env)
+        Product = env.get("product.product")
+        if not Product or not cart:
+            content = '<h1>Cart</h1><p><a href="/shop">Continue shopping</a></p><p>Your cart is empty.</p>'
+            return _cart_response(content, cart)
+        pids = [c["product_id"] for c in cart]
+        products = Product.search_read([("id", "in", pids)], ["id", "name", "list_price"])
+        pmap = {p["id"]: p for p in products}
+        total = 0
+        rows = []
+        for c in cart:
+            pid = c.get("product_id")
+            qty = c.get("qty", 1)
+            p = pmap.get(pid)
+            if not p:
+                continue
+            price = p.get("list_price") or 0
+            subtotal = price * qty
+            total += subtotal
+            name = (p.get("name") or "").replace("<", "&lt;")
+            rows.append({"pid": pid, "name": name, "qty": qty, "price": price, "subtotal": subtotal})
+        content = '<h1>Cart</h1><p><a href="/shop">Continue shopping</a></p>'
+        if not rows:
+            content += "<p>Your cart is empty.</p>"
+        else:
+            content += '<table style="width:100%;border-collapse:collapse"><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th><th></th></tr>'
+            for r in rows:
+                content += f'<tr><td>{r["name"]}</td><td>{r["qty"]}</td><td>{r["price"]:,.2f}</td><td>{r["subtotal"]:,.2f}</td><td><a href="/shop/cart?remove={r["pid"]}">Remove</a></td></tr>'
+            content += f'<tr><td colspan="3"><strong>Total</strong></td><td><strong>{total:,.2f}</strong></td><td></td></tr></table>'
+            content += '<p><a href="/shop/checkout" class="btn-add-cart" style="margin-top:1rem;display:inline-block">Proceed to Checkout</a></p>'
+        return _cart_response(content, cart)
+
+
+@route("/shop/checkout", auth="public", methods=["GET", "POST"])
+def shop_checkout(request):
+    """Checkout - address form, create sale.order (Phase 142)."""
+    cart = _get_cart_from_request(request)
+    if not cart:
+        return redirect("/shop/cart")
+    db = get_session_db(request)
+    if not db:
+        return Response(SHOP_HTML.format(content="<h1>Checkout</h1><p>Database not configured.</p>"), content_type="text/html; charset=utf-8")
+    uid = get_session_uid(request)
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        street = request.form.get("street", "").strip()
+        city = request.form.get("city", "").strip()
+        if not name or not email:
+            content = '<h1>Checkout</h1><p style="color:#c00">Name and email are required.</p>' + _checkout_form(name, email, street, city)
+            return Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            from core.orm import Environment
+            env = Environment(registry, cr=cr, uid=uid or 1)
+            registry.set_env(env)
+            Partner = env.get("res.partner")
+            Product = env.get("product.product")
+            Order = env.get("sale.order")
+            if not all([Partner, Product, Order]):
+                return Response(SHOP_HTML.format(content="<h1>Checkout</h1><p>Sales module not available.</p>"), content_type="text/html; charset=utf-8")
+            partner_id = None
+            if uid:
+                User = env.get("res.users")
+                if User:
+                    rows = User.read_ids([uid], ["partner_id"])
+                    if rows and rows[0].get("partner_id"):
+                        pid = rows[0]["partner_id"]
+                        partner_id = pid[0] if isinstance(pid, (list, tuple)) and pid else pid
+            if not partner_id:
+                partner = Partner.create({"name": name, "email": email, "street": street, "city": city})
+                partner_id = partner.id if hasattr(partner, "id") else (partner.ids[0] if partner.ids else None)
+            if not partner_id:
+                return Response(SHOP_HTML.format(content="<h1>Checkout</h1><p>Could not create customer.</p>"), content_type="text/html; charset=utf-8")
+            products = Product.search_read([("id", "in", [c["product_id"] for c in cart])], ["id", "name", "list_price"])
+            pmap = {p["id"]: p for p in products}
+            line_vals = []
+            for c in cart:
+                p = pmap.get(c["product_id"])
+                if not p:
+                    continue
+                line_vals.append({
+                    "product_id": p["id"],
+                    "name": p.get("name", ""),
+                    "product_uom_qty": c.get("qty", 1),
+                    "price_unit": p.get("list_price") or 0,
+                })
+            if not line_vals:
+                return redirect("/shop/cart")
+            order = Order.create({
+                "partner_id": partner_id,
+                "order_line": line_vals,
+            })
+            order_id = order.id if hasattr(order, "id") else (order.ids[0] if order.ids else None)
+            order.action_confirm()
+        r = redirect(f"/shop/confirmation?order={order_id}")
+        r.set_cookie("erp_cart", "", max_age=0)
+        return r
+    content = '<h1>Checkout</h1><p><a href="/shop/cart">&larr; Back to cart</a></p>' + _checkout_form("", "", "", "")
+    return Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
+
+
+def _checkout_form(name, email, street, city):
+    return f'''
+    <form method="post" style="max-width:400px;margin-top:1rem">
+      <p><label>Name *<br/><input type="text" name="name" value="{html.escape(name)}" style="width:100%;padding:0.5rem" required/></label></p>
+      <p><label>Email *<br/><input type="email" name="email" value="{html.escape(email)}" style="width:100%;padding:0.5rem" required/></label></p>
+      <p><label>Address<br/><input type="text" name="street" value="{html.escape(street)}" style="width:100%;padding:0.5rem" placeholder="Street"/></label></p>
+      <p><label>City<br/><input type="text" name="city" value="{html.escape(city)}" style="width:100%;padding:0.5rem"/></label></p>
+      <button type="submit" class="btn-add-cart" style="margin-top:1rem">Place Order</button>
+    </form>
+    '''
+
+
+@route("/shop/confirmation", auth="public", methods=["GET"])
+def shop_confirmation(request):
+    """Order confirmation page (Phase 142)."""
+    order_id = request.args.get("order", type=int)
+    content = "<h1>Thank you!</h1><p>Your order has been placed.</p>"
+    if order_id:
+        content += f"<p>Order reference: {order_id}</p>"
+    content += '<p><a href="/shop">Continue shopping</a></p>'
+    return Response(SHOP_HTML.format(content=content), content_type="text/html; charset=utf-8")
+
+
 @route("/website", auth="public", methods=["GET"])
 def website_home(request):
     """Public homepage (Phase 101)."""
@@ -103,6 +392,106 @@ def portal_my(request):
         PORTAL_MY_HTML.format(content=content),
         content_type="text/html; charset=utf-8",
     )
+
+
+@route("/my/orders", auth="portal", methods=["GET"])
+def portal_my_orders(request):
+    """List sale orders where partner_id = current user's partner (Phase 143)."""
+    uid, db = _require_portal_session(request)
+    if uid is None:
+        return redirect("/web/login")
+    registry = _get_registry(db)
+    if not _is_portal_user(registry, db, uid):
+        return redirect("/")
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        User = env.get("res.users")
+        Order = env.get("sale.order")
+        if not User or not Order:
+            content = "<h1>My Orders</h1><p>Sales module not available.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        rows = User.read_ids([uid], ["partner_id"])
+        partner_id = rows[0].get("partner_id") if rows else None
+        if not partner_id:
+            content = "<h1>My Orders</h1><p>No contact linked to your account.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        pid = partner_id[0] if isinstance(partner_id, (list, tuple)) and partner_id else partner_id
+        orders = Order.search([("partner_id", "=", pid)], order="id desc", limit=50)
+        if not orders or not orders.ids:
+            content = "<h1>My Orders</h1><p>No orders yet.</p><p><a href=\"/shop\">Browse shop</a></p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        order_rows = Order.browse(orders.ids).read(["name", "partner_id", "amount_total", "state", "date_order"])
+        html = "<h1>My Orders</h1><table><tr><th>Order</th><th>Total</th><th>Status</th><th>Date</th></tr>"
+        for r in order_rows:
+            name = (r.get("name") or "").replace("<", "&lt;")
+            total = r.get("amount_total")
+            total_str = f"{total:,.2f}" if total is not None else "-"
+            state = (r.get("state") or "").replace("<", "&lt;")
+            date_order = r.get("date_order") or ""
+            if date_order and len(date_order) > 10:
+                date_order = date_order[:10]
+            oid = r.get("id", "")
+            html += f'<tr><td><a href="/my/orders/{oid}">{name}</a></td><td>{total_str}</td><td>{state}</td><td>{date_order}</td></tr>'
+        html += "</table>"
+        return Response(PORTAL_MY_HTML.format(content=html), content_type="text/html; charset=utf-8")
+
+
+@route("/my/orders/<int:order_id>", auth="portal", methods=["GET"])
+def portal_my_order_detail(request, order_id):
+    """View single order detail (Phase 143)."""
+    uid, db = _require_portal_session(request)
+    if uid is None:
+        return redirect("/web/login")
+    registry = _get_registry(db)
+    if not _is_portal_user(registry, db, uid):
+        return redirect("/")
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        User = env.get("res.users")
+        Order = env.get("sale.order")
+        OrderLine = env.get("sale.order.line")
+        if not User or not Order:
+            return redirect("/my/orders")
+        rows = User.read_ids([uid], ["partner_id"])
+        partner_id = rows[0].get("partner_id") if rows else None
+        if not partner_id:
+            return redirect("/my/orders")
+        pid = partner_id[0] if isinstance(partner_id, (list, tuple)) and partner_id else partner_id
+        orders = Order.search([("partner_id", "=", pid), ("id", "=", order_id)], limit=1)
+        if not orders or not orders.ids:
+            return redirect("/my/orders")
+        order = Order.browse(orders.ids[0])
+        order_row = order.read(["name", "partner_id", "amount_total", "state", "date_order", "order_line"])[0]
+        name = (order_row.get("name") or "").replace("<", "&lt;")
+        total = order_row.get("amount_total")
+        total_str = f"{total:,.2f}" if total is not None else "-"
+        state = (order_row.get("state") or "").replace("<", "&lt;")
+        date_order = (order_row.get("date_order") or "")[:10] if order_row.get("date_order") else ""
+        line_ids = order_row.get("order_line") or []
+        if isinstance(line_ids, list) and line_ids:
+            line_ids = [x[0] if isinstance(x, (list, tuple)) and x else x for x in line_ids]
+        lines_html = ""
+        if line_ids and OrderLine:
+            line_rows = OrderLine.browse(line_ids).read(["name", "product_uom_qty", "price_unit", "price_subtotal"])
+            lines_html = "<table style=\"margin-top:1rem;width:100%\"><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>"
+            for ln in line_rows:
+                lname = (ln.get("name") or "").replace("<", "&lt;")
+                qty = ln.get("product_uom_qty") or 0
+                pu = ln.get("price_unit") or 0
+                ps = ln.get("price_subtotal") or 0
+                lines_html += f"<tr><td>{lname}</td><td>{qty}</td><td>{pu:,.2f}</td><td>{ps:,.2f}</td></tr>"
+            lines_html += "</table>"
+        content = f"""
+        <h1>{name}</h1>
+        <p><a href="/my/orders">&larr; Back to orders</a></p>
+        <table style="margin-top:1rem"><tr><th>Status</th><td>{state}</td></tr><tr><th>Date</th><td>{date_order}</td></tr><tr><th>Total</th><td>{total_str}</td></tr></table>
+        {lines_html}
+        """
+        return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
 
 
 @route("/my/leads", auth="portal", methods=["GET"])

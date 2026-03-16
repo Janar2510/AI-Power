@@ -4,3 +4,5 @@ access_stock_warehouse_user,stock.warehouse user,model_stock_warehouse,,1,1,1,1
 access_stock_picking_type_user,stock.picking.type user,model_stock_picking_type,,1,1,1,1
 access_stock_picking_user,stock.picking user,model_stock_picking,,1,1,1,1
 access_stock_move_user,stock.move user,model_stock_move,,1,1,1,1
+access_stock_quant_user,stock.quant user,model_stock_quant,,1,1,1,1
+access_stock_lot_user,stock.lot user,model_stock_lot,,1,1,1,1

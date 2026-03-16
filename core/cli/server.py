@@ -85,23 +85,20 @@ class Server(Command):
         http_port: int,
         gevent_websocket: bool,
     ) -> None:
-        """Prefork N HTTP workers + 1 cron worker (Phase 120)."""
+        """Prefork N HTTP workers + 1 cron worker (Phase 128). Uses gunicorn when available."""
+        try:
+            from gunicorn.app.base import BaseApplication
+        except ImportError:
+            _logger.warning(
+                "gunicorn not installed; --workers requires gunicorn. "
+                "Falling back to single process. Install: pip install gunicorn"
+            )
+            self._run_single(http_interface, http_port, gevent_websocket)
+            return
+
         import multiprocessing
 
         signal.signal(signal.SIGTERM, _handle_sigterm)
-
-        def worker_http(worker_id: int) -> None:
-            config.parse_config(["--addons-path=addons"])
-            app = Application()
-            if gevent_websocket:
-                try:
-                    from gevent.pywsgi import WSGIServer
-                    server = WSGIServer((http_interface, http_port), app)
-                    server.serve_forever()
-                except ImportError:
-                    self._run_werkzeug(http_interface, http_port, app)
-            else:
-                self._run_werkzeug(http_interface, http_port, app)
 
         def worker_cron() -> None:
             global _shutdown_requested
@@ -132,30 +129,50 @@ class Server(Command):
                         return
                     time.sleep(1)
 
+        cron_proc = multiprocessing.Process(target=worker_cron)
+        cron_proc.start()
+
+        def shutdown_cron():
+            global _shutdown_requested
+            _shutdown_requested = True
+            if cron_proc.is_alive():
+                cron_proc.terminate()
+                cron_proc.join(timeout=5)
+
+        import atexit
+        atexit.register(shutdown_cron)
+
+        class ERPApplication(BaseApplication):
+            def __init__(self, app, options=None):
+                self.options = options or {}
+                self.application = app
+                super().__init__()
+
+            def load_config(self):
+                for k, v in self.options.items():
+                    if k in self.cfg.settings and v is not None:
+                        self.cfg.set(k.lower(), v)
+
+            def load(self):
+                return self.application
+
+        app = Application()
+        opts = {
+            "bind": f"{http_interface}:{http_port}",
+            "workers": num_workers,
+            "worker_class": "sync",
+            "timeout": 120,
+            "graceful_timeout": 30,
+        }
+        if gevent_websocket:
+            opts["worker_class"] = "gevent"
         _logger.info(
-            "Prefork mode: %d HTTP workers + 1 cron worker on %s:%s",
+            "Prefork mode (gunicorn): %d workers + 1 cron on %s:%s",
             num_workers,
             http_interface,
             http_port,
         )
-        processes = []
-        for i in range(num_workers):
-            p = multiprocessing.Process(target=worker_http, args=(i,))
-            p.start()
-            processes.append(p)
-        cron_proc = multiprocessing.Process(target=worker_cron)
-        cron_proc.start()
-        processes.append(cron_proc)
-
-        try:
-            for p in processes:
-                p.join()
-        except KeyboardInterrupt:
-            pass
-        for p in processes:
-            if p.is_alive():
-                p.terminate()
-                p.join(timeout=5)
+        ERPApplication(app, opts).run()
 
     def _run_werkzeug(
         self, http_interface: str, http_port: int, app: Application

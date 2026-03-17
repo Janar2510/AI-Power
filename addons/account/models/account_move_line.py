@@ -15,3 +15,4 @@ class AccountMoveLine(Model):
     amount_currency = fields.Float(string="Amount Currency", default=0.0)
     currency_id = fields.Many2one("res.currency", string="Currency")
     partner_id = fields.Many2one("res.partner", string="Partner")
+    analytic_account_id = fields.Many2one("analytic.account", string="Analytic Account")

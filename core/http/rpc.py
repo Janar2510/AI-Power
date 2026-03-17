@@ -67,6 +67,7 @@ class UserError(Exception):
 _CLASS_METHODS = frozenset({
     "create", "import_data", "search", "search_read", "search_count", "read", "read_group", "read_ids", "write_ids",
     "fields_get", "default_get", "onchange", "name_get", "name_search", "write", "copy",
+    "process_email_queue",  # Phase 166: mail.mail class method
 })
 
 

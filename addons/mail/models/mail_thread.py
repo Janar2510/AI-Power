@@ -1,5 +1,6 @@
 """MailThreadMixin - add message_ids and message_post to any model (Phase 81)."""
 
+import uuid
 from datetime import datetime
 from typing import Any, Dict
 
@@ -36,12 +37,14 @@ class MailThreadMixin:
         if not rid:
             raise ValueError("message_post requires a saved record")
         uid = env.uid if hasattr(env, "uid") else None
+        message_id_val = f"<{uuid.uuid4().hex}@erp>"  # Phase 172: for In-Reply-To routing
         vals: Dict[str, Any] = {
             "res_model": self._model._name,
             "res_id": rid,
             "body": body or "",
             "message_type": message_type or "comment",
             "date": datetime.utcnow().isoformat(),
+            "message_id": message_id_val,
         }
         if uid:
             vals["author_id"] = uid
@@ -98,6 +101,7 @@ class MailThreadMixin:
                         "state": "outgoing",
                         "res_model": self._model._name,
                         "res_id": rid,
+                        "message_id": message_id_val,  # Phase 172: for In-Reply-To routing
                     })
         return msg
 

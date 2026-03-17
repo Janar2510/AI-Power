@@ -8,6 +8,7 @@ class MailMessage(Model):
     _description = "Message"
 
     body = fields.Text(string="Body")
+    message_id = fields.Char(string="Message-ID")  # Phase 172: email Message-ID for reply routing
     author_id = fields.Many2one("res.users", string="Author")
     company_id = fields.Many2one("res.company", string="Company")
     res_model = fields.Char(string="Related Model")

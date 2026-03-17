@@ -143,7 +143,8 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
             if comodel:
                 col_def["comodel"] = comodel
             cols.append(col_def)
-        return {"type": "list", "columns": cols}
+        editable = node.get("editable", "")  # Phase 176: "top" or "bottom"
+        return {"type": "list", "columns": cols, "editable": editable}
     if tag == "form":
         children = []
         for c in node:
@@ -156,6 +157,13 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
         return {"type": "kanban", "default_group_by": default_group, "fields": fields}
     if tag == "search":
         search_fields = [f.get("name", "") for f in node.findall("field") if f.get("name")]
+        search_panel = []  # Phase 177: <searchpanel> fields
+        for sp in node.findall("searchpanel"):
+            for f in sp.findall("field"):
+                name = f.get("name", "")
+                select = f.get("select", "one")  # one or multi
+                if name:
+                    search_panel.append({"name": name, "select": select})
         filters = []
         group_bys = []
         for f in node.findall("filter"):
@@ -178,7 +186,7 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
                 group_bys.append({"name": name, "string": string, "group_by": gb})
             if domain:
                 filters.append({"name": name, "string": string, "domain": domain})
-        return {"type": "search", "search_fields": search_fields, "filters": filters, "group_bys": group_bys}
+        return {"type": "search", "search_fields": search_fields, "search_panel": search_panel, "filters": filters, "group_bys": group_bys}
     if tag == "calendar":
         date_start = node.get("date_start", "")
         string = node.get("string", "")

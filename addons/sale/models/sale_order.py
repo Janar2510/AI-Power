@@ -28,7 +28,7 @@ class SaleOrder(Model):
                     if cid:
                         vals = dict(vals, currency_id=cid)
         return super().create(vals)
-    partner_id = fields.Many2one("res.partner", string="Customer", required=True)
+    partner_id = fields.Many2one("res.partner", string="Customer", required=True, tracking=True)
     date_order = fields.Datetime(string="Order Date", default=lambda self: self._default_date_order())
     state = fields.Selection(
         selection=[
@@ -38,6 +38,7 @@ class SaleOrder(Model):
         ],
         string="Status",
         default="draft",
+        tracking=True,
     )
     currency_id = fields.Many2one("res.currency", string="Currency")  # Defaults from company (Phase 154)
     amount_total = fields.Computed(compute="_compute_amount_total", string="Total")
@@ -50,6 +51,29 @@ class SaleOrder(Model):
     def _default_date_order(self):
         from datetime import datetime
         return datetime.utcnow().isoformat()
+
+    @classmethod
+    def _onchange_partner_id(cls, vals):
+        """Fill currency_id from company when partner changes (Phase 165)."""
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env or vals.get("currency_id"):
+            return {}
+        Company = env.get("res.company")
+        if not Company:
+            return {}
+        try:
+            companies = Company.search([], limit=1)
+            if not companies or not companies.ids:
+                return {}
+            cdata = Company.browse(companies.ids[0]).read(["currency_id"])[0]
+            cid = cdata.get("currency_id")
+            if isinstance(cid, (list, tuple)) and cid:
+                cid = cid[0]
+            if cid:
+                return {"currency_id": cid}
+        except Exception:
+            pass
+        return {}
 
     @api.depends("order_line.product_uom_qty", "order_line.price_unit")
     def _compute_amount_total(self):

@@ -34,9 +34,9 @@
             <button name="action_cancel" string="Cancel" type="object"/>
           </header>
           <sheet>
+            <field name="state" widget="statusbar"/>
             <field name="name"/>
             <field name="partner_id" comodel="res.partner"/>
-            <field name="state"/>
             <field name="order_line">
               <list>
                 <field name="product_id" comodel="product.product"/>

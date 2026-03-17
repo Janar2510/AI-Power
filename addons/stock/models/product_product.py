@@ -1,10 +1,17 @@
-"""Extend product.product with qty_available (Phase 116)."""
+"""Extend product.product with qty_available (Phase 116), standard_price and cost_method (Phase 173)."""
 
 from core.orm import Model, api, fields
 
 
 class ProductProduct(Model):
     _inherit = "product.product"
+
+    standard_price = fields.Float(string="Cost", default=0.0)  # Phase 173
+    cost_method = fields.Selection(
+        selection=[("standard", "Standard Price"), ("average", "Average Cost")],
+        string="Costing Method",
+        default="standard",
+    )  # Phase 173
 
     qty_available = fields.Computed(
         compute="_compute_qty_available",

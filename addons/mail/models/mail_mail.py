@@ -28,6 +28,7 @@ class MailMail(Model):
     failure_reason = fields.Text(string="Failure Reason")
     res_model = fields.Char(string="Related Model")
     res_id = fields.Integer(string="Related Record ID")
+    message_id = fields.Char(string="Message-ID")  # Phase 172: for In-Reply-To routing
 
     def send(self, auto_commit: bool = False) -> bool:
         """Send this email via ir.mail_server. Updates state on success/failure."""

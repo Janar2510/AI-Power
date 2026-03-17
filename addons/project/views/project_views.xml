@@ -31,6 +31,7 @@
           <sheet>
             <field name="name"/>
             <field name="partner_id" comodel="res.partner"/>
+            <field name="analytic_account_id" comodel="analytic.account"/>
             <field name="description"/>
           </sheet>
         </form>
@@ -56,6 +57,9 @@
       <field name="model">project.task</field>
       <field name="arch" type="xml">
         <search>
+          <searchpanel>
+            <field name="project_id" select="one"/>
+          </searchpanel>
           <field name="name"/>
           <field name="description"/>
           <filter name="group_stage" string="Stage" context="{'group_by': 'stage_id'}"/>

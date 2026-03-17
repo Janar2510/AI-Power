@@ -400,6 +400,10 @@ def _load_ir_ui_views(env) -> None:
                     "fields": v.get("fields", []),
                     "default_group_by": v.get("default_group_by", ""),
                     "search_fields": v.get("search_fields", []),
+                    "editable": v.get("editable", ""),
+                    "search_panel": v.get("search_panel", []),
+                    "filters": v.get("filters", []),
+                    "group_bys": v.get("group_bys", []),
                 }
                 if v.get("children"):
                     arch_dict["children"] = v["children"]

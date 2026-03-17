@@ -96,5 +96,27 @@
     <menuitem name="Transfers" id="menu_stock_picking" action="stock.action_stock_picking" parent="stock.menu_stock_operations" sequence="10"/>
     <menuitem name="Configuration" id="menu_stock_config" sequence="20"/>
     <menuitem name="Warehouses" id="menu_stock_warehouse" action="stock.action_stock_warehouse" parent="stock.menu_stock_config" sequence="10"/>
+    <record model="ir.ui.view" id="stock_valuation_layer_list">
+      <field name="name">stock.valuation.layer list</field>
+      <field name="model">stock.valuation.layer</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="product_id" comodel="product.product"/>
+          <field name="quantity"/>
+          <field name="unit_cost"/>
+          <field name="value"/>
+          <field name="stock_move_id" comodel="stock.move"/>
+          <field name="description"/>
+          <field name="create_date"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_stock_valuation_layer">
+      <field name="name">Valuation</field>
+      <field name="res_model">stock.valuation.layer</field>
+      <field name="view_mode">list</field>
+    </record>
+    <menuitem name="Reporting" id="menu_stock_reporting" sequence="15"/>
+    <menuitem name="Valuation" id="menu_stock_valuation" action="stock.action_stock_valuation_layer" parent="stock.menu_stock_reporting" sequence="10"/>
   </data>
 </odoo>

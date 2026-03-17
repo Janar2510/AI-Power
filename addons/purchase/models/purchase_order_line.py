@@ -20,3 +20,26 @@ class PurchaseOrderLine(Model):
             return []
         rows = self.read(["product_qty", "price_unit"])
         return [r.get("product_qty", 0) * r.get("price_unit", 0) for r in rows]
+
+    @classmethod
+    def _onchange_product_id(cls, vals):
+        """Fill price_unit from product list_price, name from product name (Phase 165)."""
+        pid = vals.get("product_id")
+        if not pid:
+            return {}
+        if isinstance(pid, (list, tuple)) and pid:
+            pid = pid[0]
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env:
+            return {}
+        Product = env.get("product.product")
+        if not Product:
+            return {}
+        try:
+            rows = Product.browse([pid]).read(["list_price", "name"])
+            if not rows:
+                return {}
+            r = rows[0]
+            return {"price_unit": r.get("list_price", 0.0), "name": r.get("name", "")}
+        except Exception:
+            return {}

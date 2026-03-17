@@ -78,6 +78,7 @@
     if (m === 'product_product') return 'products';
     if (m === 'ir_attachment') return 'attachments';
     if (m === 'res_users') return 'settings/users';
+    if (m === 'approval_rule') return 'settings/approval_rules';
     if (m === 'hr_leave') return 'leaves';
     if (m === 'hr_leave_type') return 'leave_types';
     if (m === 'hr_leave_allocation') return 'allocations';
@@ -87,6 +88,17 @@
     if (m === 'mrp_production') return 'manufacturing';
     if (m === 'mrp_bom') return 'boms';
     if (m === 'mrp_workcenter') return 'workcenters';
+    if (m === 'stock_picking') return 'transfers';
+    if (m === 'stock_warehouse') return 'warehouses';
+    if (m === 'purchase_order') return 'purchase_orders';
+    if (m === 'account_move') return 'invoices';
+    if (m === 'account_journal') return 'journals';
+    if (m === 'account_account') return 'accounts';
+    if (m === 'hr_employee') return 'employees';
+    if (m === 'hr_department') return 'departments';
+    if (m === 'hr_job') return 'jobs';
+    if (m === 'project_project') return 'projects';
+    if (m === 'calendar_event') return 'meetings';
     return m || null;
   }
 
@@ -97,6 +109,11 @@
     if (name === 'home') return 'home';
     if (name === 'settings') return 'settings';
     if (name === 'api keys') return 'settings/apikeys';
+    if (name === 'contacts') return 'contacts';
+    if (name === 'leads') return 'leads';
+    if (name === 'orders') return 'orders';
+    if (name === 'products') return 'products';
+    if (name === 'tasks') return 'tasks';
     return null;
   }
 
@@ -124,6 +141,7 @@
     if (route === 'products') return 'product.product';
     if (route === 'attachments') return 'ir.attachment';
     if (route === 'settings/users') return 'res.users';
+    if (route === 'settings/approval_rules') return 'approval.rule';
     if (route === 'leaves') return 'hr.leave';
     if (route === 'leave_types') return 'hr.leave.type';
     if (route === 'allocations') return 'hr.leave.allocation';
@@ -133,6 +151,17 @@
     if (route === 'manufacturing') return 'mrp.production';
     if (route === 'boms') return 'mrp.bom';
     if (route === 'workcenters') return 'mrp.workcenter';
+    if (route === 'transfers') return 'stock.picking';
+    if (route === 'warehouses') return 'stock.warehouse';
+    if (route === 'purchase_orders') return 'purchase.order';
+    if (route === 'invoices') return 'account.move';
+    if (route === 'journals') return 'account.journal';
+    if (route === 'accounts') return 'account.account';
+    if (route === 'employees') return 'hr.employee';
+    if (route === 'departments') return 'hr.department';
+    if (route === 'jobs') return 'hr.job';
+    if (route === 'projects') return 'project.project';
+    if (route === 'meetings') return 'calendar.event';
     return null;
   }
 
@@ -353,9 +382,12 @@
     if (!navbar) return;
     userLangs = userLangs || [];
     currentLang = currentLang || 'en_US';
-    let html = '<span class="logo">ERP Platform</span><nav role="navigation" class="nav-menu" aria-label="Main navigation" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
-    if (viewsSvc) {
-      const menus = viewsSvc.getMenus() || [];
+    let html = '<button type="button" class="nav-hamburger" aria-label="Toggle menu" style="display:none">&#9776;</button><span class="logo">ERP Platform</span><nav role="navigation" class="nav-menu" aria-label="Main navigation" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
+    var menus = (viewsSvc && viewsSvc.getMenus()) ? viewsSvc.getMenus() : [];
+    if (menus.length === 0) {
+      html += '<span class="nav-menu-stale-banner" style="padding:0.25rem 0.5rem;background:var(--color-warning, #f59e0b);color:#000;font-size:0.85rem;border-radius:4px">Navigation menus missing. Run: <code style="background:rgba(0,0,0,0.2);padding:0.1rem 0.3rem;border-radius:2px">erp-bin db upgrade -d ' + (window.Session && window.Session.db ? String(window.Session.db).replace(/</g, '&lt;') : 'erp') + '</code></span>';
+    }
+    if (menus.length) {
       const tree = buildMenuTree(menus);
       tree.forEach(function (node) {
         const m = node.menu;
@@ -419,6 +451,19 @@
     html += '<a href="/web/logout" class="nav-link">Logout</a>';
     html += '</span>';
     navbar.innerHTML = html;
+    var hamburger = navbar.querySelector('.nav-hamburger');
+    var navMenu = navbar.querySelector('.nav-menu');
+    if (hamburger && navMenu) {
+      function updateHamburgerVisibility() {
+        hamburger.style.display = (window.innerWidth <= 768) ? 'flex' : 'none';
+        if (window.innerWidth > 768) navMenu.classList.remove('nav-menu-open');
+      }
+      if (window.innerWidth <= 768) hamburger.style.display = 'flex';
+      hamburger.onclick = function () {
+        navMenu.classList.toggle('nav-menu-open');
+      };
+      window.addEventListener('resize', updateHamburgerVisibility);
+    }
     navbar.querySelectorAll('.theme-toggle').forEach(function (btn) {
       btn.onclick = function () {
         const root = document.documentElement;
@@ -433,8 +478,28 @@
       const label = dd.querySelector('a') || dd.querySelector('button');
       const content = dd.querySelector('.nav-dropdown-content');
       if (label && content) {
-        label.onmouseenter = function () { content.style.display = 'block'; };
-        dd.onmouseleave = function () { content.style.display = 'none'; };
+        var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (isTouch && window.innerWidth <= 768) {
+          label.onclick = function (e) {
+            if (dd.classList.contains('nav-dropdown-open')) {
+              dd.classList.remove('nav-dropdown-open');
+              content.style.display = 'none';
+            } else {
+              navbar.querySelectorAll('.nav-dropdown-open').forEach(function (o) {
+                o.classList.remove('nav-dropdown-open');
+                var c = o.querySelector('.nav-dropdown-content');
+                if (c) c.style.display = 'none';
+              });
+              dd.classList.add('nav-dropdown-open');
+              content.style.display = 'block';
+            }
+            e.preventDefault();
+            e.stopPropagation();
+          };
+        } else {
+          label.onmouseenter = function () { content.style.display = 'block'; };
+          dd.onmouseleave = function () { content.style.display = 'none'; };
+        }
       }
     });
     navbar.querySelectorAll('.company-option').forEach(function (btn) {
@@ -676,6 +741,16 @@
     if (route === 'manufacturing') return 'Manufacturing Orders';
     if (route === 'boms') return 'Bills of Materials';
     if (route === 'workcenters') return 'Work Centers';
+    if (route === 'transfers') return 'Transfers';
+    if (route === 'warehouses') return 'Warehouses';
+    if (route === 'purchase_orders') return 'Purchase Orders';
+    if (route === 'invoices') return 'Invoices';
+    if (route === 'journals') return 'Journals';
+    if (route === 'accounts') return 'Chart of Accounts';
+    if (route === 'employees') return 'Employees';
+    if (route === 'departments') return 'Departments';
+    if (route === 'jobs') return 'Job Positions';
+    if (route === 'projects') return 'Projects';
     return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records';
   }
 
@@ -905,6 +980,7 @@
     main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">Outgoing Mail Servers</h3><div id="settings-mail-servers"></div></div>';
     main.innerHTML += '<a href="#settings/dashboard-widgets" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Dashboard Widgets</a>';
     main.innerHTML += '<a href="#settings/apikeys" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">API Keys</a>';
+    main.innerHTML += '<a href="#settings/approval_rules" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Approval Rules</a>';
     main.innerHTML += '<a href="#settings/totp" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Two-Factor Authentication</a>';
     main.innerHTML += '</div>';
     rpc.callKw('res.company', 'search_read', [[]], { fields: ['id', 'name'], limit: 1 })
@@ -1393,7 +1469,8 @@
     if (model === 'crm.lead') {
       html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
     }
-    html += '<button type="button" id="btn-export" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Export</button>';
+    html += '<button type="button" id="btn-export" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Export CSV</button>';
+    html += '<button type="button" id="btn-export-excel" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Export Excel</button>';
     html += '<button type="button" id="btn-import" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Import</button>';
     const reportName = getReportName(model);
     if (reportName) html += '<button type="button" id="btn-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Print</button>';
@@ -1572,6 +1649,48 @@
     }
     const btn = document.getElementById('btn-add');
     if (btn) btn.onclick = () => { window.location.hash = route + '/new'; };
+    const btnExportExcel = document.getElementById('btn-export-excel');
+    if (btnExportExcel && records && records.length) {
+      btnExportExcel.onclick = function () {
+        const cols = getListColumns(model);
+        const fields = ['id'].concat(cols.map(function (c) { return typeof c === 'object' ? c.name : c; }));
+        let domain = [];
+        const action = getActionForRoute(route);
+        if (action && action.domain) {
+          const parsed = parseActionDomain(action.domain);
+          if (parsed && parsed.length) domain = parsed;
+        }
+        const searchDom = buildSearchDomain(model, (document.getElementById('list-search') && document.getElementById('list-search').value) || '');
+        if (searchDom && searchDom.length) domain = domain.concat(searchDom);
+        const stageEl = document.getElementById('list-stage-filter');
+        if (model === 'crm.lead' && stageEl && stageEl.value) domain = domain.concat([['stage_id', '=', parseInt(stageEl.value, 10)]]);
+        (currentListState.activeSearchFilters || []).forEach(function (fname) {
+          const searchView = viewsSvc && viewsSvc.getView(model, 'search');
+          const filters = (searchView && searchView.filters) || [];
+          const f = filters.find(function (x) { return x.name === fname && x.domain; });
+          if (f && f.domain) {
+            const fd = parseFilterDomain(f.domain);
+            if (fd.length) domain = domain.concat(fd);
+          }
+        });
+        fetch('/web/export/xlsx', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: model, fields: fields, domain: domain })
+        }).then(function (r) {
+          if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'Export failed'); });
+          return r.blob();
+        }).then(function (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = (route || 'export') + '.xlsx';
+          a.click();
+          URL.revokeObjectURL(url);
+        }).catch(function (err) { showToast(err.message || 'Failed to export', 'error'); });
+      };
+    }
     const btnExport = document.getElementById('btn-export');
     if (btnExport && records && records.length) {
       btnExport.onclick = function () {
@@ -1870,12 +1989,21 @@
     return null;
   }
 
-  function renderOne2manyRow(fname, lineFields, rowData, rowIndex) {
+  function getOne2manyFieldInputType(model, fname, lf) {
+    if (lf === 'date_deadline') return 'date';
+    if (['product_uom_qty', 'price_unit', 'price_subtotal', 'product_qty', 'unit_amount', 'quantity', 'total_amount'].indexOf(lf) >= 0) return 'number';
+    return 'text';
+  }
+
+  function renderOne2manyRow(model, fname, lineFields, rowData, rowIndex) {
     var id = rowData && rowData.id;
     var dataAttrs = id ? ' data-o2m-id="' + id + '"' : ' data-o2m-new="1"';
     var cells = lineFields.map(function (lf) {
       var val = (rowData && rowData[lf]) || '';
-      return '<td style="padding:0.25rem"><input type="' + (lf === 'date_deadline' ? 'date' : 'text') + '" data-o2m-field="' + lf + '" value="' + (val || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;font-size:0.9rem"></td>';
+      var inpType = getOne2manyFieldInputType(model, fname, lf);
+      var step = (lf === 'price_unit' || lf === 'price_subtotal' || lf === 'unit_amount' || lf === 'total_amount') ? '0.01' : '1';
+      var readonly = (lf === 'price_subtotal' || lf === 'total_amount') ? ' readonly data-o2m-computed="1"' : '';
+      return '<td style="padding:0.25rem"><input type="' + inpType + '" data-o2m-field="' + lf + '" value="' + (val || '').replace(/"/g, '&quot;') + '" step="' + step + '"' + readonly + ' style="width:100%;padding:0.25rem;font-size:0.9rem"></td>';
     }).join('');
     return '<tr' + dataAttrs + '>' + cells + '<td style="padding:0.25rem"><button type="button" class="o2m-delete-row" style="padding:0.2rem 0.4rem;font-size:0.8rem;cursor:pointer;color:#c00">Delete</button></td></tr>';
   }
@@ -1889,7 +2017,7 @@
       var tbody = form.querySelector('#o2m-tbody-' + fname);
       if (!tbody) return;
       btn.onclick = function () {
-        tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(fname, lineFields, null, 0));
+        tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(model, fname, lineFields, null, 0));
         var lastRow = tbody.lastElementChild;
         if (lastRow) {
           var delBtn = lastRow.querySelector('.o2m-delete-row');
@@ -1900,6 +2028,42 @@
     form.querySelectorAll('.o2m-delete-row').forEach(function (b) {
       b.onclick = function () { b.closest('tr').remove(); };
     });
+  }
+
+  function setupOne2manyComputedFields(form, model) {
+    var o2mProductQty = { 'sale.order': { fname: 'order_line', qty: 'product_uom_qty', price: 'price_unit', subtotal: 'price_subtotal' }, 'hr.expense.sheet': { fname: 'expense_line_ids', qty: 'quantity', price: 'unit_amount', subtotal: 'total_amount' } };
+    var cfg = o2mProductQty[model];
+    if (!cfg) return;
+    var tbody = form.querySelector('#o2m-tbody-' + cfg.fname);
+    if (!tbody) return;
+    var updateSubtotal = function (tr) {
+      var qtyInp = tr.querySelector('[data-o2m-field="' + cfg.qty + '"]');
+      var priceInp = tr.querySelector('[data-o2m-field="' + cfg.price + '"]');
+      var subInp = tr.querySelector('[data-o2m-field="' + cfg.subtotal + '"]');
+      if (!qtyInp || !priceInp || !subInp) return;
+      var q = parseFloat(qtyInp.value) || 0;
+      var p = parseFloat(priceInp.value) || 0;
+      subInp.value = (q * p).toFixed(2);
+    };
+    tbody.querySelectorAll('tr').forEach(function (tr) {
+      var qtyInp = tr.querySelector('[data-o2m-field="' + cfg.qty + '"]');
+      var priceInp = tr.querySelector('[data-o2m-field="' + cfg.price + '"]');
+      if (qtyInp) qtyInp.oninput = function () { updateSubtotal(tr); };
+      if (priceInp) priceInp.oninput = function () { updateSubtotal(tr); };
+    });
+    var observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1 && node.tagName === 'TR') {
+            var qtyInp = node.querySelector('[data-o2m-field="' + cfg.qty + '"]');
+            var priceInp = node.querySelector('[data-o2m-field="' + cfg.price + '"]');
+            if (qtyInp) qtyInp.oninput = function () { updateSubtotal(node); };
+            if (priceInp) priceInp.oninput = function () { updateSubtotal(node); };
+          }
+        });
+      });
+    });
+    observer.observe(tbody, { childList: true });
   }
 
   function loadChatter(model, recordId, messageIds) {
@@ -1972,6 +2136,8 @@
     if (!o2m) return [];
     if (model === 'crm.lead' && fname === 'activity_ids') return ['summary', 'note', 'date_deadline', 'state'];
     if (model === 'sale.order' && fname === 'order_line') return ['product_id', 'name', 'product_uom_qty', 'price_unit', 'price_subtotal'];
+    if (model === 'mrp.bom' && fname === 'bom_line_ids') return ['product_id', 'product_qty'];
+    if (model === 'hr.expense.sheet' && fname === 'expense_line_ids') return ['name', 'product_id', 'unit_amount', 'quantity', 'total_amount'];
     var meta = viewsSvc ? viewsSvc.getFieldsMeta(o2m.comodel) : null;
     if (meta) {
       var skip = ['id', (o2m.inverse || '').replace(/_id$/, '') + '_id'];
@@ -2097,7 +2263,7 @@
       var headers = lineFields.map(function (lf) { return '<th style="text-align:left;padding:0.35rem">' + (lf.charAt(0).toUpperCase() + lf.slice(1)) + '</th>'; }).join('');
       var rowHtml = lineFields.map(function (lf) { return '<td style="padding:0.25rem"><input type="text" data-o2m-field="' + lf + '" style="width:100%;padding:0.25rem;font-size:0.9rem" placeholder="' + lf + '"></td>'; }).join('');
       var addId = 'o2m-add-' + fname;
-      return '<p><label>' + label + '</label><div id="o2m-' + fname + '" data-comodel="' + (o2m.comodel || '') + '" data-inverse="' + (o2m.inverse || '') + '" data-fname="' + fname + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px"><table style="width:100%;font-size:0.9rem"><thead><tr>' + headers + '<th style="width:1%"></th></tr></thead><tbody id="o2m-tbody-' + fname + '"></tbody></table><button type="button" id="' + addId + '" style="margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.85rem;cursor:pointer">Add</button></div></p>';
+      return '<p><label>' + label + '</label><div id="o2m-' + fname + '" class="o2m-editable" data-comodel="' + (o2m.comodel || '') + '" data-inverse="' + (o2m.inverse || '') + '" data-fname="' + fname + '" style="margin-top:0.25rem;padding:0.5rem;background:#f8f8f8;border-radius:4px"><table style="width:100%;font-size:0.9rem"><thead><tr>' + headers + '<th style="width:1%"></th></tr></thead><tbody id="o2m-tbody-' + fname + '"></tbody></table><button type="button" id="' + addId + '" class="o2m-add-line" style="margin-top:0.25rem;padding:0.25rem 0.5rem;font-size:0.85rem;cursor:pointer">Add a line</button></div></p>';
     }
     if (m2m) {
       const tagsClass = (widget === 'many2many_tags') ? ' m2m-tags' : '';
@@ -2441,12 +2607,13 @@
       var fname = sb.dataset.fname;
       var hiddenInput = form.querySelector('input[name="' + fname + '"]');
       if (!hiddenInput) return;
-      var currentId = currentVal != null ? parseInt(currentVal, 10) : null;
+      var currentId = currentVal != null ? currentVal : null;
       if (currentId != null) hiddenInput.value = currentId;
       var currentIdx = -1;
       if (currentId != null) {
         for (var i = 0; i < options.length; i++) {
-          if ((options[i].id != null ? options[i].id : options[i][0]) == currentId) { currentIdx = i; break; }
+          var oid = options[i].id != null ? options[i].id : options[i][0];
+          if (String(oid) === String(currentId)) { currentIdx = i; break; }
         }
       }
       options.forEach(function (opt, idx) {
@@ -2455,14 +2622,15 @@
         var optId = opt.id != null ? opt.id : opt[0];
         var optName = opt.name != null ? opt.name : (opt[1] || opt[0]);
         item.textContent = optName;
-        item.dataset.value = optId;
-        if (optId == currentId || (currentId == null && idx === 0)) item.classList.add('o-statusbar-item--active');
+        item.dataset.value = String(optId);
+        if (String(optId) === String(currentId) || (currentId == null && idx === 0)) item.classList.add('o-statusbar-item--active');
         if (currentIdx >= 0 && idx < currentIdx) item.classList.add('o-statusbar-item--done');
         if (clickable) {
           item.style.cursor = 'pointer';
           item.onclick = function () {
-            const val = parseInt(item.dataset.value, 10);
-            hiddenInput.value = val;
+            const raw = item.dataset.value;
+            const val = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+            hiddenInput.value = raw;
             if (isNew) {
               statusbars.forEach(function (s) {
                 if (s.dataset.fname === fname) {
@@ -2477,11 +2645,18 @@
                   loadRecord(model, id).then(function (r) {
                     if (r && r[0]) {
                       var rec = r[0];
+                      var newCurrent = rec[fname];
                       statusbars.forEach(function (s) {
                         if (s.dataset.fname === fname) {
-                          s.querySelectorAll('.o-statusbar-item').forEach(function (i) {
+                          var items = s.querySelectorAll('.o-statusbar-item');
+                          var newIdx = -1;
+                          for (var j = 0; j < items.length; j++) {
+                            if (String(items[j].dataset.value) === String(newCurrent)) { newIdx = j; break; }
+                          }
+                          items.forEach(function (i, j) {
                             i.classList.remove('o-statusbar-item--active', 'o-statusbar-item--done');
-                            if (parseInt(i.dataset.value, 10) === rec[fname]) i.classList.add('o-statusbar-item--active');
+                            if (j === newIdx) i.classList.add('o-statusbar-item--active');
+                            else if (newIdx >= 0 && j < newIdx) i.classList.add('o-statusbar-item--done');
                           });
                         }
                       });
@@ -2663,6 +2838,57 @@
         el.addEventListener(ev, function () { runServerOnchange(fieldName); });
       });
     };
+    var o2mOnchangeDebounce = {};
+    const setupO2mOnchangeHandlers = function () {
+      form.querySelectorAll('[id^="o2m-"]').forEach(function (div) {
+        var fname = div.dataset.fname;
+        var o2m = getOne2manyInfo(model, fname);
+        if (!o2m || !o2m.comodel) return;
+        var lineFields = getOne2manyLineFields(model, fname);
+        if (lineFields.indexOf('product_id') < 0) return;
+        var tbody = div.querySelector('tbody');
+        if (!tbody) return;
+        var runLineOnchange = function (tr, fieldName) {
+          var key = fname + '-' + fieldName;
+          if (o2mOnchangeDebounce[key]) clearTimeout(o2mOnchangeDebounce[key]);
+          o2mOnchangeDebounce[key] = setTimeout(function () {
+            o2mOnchangeDebounce[key] = null;
+            var rowVals = {};
+            lineFields.forEach(function (lf) {
+              var inp = tr.querySelector('[data-o2m-field="' + lf + '"]');
+              if (inp) {
+                var v = inp.value;
+                if (lf === 'product_id' && /^\d+$/.test(String(v))) v = parseInt(v, 10);
+                else if (['product_uom_qty', 'price_unit', 'price_subtotal', 'product_qty', 'unit_amount', 'quantity', 'total_amount'].indexOf(lf) >= 0 && v !== '') v = parseFloat(v) || 0;
+                rowVals[lf] = v;
+              }
+            });
+            rpc.callKw(o2m.comodel, 'onchange', [fieldName, rowVals], {}).then(function (updates) {
+              if (!updates || typeof updates !== 'object') return;
+              Object.keys(updates).forEach(function (n) {
+                var inp = tr.querySelector('[data-o2m-field="' + n + '"]');
+                if (inp) inp.value = updates[n] != null ? updates[n] : '';
+              });
+            }).catch(function () {});
+          }, 300);
+        };
+        tbody.querySelectorAll('tr').forEach(function (tr) {
+          var prodInp = tr.querySelector('[data-o2m-field="product_id"]');
+          if (prodInp) prodInp.addEventListener('change', function () { runLineOnchange(tr, 'product_id'); });
+        });
+        var obs = new MutationObserver(function (mutations) {
+          mutations.forEach(function (m) {
+            m.addedNodes.forEach(function (node) {
+              if (node.nodeType === 1 && node.tagName === 'TR') {
+                var prodInp = node.querySelector('[data-o2m-field="product_id"]');
+                if (prodInp) prodInp.addEventListener('change', function () { runLineOnchange(node, 'product_id'); });
+              }
+            });
+          });
+        });
+        obs.observe(tbody, { childList: true });
+      });
+    };
     const setM2mChecked = function (fname, ids) {
       const div = form.querySelector('#m2m-' + fname);
       if (div && div.dataset.widget === 'many2many_tags') {
@@ -2722,6 +2948,8 @@
         .then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); })
         .catch(function () { loadOptions({}).then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); }); });
       setupOne2manyAddButtons(form, model);
+      setupOne2manyComputedFields(form, model);
+      setupO2mOnchangeHandlers();
       form.onsubmit = (e) => { e.preventDefault(); createRecord(model, route, form); return false; };
     } else {
       loadRecord(model, id).then(function (r) {
@@ -2766,13 +2994,17 @@
                   .then(function (rows) {
                     var lineFields = getOne2manyLineFields(model, n);
                     rows.forEach(function (row) {
-                      tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(n, lineFields, row, 0));
+                      tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(model, n, lineFields, row, 0));
                     });
                     setupOne2manyAddButtons(form, model);
+      setupOne2manyComputedFields(form, model);
+      setupO2mOnchangeHandlers();
                   })
                   .catch(function () { if (tbody) tbody.innerHTML = '<tr><td colspan="4">—</td></tr>'; });
               } else if (div) {
                 setupOne2manyAddButtons(form, model);
+      setupOne2manyComputedFields(form, model);
+      setupO2mOnchangeHandlers();
               }
             } else if (isBooleanField(model, n)) {
               const cb = form.querySelector('[name="' + n + '"][type="checkbox"]');
@@ -2928,7 +3160,11 @@
             if (id) row.id = parseInt(id, 10);
             lineFields.forEach(function (lf) {
               var inp = tr.querySelector('[data-o2m-field="' + lf + '"]');
-              if (inp) row[lf] = inp.value || (lf === 'date_deadline' ? null : '');
+              if (!inp) return;
+              var v = inp.value || (lf === 'date_deadline' ? null : '');
+              if (lf === 'product_id' && /^\d+$/.test(String(v))) v = parseInt(v, 10);
+              else if (['product_uom_qty', 'price_unit', 'price_subtotal', 'product_qty', 'unit_amount', 'quantity', 'total_amount'].indexOf(lf) >= 0 && v !== '') v = parseFloat(v) || 0;
+              row[lf] = v;
             });
             if (lineFields.length) rows.push(row);
           });
@@ -3790,7 +4026,8 @@
     html += '<button type="button" id="cal-today" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Today</button>';
     html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
     html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
+    const calAddLabel = (model === 'calendar.event') ? 'Add meeting' : 'Add lead';
+    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + calAddLabel + '</button></p>';
     html += '<div class="o-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border-color);border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden">';
     dayNames.forEach(function (dn) {
       html += '<div style="padding:var(--space-sm);background:var(--color-bg);font-weight:600;font-size:0.85rem">' + dn + '</div>';
@@ -3954,7 +4191,7 @@
       formDirty = false;
     }
     lastHash = hash;
-    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|leaves|leave_types|allocations|cron|server_actions|sequences|manufacturing|boms|workcenters';
+    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|leaves|leave_types|allocations|cron|server_actions|sequences|manufacturing|boms|workcenters|transfers|warehouses|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
     const editMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/edit\\/(\\d+)$'));
     const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
@@ -4001,7 +4238,7 @@
     if (!e.altKey) return;
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
-    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|leaves|leave_types|allocations|cron|server_actions|sequences|manufacturing|boms|workcenters';
+    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|leaves|leave_types|allocations|cron|server_actions|sequences|manufacturing|boms|workcenters|transfers|warehouses|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
     const formMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/(edit\\/\\d+|new)$'));
     if (e.key === 'n' && listMatch) {

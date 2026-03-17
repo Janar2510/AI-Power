@@ -10,3 +10,4 @@ class ProjectProject(Model):
     name = fields.Char(required=True)
     description = fields.Text()
     partner_id = fields.Many2one("res.partner", string="Customer")
+    analytic_account_id = fields.Many2one("analytic.account", string="Analytic Account")

@@ -64,11 +64,11 @@
             <button name="action_cancel" string="Cancel" type="object" invisible="state in ('done', 'cancel')"/>
           </header>
           <sheet>
+            <field name="state" widget="statusbar"/>
             <field name="name"/>
             <field name="product_id" comodel="product.product"/>
             <field name="bom_id" comodel="mrp.bom"/>
             <field name="product_qty"/>
-            <field name="state"/>
             <field name="date_start"/>
             <field name="date_finished"/>
             <field name="move_ids">

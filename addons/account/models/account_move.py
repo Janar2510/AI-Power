@@ -29,6 +29,7 @@ class AccountMove(Model):
         ],
         string="Status",
         default="draft",
+        tracking=True,
     )
     move_type = fields.Selection(
         selection=[

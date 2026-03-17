@@ -16,12 +16,14 @@ class Field:
         readonly: bool = False,
         default: Any = None,
         help: str = "",
+        tracking: bool = False,
     ):
         self.string = string
         self.required = required
         self.readonly = readonly
         self.default = default
         self.help = help
+        self.tracking = tracking
 
     def __set_name__(self, owner, name: str):
         self.name = name

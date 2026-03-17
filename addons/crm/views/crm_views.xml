@@ -6,6 +6,9 @@
       <field name="model">crm.lead</field>
       <field name="arch" type="xml">
         <search>
+          <searchpanel>
+            <field name="stage_id" select="one"/>
+          </searchpanel>
           <field name="name"/>
           <field name="description"/>
           <filter name="opportunities" string="Opportunities" domain="[('type','=','opportunity')]"/>
@@ -18,7 +21,7 @@
       <field name="name">crm.lead list</field>
       <field name="model">crm.lead</field>
       <field name="arch" type="xml">
-        <list>
+        <list editable="bottom">
           <field name="name"/>
           <field name="type"/>
           <field name="stage_id" comodel="crm.stage"/>

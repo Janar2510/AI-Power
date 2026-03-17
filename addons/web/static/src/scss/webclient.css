@@ -105,6 +105,10 @@ body {
   cursor: default;
 }
 
+#navbar .nav-hamburger {
+  display: none;
+}
+
 #navbar .nav-user {
   margin-left: auto;
   display: flex;
@@ -177,9 +181,50 @@ body {
 .o-statusbar-item--done {
   color: var(--text-muted);
 }
+.o-statusbar-item--done::before {
+  content: "✓ ";
+  color: var(--color-success);
+  font-weight: 600;
+}
 .o-statusbar-sep {
   margin: 0 var(--space-xs);
   color: var(--text-muted);
+}
+
+/* Phase 163: Form header buttons - pill style */
+.o-form-header .btn-action-object {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color);
+  background: var(--color-bg);
+  cursor: pointer;
+  margin-right: var(--space-sm);
+}
+.o-form-header .btn-action-object.btn-primary {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+.o-form-header .btn-action-object:hover {
+  opacity: 0.9;
+}
+
+/* Phase 164: Inline One2many editing */
+.o2m-editable table {
+  border-collapse: collapse;
+}
+.o2m-editable td input {
+  min-width: 4rem;
+}
+.o2m-editable td input[data-o2m-computed="1"] {
+  background: var(--color-bg);
+  color: var(--text-muted);
+}
+.o2m-add-line {
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
 }
 
 /* Kanban drag-drop */
@@ -475,4 +520,140 @@ body {
 .breadcrumb-sep {
   color: var(--text-muted);
   margin: 0 var(--space-xs);
+}
+
+/* Phase 169: Responsive layout + mobile */
+:root {
+  --touch-target-min: 44px;
+  --responsive-space-sm: var(--space-sm);
+  --responsive-space-md: var(--space-md);
+}
+
+@media (max-width: 1023px) {
+  .form-group {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  #navbar {
+    flex-wrap: wrap;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  #navbar .nav-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-target-min);
+    min-height: var(--touch-target-min);
+    padding: var(--space-sm);
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.5rem;
+    margin-right: var(--space-sm);
+  }
+
+  #navbar .nav-menu {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    gap: 0;
+    padding: var(--space-md) 0;
+    order: 10;
+  }
+
+  #navbar .nav-menu.nav-menu-open {
+    display: flex;
+  }
+
+  #navbar .nav-menu .nav-link,
+  #navbar .nav-menu .nav-dropdown > a,
+  #navbar .nav-menu .nav-dropdown > button {
+    min-height: var(--touch-target-min);
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  #navbar .nav-dropdown-content {
+    position: static;
+    display: none;
+    box-shadow: none;
+    padding-left: var(--space-lg);
+    background: rgba(0, 0, 0, 0.2);
+  }
+
+  #navbar .nav-dropdown.nav-dropdown-open .nav-dropdown-content {
+    display: block;
+  }
+
+  #main {
+    padding: var(--space-md);
+  }
+
+  .form-group {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .o-form-header .btn-action-object {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+    padding: var(--space-md);
+  }
+
+  .o-kanban-columns {
+    flex-direction: column;
+  }
+
+  .o-kanban-column {
+    min-width: 100%;
+  }
+
+  .o-list-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .o-list-table-wrapper table {
+    min-width: 600px;
+  }
+
+  .o-list-table-wrapper th:first-child,
+  .o-list-table-wrapper td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--color-bg);
+    z-index: 1;
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+}
+
+@media (max-width: 480px) {
+  #navbar {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  #main {
+    padding: var(--space-sm);
+  }
+
+  button,
+  .btn-action-object,
+  input[type="submit"],
+  input[type="button"],
+  .nav-link {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+    padding: var(--space-md);
+  }
+
+  .form-group {
+    gap: var(--space-sm);
+  }
 }

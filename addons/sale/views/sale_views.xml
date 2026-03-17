@@ -36,10 +36,10 @@
             <button name="action_cancel" string="Cancel" type="object"/>
           </header>
           <sheet>
+            <field name="state" widget="statusbar"/>
             <field name="name"/>
             <field name="partner_id" comodel="res.partner"/>
             <field name="date_order"/>
-            <field name="state"/>
             <field name="currency_id" comodel="res.currency"/>
             <field name="amount_total"/>
             <field name="order_line">

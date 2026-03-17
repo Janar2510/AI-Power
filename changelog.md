@@ -1,5 +1,125 @@
 # Changelog
 
+## 1.54.0 (Phases 170–177: Menu Fix, Tracking, Email Routing, Stock Valuation, Excel, Approval, Editable List, Search Panel)
+
+### Phase 170: Fix Navigation Menu + Auto-Upgrade on Login
+- core/http/routes.py: load_views auto-runs load_default_data when DB menus empty or &lt;50% of XML count
+- addons/web/static/src/main.js: warning banner when menus empty ("Run: erp-bin db upgrade -d &lt;db&gt;")
+- core/data/views_registry.py: already keeps XML menus when DB menus_filtered empty (no overwrite)
+- tests/test_menu_fix_phase170.py
+
+### Phase 171: Field Change Tracking (Audit Trail)
+- core/orm/fields.py: Field base class adds tracking=True parameter
+- core/orm/models.py: write() reads old values for tracked fields; _track_changes() creates mail.message with change log
+- crm.lead: tracking=True on stage_id, partner_id, expected_revenue
+- sale.order: tracking=True on state, partner_id
+- account.move: tracking=True on state
+- hr.leave: tracking=True on state
+- tests/test_tracking_phase171.py
+
+### Phase 172: Incoming Email to Chatter (Reply Routing)
+- addons/mail/models/mail_message.py: message_id field (Char) for email Message-ID
+- addons/mail/models/mail_thread.py: message_post generates message_id; passes to mail.mail when send_as_email
+- addons/mail/models/mail_mail.py: message_id field; ir.mail_server sets Message-ID header when sending
+- addons/fetchmail/models/fetchmail_server.py: In-Reply-To routing - match mail.message by message_id, post to chatter
+- tests/test_email_routing_phase172.py
+
+### Phase 173: Stock Valuation + Cost Tracking
+- addons/stock/models/product_product.py: standard_price, cost_method (standard/average)
+- addons/stock/models/stock_valuation_layer.py: stock.valuation.layer (product_id, quantity, unit_cost, value, stock_move_id)
+- addons/stock/models/stock_move_quant.py: _create_valuation_layers on done moves; average cost updates product.standard_price
+- addons/stock/views/stock_views.xml: Inventory > Reporting > Valuation menu
+- tests/test_valuation_phase173.py
+
+### Phase 174: Excel Export
+- core/http/routes.py: POST /web/export/xlsx (model, fields, domain) returns .xlsx via openpyxl
+- addons/web/static/src/main.js: Export Excel button; POST to /web/export/xlsx with current domain
+- requirements.txt: openpyxl>=3.1
+- tests/test_excel_export_phase174.py
+
+### Phase 175: Generic Approval Workflow
+- addons/base/models/approval_rule.py: approval.rule (model, field_trigger, approver_user_id, approver_group_id, min_amount)
+- addons/base/models/approval_request.py: approval.request (rule_id, res_model, res_id, state: pending/approved/rejected)
+- addons/base/views/ir_views.xml: Settings > Approval Rules, Approval Requests menus
+
+### Phase 176: Editable List View
+- core/data/xml_loader.py: parse editable attribute from &lt;list editable="top"|"bottom"&gt;
+- core/data/views_registry.py: include editable in list view_def
+- addons/crm/views/crm_views.xml: crm.lead list editable="bottom"
+
+### Phase 177: Search Panel
+- core/data/xml_loader.py: parse &lt;searchpanel&gt; with &lt;field name="..." select="one"|"multi"/&gt;
+- core/data/views_registry.py: include search_panel in search view_def
+- addons/crm/views/crm_views.xml: searchpanel for stage_id on crm.lead
+- addons/project/views/project_views.xml: searchpanel for project_id on project.task
+
+## 1.53.0 (Phases 162–169: DB Upgrade, Statusbar, One2many Edit, Onchange, Email, Calendar, Analytic, Responsive)
+
+### Phase 162: DB Upgrade CLI + Data Reload
+- core/upgrade/runner.py: run_upgrade calls load_default_data (idempotent menus, actions, views, sequences, stages)
+- addons/web/static/src/main.js: Removed fallback menus (use `erp-bin db upgrade -d <db>` to reload menus)
+- tests/test_db_upgrade_phase162.py
+
+### Phase 163: Statusbar Widget + Workflow Buttons
+- addons/web/static/src/main.js: statusbar supports Selection fields (string values), fix write/compare for draft/sale/cancel
+- addons/web/static/src/scss/webclient.css: statusbar done-state checkmark, header button pill styling
+- sale, purchase, account, mrp, hr: form views with `<field name="state" widget="statusbar"/>`
+- tests/test_statusbar_phase163.py
+
+### Phase 164: Inline One2many Editing
+- addons/web/static/src/main.js: renderOne2manyRow with number inputs, computed subtotal, setupOne2manyComputedFields
+- getOne2manyLineFields for mrp.bom bom_line_ids, hr.expense.sheet expense_line_ids
+- Auto-compute price_subtotal (qty*price) and total_amount on input; "Add a line" button
+- addons/web/static/src/scss/webclient.css: o2m-editable styles
+- tests/test_one2many_edit_phase164.py
+
+### Phase 165: Onchange + Dynamic Domains
+- sale.order.line._onchange_product_id: fill price_unit, name from product
+- purchase.order.line._onchange_product_id: same
+- sale.order._onchange_partner_id: fill currency_id from company
+- crm.lead._onchange_partner_id: fill email_from, phone from partner; crm.lead email_from, phone fields
+- addons/web/static/src/main.js: setupO2mOnchangeHandlers for product_id in order lines
+- tests/test_onchange_phase165.py
+
+### Phase 166: Email Outbox (SMTP)
+- mail.mail.send(), ir.mail_server, process_email_queue already implemented
+- core/http/rpc.py: process_email_queue in _CLASS_METHODS for RPC
+- tests/test_email_phase166.py
+
+### Phase 169: Responsive Layout + Mobile
+- addons/web/static/src/scss/webclient.css: media queries for 768px, 480px; hamburger menu, stacked forms, touch targets (44px min)
+- addons/web/static/src/main.js: hamburger toggle for nav; touch-friendly dropdowns on mobile
+- Kanban single-column on mobile; list view horizontal scroll with sticky first column
+
+### Phase 168: Analytic Accounting
+- addons/account/models/analytic_account.py: analytic.account (name, code, partner_id, company_id, active)
+- addons/account/models/analytic_line.py: analytic.line (name, date, account_id, amount, unit_amount, partner_id, move_line_id)
+- account.move.line: analytic_account_id Many2one
+- hr.expense: analytic_account_id; action_done creates analytic.line when expense has analytic account
+- project.project: analytic_account_id for project cost tracking
+- Invoicing > Configuration > Analytic Accounts menu
+- tests/test_analytic_phase168.py
+
+### Phase 167: Calendar Module
+- addons/calendar/: calendar.event, calendar.attendee (meetings linked to partners)
+- calendar.event: name, start, stop, allday, duration (computed), partner_ids, user_id, location, description, privacy, show_as
+- calendar.attendee: event_id, partner_id, state (needs_action/accepted/declined)
+- addons/calendar/views/calendar_views.xml: calendar, list, form views; Meetings menu
+- addons/website/controllers/website.py: /my/calendar, /my/calendar/<id> portal routes
+- core/tools/config.py: calendar in DEFAULT_SERVER_WIDE_MODULES
+- addons/web/static/src/main.js: actionToRoute calendar_event->meetings, getModelForRoute meetings->calendar.event
+- tests/test_calendar_phase167.py
+
+## 1.52.1 (Menu navigation fix)
+
+### Menu visibility fix
+- core/data/views_registry.py: Only overwrite XML menus with DB menus when DB returns non-empty; keep XML fallback when filtered empty
+- core/data/views_registry.py: Parse record-style ir.ui.menu (parent_id, action refs) for knowledge module
+- core/tools/config.py: Add mrp to DEFAULT_SERVER_WIDE_MODULES (menus from XML)
+- addons/web/static/src/main.js: Fallback menus when server returns empty (Home, Contacts, Leads, Orders, Products, Tasks, Settings)
+- addons/web/static/src/main.js: actionToRoute/getModelForRoute for transfers, warehouses, purchase_orders, invoices, journals, accounts, employees, departments, jobs, projects
+- addons/web/static/src/main.js: menuToRoute for contacts, leads, orders, products, tasks
+
 ## 1.52.0 (Phases 154–161: Multi-Currency, Variants, Payment, Portal, Gantt, Webhooks, Widgets, Expenses)
 
 ### Phase 161: Expense module

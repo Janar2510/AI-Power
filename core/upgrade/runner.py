@@ -72,18 +72,13 @@ def run_upgrade(cr: Any, dbname: str, module_names: Optional[List[str]] = None) 
     init_schema(cr, registry)
     env = Environment(registry, cr=cr, uid=1)
     registry.set_env(env)
-    # Phase 106: ensure default dashboard widgets on upgrade (idempotent)
+    # Phase 162: full idempotent data reload (menus, actions, views, sequences, stages, etc.)
     try:
-        from core.db.init_data import _load_dashboard_widgets
-        _load_dashboard_widgets(env)
+        from core.db.init_data import load_default_data
+        load_default_data(env)
+        _logger.info("Reloaded default data (menus, actions, views, etc.)")
     except Exception as e:
-        _logger.warning("Could not load dashboard widgets on upgrade: %s", e)
-    # Phase 110: ensure default report actions on upgrade (idempotent)
-    try:
-        from core.db.init_data import _load_ir_actions_reports
-        _load_ir_actions_reports(env)
-    except Exception as e:
-        _logger.warning("Could not load ir.actions.report on upgrade: %s", e)
+        _logger.warning("Could not reload default data on upgrade: %s", e)
     to_run = module_names or []
     if not to_run:
         IrModule = registry.get("ir.module.module")

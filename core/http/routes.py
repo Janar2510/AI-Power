@@ -290,6 +290,7 @@ def load_views(request):
     import json
     from core.orm import Environment
     from core.data.views_registry import load_views_registry, load_views_registry_from_db
+    from core.db.init_data import load_default_data
 
     db = get_session_db(request)
     try:
@@ -298,6 +299,16 @@ def load_views(request):
             env = Environment(registry_obj, cr=cr, uid=uid)
             registry_obj.set_env(env)
             registry = load_views_registry_from_db(env)
+            # Phase 170: auto-upgrade when DB menus are empty or stale
+            xml_reg = load_views_registry()
+            xml_menu_count = len(xml_reg.get("menus", []))
+            registry_menus = registry.get("menus", [])
+            if xml_menu_count > 0 and (
+                len(registry_menus) == 0 or len(registry_menus) < xml_menu_count * 0.5
+            ):
+                load_default_data(env)
+                cr.connection.commit()
+                registry = load_views_registry_from_db(env)
             fields_meta = {}
             for model_name in list(registry.get("views", {}).keys()):
                 ModelCls = env.get(model_name)
@@ -327,6 +338,61 @@ def load_views(request):
         json.dumps(_json_safe(registry)),
         content_type="application/json",
     )
+
+
+@route("/web/export/xlsx", auth="user", methods=["POST"])
+def export_xlsx(request):
+    """Phase 174: Server-side Excel export. POST {model, fields, domain} -> .xlsx binary."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    import json
+    from core.orm import Environment
+    from io import BytesIO
+    try:
+        from openpyxl import Workbook
+        from openpyxl.utils import get_column_letter
+    except ImportError:
+        return Response('{"error": "openpyxl not installed"}', status=500, content_type="application/json")
+    try:
+        data = request.get_json() or {}
+        model = data.get("model", "")
+        fields = data.get("fields", ["id", "name"])
+        domain = data.get("domain", [])
+        if not model:
+            return Response('{"error": "model required"}', status=400, content_type="application/json")
+        db = get_session_db(request)
+        registry_obj = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry_obj, cr=cr, uid=uid)
+            registry_obj.set_env(env)
+            ModelCls = env.get(model)
+            if not ModelCls:
+                return Response('{"error": "model not found"}', status=404, content_type="application/json")
+            rows = ModelCls.search_read(domain, fields, limit=10000)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = model.replace(".", "_")[:31]
+        for col, f in enumerate(fields, 1):
+            ws.cell(row=1, column=col, value=str(f))
+        for row_idx, r in enumerate(rows, 2):
+            for col_idx, f in enumerate(fields, 1):
+                val = r.get(f)
+                if isinstance(val, (list, tuple)) and len(val) >= 2:
+                    val = val[1]
+                elif val is None:
+                    val = ""
+                ws.cell(row=row_idx, column=col_idx, value=val)
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return Response(
+            buf.getvalue(),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={model.replace('.', '_')}_export.xlsx"},
+        )
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, content_type="application/json")
 
 
 @route("/web/session/get_session_info", auth="public", methods=["POST"])

@@ -62,6 +62,7 @@ PORTAL_MY_HTML = """<!DOCTYPE html>
   <a href="/my/leads">My Leads</a>
   <a href="/my/orders">My Orders</a>
   <a href="/my/invoices">My Invoices</a>
+  <a href="/my/calendar">My Calendar</a>
   <a href="/my/profile">My Profile</a>
   <a href="/web/logout">Logout</a>
 </div>
@@ -696,6 +697,115 @@ def portal_my_leads(request):
             html += f'<tr><td><a href="/my/leads/{lid}">{name}</a></td><td>{pname}</td><td>{rev}</td><td>{dl}</td></tr>'
         html += "</table>"
         return Response(PORTAL_MY_HTML.format(content=html), content_type="text/html; charset=utf-8")
+
+
+@route("/my/calendar", auth="portal", methods=["GET"])
+def portal_my_calendar(request):
+    """List calendar events where current user's partner is attendee (Phase 167)."""
+    uid, db = _require_portal_session(request)
+    if uid is None:
+        return redirect("/web/login")
+    registry = _get_registry(db)
+    if not _is_portal_user(registry, db, uid):
+        return redirect("/")
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        User = env.get("res.users")
+        CalendarEvent = env.get("calendar.event")
+        CalendarAttendee = env.get("calendar.attendee")
+        if not User or not CalendarEvent:
+            content = "<h1>My Calendar</h1><p>Calendar module not available.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        rows = User.read_ids([uid], ["partner_id"])
+        partner_id = rows[0].get("partner_id") if rows else None
+        if not partner_id:
+            content = "<h1>My Calendar</h1><p>No contact linked to your account.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        event_ids = []
+        if CalendarAttendee:
+            attendees = CalendarAttendee.search([("partner_id", "=", partner_id)], limit=200)
+            if attendees and attendees.ids:
+                att_rows = CalendarAttendee.browse(attendees.ids).read(["event_id"])
+                event_ids = list(dict.fromkeys(r.get("event_id") for r in att_rows if r.get("event_id")))
+        if not event_ids and cr:
+            try:
+                cr.execute(
+                    "SELECT event_id FROM calendar_event_res_partner_rel WHERE partner_id = %s",
+                    (partner_id,),
+                )
+                event_ids = [r["event_id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
+            except Exception:
+                pass
+        if not event_ids:
+            content = "<h1>My Calendar</h1><p>No meetings found.</p>"
+            return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
+        events = CalendarEvent.browse(event_ids).read(["name", "start", "stop", "location"])
+        html = "<h1>My Calendar</h1><table><tr><th>Meeting</th><th>Start</th><th>End</th><th>Location</th></tr>"
+        for r in sorted(events, key=lambda x: (x.get("start") or "")):
+            name = (r.get("name") or "").replace("<", "&lt;")
+            start = (r.get("start") or "")[:19].replace("T", " ") if r.get("start") else ""
+            stop = (r.get("stop") or "")[:19].replace("T", " ") if r.get("stop") else ""
+            loc = (r.get("location") or "").replace("<", "&lt;")
+            eid = r.get("id", "")
+            html += f'<tr><td><a href="/my/calendar/{eid}">{name}</a></td><td>{start}</td><td>{stop}</td><td>{loc}</td></tr>'
+        html += "</table>"
+        return Response(PORTAL_MY_HTML.format(content=html), content_type="text/html; charset=utf-8")
+
+
+@route("/my/calendar/<int:event_id>", auth="portal", methods=["GET"])
+def portal_my_calendar_detail(request, event_id):
+    """View single calendar event (Phase 167)."""
+    uid, db = _require_portal_session(request)
+    if uid is None:
+        return redirect("/web/login")
+    registry = _get_registry(db)
+    if not _is_portal_user(registry, db, uid):
+        return redirect("/")
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        User = env.get("res.users")
+        CalendarEvent = env.get("calendar.event")
+        CalendarAttendee = env.get("calendar.attendee")
+        if not User or not CalendarEvent:
+            return redirect("/my/calendar")
+        rows = User.read_ids([uid], ["partner_id"])
+        partner_id = rows[0].get("partner_id") if rows else None
+        if not partner_id:
+            return redirect("/my/calendar")
+        event_ids = []
+        if CalendarAttendee:
+            attendees = CalendarAttendee.search([("partner_id", "=", partner_id), ("event_id", "=", event_id)], limit=1)
+            if attendees and attendees.ids:
+                event_ids = [event_id]
+        if not event_ids and cr:
+            try:
+                cr.execute(
+                    "SELECT 1 FROM calendar_event_res_partner_rel WHERE event_id = %s AND partner_id = %s",
+                    (event_id, partner_id),
+                )
+                if cr.fetchone():
+                    event_ids = [event_id]
+            except Exception:
+                pass
+        if not event_ids:
+            return redirect("/my/calendar")
+        event = CalendarEvent.browse(event_ids[0])
+        row = event.read(["name", "start", "stop", "location", "description"])[0]
+        name = (row.get("name") or "").replace("<", "&lt;")
+        start = (row.get("start") or "")[:19].replace("T", " ") if row.get("start") else ""
+        stop = (row.get("stop") or "")[:19].replace("T", " ") if row.get("stop") else ""
+        loc = (row.get("location") or "").replace("<", "&lt;")
+        desc = (row.get("description") or "").replace("<", "&lt;").replace("\n", "<br/>")
+        content = f"<h1>{name}</h1><p><a href=\"/my/calendar\">&larr; Back to calendar</a></p>"
+        content += f"<table style=\"margin-top:1rem\"><tr><th>Start</th><td>{start}</td></tr>"
+        content += f"<tr><th>End</th><td>{stop}</td></tr><tr><th>Location</th><td>{loc}</td></tr></table>"
+        if desc:
+            content += f"<h3>Description</h3><p>{desc}</p>"
+        return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
 
 
 @route("/my/leads/<int:lead_id>", auth="portal", methods=["GET"])

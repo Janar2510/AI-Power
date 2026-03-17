@@ -5,6 +5,7 @@
     "description": "The kernel of the ERP platform, needed for all installation.",
     "depends": [],
     "data": [
+        "security/ir.model.access.csv",
         "views/ir_views.xml",
     ],
     "demo": [],

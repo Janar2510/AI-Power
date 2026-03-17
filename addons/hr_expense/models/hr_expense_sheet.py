@@ -83,10 +83,8 @@ class HrExpenseSheet(Model):
             if not lines or not lines.ids:
                 sheet.write({"state": "done"})
                 continue
-            total = sum(
-                r.get("unit_amount", 0) * r.get("quantity", 1)
-                for r in lines.read(["unit_amount", "quantity"])
-            )
+            line_rows = lines.read(["name", "unit_amount", "quantity", "date", "analytic_account_id", "employee_id"])
+            total = sum(r.get("unit_amount", 0) * r.get("quantity", 1) for r in line_rows)
             move_vals = {
                 "journal_id": journal_id,
                 "move_type": "entry",
@@ -94,18 +92,33 @@ class HrExpenseSheet(Model):
             move = Move.create(move_vals)
             MoveLine = env.get("account.move.line")
             Account = env.get("account.account")
+            AnalyticLine = env.get("analytic.line")
             if MoveLine and Account:
                 expense_accounts = Account.search([("code", "ilike", "6")], limit=1)
-                payable_accounts = Account.search([("code", "ilike", "4")], limit=1)
+                payable_accounts = Account.search([("code", "ilike", "2")], limit=1)
+                if not payable_accounts.ids:
+                    payable_accounts = Account.search([("code", "ilike", "4")], limit=1)
                 exp_acc = expense_accounts.ids[0] if expense_accounts.ids else None
                 pay_acc = payable_accounts.ids[0] if payable_accounts.ids else None
                 if exp_acc and pay_acc:
-                    MoveLine.create({
-                        "move_id": move.id,
-                        "account_id": exp_acc,
-                        "name": f"Expense {sheet.name}",
-                        "debit": total,
-                    })
+                    for r in line_rows:
+                        amt = r.get("unit_amount", 0) * r.get("quantity", 1)
+                        debit_line = MoveLine.create({
+                            "move_id": move.id,
+                            "account_id": exp_acc,
+                            "name": r.get("name") or f"Expense {sheet.name}",
+                            "debit": amt,
+                            "analytic_account_id": r.get("analytic_account_id") or None,
+                        })
+                        if AnalyticLine and r.get("analytic_account_id"):
+                            AnalyticLine.create({
+                                "name": r.get("name") or f"Expense {sheet.name}",
+                                "date": r.get("date") or "",
+                                "account_id": r["analytic_account_id"],
+                                "amount": -amt,
+                                "unit_amount": r.get("quantity", 1),
+                                "move_line_id": debit_line.id,
+                            })
                     MoveLine.create({
                         "move_id": move.id,
                         "account_id": pay_acc,

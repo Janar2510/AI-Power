@@ -3,7 +3,7 @@
     "version": "1.0",
     "category": "Services",
     "description": "Projects and tasks.",
-    "depends": ["base", "mail"],
+    "depends": ["base", "mail", "account"],
     "data": [
         "security/ir.model.access.csv",
         "views/project_views.xml",

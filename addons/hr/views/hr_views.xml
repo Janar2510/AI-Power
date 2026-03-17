@@ -138,13 +138,13 @@
             <button name="action_draft" string="Reset to Draft" type="object"/>
           </header>
           <sheet>
+            <field name="state" widget="statusbar"/>
             <field name="name"/>
             <field name="employee_id" comodel="hr.employee"/>
             <field name="leave_type_id" comodel="hr.leave.type"/>
             <field name="date_from"/>
             <field name="date_to"/>
             <field name="number_of_days"/>
-            <field name="state"/>
           </sheet>
         </form>
       </field>

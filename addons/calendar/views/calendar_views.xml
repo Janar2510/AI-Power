@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="calendar_event_search">
+      <field name="name">calendar.event search</field>
+      <field name="model">calendar.event</field>
+      <field name="arch" type="xml">
+        <search>
+          <field name="name"/>
+          <field name="location"/>
+        </search>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="calendar_event_list">
+      <field name="name">calendar.event list</field>
+      <field name="model">calendar.event</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="start"/>
+          <field name="stop"/>
+          <field name="location"/>
+          <field name="user_id" comodel="res.users"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="calendar_event_calendar">
+      <field name="name">calendar.event calendar</field>
+      <field name="model">calendar.event</field>
+      <field name="arch" type="xml">
+        <calendar date_start="start" string="name"/>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="calendar_event_form">
+      <field name="name">calendar.event form</field>
+      <field name="model">calendar.event</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="start"/>
+            <field name="stop"/>
+            <field name="allday"/>
+            <field name="location"/>
+            <field name="user_id" comodel="res.users"/>
+            <field name="partner_ids" widget="many2many_tags"/>
+            <field name="description"/>
+            <field name="attendee_ids">
+              <list>
+                <field name="partner_id" comodel="res.partner"/>
+                <field name="state"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_calendar_event">
+      <field name="name">Meetings</field>
+      <field name="res_model">calendar.event</field>
+      <field name="view_mode">calendar,list,form</field>
+    </record>
+    <menuitem name="Calendar" id="menu_calendar_root" sequence="14"/>
+    <menuitem name="Meetings" id="menu_calendar_event" action="calendar.action_calendar_event" parent="calendar.menu_calendar_root" sequence="10"/>
+  </data>
+</odoo>

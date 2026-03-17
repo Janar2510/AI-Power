@@ -8,6 +8,8 @@ simple-websocket>=1.0
 # Optional for --workers=N (multi-worker prefork): pip install gunicorn
 # Optional for Phase 136 vector RAG: pip install pgvector
 # Phase 151 PDF reports: pip install weasyprint
+# Phase 174 Excel export: pip install openpyxl
+openpyxl>=3.1
 weasyprint>=60.0
 pyotp>=2.9
 qrcode>=7.4

@@ -748,6 +748,21 @@ class ModelBase(metaclass=Model):
         if not cr:
             self._cache.update(vals)
             return True
+        # Phase 171: read old values for tracked fields before write
+        old_vals_by_id: Dict[int, Dict[str, Any]] = {}
+        tracked_in_vals = [
+            f for f in vals
+            if getattr(getattr(self._model, f, None), "tracking", False)
+        ]
+        if tracked_in_vals and hasattr(self._model, "message_post"):
+            try:
+                rows = self.read(["id"] + tracked_in_vals)
+                for r in rows:
+                    rid = r.get("id")
+                    if rid is not None:
+                        old_vals_by_id[rid] = {f: r.get(f) for f in tracked_in_vals}
+            except Exception:
+                pass
         stored = self._get_stored_columns()
         related_stored = set(self._model._get_stored_related_fields())
         computed_stored = set(self._model._get_stored_computed_fields())
@@ -876,7 +891,72 @@ class ModelBase(metaclass=Model):
                     ir_webhook.run_webhooks(env, "on_write", self._model._name, self._ids, vals)
             except Exception:
                 pass
+        # Phase 171: field change tracking (audit trail to chatter)
+        if env and self._ids and vals and old_vals_by_id:
+            self._track_changes(old_vals_by_id, vals)
         return True
+
+    def _track_changes(self, old_vals_by_id: Dict[int, Dict[str, Any]], vals: Dict[str, Any]) -> None:
+        """Phase 171: Log tracked field changes to chatter (mail.message)."""
+        from core.orm import fields as fmod
+        env = getattr(self, "env", None)
+        if not env or not hasattr(self._model, "message_post"):
+            return
+        for rid in self._ids:
+            old_vals = old_vals_by_id.get(rid, {})
+            lines: List[str] = []
+            for fname in old_vals:
+                if fname not in vals:
+                    continue
+                old_v = old_vals[fname]
+                new_v = vals[fname]
+                if old_v == new_v:
+                    continue
+                field = getattr(self._model, fname, None)
+                if not isinstance(field, fmod.Field):
+                    continue
+                label = getattr(field, "string", "") or fname.replace("_", " ").title()
+                old_str = self._format_tracked_value(env, field, old_v)
+                new_str = self._format_tracked_value(env, field, new_v)
+                lines.append(f"{label}: {old_str} -> {new_str}")
+            if lines:
+                try:
+                    rec = self._model.browse(rid)
+                    rec.message_post(body="\n".join(lines), message_type="note")
+                except Exception:
+                    pass
+
+    def _format_tracked_value(self, env: Any, field: Any, value: Any) -> str:
+        """Format a tracked field value for display in chatter."""
+        from core.orm import fields as fmod
+        if value is None or value is False or value == "":
+            return ""
+        if isinstance(field, fmod.Many2one):
+            if isinstance(value, (list, tuple)) and len(value) >= 2:
+                return str(value[1]) if value[1] else str(value[0] or "")
+            if isinstance(value, int):
+                comodel = getattr(field, "comodel", "")
+                if comodel:
+                    try:
+                        rows = env.get(comodel).browse([value]).read(["display_name", "name"])
+                        if rows:
+                            return rows[0].get("display_name") or rows[0].get("name") or str(value)
+                    except Exception:
+                        pass
+                return str(value)
+        if isinstance(field, fmod.Selection) and hasattr(field, "selection"):
+            sel = field.selection
+            if callable(sel):
+                sel = sel(self._model) if hasattr(self._model, "_env") else []
+            for v, label in (sel or []):
+                if v == value:
+                    return str(label)
+        if isinstance(field, (fmod.Float, fmod.Monetary)):
+            try:
+                return f"{float(value):,.2f}".rstrip("0").rstrip(".")
+            except (TypeError, ValueError):
+                pass
+        return str(value)
 
     @classmethod
     def _get_stored_field_names(cls) -> List[str]:

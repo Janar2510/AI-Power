@@ -72,11 +72,34 @@ class FetchmailServer(Model):
         return count
 
     def _message_process(self, env: Any, msg: email.message.Message) -> bool:
-        """Process one email: find alias, create record or post to chatter."""
+        """Process one email: route reply to chatter or find alias, create record (Phase 172)."""
         to_addrs = self._get_to_addrs(msg)
         subject = self._get_header(msg, "Subject") or "(No Subject)"
         body = self._get_body(msg)
         from_addr = self._get_header(msg, "From") or ""
+
+        # Phase 172: In-Reply-To routing - post to existing record if reply
+        in_reply_to = self._get_header(msg, "In-Reply-To")
+        if in_reply_to:
+            msg_id = in_reply_to.strip()
+            if msg_id.startswith("<") and msg_id.endswith(">"):
+                msg_id = msg_id[1:-1]
+            # Try with and without angle brackets (we store with brackets)
+            msg_id_variants = [msg_id, f"<{msg_id}>"]
+            MailMessage = env.get("mail.message")
+            if MailMessage:
+                recs = MailMessage.search([("message_id", "in", msg_id_variants)], limit=1)
+                if recs:
+                    rows = recs.read(["res_model", "res_id"])
+                    if rows:
+                        res_model = rows[0].get("res_model")
+                        res_id = rows[0].get("res_id")
+                        if res_model and res_id:
+                            ModelCls = env.get(res_model)
+                            if ModelCls and hasattr(ModelCls, "message_post"):
+                                rec = ModelCls(env, [res_id])
+                                rec.message_post(body=body or "(no content)", message_type="comment")
+                                return True
 
         for addr in to_addrs:
             Alias = env.get("mail.alias")

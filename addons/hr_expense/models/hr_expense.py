@@ -14,6 +14,7 @@ class HrExpense(Model):
     quantity = fields.Float(default=1.0)
     total_amount = fields.Computed(compute="_compute_total_amount", string="Total")
     date = fields.Date(default=lambda: __import__("datetime").datetime.utcnow().strftime("%Y-%m-%d"))
+    analytic_account_id = fields.Many2one("analytic.account", string="Analytic Account")
     state = fields.Selection(
         selection=[
             ("draft", "Draft"),

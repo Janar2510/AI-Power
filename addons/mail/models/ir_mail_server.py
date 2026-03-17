@@ -53,7 +53,7 @@ class IrMailServer(Model):
 
     def send_email(self, message: "MailMail") -> bool:
         """Send mail.mail record via SMTP."""
-        rows = message.read(["email_from", "email_to", "subject", "body_html"])
+        rows = message.read(["email_from", "email_to", "subject", "body_html", "message_id"])
         if not rows:
             return False
         r = rows[0]
@@ -61,12 +61,15 @@ class IrMailServer(Model):
         email_to = r.get("email_to") or ""
         subject = r.get("subject") or "(No Subject)"
         body_html = r.get("body_html") or ""
+        message_id = r.get("message_id")
         if not email_from or not email_to:
             return False
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
         msg["From"] = email_from
         msg["To"] = email_to
+        if message_id:
+            msg["Message-ID"] = message_id
         msg.attach(MIMEText(body_html or "(empty)", "html"))
         conn = self.connect()
         try:

@@ -18,8 +18,33 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
         string="Type",
         default="lead",
     )
-    partner_id = fields.Many2one("res.partner", string="Contact")
+    partner_id = fields.Many2one("res.partner", string="Contact", tracking=True)
+    email_from = fields.Char(string="Email")
+    phone = fields.Char(string="Phone")
     partner_name = fields.Computed(compute="_compute_partner_name", store=True, string="Partner Name")
+
+    @classmethod
+    def _onchange_partner_id(cls, vals):
+        """Fill email_from, phone from partner (Phase 165)."""
+        pid = vals.get("partner_id")
+        if not pid:
+            return {}
+        if isinstance(pid, (list, tuple)) and pid:
+            pid = pid[0]
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env:
+            return {}
+        Partner = env.get("res.partner")
+        if not Partner:
+            return {}
+        try:
+            rows = Partner.browse([pid]).read(["email", "phone"])
+            if not rows:
+                return {}
+            r = rows[0]
+            return {"email_from": r.get("email") or "", "phone": r.get("phone") or ""}
+        except Exception:
+            return {}
 
     @api.depends("partner_id.name")
     def _compute_partner_name(self):
@@ -35,7 +60,7 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
             return [None] * len(self)
         names = {r["id"]: r.get("name") for r in Partner.browse(partner_ids).read(["id", "name"])}
         return [names.get(r.get("partner_id")) if r.get("partner_id") else None for r in rows]
-    stage_id = fields.Many2one("crm.stage", string="Stage")
+    stage_id = fields.Many2one("crm.stage", string="Stage", tracking=True)
     priority = fields.Selection(
         selection=[("0", "Low"), ("1", "Normal"), ("2", "High"), ("3", "Urgent")],
         string="Priority",
@@ -43,7 +68,7 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
     )
     date_deadline = fields.Date(string="Deadline")
     currency_id = fields.Many2one("res.currency", string="Currency")
-    expected_revenue = fields.Monetary(currency_field="currency_id", string="Expected Revenue")
+    expected_revenue = fields.Monetary(currency_field="currency_id", string="Expected Revenue", tracking=True)
     description = fields.Text()
     note_html = fields.Html(string="Notes")
     tag_ids = fields.Many2many("crm.tag", string="Tags")

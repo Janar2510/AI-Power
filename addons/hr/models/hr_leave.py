@@ -50,6 +50,7 @@ class HrLeave(Model):
         ],
         string="Status",
         default="draft",
+        tracking=True,
     )
 
     @classmethod

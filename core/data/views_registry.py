@@ -50,6 +50,8 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                             "fields": arch_dict.get("fields", []),
                             "default_group_by": arch_dict.get("default_group_by", ""),
                             "search_fields": arch_dict.get("search_fields", []),
+                            "editable": arch_dict.get("editable", ""),
+                            "search_panel": arch_dict.get("search_panel", []),
                         }
                         if arch_dict.get("children"):
                             view_def["children"] = arch_dict["children"]
@@ -133,7 +135,9 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                         "parent": r.get("parent_ref", ""),
                         "sequence": r.get("sequence", 10),
                     })
-                reg["menus"] = menus_filtered
+                # Only overwrite XML menus when we have DB menus; keep XML fallback if filtered empty
+                if menus_filtered:
+                    reg["menus"] = menus_filtered
         except Exception:
             pass
     # Phase 110: report actions from ir.actions.report (model -> report_name)
@@ -244,6 +248,9 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
                         if view_type == "search" and isinstance(arch, dict):
                             view_def["filters"] = arch.get("filters", [])
                             view_def["group_bys"] = arch.get("group_bys", [])
+                            view_def["search_panel"] = arch.get("search_panel", [])  # Phase 177
+                        if view_type == "list" and isinstance(arch, dict):
+                            view_def["editable"] = arch.get("editable", "")  # Phase 176
                         views.setdefault(m, []).append(view_def)
                         id_map[full_id] = full_id
 
@@ -261,18 +268,31 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
 
                 elif model == "ir.ui.menu":
                     action_ref = r.get("action", "")
-                    if action_ref and "." not in str(action_ref):
+                    if isinstance(action_ref, dict) and "_ref" in action_ref:
+                        ref = action_ref["_ref"]
+                        action_ref = id_map.get(
+                            f"{module}.{ref}" if "." not in ref else ref,
+                            f"{module}.{ref}" if "." not in ref else ref,
+                        )
+                    elif action_ref and "." not in str(action_ref):
                         action_ref = f"{module}.{action_ref}"
-                    parent = r.get("parent", "")
-                    if parent and "." not in str(parent):
+                    parent = r.get("parent", "") or r.get("parent_id", "")
+                    if isinstance(parent, dict) and "_ref" in parent:
+                        ref = parent["_ref"]
+                        parent = id_map.get(
+                            f"{module}.{ref}" if "." not in ref else ref,
+                            f"{module}.{ref}" if "." not in ref else ref,
+                        )
+                    elif parent and "." not in str(parent):
                         parent = f"{module}.{parent}"
                     menus.append({
                         "id": full_id,
                         "name": r.get("name", ""),
-                        "action": action_ref,
-                        "parent": parent,
+                        "action": action_ref if isinstance(action_ref, str) else "",
+                        "parent": parent if isinstance(parent, str) else "",
                         "sequence": r.get("sequence", 10),
                     })
+                    id_map[full_id] = full_id
 
     # Apply view inheritance (inherit_id + xpath)
     for pending in inherit_pending:

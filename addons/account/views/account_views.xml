@@ -38,12 +38,12 @@
             <button name="action_cancel" string="Cancel" type="object"/>
           </header>
           <sheet>
+            <field name="state" widget="statusbar"/>
             <field name="name"/>
             <field name="journal_id" comodel="account.journal"/>
             <field name="partner_id" comodel="res.partner"/>
             <field name="move_type"/>
             <field name="invoice_origin"/>
-            <field name="state"/>
             <field name="line_ids">
               <list>
                 <field name="account_id" comodel="account.account"/>
@@ -51,6 +51,7 @@
                 <field name="debit"/>
                 <field name="credit"/>
                 <field name="partner_id" comodel="res.partner"/>
+                <field name="analytic_account_id" comodel="analytic.account"/>
               </list>
             </field>
           </sheet>
@@ -99,5 +100,37 @@
     <menuitem name="Configuration" id="menu_account_config" sequence="20"/>
     <menuitem name="Journals" id="menu_account_journal" action="account.action_account_journal" parent="account.menu_account_config" sequence="10"/>
     <menuitem name="Chart of Accounts" id="menu_account_account" action="account.action_account_account" parent="account.menu_account_config" sequence="20"/>
+    <record model="ir.ui.view" id="analytic_account_list">
+      <field name="name">analytic.account list</field>
+      <field name="model">analytic.account</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="code"/>
+          <field name="name"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="active"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="analytic_account_form">
+      <field name="name">analytic.account form</field>
+      <field name="model">analytic.account</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="code"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="active"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_analytic_account">
+      <field name="name">Analytic Accounts</field>
+      <field name="res_model">analytic.account</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Analytic Accounts" id="menu_analytic_account" action="account.action_analytic_account" parent="account.menu_account_config" sequence="30"/>
   </data>
 </odoo>

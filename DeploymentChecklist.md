@@ -32,6 +32,60 @@
 - [ ] Run `erp-bin cron -d <db>` periodically (e.g. via system cron every minute)
 - [ ] ir_cron table created on db init; add cron records via RPC or data XML
 
+## Menu Navigation (Phase 162, Phase 170)
+
+- [ ] Navbar shows menu items (Home, Contacts, Leads, Sales, Purchase, Inventory, Project, etc.)
+- [ ] If menus are empty after code changes, run `erp-bin db upgrade -d <db>` to reload menus, actions, views
+- [ ] Phase 170: load_views auto-runs load_default_data when DB menus empty or stale; warning banner shown if menus still empty
+- [ ] mrp in DEFAULT_SERVER_WIDE_MODULES for Manufacturing menus
+
+## Phase 176 (Editable List View)
+
+- [ ] List views with editable="bottom" support inline editing (parsed from XML)
+
+## Phase 177 (Search Panel)
+
+- [ ] Search views with &lt;searchpanel&gt; expose hierarchical filters (parsed from XML)
+
+## Phase 173 (Stock Valuation)
+
+- [ ] product.product has standard_price and cost_method (standard/average)
+- [ ] stock.valuation.layer created on stock moves; Inventory > Reporting > Valuation
+
+## Phase 172 (Incoming Email to Chatter)
+
+- [ ] Incoming emails with In-Reply-To header matching a sent mail.message are posted to chatter (not new leads)
+- [ ] Run `erp-bin db upgrade -d <db>` to add mail.message.message_id column
+
+## Phase 171 (Field Change Tracking)
+
+- [ ] Models with MailThreadMixin (e.g. crm.lead): tracked field changes create mail.message in chatter
+- [ ] Use tracking=True on fields that should appear in audit trail (stage_id, partner_id, state, etc.)
+
+## Phase 162 (DB Upgrade)
+
+- [ ] `erp-bin db upgrade -d <db>` runs init_schema + load_default_data idempotently
+- [ ] Does NOT drop existing user data (partners, orders, leads, etc.)
+
+## Phase 169 (Responsive Layout + Mobile)
+
+- [ ] @media (max-width: 768px): hamburger menu, stacked nav, full-width forms
+- [ ] @media (max-width: 480px): single-column forms, touch targets (min 44px)
+- [ ] Kanban single-column on mobile; list horizontal scroll with sticky first column
+
+## Phase 168 (Analytic Accounting)
+
+- [ ] analytic.account, analytic.line models; Invoicing > Configuration > Analytic Accounts
+- [ ] hr.expense has analytic_account_id; expense approval creates analytic.line when set
+- [ ] project.project has analytic_account_id for cost tracking
+
+## Phase 167 (Calendar Module)
+
+- [ ] calendar in DEFAULT_SERVER_WIDE_MODULES; run `erp-bin db upgrade -d <db>` after adding
+- [ ] Calendar > Meetings menu; calendar.event, calendar.attendee models
+- [ ] Portal: /my/calendar lists events where user's partner is attendee; /my/calendar/<id> detail
+- [ ] My Calendar link in portal nav (when logged in as portal user)
+
 ## Post-deployment
 
 - [ ] Verify web client loads at /

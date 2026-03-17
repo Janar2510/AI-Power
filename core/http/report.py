@@ -13,9 +13,13 @@ from core.orm import Environment
 from core.http.auth import get_session_uid, get_session_db, _get_registry
 from .request import Request
 
-# Report name -> (model, template_path, fields)
+# Report name -> (model, template_path, fields)  Phase 183
 _REPORT_REGISTRY: Dict[str, tuple] = {
     "crm.lead_summary": ("crm.lead", "crm/report/lead_summary.html", ["id", "name", "type", "stage_id", "expected_revenue", "date_deadline", "description"]),
+    "sale.order": ("sale.order", "sale/report/sale_order_report.html", ["id", "name", "partner_id", "date_order", "state", "amount_total", "order_line"]),
+    "account.move": ("account.move", "account/report/invoice_report.html", ["id", "name", "partner_id", "invoice_origin", "state", "line_ids"]),
+    "purchase.order": ("purchase.order", "purchase/report/purchase_order_report.html", ["id", "name", "partner_id", "state", "order_line"]),
+    "stock.picking": ("stock.picking", "stock/report/delivery_slip_report.html", ["id", "name", "partner_id", "origin", "state", "move_ids"]),
 }
 
 

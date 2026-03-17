@@ -221,8 +221,8 @@
     overlay.id = 'import-modal-overlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999';
     let html = '<div id="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" style="background:white;border-radius:8px;padding:var(--space-lg);max-width:600px;width:90%;max-height:90vh;overflow:auto">';
-    html += '<h3 id="import-modal-title" style="margin-top:0">Import CSV</h3>';
-    html += '<p><input type="file" id="import-file" accept=".csv" style="padding:0.5rem"></p>';
+    html += '<h3 id="import-modal-title" style="margin-top:0">Import CSV / Excel</h3>';
+    html += '<p><input type="file" id="import-file" accept=".csv,.xlsx" style="padding:0.5rem"></p>';
     html += '<div id="import-preview" style="display:none;margin:1rem 0">';
     html += '<p><strong>Preview (first 5 rows)</strong></p>';
     html += '<div id="import-preview-table"></div>';
@@ -261,44 +261,66 @@
     setTimeout(function () { const f = document.getElementById('import-file'); if (f) f.focus(); }, 50);
     let csvHeaders = [];
     let csvRows = [];
+    let importFile = null;
     const fileInput = document.getElementById('import-file');
     fileInput.onchange = function () {
       const f = fileInput.files && fileInput.files[0];
       if (!f) return;
-      const r = new FileReader();
-      r.onload = function () {
-        const parsed = parseCSV(r.result || '');
-        if (!parsed.length) { showToast('No rows in CSV', 'error'); return; }
-        csvHeaders = parsed[0];
-        csvRows = parsed.slice(1);
-        const preview = csvRows.slice(0, 5);
-        let tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem"><tr>';
-        csvHeaders.forEach(function (h) { tbl += '<th style="padding:0.35rem;border:1px solid #ddd;text-align:left">' + String(h).replace(/</g, '&lt;') + '</th>'; });
-        tbl += '</tr>';
-        preview.forEach(function (row) {
-          tbl += '<tr>';
-          row.forEach(function (c) { tbl += '<td style="padding:0.35rem;border:1px solid #eee">' + String(c || '').replace(/</g, '&lt;') + '</td>'; });
-          tbl += '</tr>';
-        });
-        tbl += '</table>';
-        document.getElementById('import-preview-table').innerHTML = tbl;
-        let mapHtml = '<table style="width:100%"><tr><th>CSV column</th><th>Map to field</th></tr>';
-        csvHeaders.forEach(function (h, i) {
-          mapHtml += '<tr><td style="padding:0.35rem">' + String(h).replace(/</g, '&lt;') + '</td><td><select class="import-map-select" data-csv-idx="' + i + '" style="width:100%;padding:0.35rem">';
-          mapHtml += '<option value="">-- Skip --</option>';
-          const autoMatch = modelFields.find(function (mf) { return mf.toLowerCase() === String(h).toLowerCase().replace(/\s/g, '_'); });
-          modelFields.forEach(function (mf) {
-            const sel = (autoMatch === mf || (!autoMatch && mf === h)) ? ' selected' : '';
-            mapHtml += '<option value="' + (mf || '').replace(/"/g, '&quot;') + '"' + sel + '>' + (mf || '').replace(/</g, '&lt;') + '</option>';
-          });
-          mapHtml += '</select></td></tr>';
-        });
-        mapHtml += '</table>';
-        document.getElementById('import-mapping').innerHTML = mapHtml;
-        document.getElementById('import-preview').style.display = 'block';
-      };
-      r.readAsText(f);
+      importFile = f;
+      csvRows = [];
+      const isXlsx = (f.name || '').toLowerCase().endsWith('.xlsx');
+      if (isXlsx) {
+        const fd = new FormData();
+        fd.append('file', f);
+        fetch('/web/import/preview', { method: 'POST', credentials: 'include', body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data.error) { showToast(data.error, 'error'); return; }
+            csvHeaders = data.headers || [];
+            csvRows = data.rows || [];
+            renderImportPreview();
+          })
+          .catch(function () { showToast('Preview failed', 'error'); });
+      } else {
+        const r = new FileReader();
+        r.onload = function () {
+          const parsed = parseCSV(r.result || '');
+          if (!parsed.length) { showToast('No rows in CSV', 'error'); return; }
+          csvHeaders = parsed[0];
+          csvRows = parsed.slice(1);
+          renderImportPreview();
+        };
+        r.readAsText(f);
+      }
+      importFile = f;
     };
+    function renderImportPreview() {
+      const preview = csvRows.slice(0, 5);
+      let tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem"><tr>';
+      csvHeaders.forEach(function (h) { tbl += '<th style="padding:0.35rem;border:1px solid #ddd;text-align:left">' + String(h).replace(/</g, '&lt;') + '</th>'; });
+      tbl += '</tr>';
+      preview.forEach(function (row) {
+        tbl += '<tr>';
+        csvHeaders.forEach(function (_, i) { tbl += '<td style="padding:0.35rem;border:1px solid #eee">' + String((row && row[i]) || '').replace(/</g, '&lt;') + '</td>'; });
+        tbl += '</tr>';
+      });
+      tbl += '</table>';
+      document.getElementById('import-preview-table').innerHTML = tbl;
+      let mapHtml = '<table style="width:100%"><tr><th>Column</th><th>Map to field</th></tr>';
+      csvHeaders.forEach(function (h, i) {
+        mapHtml += '<tr><td style="padding:0.35rem">' + String(h).replace(/</g, '&lt;') + '</td><td><select class="import-map-select" data-csv-idx="' + i + '" style="width:100%;padding:0.35rem">';
+        mapHtml += '<option value="">-- Skip --</option>';
+        const autoMatch = modelFields.find(function (mf) { return mf.toLowerCase() === String(h).toLowerCase().replace(/\s/g, '_'); });
+        modelFields.forEach(function (mf) {
+          const sel = (autoMatch === mf || (!autoMatch && mf === h)) ? ' selected' : '';
+          mapHtml += '<option value="' + (mf || '').replace(/"/g, '&quot;') + '"' + sel + '>' + (mf || '').replace(/</g, '&lt;') + '</option>';
+        });
+        mapHtml += '</select></td></tr>';
+      });
+      mapHtml += '</table>';
+      document.getElementById('import-mapping').innerHTML = mapHtml;
+      document.getElementById('import-preview').style.display = 'block';
+    }
     document.getElementById('import-do-btn').onclick = function () {
       const selects = overlay.querySelectorAll('.import-map-select');
       const csvIdxToField = {};
@@ -314,44 +336,48 @@
         if (!fieldSet[f]) { fields.push(f); fieldSet[f] = true; }
       });
       if (!fields.length) { showToast('Map at least one column', 'error'); return; }
-      const orderedRows = csvRows.map(function (row) {
-        return fields.map(function (f) {
-          for (let i = 0; i < csvHeaders.length; i++) {
-            if (csvIdxToField[i] === f) return row[i] != null ? String(row[i]).trim() : '';
-          }
-          return '';
-        });
-      });
-      rpc.callKw(model, 'import_data', [fields, orderedRows], {})
-        .then(function (res) {
-          document.getElementById('import-preview').style.display = 'none';
-          const r = document.getElementById('import-result');
-          r.style.display = 'block';
-          r.innerHTML = '<p><strong>Import complete</strong></p><p>Created: ' + (res.created || 0) + ', Updated: ' + (res.updated || 0) + '</p>';
-          if (res.errors && res.errors.length) {
-            r.innerHTML += '<p style="color:#c00">Errors:</p><table style="width:100%;font-size:0.9rem"><tr><th>Row</th><th>Field</th><th>Message</th></tr>';
-            res.errors.forEach(function (e) {
-              r.innerHTML += '<tr><td>' + (e.row || '') + '</td><td>' + (e.field || '').replace(/</g, '&lt;') + '</td><td>' + (e.message || '').replace(/</g, '&lt;') + '</td></tr>';
-            });
-            r.innerHTML += '</table>';
-          }
-          r.innerHTML += '<p><button type="button" id="import-close-btn" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Close</button></p>';
-          document.getElementById('import-close-btn').onclick = function () {
-            closeModal();
-            loadRecords(model, route, currentListState.searchTerm);
-          };
-          if (!res.errors || !res.errors.length) {
-            showToast('Imported ' + (res.created || 0) + ' created, ' + (res.updated || 0) + ' updated', 'success');
-            setTimeout(function () {
-              closeModal();
-              loadRecords(model, route, currentListState.searchTerm);
-            }, 1500);
-          }
+      const mapping = {};
+      Object.keys(csvIdxToField).forEach(function (k) { mapping[k] = csvIdxToField[k]; });
+      if (!importFile) { showToast('Select a file first', 'error'); return; }
+      const fd = new FormData();
+      fd.append('file', importFile);
+      fd.append('model', model);
+      fd.append('mapping', JSON.stringify(mapping));
+      fetch('/web/import/execute', { method: 'POST', credentials: 'include', body: fd })
+        .then(function (r) {
+          return r.json().then(function (data) {
+            if (!r.ok) throw new Error(data.error || 'Import failed');
+            return data;
+          });
         })
-        .catch(function (err) {
-          showToast(err.message || 'Import failed', 'error');
-        });
+        .then(handleImportResult)
+        .catch(function (err) { showToast(err.message || 'Import failed', 'error'); });
     };
+    function handleImportResult(res) {
+      document.getElementById('import-preview').style.display = 'none';
+      const r = document.getElementById('import-result');
+      r.style.display = 'block';
+      r.innerHTML = '<p><strong>Import complete</strong></p><p>Created: ' + (res.created || 0) + ', Updated: ' + (res.updated || 0) + '</p>';
+      if (res.errors && res.errors.length) {
+        r.innerHTML += '<p style="color:#c00">Errors:</p><table style="width:100%;font-size:0.9rem"><tr><th>Row</th><th>Field</th><th>Message</th></tr>';
+        res.errors.forEach(function (e) {
+          r.innerHTML += '<tr><td>' + (e.row || '') + '</td><td>' + (e.field || '').replace(/</g, '&lt;') + '</td><td>' + (e.message || '').replace(/</g, '&lt;') + '</td></tr>';
+        });
+        r.innerHTML += '</table>';
+      }
+      r.innerHTML += '<p><button type="button" id="import-close-btn" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Close</button></p>';
+      document.getElementById('import-close-btn').onclick = function () {
+        closeModal();
+        loadRecords(model, route, currentListState.searchTerm);
+      };
+      if (!res.errors || !res.errors.length) {
+        showToast('Imported ' + (res.created || 0) + ' created, ' + (res.updated || 0) + ' updated', 'success');
+        setTimeout(function () {
+          closeModal();
+          loadRecords(model, route, currentListState.searchTerm);
+        }, 1500);
+      }
+    }
     document.getElementById('import-cancel-btn').onclick = closeModal;
   }
 
@@ -610,7 +636,13 @@
       const fromRegistry = viewsSvc.getReportName(model);
       if (fromRegistry) return fromRegistry;
     }
-    const reportMap = { 'crm.lead': 'crm.lead_summary' };
+    const reportMap = {
+      'crm.lead': 'crm.lead_summary',
+      'sale.order': 'sale.order',
+      'account.move': 'account.move',
+      'purchase.order': 'purchase.order',
+      'stock.picking': 'stock.picking'
+    };
     return reportMap[model] || null;
   }
 
@@ -1501,7 +1533,9 @@
       });
       const numericCols = ['expected_revenue', 'revenue', 'amount', 'quantity'];
       function renderTable(nameMap) {
-        let tbl = '<table role="grid" aria-label="Records" style="width:100%;border-collapse:collapse"><thead><tr role="row">';
+        let tbl = '<div id="bulk-action-bar" style="display:none;margin-bottom:0.5rem;padding:0.5rem;background:var(--color-bg-secondary,#f0f0f0);border-radius:4px;align-items:center;gap:0.5rem;flex-wrap:wrap;flex-direction:row"><span id="bulk-selected-count" style="font-size:0.9rem"></span><button type="button" id="bulk-delete" style="padding:0.35rem 0.75rem;background:#c00;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem">Delete Selected</button><button type="button" id="bulk-clear" style="padding:0.35rem 0.75rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff;font-size:0.9rem">Clear</button></div>';
+        tbl += '<table role="grid" aria-label="Records" style="width:100%;border-collapse:collapse"><thead><tr role="row">';
+        tbl += '<th role="columnheader" style="width:2rem;padding:0.5rem;border-bottom:1px solid #ddd"><input type="checkbox" id="list-select-all" aria-label="Select all" title="Select all"></th>';
         cols.forEach(c => {
           const f = typeof c === 'object' ? c.name : c;
           const label = (typeof c === 'object' ? c.name || c : c);
@@ -1510,7 +1544,7 @@
           const arrow = isSorted ? (dir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
           tbl += '<th role="columnheader" class="sortable-col" data-field="' + (f || '').replace(/"/g, '&quot;') + '" style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd;cursor:pointer;user-select:none">' + (label || '').replace(/</g, '&lt;') + arrow + '</th>';
         });
-        tbl += '<th role="columnheader" style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd"></th></tr></thead><tbody>';
+        tbl += '<th role="columnheader" style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd;width:2rem"></th></tr></thead><tbody>';
         const groupByField = currentListState.groupBy;
         const groups = groupByField ? (function () {
           const g = {};
@@ -1529,7 +1563,7 @@
             return;
           }
           if (isSubtotal) {
-            tbl += '<tr role="row" class="group-subtotal" style="background:var(--color-bg-secondary, #f8f8f8);font-weight:500">';
+            tbl += '<tr role="row" class="group-subtotal" style="background:var(--color-bg-secondary, #f8f8f8);font-weight:500"><td colspan="1" style="padding:0.5rem;border-bottom:1px solid #eee"></td>';
             cols.forEach(c => {
               const f = typeof c === 'object' ? c.name : c;
               const sum = r[f];
@@ -1540,6 +1574,7 @@
             return;
           }
           tbl += '<tr role="row" tabindex="0" data-id="' + (r.id || '') + '" class="list-data-row">';
+          tbl += '<td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee"><input type="checkbox" class="list-row-select" data-id="' + (r.id || '') + '" aria-label="Select row"></td>';
           cols.forEach(c => {
             const f = typeof c === 'object' ? c.name : c;
             let val = r[f];
@@ -1568,7 +1603,7 @@
             tbl += '<td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee">' + (val != null ? String(val) : '').replace(/</g, '&lt;') + '</td>';
           });
           tbl += '<td role="gridcell" style="padding:0.5rem"><a href="#' + route + '/edit/' + (r.id || '') + '" style="font-size:0.9rem;margin-right:0.5rem">Edit</a>';
-          tbl += '<a href="#" class="btn-delete" data-id="' + (r.id || '') + '" style="font-size:0.9rem;color:#c00">Delete</a></td></tr>';
+          tbl += '<a href="#" class="btn-delete" data-id="' + (r.id || '') + '" style="font-size:0.9rem;color:#c00;margin-left:0.25rem">Delete</a></td></tr>';
         }
         if (groups) {
           groups.forEach(function (grp) {
@@ -1600,6 +1635,45 @@
           pager += '</p>';
         }
         main.innerHTML = html + tbl + pager;
+        (function setupBulkActions() {
+          const bar = document.getElementById('bulk-action-bar');
+          const countEl = document.getElementById('bulk-selected-count');
+          const selectAll = document.getElementById('list-select-all');
+          const bulkDelete = document.getElementById('bulk-delete');
+          const bulkClear = document.getElementById('bulk-clear');
+          function getSelectedIds() {
+            return Array.prototype.map.call(main.querySelectorAll('.list-row-select:checked'), function (cb) { return parseInt(cb.dataset.id, 10); }).filter(function (x) { return !isNaN(x); });
+          }
+          function updateBar() {
+            const ids = getSelectedIds();
+            if (bar) { bar.style.display = ids.length ? 'flex' : 'none'; bar.style.flexDirection = 'row'; }
+            if (countEl) countEl.textContent = ids.length ? ids.length + ' selected' : '';
+            if (selectAll) selectAll.checked = ids.length && main.querySelectorAll('.list-row-select').length === ids.length;
+          }
+          if (selectAll) {
+            selectAll.onclick = function () {
+              main.querySelectorAll('.list-row-select').forEach(function (cb) { cb.checked = selectAll.checked; });
+              updateBar();
+            };
+          }
+          main.querySelectorAll('.list-row-select').forEach(function (cb) {
+            cb.onclick = updateBar;
+          });
+          if (bulkDelete) {
+            bulkDelete.onclick = function () {
+              const ids = getSelectedIds();
+              if (!ids.length) return;
+              if (!confirm('Delete ' + ids.length + ' record(s)?')) return;
+              rpc.callKw(model, 'unlink', [ids], {})
+                .then(function () {
+                  showToast('Deleted', 'success');
+                  loadRecords(model, route, currentListState.searchTerm, stageFilter, undefined, currentListState.savedFilterId, offset, limit, getHashDomainParam());
+                })
+                .catch(function (err) { showToast(err.message || 'Delete failed', 'error'); });
+            };
+          }
+          if (bulkClear) bulkClear.onclick = function () { main.querySelectorAll('.list-row-select').forEach(function (cb) { cb.checked = false; }); if (selectAll) selectAll.checked = false; updateBar(); };
+        })();
         (function setupListKeyboardNav() {
           const table = main.querySelector('table[role="grid"]');
           if (!table) return;
@@ -2075,7 +2149,7 @@
       return;
     }
     rpc.callKw('mail.message', 'search_read', [[['id', 'in', messageIds]]], {
-      fields: ['id', 'body', 'author_id', 'date'],
+      fields: ['id', 'body', 'author_id', 'date', 'attachment_ids'],
       order: 'id asc'
     }).then(function (rows) {
       const authorIds = [];
@@ -2084,10 +2158,18 @@
       const nameMap = {};
       const renderRows = function () {
         rows.forEach(function (r) {
-          const authorName = r.author_id ? (nameMap[r.author_id] || 'User #' + r.author_id) : 'Unknown';
+          const authorName = r.author_id ? (nameMap[r.author_id] || 'User #' + (Array.isArray(r.author_id) ? r.author_id[0] : r.author_id)) : 'Unknown';
           const dateStr = r.date ? String(r.date).replace('T', ' ').slice(0, 16) : '';
           const body = (r.body || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
-          container.insertAdjacentHTML('beforeend', '<div class="chatter-msg" style="padding:0.5rem 0;border-bottom:1px solid var(--border-color,#eee)"><div style="font-size:0.85rem;color:var(--text-muted,#666)">' + authorName + ' · ' + dateStr + '</div><div style="margin-top:0.25rem">' + body + '</div></div>');
+          let attHtml = '';
+          const aids = r.attachment_ids || [];
+          if (aids.length) {
+            const ids = aids.map(function (x) { return Array.isArray(x) ? x[0] : x; });
+            attHtml = '<div style="margin-top:0.35rem;font-size:0.85rem">' + ids.map(function (aid) {
+              return '<a href="/web/attachment/download/' + aid + '" target="_blank" rel="noopener" style="color:var(--color-primary);margin-right:0.5rem">📎 Attachment</a>';
+            }).join('') + '</div>';
+          }
+          container.insertAdjacentHTML('beforeend', '<div class="chatter-msg" style="padding:0.5rem 0;border-bottom:1px solid var(--border-color,#eee)"><div style="font-size:0.85rem;color:var(--text-muted,#666)">' + authorName + ' · ' + dateStr + '</div><div style="margin-top:0.25rem">' + body + '</div>' + attHtml + '</div>');
         });
       };
       if (uniq.length) {
@@ -2108,16 +2190,50 @@
     const sendBtn = form.querySelector('#chatter-send');
     const inputEl = form.querySelector('#chatter-input');
     const sendEmailCb = form.querySelector('#chatter-send-email');
+    const fileInput = form.querySelector('#chatter-file');
+    let pendingAttachmentIds = [];
+    if (fileInput) {
+      fileInput.onchange = function () {
+        const files = fileInput.files;
+        if (!files || !files.length) return;
+        pendingAttachmentIds = [];
+        var done = 0, total = files.length;
+        function checkDone() {
+          var span = form.querySelector('#chatter-attachments');
+          if (span) span.textContent = pendingAttachmentIds.length ? pendingAttachmentIds.length + ' file(s) attached' : '';
+          if (done === total && pendingAttachmentIds.length < total) showToast('Some uploads failed', 'error');
+        }
+        Array.prototype.forEach.call(files, function (f) {
+          var fd = new FormData();
+          fd.append('file', f);
+          fd.append('res_model', model);
+          fd.append('res_id', recordId);
+          fetch('/web/attachment/upload', { method: 'POST', credentials: 'include', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              done++;
+              if (data.id) pendingAttachmentIds.push(data.id);
+              if (data.error) showToast(data.error, 'error');
+              checkDone();
+            })
+            .catch(function () { done++; showToast('Upload failed', 'error'); checkDone(); });
+        });
+      };
+    }
     if (sendBtn && inputEl) {
       sendBtn.onclick = function () {
         const body = (inputEl.value || '').trim();
-        if (!body) return;
+        if (!body && !pendingAttachmentIds.length) return;
         sendBtn.disabled = true;
         const sendAsEmail = sendEmailCb && sendEmailCb.checked;
-        rpc.callKw(model, 'message_post', [[parseInt(recordId, 10)], body], { send_as_email: sendAsEmail })
+        const kwargs = { send_as_email: sendAsEmail };
+        if (pendingAttachmentIds.length) kwargs.attachment_ids = pendingAttachmentIds;
+        rpc.callKw(model, 'message_post', [[parseInt(recordId, 10)], body || ''], kwargs)
           .then(function () {
             sendBtn.disabled = false;
             inputEl.value = '';
+            pendingAttachmentIds = [];
+            if (fileInput) { fileInput.value = ''; var s = form.querySelector('#chatter-attachments'); if (s) s.textContent = ''; }
             showToast('Message posted', 'success');
             rpc.callKw(model, 'read', [[parseInt(recordId, 10)], ['message_ids']]).then(function (recs) {
               if (recs && recs[0] && recs[0].message_ids) loadChatter(model, recordId, recs[0].message_ids);
@@ -2255,8 +2371,8 @@
     }
     const o2m = getOne2manyInfo(model, fname);
     const m2m = getMany2manyInfo(model, fname);
-    if (fname === 'message_ids' && model === 'crm.lead') {
-      return '<p><label>' + label + '</label><div id="chatter-messages" class="o-chatter" data-model="' + model + '" style="margin-top:0.5rem;padding:var(--space-md,0.75rem);background:var(--color-bg,#f5f5f5);border-radius:var(--radius-md,8px);border:1px solid var(--border-color,#ddd)"><div class="chatter-messages-list" style="max-height:200px;overflow-y:auto;margin-bottom:var(--space-md,0.75rem)"></div><div class="chatter-compose"><textarea id="chatter-input" placeholder="Add a comment..." style="width:100%;min-height:60px;padding:0.5rem;border:1px solid var(--border-color,#ddd);border-radius:4px;resize:vertical"></textarea><label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;font-size:0.9rem;cursor:pointer"><input type="checkbox" id="chatter-send-email"> Send as email</label><button type="button" id="chatter-send" style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--color-primary,#1a1a2e);color:white;border:none;border-radius:4px;cursor:pointer">Send</button></div></div></p>';
+    if (fname === 'message_ids' && (model === 'crm.lead' || model === 'project.task')) {
+      return '<p><label>' + label + '</label><div id="chatter-messages" class="o-chatter" data-model="' + model + '" style="margin-top:0.5rem;padding:var(--space-md,0.75rem);background:var(--color-bg,#f5f5f5);border-radius:var(--radius-md,8px);border:1px solid var(--border-color,#ddd)"><div class="chatter-messages-list" style="max-height:200px;overflow-y:auto;margin-bottom:var(--space-md,0.75rem)"></div><div class="chatter-compose"><textarea id="chatter-input" placeholder="Add a comment..." style="width:100%;min-height:60px;padding:0.5rem;border:1px solid var(--border-color,#ddd);border-radius:4px;resize:vertical"></textarea><div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap"><input type="file" id="chatter-file" multiple style="font-size:0.85rem"><span id="chatter-attachments" style="font-size:0.85rem;color:var(--text-muted)"></span></div><label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;font-size:0.9rem;cursor:pointer"><input type="checkbox" id="chatter-send-email"> Send as email</label><button type="button" id="chatter-send" style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--color-primary,#1a1a2e);color:white;border:none;border-radius:4px;cursor:pointer">Send</button></div></div></p>';
     }
     if (o2m) {
       var lineFields = getOne2manyLineFields(model, fname);
@@ -2981,7 +3097,7 @@
             const m2m = getMany2manyInfo(model, n);
             if (m2m) {
               setM2mChecked(n, rec[n]);
-            } else if (n === 'message_ids' && model === 'crm.lead') {
+            } else if (n === 'message_ids' && (model === 'crm.lead' || model === 'project.task')) {
               loadChatter(model, id, rec[n]);
               setupChatter(form, model, id);
             } else if (o2m) {
@@ -4138,46 +4254,100 @@
           });
       }
     }
+    const groupBy = (kanbanView && kanbanView.default_group_by) || 'stage_id';
     const stageIds = [];
-    (records || []).forEach(r => { if (r.stage_id) stageIds.push(r.stage_id); });
-    const uniq = stageIds.filter((x, i, a) => a.indexOf(x) === i);
+    (records || []).forEach(function (r) {
+      const val = r[groupBy];
+      const id = (val && (Array.isArray(val) ? val[0] : val)) || (val === 0 ? 0 : null);
+      if (id != null) stageIds.push(id);
+    });
+    const uniq = stageIds.filter(function (x, i, a) { return a.indexOf(x) === i; });
+    const comodelMap = { 'crm.lead': 'crm.stage', 'project.task': 'project.task.type' };
+    const comodel = comodelMap[model] || (groupBy === 'stage_id' ? 'crm.stage' : null);
     const nameMap = {};
-    if (uniq.length) {
-      rpc.callKw('crm.stage', 'read', [uniq, ['id', 'name']])
-        .then(stages => {
-          stages.forEach(s => { nameMap[s.id] = s.name; });
-          window.ViewRenderers.kanban(document.getElementById('kanban-area'), model, records, {
-            default_group_by: (kanbanView && kanbanView.default_group_by) || 'stage_id',
-            fields: (kanbanView && kanbanView.fields) || ['name', 'expected_revenue'],
-            stageNames: nameMap,
-            onCardClick: (id) => { window.location.hash = route + '/edit/' + id; },
-            onStageChange: (recordId, newStageId) => {
-              const stageVal = newStageId || false;
-              rpc.callKw(model, 'write', [[parseInt(recordId, 10)], { stage_id: stageVal }])
-                .then(() => loadRecords(model, route, currentListState.searchTerm))
-                .catch(err => showToast(err.message || 'Failed to update stage', 'error'));
-            }
-          });
+    function renderKanbanWithOptions(opts) {
+      window.ViewRenderers.kanban(document.getElementById('kanban-area'), model, records, opts);
+    }
+    const baseOpts = {
+      default_group_by: groupBy,
+      fields: (kanbanView && kanbanView.fields) || ['name', 'expected_revenue', 'date_deadline'],
+      stageNames: nameMap,
+      onCardClick: function (id) { window.location.hash = route + '/edit/' + id; },
+      onStageChange: function (recordId, newStageId) {
+        const stageVal = newStageId || false;
+        const writeVal = {};
+        writeVal[groupBy] = stageVal;
+        rpc.callKw(model, 'write', [[parseInt(recordId, 10)], writeVal])
+          .then(function () { return loadRecords(model, route, currentListState.searchTerm); })
+          .catch(function (err) { showToast(err.message || 'Failed to update', 'error'); });
+      }
+    };
+    if (comodel && uniq.length) {
+      rpc.callKw(comodel, 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence' })
+        .then(function (stages) {
+          stages.forEach(function (s) { nameMap[s.id] = s.name; });
+          baseOpts.stageNames = nameMap;
+          renderKanbanWithOptions(baseOpts);
         })
-        .catch(() => {
-          window.ViewRenderers.kanban(document.getElementById('kanban-area'), model, records, {
-            default_group_by: 'stage_id',
-            stageNames: {},
-            onCardClick: (id) => { window.location.hash = route + '/edit/' + id; }
-          });
-        });
+        .catch(function () { renderKanbanWithOptions(baseOpts); });
+    } else if (uniq.length || groupBy) {
+      uniq.forEach(function (id) { if (id && !nameMap[id]) nameMap[id] = 'Stage ' + id; });
+      baseOpts.stageNames = nameMap;
+      renderKanbanWithOptions(baseOpts);
     } else {
-      window.ViewRenderers.kanban(document.getElementById('kanban-area'), model, records, {
-        default_group_by: 'stage_id',
-        stageNames: {},
-        onCardClick: (id) => { window.location.hash = route + '/edit/' + id; }
-      });
+      renderKanbanWithOptions({ default_group_by: groupBy, stageNames: {}, onCardClick: baseOpts.onCardClick });
     }
   }
 
   function isFormRoute(hash) {
     const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings\\/users';
     return new RegExp('^(' + dataRoutes + ')\\/edit\\/\\d+$').test(hash) || new RegExp('^(' + dataRoutes + ')\\/new$').test(hash);
+  }
+
+  function renderAccountingReport(reportType, title) {
+    actionStack = [{ label: title, hash: 'reports/' + reportType }];
+    const today = new Date().toISOString().slice(0, 10);
+    const yearStart = today.slice(0, 4) + '-01-01';
+    main.innerHTML = '<h2>' + title + '</h2><p style="margin-bottom:1rem">' +
+      '<label>From <input type="date" id="report-date-from" value="' + yearStart + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
+      '<label>To <input type="date" id="report-date-to" value="' + today + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
+      '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
+      '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
+      '</p><div id="report-table" style="overflow-x:auto"><p style="color:var(--text-muted)">Loading...</p></div>';
+    function loadReport() {
+      const df = document.getElementById('report-date-from').value || yearStart;
+      const dt = document.getElementById('report-date-to').value || today;
+      const method = reportType === 'trial-balance' ? 'get_trial_balance' : (reportType === 'profit-loss' ? 'get_profit_loss' : 'get_balance_sheet');
+      const args = reportType === 'balance-sheet' ? [dt] : [df, dt];
+      rpc.callKw('account.account', method, args, {})
+        .then(function (rows) {
+          const el = document.getElementById('report-table');
+          if (!el) return;
+          if (!rows || !rows.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data</p>'; return; }
+          const cols = Object.keys(rows[0]);
+          let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
+          cols.forEach(function (c) { tbl += '<th style="padding:0.5rem;border:1px solid var(--border-color);text-align:left">' + String(c).replace(/</g, '&lt;') + '</th>'; });
+          tbl += '</tr></thead><tbody>';
+          rows.forEach(function (r) {
+            tbl += '<tr>';
+            cols.forEach(function (c) {
+              const v = r[c];
+              const val = (typeof v === 'number' && (c === 'debit' || c === 'credit' || c === 'balance')) ? v.toFixed(2) : (v || '');
+              tbl += '<td style="padding:0.5rem;border:1px solid var(--border-color)">' + String(val).replace(/</g, '&lt;') + '</td>';
+            });
+            tbl += '</tr>';
+          });
+          tbl += '</tbody></table>';
+          el.innerHTML = tbl;
+        })
+        .catch(function (err) {
+          const el = document.getElementById('report-table');
+          if (el) el.innerHTML = '<p style="color:#c00">' + (err.message || 'Failed to load').replace(/</g, '&lt;') + '</p>';
+        });
+    }
+    document.getElementById('report-refresh').onclick = loadReport;
+    document.getElementById('report-print').onclick = function () { window.print(); };
+    loadReport();
   }
 
   function route() {
@@ -4201,8 +4371,17 @@
     const settingsIndexMatch = hash.match(/^settings\/?$/);
     const discussMatch = hash.match(/^discuss$/);
     const discussChannelMatch = hash.match(/^discuss\/(\d+)$/);
+    const reportsTrialMatch = hash.match(/^reports\/trial-balance$/);
+    const reportsPLMatch = hash.match(/^reports\/profit-loss$/);
+    const reportsBSMatch = hash.match(/^reports\/balance-sheet$/);
 
-    if (discussMatch || discussChannelMatch) {
+    if (reportsTrialMatch) {
+      renderAccountingReport('trial-balance', 'Trial Balance');
+    } else if (reportsPLMatch) {
+      renderAccountingReport('profit-loss', 'Profit & Loss');
+    } else if (reportsBSMatch) {
+      renderAccountingReport('balance-sheet', 'Balance Sheet');
+    } else if (discussMatch || discussChannelMatch) {
       renderDiscuss(discussChannelMatch ? discussChannelMatch[1] : null);
     } else if (settingsApiKeysMatch) {
       renderApiKeysSettings();

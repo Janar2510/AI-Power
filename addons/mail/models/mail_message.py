@@ -19,3 +19,9 @@ class MailMessage(Model):
         default="comment",
         string="Type",
     )
+    attachment_ids = fields.One2many(
+        "ir.attachment",
+        "mail_message_id",
+        string="Attachments",
+        help="Phase 184",
+    )

@@ -39,6 +39,49 @@
 - [ ] Phase 170: load_views auto-runs load_default_data when DB menus empty or stale; warning banner shown if menus still empty
 - [ ] mrp in DEFAULT_SERVER_WIDE_MODULES for Manufacturing menus
 
+## Phase 185 (Bulk Operations)
+
+- [ ] List views: checkbox column with Select All; bulk action bar (Delete Selected, Clear) when rows selected
+- [ ] Bulk delete calls rpc unlink on selected IDs; bar hidden when no selection
+
+## Phase 184 (Chatter File Attachments)
+
+- [ ] Chatter: file input, upload to /web/attachment/upload before posting
+- [ ] message_post(attachment_ids=[...]) links attachments to message
+- [ ] GET /web/attachment/download/<id> serves file
+
+## Phase 183 (PDF Report Templates)
+
+- [ ] Print button on sale.order, account.move, purchase.order, stock.picking opens /report/html/<model>/<id>
+- [ ] Templates: Sale Order, Invoice, Purchase Order, Delivery Slip
+
+## Phase 182 (Accounting Reports)
+
+- [ ] Invoicing > Reports > Trial Balance, Profit & Loss, Balance Sheet
+- [ ] Date range picker; RPC calls account.account.get_trial_balance, get_profit_loss, get_balance_sheet
+
+## Phase 181 (Tax Management)
+
+- [ ] Invoicing > Configuration > Taxes; account.tax model
+- [ ] Sale/Purchase order lines: tax_id, taxes_id; price_subtotal includes tax
+- [ ] account.move.line: tax_ids
+
+## Phase 180 (Drag-and-Drop Kanban)
+
+- [ ] Kanban cards draggable; drop on column calls write RPC with group_by field
+- [ ] Works for crm.lead (stage_id), project.task (stage_id -> project.task.type)
+
+## Phase 179 (CSV/Excel Import)
+
+- [ ] Import button opens modal; file input accepts .csv and .xlsx
+- [ ] POST /web/import/preview returns headers and first 5 rows
+- [ ] POST /web/import/execute imports with column mapping; uses Model.import_data
+
+## Phase 178 (Mail Templates)
+
+- [ ] Settings > Email Templates menu; mail.template model with Jinja2 subject/body
+- [ ] Server actions: state=email uses template_id to send mail via mail.template.send_mail()
+
 ## Phase 176 (Editable List View)
 
 - [ ] List views with editable="bottom" support inline editing (parsed from XML)

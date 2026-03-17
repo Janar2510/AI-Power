@@ -1,5 +1,53 @@
 # Changelog
 
+## 1.55.0 (Phases 178–185: Mail Templates, Import, Kanban DnD, Tax, Reports, PDF, Attachments, Bulk)
+
+### Phase 185: Bulk Operations
+- addons/web/static/src/main.js: checkbox column with #list-select-all and .list-row-select; #bulk-action-bar with Delete Selected and Clear
+- Event handlers: select all, row selection, bulk delete (rpc unlink), bulk clear; bar visibility based on selection count
+
+### Phase 184: Chatter File Attachments
+- addons/mail/models/ir_attachment.py: extend ir.attachment with mail_message_id
+- addons/mail/models/mail_message.py: attachment_ids (One2many)
+- addons/mail/models/mail_thread.py: message_post(attachment_ids=[])
+- core/http/routes.py: POST /web/attachment/upload, GET /web/attachment/download/<id>
+- addons/web/static/src/main.js: chatter file input, upload before post, display attachment links
+
+### Phase 183: PDF Report Templates
+- core/http/report.py: register sale.order, account.move, purchase.order, stock.picking in _REPORT_REGISTRY
+- addons/web/static/src/main.js: getReportName maps sale.order, account.move, purchase.order, stock.picking
+- Templates: sale/report/sale_order_report.html, account/report/invoice_report.html, purchase/report/purchase_order_report.html, stock/report/delivery_slip_report.html (already present)
+
+### Phase 182: Accounting Reports
+- addons/account/models/account_report.py: get_trial_balance, get_profit_loss, get_balance_sheet (inherit account.account)
+- addons/account/models/account_move.py: date field for report filtering
+- addons/account/views/account_views.xml: Invoicing > Reports > Trial Balance, P&L, Balance Sheet
+- addons/web/static/src/main.js: #reports/trial-balance, #reports/profit-loss, #reports/balance-sheet with date pickers
+
+### Phase 181: Tax Management
+- addons/account/models/account_tax.py: account.tax (name, amount, amount_type, type_tax_use, price_include); compute_all(price_unit, quantity)
+- addons/account/models/account_move_line.py: tax_ids (Many2many)
+- addons/sale/models/sale_order_line.py: tax_id (Many2many); price_subtotal includes tax when set
+- addons/purchase/models/purchase_order_line.py: taxes_id (Many2many); price_subtotal includes tax when set
+- addons/account/views/account_views.xml: Invoicing > Configuration > Taxes menu
+
+### Phase 180: Drag-and-Drop Kanban
+- addons/web/static/src/main.js: renderKanban passes onStageChange for crm.lead and project.task; uses groupBy from view
+- addons/web/static/src/views/kanban_renderer.js: normalize Many2one [id,name] for grouping; draggable cards, drop handlers, visual feedback (already present)
+
+### Phase 179: CSV/Excel Import Wizard
+- core/http/routes.py: POST /web/import/preview (parse CSV/XLSX, return headers + first 5 rows)
+- core/http/routes.py: POST /web/import/execute (model, mapping, file -> Model.import_data)
+- addons/web/static/src/main.js: Import modal accepts .csv,.xlsx; uses server endpoints for preview and execute
+- tests/test_import_phase179.py
+
+### Phase 178: Mail Templates
+- addons/mail/models/mail_template.py: mail.template (name, model_id, subject, body_html, email_from, email_to, auto_delete)
+- Jinja2 rendering for subject/body; send_mail(res_id) creates mail.mail, optionally sends
+- addons/mail/models/ir_actions_server.py: extend ir.actions.server with template_id; state=email uses mail.template
+- addons/mail/views/mail_template_views.xml: Settings > Email Templates menu
+- tests/test_mail_template_phase178.py
+
 ## 1.54.0 (Phases 170–177: Menu Fix, Tracking, Email Routing, Stock Valuation, Excel, Approval, Editable List, Search Panel)
 
 ### Phase 170: Fix Navigation Menu + Auto-Upgrade on Login

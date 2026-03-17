@@ -12,7 +12,9 @@
 
     const byStage = {};
     (records || []).forEach(function (r) {
-      const key = r[groupBy] || 0;
+      let key = r[groupBy];
+      if (Array.isArray(key) && key.length) key = key[0];
+      key = key || 0;
       if (!byStage[key]) byStage[key] = [];
       byStage[key].push(r);
     });

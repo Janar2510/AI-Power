@@ -25,6 +25,7 @@ class MailThreadMixin:
         body: str = "",
         message_type: str = "comment",
         send_as_email: bool = False,
+        attachment_ids: list = None,
     ) -> "MailMessage":
         """Post a message on this record. When send_as_email=True and record has email, create mail.mail."""
         env = getattr(self, "env", None)
@@ -49,6 +50,12 @@ class MailThreadMixin:
         if uid:
             vals["author_id"] = uid
         msg = MailMessage.create(vals)
+        if attachment_ids:
+            Attachment = env.get("ir.attachment")
+            if Attachment:
+                for aid in attachment_ids:
+                    if aid:
+                        Attachment.browse([aid]).write({"mail_message_id": msg.ids[0] if msg.ids else msg.id})
         try:
             BusBus = env.get("bus.bus")
             if BusBus:

@@ -7,6 +7,7 @@
     "data": [
         "security/ir.model.access.csv",
         "security/ir_rule.xml",
+        "views/mail_template_views.xml",
     ],
     "installable": True,
     "auto_install": True,

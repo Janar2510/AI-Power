@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="mail_template_list">
+      <field name="name">mail.template list</field>
+      <field name="model">mail.template</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="model_id"/>
+          <field name="subject"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="mail_template_form">
+      <field name="name">mail.template form</field>
+      <field name="model">mail.template</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <group string="Template">
+              <field name="name"/>
+              <field name="model_id" placeholder="crm.lead"/>
+              <field name="email_from" placeholder="noreply@company.com"/>
+              <field name="email_to" placeholder="email_from or partner_id"/>
+              <field name="auto_delete"/>
+            </group>
+            <group string="Content">
+              <field name="subject" placeholder="{{ object.name }}"/>
+              <field name="body_html" nolabel="1" placeholder="&lt;p&gt;Hello {{ object.name }}&lt;/p&gt;"/>
+            </group>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_mail_template">
+      <field name="name">Email Templates</field>
+      <field name="res_model">mail.template</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Email Templates" id="menu_mail_template" action="mail.action_mail_template" parent="base.menu_settings" sequence="12"/>
+    <record model="ir.ui.view" id="ir_actions_server_form_mail">
+      <field name="name">ir.actions.server form (mail)</field>
+      <field name="model">ir.actions.server</field>
+      <field name="inherit_id" ref="base.ir_actions_server_form"/>
+      <field name="arch" type="xml">
+        <xpath expr="//field[@name='state']" position="after">
+          <field name="template_id" string="Email Template"/>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

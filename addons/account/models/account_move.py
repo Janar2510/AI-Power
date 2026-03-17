@@ -8,6 +8,7 @@ class AccountMove(Model):
     _description = "Journal Entry"
 
     name = fields.Char(string="Number", required=True, default="New")
+    date = fields.Date(string="Date")
 
     @classmethod
     def create(cls, vals):

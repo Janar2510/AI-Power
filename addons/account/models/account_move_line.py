@@ -16,3 +16,4 @@ class AccountMoveLine(Model):
     currency_id = fields.Many2one("res.currency", string="Currency")
     partner_id = fields.Many2one("res.partner", string="Partner")
     analytic_account_id = fields.Many2one("analytic.account", string="Analytic Account")
+    tax_ids = fields.Many2many("account.tax", string="Taxes", help="Phase 181")

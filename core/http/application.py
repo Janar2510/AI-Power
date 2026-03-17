@@ -216,6 +216,17 @@ class Application:
             if resp is not None:
                 return resp(environ, start_response)
 
+        # Phase 184: Attachment download /web/attachment/download/<id>
+        if request.path.startswith("/web/attachment/download/") and request.method == "GET":
+            try:
+                att_id = int(request.path.rsplit("/", 1)[-1])
+                from core.http.routes import _attachment_download_view
+                resp = _attachment_download_view(request, att_id)
+                if resp:
+                    return resp(environ, start_response)
+            except (ValueError, IndexError):
+                pass
+
         # Route dispatch first for /web/ API paths (before static to avoid 404)
         match = _match_route(request.path, request.method)
         if match:

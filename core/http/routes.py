@@ -340,6 +340,209 @@ def load_views(request):
     )
 
 
+def _parse_import_file(file_storage):
+    """Parse CSV or XLSX file. Returns (headers, all_rows) or (None, None) on error. Phase 179."""
+    if not file_storage or not file_storage.filename:
+        return None, None
+    fn = (file_storage.filename or "").lower()
+    try:
+        if fn.endswith(".xlsx"):
+            from openpyxl import load_workbook
+            wb = load_workbook(file_storage, read_only=True, data_only=True)
+            ws = wb.active
+            rows = list(ws.iter_rows(values_only=True))
+            wb.close()
+            if not rows:
+                return None, None
+            headers = [str(c or "").strip() for c in rows[0]]
+            data_rows = [[str(c or "").strip() if c is not None else "" for c in row] for row in rows[1:]]
+            return headers, data_rows
+        else:
+            import csv
+            import io
+            content = file_storage.read()
+            if isinstance(content, bytes):
+                content = content.decode("utf-8", errors="replace")
+            reader = csv.reader(io.StringIO(content))
+            rows = list(reader)
+            if not rows:
+                return None, None
+            headers = [str(c or "").strip() for c in rows[0]]
+            data_rows = [[str(c or "").strip() for c in row] for row in rows[1:]]
+            return headers, data_rows
+    except Exception:
+        return None, None
+
+
+@route("/web/import/preview", auth="user", methods=["POST"])
+def import_preview(request):
+    """Phase 179: Parse CSV or XLSX, return column headers + first 5 rows."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    import json
+    f = request.files.get("file")
+    headers, rows = _parse_import_file(f)
+    if headers is None:
+        return Response(json.dumps({"error": "Could not parse file. Use CSV or XLSX."}), status=400, content_type="application/json")
+    preview = rows[:5] if rows else []
+    return Response(json.dumps({"headers": headers, "rows": preview, "total_rows": len(rows) if rows else 0}), content_type="application/json")
+
+
+@route("/web/import/execute", auth="user", methods=["POST"])
+def import_execute(request):
+    """Phase 179: Import file with column mapping. Returns {success, errors}."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    import json
+    f = request.files.get("file")
+    model = (request.form.get("model") or "").strip()
+    mapping_str = request.form.get("mapping") or "{}"
+    if not model or not f:
+        return Response(json.dumps({"error": "model and file required"}), status=400, content_type="application/json")
+    try:
+        mapping = json.loads(mapping_str)
+    except Exception:
+        mapping = {}
+    headers, rows = _parse_import_file(f)
+    if headers is None or not rows:
+        return Response(json.dumps({"error": "Could not parse file"}), status=400, content_type="application/json")
+    db = get_session_db(request)
+    registry_obj = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry_obj, cr=cr, uid=uid)
+        registry_obj.set_env(env)
+        ModelCls = env.get(model)
+        if not ModelCls:
+            return Response(json.dumps({"error": "model not found"}), status=404, content_type="application/json")
+        col_to_field = {}
+        for i in range(len(headers)):
+            fn = mapping.get(str(i))
+            if fn and fn != "id":
+                col_to_field[i] = fn
+        fields = list(dict.fromkeys(col_to_field.values()))
+        if not fields:
+            return Response(json.dumps({"error": "map at least one column"}), status=400, content_type="application/json")
+        ordered_rows = []
+        for row in rows:
+            vals = []
+            for fn in fields:
+                found = ""
+                for idx, f in col_to_field.items():
+                    if f == fn and idx < len(row):
+                        found = row[idx] if row[idx] is not None else ""
+                        break
+                vals.append(str(found).strip() if found else "")
+            ordered_rows.append(vals)
+        try:
+            res = ModelCls.import_data(fields, ordered_rows)
+            return Response(json.dumps({
+                "success": (res.get("created") or 0) + (res.get("updated") or 0),
+                "created": res.get("created", 0),
+                "updated": res.get("updated", 0),
+                "errors": res.get("errors", []),
+            }), content_type="application/json")
+        except Exception as e:
+            return Response(json.dumps({"error": str(e), "success": 0, "errors": []}), status=500, content_type="application/json")
+
+
+@route("/web/attachment/upload", auth="user", methods=["POST"])
+def attachment_upload(request):
+    """Phase 184: Upload file, create ir.attachment. Returns {id, name, mimetype, url}."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    import json
+    f = request.files.get("file")
+    res_model = (request.form.get("res_model") or "").strip()
+    res_id_str = (request.form.get("res_id") or "").strip()
+    if not f or not res_model or not res_id_str:
+        return Response(json.dumps({"error": "file, res_model, res_id required"}), status=400, content_type="application/json")
+    try:
+        res_id = int(res_id_str)
+    except ValueError:
+        return Response(json.dumps({"error": "invalid res_id"}), status=400, content_type="application/json")
+    db = get_session_db(request)
+    registry_obj = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry_obj, cr=cr, uid=uid)
+        registry_obj.set_env(env)
+        Attachment = env.get("ir.attachment")
+        if not Attachment:
+            return Response(json.dumps({"error": "ir.attachment not found"}), status=500, content_type="application/json")
+        name = (f.filename or "attachment").strip() or "attachment"
+        data = f.read()
+        import base64
+        b64 = base64.b64encode(data).decode("ascii") if data else ""
+        att = Attachment.create({
+            "name": name,
+            "res_model": res_model,
+            "res_id": res_id,
+            "datas": b64,
+        })
+        aid = att.ids[0] if att.ids else att.id
+        return Response(json.dumps({
+            "id": aid,
+            "name": name,
+            "mimetype": getattr(f, "content_type", None) or "application/octet-stream",
+            "url": f"/web/attachment/download/{aid}",
+        }), content_type="application/json")
+
+
+def _attachment_download_view(request, att_id: int):
+    """Phase 184: Serve attachment file (called from application for /web/attachment/download/<id>)."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response("Unauthorized", status=401)
+    db = get_session_db(request)
+    registry_obj = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry_obj, cr=cr, uid=uid)
+        registry_obj.set_env(env)
+        Attachment = env.get("ir.attachment")
+        if not Attachment:
+            return Response("Not found", status=404)
+        atts = Attachment.browse([att_id]).read(["name", "datas"])
+        if not atts or not atts[0].get("datas"):
+            return Response("Not found", status=404)
+        import base64
+        data = base64.b64decode(atts[0]["datas"])
+        name = atts[0].get("name", "download")
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(name) or "download"
+        resp = Response(data, mimetype="application/octet-stream")
+        resp.headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+        return resp
+    """Phase 184: Serve attachment file."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response("Unauthorized", status=401)
+    db = get_session_db(request)
+    registry_obj = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry_obj, cr=cr, uid=uid)
+        registry_obj.set_env(env)
+        Attachment = env.get("ir.attachment")
+        if not Attachment:
+            return Response("Not found", status=404)
+        atts = Attachment.browse([att_id]).read(["name", "datas"])
+        if not atts or not atts[0].get("datas"):
+            return Response("Not found", status=404)
+        import base64
+        data = base64.b64decode(atts[0]["datas"])
+        name = atts[0].get("name", "download")
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(name) or "download"
+        resp = Response(data, mimetype="application/octet-stream")
+        resp.headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+        return resp
+
+
 @route("/web/export/xlsx", auth="user", methods=["POST"])
 def export_xlsx(request):
     """Phase 174: Server-side Excel export. POST {model, fields, domain} -> .xlsx binary."""

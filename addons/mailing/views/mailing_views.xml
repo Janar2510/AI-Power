@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="mailing_list_list">
+      <field name="name">mailing.list list</field>
+      <field name="model">mailing.list</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="mailing_list_partner_list">
+      <field name="name">mailing.list.partner list</field>
+      <field name="model">mailing.list.partner</field>
+      <field name="arch" type="xml">
+        <list editable="bottom">
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="is_subscribed"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="mailing_list_form">
+      <field name="name">mailing.list form</field>
+      <field name="model">mailing.list</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="partner_ids"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_mailing_list">
+      <field name="name">Mailing Lists</field>
+      <field name="res_model">mailing.list</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.ui.view" id="mailing_mailing_list">
+      <field name="name">mailing.mailing list</field>
+      <field name="model">mailing.mailing</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="subject"/>
+          <field name="mailing_list_id" comodel="mailing.list"/>
+          <field name="state"/>
+          <field name="sent_count"/>
+          <field name="opened_count"/>
+          <field name="clicked_count"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="mailing_mailing_form">
+      <field name="name">mailing.mailing form</field>
+      <field name="model">mailing.mailing</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="action_send" string="Send" type="object" class="btn-primary" invisible="state != 'draft'"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="subject"/>
+            <field name="body_html"/>
+            <field name="mailing_list_id" comodel="mailing.list"/>
+            <field name="state"/>
+            <field name="sent_count"/>
+            <field name="opened_count"/>
+            <field name="clicked_count"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_mailing_mailing">
+      <field name="name">Mailings</field>
+      <field name="res_model">mailing.mailing</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Marketing" id="menu_marketing" sequence="50"/>
+    <menuitem name="Mailing Lists" id="menu_mailing_list" action="mailing.action_mailing_list" parent="mailing.menu_marketing" sequence="10"/>
+    <menuitem name="Mailings" id="menu_mailing_mailing" action="mailing.action_mailing_mailing" parent="mailing.menu_marketing" sequence="20"/>
+  </data>
+</odoo>

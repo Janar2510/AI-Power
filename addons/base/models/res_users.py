@@ -8,6 +8,7 @@ from core.http.auth import hash_password
 
 class ResUsers(Model):
     _name = "res.users"
+    _audit = True  # Phase 205
     _description = "User"
     _inherits = {"res.partner": "partner_id"}  # Phase 126: delegate name, email, etc. to partner
 

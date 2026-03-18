@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="hr_attendance_list">
+      <field name="name">hr.attendance list</field>
+      <field name="model">hr.attendance</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="employee_id" comodel="hr.employee"/>
+          <field name="check_in"/>
+          <field name="check_out"/>
+          <field name="worked_hours"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_attendance_form">
+      <field name="name">hr.attendance form</field>
+      <field name="model">hr.attendance</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="employee_id" comodel="hr.employee"/>
+            <field name="check_in"/>
+            <field name="check_out"/>
+            <field name="worked_hours"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_attendance">
+      <field name="name">Attendance</field>
+      <field name="res_model">hr.attendance</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_url" id="action_hr_attendance_kiosk">
+      <field name="name">Attendance Kiosk</field>
+      <field name="url">/hr/attendance/kiosk</field>
+    </record>
+    <menuitem name="Attendance" id="menu_hr_attendance" action="action_hr_attendance" parent="hr.menu_hr_root" sequence="12"/>
+    <menuitem name="Kiosk" id="menu_hr_attendance_kiosk" action="action_hr_attendance_kiosk" parent="hr.menu_hr_root" sequence="13"/>
+  </data>
+</odoo>

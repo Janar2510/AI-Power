@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="hr_payslip_list">
+      <field name="name">hr.payslip list</field>
+      <field name="model">hr.payslip</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="employee_id"/>
+          <field name="date_from"/>
+          <field name="date_to"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_payslip_form">
+      <field name="name">hr.payslip form</field>
+      <field name="model">hr.payslip</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="compute_sheet" string="Compute Sheet" type="object" class="btn-primary" invisible="state != 'draft'"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="employee_id"/>
+            <field name="date_from"/>
+            <field name="date_to"/>
+            <field name="state"/>
+            <field name="line_ids">
+              <list>
+                <field name="rule_id"/>
+                <field name="amount"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_salary_rule_list">
+      <field name="name">hr.salary.rule list</field>
+      <field name="model">hr.salary.rule</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="code"/>
+          <field name="amount_fix"/>
+          <field name="amount_percentage"/>
+          <field name="sequence"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_salary_rule_form">
+      <field name="name">hr.salary.rule form</field>
+      <field name="model">hr.salary.rule</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="code"/>
+            <field name="amount_fix"/>
+            <field name="amount_percentage"/>
+            <field name="sequence"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_payslip">
+      <field name="name">Payslips</field>
+      <field name="res_model">hr.payslip</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_salary_rule">
+      <field name="name">Salary Rules</field>
+      <field name="res_model">hr.salary.rule</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Payroll" id="menu_hr_payroll_root" parent="hr.menu_hr_root" sequence="25"/>
+    <menuitem name="Payslips" id="menu_hr_payslip" action="action_hr_payslip" parent="hr_payroll.menu_hr_payroll_root" sequence="10"/>
+    <menuitem name="Salary Rules" id="menu_hr_salary_rule" action="action_hr_salary_rule" parent="hr_payroll.menu_hr_payroll_root" sequence="20"/>
+  </data>
+</odoo>

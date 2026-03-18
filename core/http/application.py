@@ -46,16 +46,38 @@ def _load_routes():
     except ImportError:
         pass
     try:
+        import addons.website_sale.controllers  # noqa: F401 - registers /shop with AI recommendations
+    except ImportError:
+        pass
+    try:
         import addons.payment.controllers  # noqa: F401 - registers /payment/process, /payment/status, /payment/callback
+    except ImportError:
+        pass
+    try:
+        import addons.mailing.controllers  # noqa: F401 - registers /mail/track/open, /mail/track/click, /mail/unsubscribe
+    except ImportError:
+        pass
+    try:
+        import addons.hr_attendance.controllers  # noqa: F401 - registers /hr/attendance/kiosk
+    except ImportError:
+        pass
+    try:
+        import addons.hr_recruitment.controllers  # noqa: F401 - registers /jobs
     except ImportError:
         pass
 
 _logger = logging.getLogger("erp.http")
 
-# Security headers (Phase 99)
+# Security headers (Phase 99, 203)
+from .security import check_rate_limit, validate_csrf
+from .session import get_session, ensure_session_csrf
+
+# Phase 203: X-Frame-Options DENY, Referrer-Policy; CSP report-only + enforce for script/style
 _SECURITY_HEADERS = [
-    ("X-Frame-Options", "SAMEORIGIN"),
     ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Referrer-Policy", "strict-origin-when-cross-origin"),
+    ("Content-Security-Policy-Report-Only", "default-src 'self'"),
     ("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net;"),
 ]
 
@@ -122,7 +144,7 @@ def _add_security_headers(start_response: Callable, environ: dict) -> Callable:
             headers.append(("Access-Control-Allow-Credentials", "true"))
             if method == "OPTIONS":
                 headers.append(("Access-Control-Allow-Methods", "POST, OPTIONS"))
-                headers.append(("Access-Control-Allow-Headers", "Content-Type"))
+                headers.append(("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token"))
                 headers.append(("Access-Control-Max-Age", "86400"))
         return start_response(status, headers, exc_info)
 
@@ -203,6 +225,33 @@ class Application:
             except ImportError:
                 pass
         request = Request(environ)
+
+        # Phase 203: Rate limiting
+        allowed, retry_after = check_rate_limit(request)
+        if not allowed:
+            resp = Response(
+                json.dumps({"error": "Too many requests", "retry_after": retry_after}),
+                status=429,
+                content_type="application/json",
+                headers={"Retry-After": str(retry_after)},
+            )
+            return resp(environ, start_response)
+
+        # Phase 203: CSRF validation for state-changing requests
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            sid = request.cookies.get("erp_session")
+            token = ensure_session_csrf(sid) if sid else None
+            sess = get_session(sid) if sid else None
+            token = (sess or {}).get("csrf_token") or token
+            valid, err = validate_csrf(request, token)
+            if not valid:
+                resp = Response(
+                    json.dumps({"error": err or "Invalid CSRF token"}),
+                    status=403,
+                    content_type="application/json",
+                )
+                return resp(environ, start_response)
+
         # WebSocket: use raw start_response (simple-websocket needs it; wrapping causes "write() before start_response")
         if request.path == "/websocket/" and request.method == "GET":
             upgrade = environ.get("HTTP_UPGRADE", "").lower()
@@ -226,6 +275,22 @@ class Application:
                     return resp(environ, start_response)
             except (ValueError, IndexError):
                 pass
+
+        # Phase 212: Binary field download /web/content/<model>/<id>/<field>/<filename>
+        if request.path.startswith("/web/content/") and request.method == "GET":
+            parts = [p for p in request.path.split("/") if p]
+            if len(parts) >= 5 and parts[0] == "web" and parts[1] == "content":
+                try:
+                    model = (parts[2] or "").replace("_", ".")
+                    rec_id = int(parts[3])
+                    field = parts[4] if len(parts) > 4 else "datas"
+                    filename = parts[5] if len(parts) > 5 else "download"
+                    from core.http.routes import _content_download_view
+                    resp = _content_download_view(request, model, rec_id, field, filename)
+                    if resp:
+                        return resp(environ, start_response)
+                except (ValueError, IndexError):
+                    pass
 
         # Route dispatch first for /web/ API paths (before static to avoid 404)
         match = _match_route(request.path, request.method)
@@ -273,6 +338,17 @@ class Application:
         # External JSON-2 API: /json/2/<model>/<method>
         if request.method == "POST" and JSON2_RE.match(request.path):
             resp = dispatch_json2(request)
+            return resp(environ, start_response)
+
+        # Phase 208: REST API v1
+        if request.path.startswith("/api/v1/"):
+            from core.http import rest
+            if request.path == "/api/v1/openapi.json":
+                resp = rest.rest_openapi(request)
+            elif request.path == "/api/v1/docs" or request.path == "/api/v1/docs/":
+                resp = rest.rest_docs(request)
+            else:
+                resp = rest.dispatch_rest(request)
             return resp(environ, start_response)
 
         return NotFound()(environ, start_response)

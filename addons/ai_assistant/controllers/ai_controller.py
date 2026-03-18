@@ -13,6 +13,7 @@ from werkzeug.wrappers import Response
 
 from ..tools.registry import get_tools, execute_tool, log_audit, retrieve_chunks, nl_search, extract_fields
 from ..llm import call_llm
+from ..agent import run_agent
 
 
 def _get_llm_config(env) -> dict:
@@ -250,6 +251,82 @@ def ai_chat(request: Request) -> Response:
             content_type="application/json",
         )
     except Exception as e:
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            content_type="application/json",
+        )
+
+
+@route("/ai/agent/run", auth="public", methods=["POST"])
+def ai_agent_run(request: Request) -> Response:
+    """Run autonomous agent. Phase 214. Creates ai.agent.task, runs ReAct loop."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
+    try:
+        data = request.get_json() or {}
+        goal = (data.get("goal") or "").strip()
+        task_id = data.get("task_id")
+        max_iter = min(int(data.get("max_iter", 10)), 20)
+        if not goal and not task_id:
+            return Response(
+                json.dumps({"error": "goal or task_id required"}),
+                status=400,
+                content_type="application/json",
+            )
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            result = run_agent(env, goal=goal or "Continue", max_iter=max_iter, task_id=task_id)
+        return Response(json.dumps(result), content_type="application/json")
+    except Exception as e:
+        return Response(
+            json.dumps({"error": str(e)}),
+            status=500,
+            content_type="application/json",
+        )
+
+
+@route("/ai/agent/status", auth="public", methods=["GET"])
+def ai_agent_status(request: Request) -> Response:
+    """Get agent task status. Phase 214."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
+    task_id = request.args.get("task_id")
+    if not task_id:
+        return Response(
+            json.dumps({"error": "task_id required"}),
+            status=400,
+            content_type="application/json",
+        )
+    try:
+        tid = int(task_id)
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            Task = env.get("ai.agent.task")
+            if not Task:
+                return Response(json.dumps({"error": "ai.agent.task not available"}), status=500, content_type="application/json")
+            recs = Task.search_read([("id", "=", tid), ("user_id", "=", uid)], ["id", "goal", "steps", "status", "result", "create_date"])
+        if not recs:
+            return Response(json.dumps({"error": "Task not found"}), status=404, content_type="application/json")
+        r = recs[0]
+        steps = json.loads(r.get("steps") or "[]") if isinstance(r.get("steps"), str) else (r.get("steps") or [])
+        return Response(json.dumps({
+            "task_id": r.get("id"),
+            "goal": r.get("goal"),
+            "status": r.get("status"),
+            "result": r.get("result"),
+            "steps": steps,
+            "create_date": r.get("create_date"),
+        }), content_type="application/json")
+    except (ValueError, Exception) as e:
         return Response(
             json.dumps({"error": str(e)}),
             status=500,

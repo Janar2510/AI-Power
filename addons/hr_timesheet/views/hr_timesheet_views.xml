@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="analytic_line_timesheet_list">
+      <field name="name">analytic.line timesheet list</field>
+      <field name="model">analytic.line</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="date"/>
+          <field name="employee_id" comodel="hr.employee"/>
+          <field name="project_id" comodel="project.project"/>
+          <field name="task_id" comodel="project.task"/>
+          <field name="unit_amount"/>
+          <field name="amount"/>
+          <field name="account_id" comodel="analytic.account"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="analytic_line_timesheet_form">
+      <field name="name">analytic.line timesheet form</field>
+      <field name="model">analytic.line</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="date"/>
+            <field name="employee_id" comodel="hr.employee"/>
+            <field name="project_id" comodel="project.project"/>
+            <field name="task_id" comodel="project.task"/>
+            <field name="unit_amount"/>
+            <field name="amount"/>
+            <field name="account_id" comodel="analytic.account"/>
+            <field name="partner_id" comodel="res.partner"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_timesheet_all">
+      <field name="name">All Timesheets</field>
+      <field name="res_model">analytic.line</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_timesheet_my">
+      <field name="name">My Timesheets</field>
+      <field name="res_model">analytic.line</field>
+      <field name="view_mode">list,form</field>
+      <field name="domain">[('employee_id.user_id', '=', uid)]</field>
+    </record>
+    <menuitem name="Timesheets" id="menu_timesheet_root" sequence="26"/>
+    <menuitem name="My Timesheets" id="menu_timesheet_my" action="hr_timesheet.action_timesheet_my" parent="hr_timesheet.menu_timesheet_root" sequence="10"/>
+    <menuitem name="All Timesheets" id="menu_timesheet_all" action="hr_timesheet.action_timesheet_all" parent="hr_timesheet.menu_timesheet_root" sequence="20"/>
+    <record model="ir.ui.view" id="project_task_form_timesheet" inherit_id="project.project_task_form">
+      <field name="name">project.task form (timesheets)</field>
+      <field name="model">project.task</field>
+      <field name="arch" type="xml">
+        <xpath expr="//field[@name='description']" position="after">
+          <field name="timesheet_ids">
+            <list>
+              <field name="name"/>
+              <field name="date"/>
+              <field name="employee_id" comodel="hr.employee"/>
+              <field name="unit_amount"/>
+              <field name="amount"/>
+            </list>
+          </field>
+        </xpath>
+      </field>
+    </record>
+  </data>
+</odoo>

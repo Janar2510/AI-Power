@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="hr_contract_list">
+      <field name="name">hr.contract list</field>
+      <field name="model">hr.contract</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="employee_id" comodel="hr.employee"/>
+          <field name="wage"/>
+          <field name="date_start"/>
+          <field name="date_end"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_contract_form">
+      <field name="name">hr.contract form</field>
+      <field name="model">hr.contract</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="employee_id" comodel="hr.employee"/>
+            <field name="wage"/>
+            <field name="date_start"/>
+            <field name="date_end"/>
+            <field name="state"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_contract">
+      <field name="name">Contracts</field>
+      <field name="res_model">hr.contract</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Contracts" id="menu_hr_contract" action="action_hr_contract" parent="hr.menu_hr_root" sequence="35"/>
+  </data>
+</odoo>

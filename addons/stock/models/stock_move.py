@@ -10,6 +10,7 @@ class StockMove(Model):
     name = fields.Char(string="Description")
     product_id = fields.Many2one("product.product", string="Product", required=True)
     product_uom_qty = fields.Float(string="Demand", default=1.0)
+    lot_id = fields.Many2one("stock.lot", string="Lot/Serial", ondelete="set null")  # Phase 198
     picking_id = fields.Many2one("stock.picking", string="Transfer", ondelete="cascade")
     location_id = fields.Many2one("stock.location", string="Source Location", required=True)
     location_dest_id = fields.Many2one("stock.location", string="Destination Location", required=True)

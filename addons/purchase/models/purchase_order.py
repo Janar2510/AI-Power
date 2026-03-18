@@ -6,19 +6,12 @@ from core.orm import Model, api, fields
 class PurchaseOrder(Model):
     _name = "purchase.order"
     _description = "Purchase Order"
+    _audit = True  # Phase 205
 
     name = fields.Char(string="Order Reference", required=True, default="New")
-
-    @classmethod
-    def create(cls, vals):
-        if vals.get("name") == "New" or not vals.get("name"):
-            env = getattr(cls._registry, "_env", None) if cls._registry else None
-            IrSequence = env.get("ir.sequence") if env else None
-            next_val = IrSequence.next_by_code("purchase.order") if IrSequence else None
-            vals = dict(vals, name=f"PO/{next_val:05d}" if next_val is not None else "New")
-        return super().create(vals)
     partner_id = fields.Many2one("res.partner", string="Vendor", required=True)
     currency_id = fields.Many2one("res.currency", string="Currency")
+    payment_term_id = fields.Many2one("account.payment.term", string="Payment Terms")  # Phase 191
     amount_total = fields.Computed(compute="_compute_amount_total", store=True, string="Total")
     state = fields.Selection(
         selection=[
@@ -34,6 +27,212 @@ class PurchaseOrder(Model):
         "order_id",
         string="Order Lines",
     )
+    bill_status = fields.Selection(
+        selection=[
+            ("no", "Nothing to Bill"),
+            ("partial", "Partially Billed"),
+            ("full", "Fully Billed"),
+        ],
+        string="Bill Status",
+        default="no",
+    )  # Phase 197
+
+    def _update_bill_status(self):
+        """Recompute bill_status from vendor bills (Phase 197)."""
+        Move = self.env.get("account.move")
+        MoveLine = self.env.get("account.move.line")
+        if not Move or not MoveLine:
+            return
+        for order in self:
+            if not order.ids:
+                continue
+            order_name = order.read(["name"])[0].get("name", "") if order.ids else ""
+            bills = Move.search([
+                ("invoice_origin", "=", order_name),
+                ("move_type", "=", "in_invoice"),
+            ])
+            if not bills.ids:
+                order.write({"bill_status": "no"})
+                continue
+            total_billed = 0.0
+            for bill in bills:
+                lines = MoveLine.search([("move_id", "=", bill.ids[0]), ("debit", ">", 0)])
+                for ln in lines:
+                    row = ln.read(["debit"])[0]
+                    total_billed += float(row.get("debit") or 0)
+            total_ordered = 0.0
+            for line in order.order_line:
+                row = line.read(["product_qty", "price_unit"])[0]
+                total_ordered += float(row.get("product_qty") or 0) * float(row.get("price_unit") or 0)
+            if total_ordered <= 0:
+                order.write({"bill_status": "no"})
+            elif total_billed >= total_ordered - 0.01:
+                order.write({"bill_status": "full"})
+            elif total_billed > 0:
+                order.write({"bill_status": "partial"})
+            else:
+                order.write({"bill_status": "no"})
+
+    def _get_received_qty_by_product(self):
+        """Return {product_id: received_qty} from done moves in pickings (Phase 197)."""
+        if not self or not self.ids:
+            return {}
+        Picking = self.env.get("stock.picking")
+        Move = self.env.get("stock.move")
+        if not Picking or not Move:
+            return {}
+        pickings = Picking.search([("purchase_id", "=", self.ids[0])])
+        result = {}
+        for p in pickings:
+            moves = Move.search([("picking_id", "=", p.ids[0]), ("state", "=", "done")])
+            for m in moves:
+                row = m.read(["product_id", "product_uom_qty"])[0]
+                pid = row.get("product_id")
+                pid = pid[0] if isinstance(pid, (list, tuple)) and pid else pid
+                if pid:
+                    result[pid] = result.get(pid, 0) + float(row.get("product_uom_qty") or 0)
+        return result
+
+    def _create_bill_from_picking(self, picking):
+        """Create vendor bill from a specific picking's received quantities (Phase 197)."""
+        if not picking or not picking.ids:
+            return None
+        Move = self.env.get("stock.move")
+        if not Move:
+            return None
+        moves = Move.search([("picking_id", "=", picking.ids[0]), ("state", "=", "done")])
+        if not moves.ids:
+            return None
+        received_by_product = {}
+        for m in moves:
+            row = m.read(["product_id", "product_uom_qty"])[0]
+            pid = row.get("product_id")
+            pid = pid[0] if isinstance(pid, (list, tuple)) and pid else pid
+            if pid:
+                received_by_product[pid] = received_by_product.get(pid, 0) + float(row.get("product_uom_qty") or 0)
+        return self._create_bill_with_quantities(received_by_product)
+
+    def _create_bill_with_quantities(self, qty_by_product=None):
+        """Create vendor bill with given quantities per product, or order qty if None (Phase 197)."""
+        for order in self:
+            if order.read(["state"])[0].get("state") != "purchase":
+                continue
+            Move = self.env.get("account.move")
+            MoveLine = self.env.get("account.move.line")
+            Journal = self.env.get("account.journal")
+            Account = self.env.get("account.account")
+            if not all([Move, MoveLine, Journal, Account]):
+                continue
+            purch_journal = Journal.search([("type", "=", "purchase")], limit=1)
+            if not purch_journal.ids:
+                continue
+            expense_account = Account.search([("account_type", "=", "expense")], limit=1)
+            payable_account = Account.search([("account_type", "=", "liability_payable")], limit=1)
+            if not expense_account.ids or not payable_account.ids:
+                continue
+            order_name = order.read(["name"])[0].get("name", "") if order.ids else ""
+            IrSequence = self.env.get("ir.sequence")
+            next_val = IrSequence.next_by_code("account.move") if IrSequence else None
+            move_name = f"BILL/{next_val:05d}" if next_val is not None else "New"
+            order_data = order.read(["partner_id", "currency_id", "payment_term_id"])[0] if order.ids else {}
+            partner_id = order_data.get("partner_id")
+            if isinstance(partner_id, (list, tuple)) and partner_id:
+                partner_id = partner_id[0]
+            order_currency_id = order_data.get("currency_id")
+            if isinstance(order_currency_id, (list, tuple)) and order_currency_id:
+                order_currency_id = order_currency_id[0]
+            Company = self.env.get("res.company")
+            company_currency_id = None
+            if Company:
+                companies = Company.search([], limit=1)
+                if companies.ids:
+                    cdata = Company.browse(companies.ids[0]).read(["currency_id"])[0]
+                    company_currency_id = cdata.get("currency_id")
+                    if isinstance(company_currency_id, (list, tuple)) and company_currency_id:
+                        company_currency_id = company_currency_id[0]
+            move_currency_id = order_currency_id or company_currency_id
+            pt_id = order_data.get("payment_term_id")
+            if isinstance(pt_id, (list, tuple)) and pt_id:
+                pt_id = pt_id[0]
+            move_vals = {
+                "name": move_name,
+                "journal_id": purch_journal.ids[0],
+                "partner_id": partner_id,
+                "currency_id": move_currency_id,
+                "move_type": "in_invoice",
+                "invoice_origin": order_name,
+                "state": "draft",
+                "date": None,
+            }
+            if pt_id:
+                move_vals["payment_term_id"] = pt_id
+            move = Move.create(move_vals)
+            if not move.ids:
+                continue
+            PoLine = self.env.get("purchase.order.line")
+            if not PoLine or not order.id:
+                continue
+            lines = PoLine.search([("order_id", "=", order.id)])
+            total = 0.0
+            total_fc = 0.0
+            Currency = self.env.get("res.currency")
+            for line in lines:
+                line_data = line.read(["product_id", "product_qty", "price_unit", "name"])
+                if not line_data:
+                    continue
+                row = line_data[0]
+                pid = row.get("product_id")
+                pid = pid[0] if isinstance(pid, (list, tuple)) and pid else pid
+                line_qty = float(row.get("product_qty") or 0)
+                if qty_by_product is not None:
+                    line_qty = float(qty_by_product.get(pid, 0))
+                if line_qty <= 0:
+                    continue
+                price_unit = float(row.get("price_unit") or 0)
+                amount_fc = line_qty * price_unit
+                amount_cc = amount_fc
+                if order_currency_id and company_currency_id and order_currency_id != company_currency_id and Currency:
+                    amount_cc = Currency.convert(amount_fc, order_currency_id, company_currency_id, None)
+                total += amount_cc
+                total_fc += amount_fc
+                line_vals = {
+                    "move_id": move.ids[0],
+                    "account_id": expense_account.ids[0],
+                    "name": row.get("name") or "Purchases",
+                    "debit": amount_cc,
+                    "credit": 0.0,
+                    "partner_id": partner_id,
+                }
+                if order_currency_id and order_currency_id != company_currency_id:
+                    line_vals["amount_currency"] = amount_fc
+                    line_vals["currency_id"] = order_currency_id
+                MoveLine.create(line_vals)
+            if total > 0:
+                pay_vals = {
+                    "move_id": move.ids[0],
+                    "account_id": payable_account.ids[0],
+                    "name": "Payable",
+                    "debit": 0.0,
+                    "credit": total,
+                    "partner_id": partner_id,
+                }
+                if order_currency_id and company_currency_id and order_currency_id != company_currency_id:
+                    pay_vals["amount_currency"] = -total_fc
+                    pay_vals["currency_id"] = order_currency_id
+                MoveLine.create(pay_vals)
+            move.write({})
+            order._update_bill_status()
+        return True
+
+    def action_create_bill(self):
+        """Create vendor bill. Uses received qty when available (Phase 197)."""
+        for order in self:
+            qty_by_product = order._get_received_qty_by_product()
+            if qty_by_product and any(q > 0 for q in qty_by_product.values()):
+                order._create_bill_with_quantities(qty_by_product)
+            else:
+                order._create_bill_with_quantities(None)
+        return True
 
     @api.depends("order_line.product_qty", "order_line.price_unit")
     def _compute_amount_total(self):
@@ -71,9 +270,10 @@ class PurchaseOrder(Model):
         return super().create(vals)
 
     def button_confirm(self):
-        """Confirm order and create incoming stock.picking."""
+        """Confirm order and create incoming stock.picking (Phase 197)."""
         self.write({"state": "purchase"})
         self._create_incoming_picking()
+        self._update_bill_status()
 
     def action_cancel(self):
         """Cancel the order."""
@@ -114,13 +314,16 @@ class PurchaseOrder(Model):
             IrSequence = self.env.get("ir.sequence")
             next_val = IrSequence.next_by_code("stock.picking") if IrSequence else None
             name = f"IN/{next_val}" if next_val is not None else "New"
+            partner_val = order.read(["partner_id"])[0].get("partner_id") if order.ids else None
+            partner_id = partner_val[0] if isinstance(partner_val, (list, tuple)) and partner_val else partner_val
             picking_vals = {
                 "name": name,
                 "picking_type_id": in_type.ids[0],
-                "partner_id": order.read(["partner_id"])[0].get("partner_id") if order.ids else None,
+                "partner_id": partner_id,
                 "location_id": src_id,
                 "location_dest_id": dest_id,
                 "origin": order_name_val,
+                "purchase_id": order.ids[0] if order.ids else None,
                 "state": "draft",
             }
             picking = Picking.create(picking_vals)
@@ -133,6 +336,7 @@ class PurchaseOrder(Model):
             for line in lines:
                 line_data = line.read(["product_id", "product_qty", "name"])[0] if line.ids else {}
                 pid = line_data.get("product_id")
+                pid = pid[0] if isinstance(pid, (list, tuple)) and pid else pid
                 if not pid:
                     continue
                 qty = line_data.get("product_qty", 0)

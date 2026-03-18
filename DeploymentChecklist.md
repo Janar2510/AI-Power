@@ -7,11 +7,17 @@
 - [ ] Run tests: `python3 run_tests.py`
 - [ ] CI (Phase 113): `.github/workflows/ci.yml` runs unit tests on push/PR; E2E on main/master
 - [ ] Optional: run e2e tour: `pip install -r requirements-dev.txt && playwright install chromium && python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python -m pytest tests/e2e/ -v`
-- [ ] Install passlib: `pip install "passlib[bcrypt]>=1.7"`
+- [ ] Install passlib: `pip install "passlib[bcrypt]>=1.7"` (bcrypt<4.1 for passlib compatibility)
+- [ ] PostgreSQL: If "role does not exist", run with `PGUSER=postgres` (e.g. `PGUSER=postgres ./erp-bin server`)
 - [ ] Verify addons path: `./erp-bin module list`
 - [ ] Initialize database: `./erp-bin db init -d <dbname>` (re-run when adding modules like crm, ai_assistant)
 - [ ] Optional: install module: `./erp-bin module install -d <db> -m <module>`
 - [ ] Check config: `./erp-bin help server`
+
+## WebSocket (optional)
+
+- [ ] For real-time updates (avoid 426 Upgrade Required): run with `--gevent-websocket` and `pip install gevent`
+- [ ] Without gevent: longpolling is used; WebSocket requests return 426 (expected, non-fatal)
 
 ## Configuration
 
@@ -38,6 +44,199 @@
 - [ ] If menus are empty after code changes, run `erp-bin db upgrade -d <db>` to reload menus, actions, views
 - [ ] Phase 170: load_views auto-runs load_default_data when DB menus empty or stale; warning banner shown if menus still empty
 - [ ] mrp in DEFAULT_SERVER_WIDE_MODULES for Manufacturing menus
+
+## Phase 186 (HR Payroll)
+
+- [ ] addons/hr_payroll loaded (depends: base, hr)
+- [ ] Payroll > Payslips, Payroll > Salary Rules menus
+- [ ] hr.payslip compute_sheet() creates lines from hr.salary.rule; state draft -> done
+- [ ] tests/test_payroll_phase186.py passes
+
+## Phase 187 (Product Pricelists)
+
+- [ ] product.pricelist, product.pricelist.item models; Pricelists menu
+- [ ] sale.order: pricelist_id; _apply_pricelist() updates line price_unit on action_confirm
+- [ ] get_product_price(product, qty) returns price from matching item or list_price
+- [ ] tests/test_pricelist_phase187.py passes
+
+## Phase 188 (Full Product Variants)
+
+- [ ] product.template._create_variant_ids() generates product.product from attribute_line_ids combinations
+- [ ] create/write on template triggers variant sync; no attributes -> 1 variant; attributes -> Cartesian product
+- [ ] tests/test_variants_phase188.py passes
+
+## Phase 189 (Inventory Reordering Rules)
+
+- [ ] stock.warehouse.orderpoint model; Inventory > Configuration > Reordering Rules
+- [ ] _procure_orderpoint_confirm() creates purchase.order (with partner) or stock.move (replenishment)
+- [ ] tests/test_orderpoint_phase189.py passes
+
+## Phase 217 (HR Expansion)
+
+- [ ] hr_attendance: hr.attendance, /hr/attendance/kiosk
+- [ ] hr_recruitment: hr.applicant, hr.recruitment.stage, hr.job extension, /jobs/<id>/apply
+- [ ] hr_contract: hr.contract (wage, date_start, date_end, state)
+
+## Phase 216 (E-Commerce website_sale)
+
+- [ ] website_sale module: /shop with AI Recommended for you
+- [ ] suggest_products tool; /shop/ai-recommendations API
+- [ ] website_sale in DEFAULT_SERVER_WIDE_MODULES
+
+## Phase 215 (AI Analytics & Forecasting)
+
+- [ ] analyze_kpi, forecast_metric tools in ai_assistant
+- [ ] ai.forecast model for storing forecasts
+- [ ] Dashboard AI Insights: anomaly alerts, forecast display
+
+## Phase 214 (AI Autonomous Agents)
+
+- [ ] POST /ai/agent/run (goal, max_iter); GET /ai/agent/status?task_id=
+- [ ] ai.agent.task model; create_record, update_record, generate_report, schedule_action tools
+- [ ] Chat panel: Agent mode checkbox when LLM enabled; collapsible steps display
+- [ ] ReAct loop: plan -> execute tool -> observe -> decide next step
+
+## Phase 213 (Transient Models & Wizards)
+
+- [ ] TransientModel: _transient_ttl_hours; TTL vacuum when create_date exists
+- [ ] vacuum_transient_models in cron
+- [ ] base.wizard.confirm, account.reconcile.wizard
+
+## Phase 212 (Binary Fields & File Upload)
+
+- [ ] ir.attachment: datas, mimetype, file_size, checksum
+- [ ] POST /web/binary/upload (ufile or file)
+- [ ] GET /web/content/<model>/<id>/<field>/<filename>
+- [ ] Binary/image file widget in form views
+
+## Phase 211 (Search View, Saved Filters & Action Domain)
+
+- [ ] Search view with filters and group_bys from XML; filter chips in list view
+- [ ] parseFilterDomain substitutes uid for domains like [('user_id','=',uid)]
+- [ ] Action domain and context passed from ir.actions.act_window to frontend
+- [ ] Saved filters (localStorage + ir.filters) and filter chips in renderList
+
+## Phase 210 (ORM Computed Fields & Model Inheritance)
+
+- [ ] Non-stored computed fields computed on read (amount_total, price_subtotal, etc.)
+- [ ] Stored computed fields (display_name, amount_total on purchase) recomputed on create/write
+- [ ] _inherit: deferred merge when base not yet registered; fields/methods merged into base model
+- [ ] tests/test_computed_fields.py, tests/test_model_inheritance.py pass
+
+## Phase 209 (E2E Test Coverage & CI Enhancements)
+
+- [ ] tests/e2e/test_crm_lead_tour.py, test_orders_tour.py
+- [ ] pytest-cov for coverage; CI uploads coverage-report artifact
+- [ ] E2E: python scripts/with_server.py --server "./erp-bin server" --port 8069 -- pytest tests/e2e/ -v
+
+## Phase 208 (REST API v1 & OpenAPI Spec)
+
+- [ ] /api/v1/<model>: GET list/read, POST create, PUT update, DELETE unlink
+- [ ] Bearer token auth; domain, fields, limit, offset, order query params
+- [ ] /api/v1/openapi.json, /api/v1/docs (Swagger UI)
+- [ ] tests/test_rest_api_phase208.py passes
+
+## Phase 207 (Mass Mailing & Email Marketing)
+
+- [ ] addons/mailing: mailing.list, mailing.list.partner, mailing.mailing, mailing.tracking
+- [ ] action_send queues mail.mail per subscriber; tracking pixel and link rewriting
+- [ ] /mail/track/open/<token>, /mail/track/click/<token>?url=..., /mail/unsubscribe/<token>
+- [ ] Marketing > Mailing Lists, Marketing > Mailings
+- [ ] tests/test_mailing_phase207.py passes
+
+## Phase 206 (Multi-Step Approval Chains)
+
+- [ ] approval.rule: parent_rule_id for chaining; approval.request: step, next_rule_id, delegate_to_user_id
+- [ ] action_approve creates next step when rule has parent_rule_id; action_reject, action_delegate
+- [ ] check_approval_rules on write/create when amount crosses min_amount
+- [ ] Settings > Approval Rules, Settings > Approval Requests
+- [ ] tests/test_approval_phase206.py passes
+
+## Phase 201 (Dashboard & Reporting Enhancements)
+
+- [ ] Default widgets: Sales This Month, Open Invoices, Low Stock, Overdue Tasks
+- [ ] KPI drill-down: click KPI → filtered list (orders, invoices, products, tasks)
+- [ ] _load_dashboard_widgets adds missing widgets on db init/upgrade
+- [ ] tests/test_dashboard_phase201.py passes
+
+## Phase 200 (Multi-Currency Improvements)
+
+- [ ] account.move: amount_residual in invoice currency
+- [ ] account.bank.statement: currency_id
+- [ ] Bank reconciliation converts statement amount when currency differs
+- [ ] tests/test_multi_currency_phase200.py passes
+
+## Phase 199 (Customer Portal - Invoice Payment)
+
+- [ ] Portal invoice detail: Pay Online button when state in (draft, posted)
+- [ ] /my/invoices/<id>/pay: provider selection, creates payment.transaction
+- [ ] Demo provider: marks invoice paid immediately; manual: pending page
+- [ ] tests/test_portal_invoice_pay_phase199.py passes
+
+## Phase 198 (Lot/Serial Number Tracking)
+
+- [ ] stock.lot has expiry_date; stock.move has lot_id
+- [ ] Receipt: assign lot_id on move; validate creates quant with lot
+- [ ] Delivery: consume from lot (manual) or FIFO when no lot
+- [ ] Inventory > Configuration > Lots menu
+- [ ] tests/test_lot_serial_phase198.py passes
+
+## Phase 197 (Purchase → Receipt → Vendor Bill)
+
+- [ ] Confirm PO creates picking with purchase_id; bill_status on order
+- [ ] Validate picking updates bill_status; Create Bill on picking creates from received qty
+- [ ] action_create_bill on order uses received qty when pickings have done moves
+- [ ] tests/test_purchase_receipt_bill_phase197.py passes
+
+## Phase 196 (Sale → Delivery → Invoice)
+
+- [ ] Confirm SO creates picking with sale_id; delivery_status on order
+- [ ] Validate picking updates delivery_status; Create Invoice on picking creates from delivered qty
+- [ ] action_create_invoice on order uses delivered qty when pickings have done moves
+- [ ] tests/test_sale_delivery_invoice_phase196.py passes
+
+## Phase 195 (Reconciliation Wizard)
+
+- [ ] Bank statement form: Reconcile button opens wizard; batch reconcile statement lines with journal items
+- [ ] account.reconcile.wizard: select statement lines + move lines, action_reconcile links and sets reconciled_id
+- [ ] tests/test_reconcile_wizard_phase195.py passes
+
+## Phase 194 (Platform Fixes)
+
+- [ ] bcrypt<4.1 for passlib compatibility; run `pip install "bcrypt>=4.0,<4.1"` if you see (trapped) bcrypt version error
+- [ ] PGUSER=postgres when PostgreSQL role differs from system user
+- [ ] WebSocket 426 is expected without --gevent-websocket; longpolling works
+
+## Phase 193 (Bank Statements & Reconciliation)
+
+- [ ] account.bank.statement, account.bank.statement.line models; Invoicing > Bank Statements
+- [ ] account.journal type "bank"; default BANK journal and sequence
+- [ ] _auto_reconcile matches statement line to account.move.line by amount + partner (asset_cash)
+- [ ] POST /web/import/bank_statement: CSV with date, amount, name, partner; creates statement or lines
+- [ ] tests/test_bank_statement_phase193.py passes
+
+## Phase 192 (Timesheets)
+
+- [ ] addons/hr_timesheet loaded (depends: base, account, hr, project)
+- [ ] analytic.line: employee_id, task_id, project_id; project.task: timesheet_ids
+- [ ] Timesheets > My Timesheets (filtered by employee_id.user_id), Timesheets > All Timesheets
+- [ ] Task form shows timesheet_ids list
+- [ ] tests/test_timesheet_phase192.py passes
+
+## Phase 191 (Payment Terms)
+
+- [ ] account.payment.term, account.payment.term.line models; Invoicing > Configuration > Payment Terms
+- [ ] compute(value, date_ref) returns (amount, due_date) installments; balance/percent/fixed
+- [ ] account.move: payment_term_id, invoice_date_due (computed); sale.order, purchase.order: payment_term_id
+- [ ] Invoice creation from sale order copies payment_term_id; invoice_date_due recomputed after lines
+- [ ] tests/test_payment_terms_phase191.py passes
+
+## Phase 190 (Helpdesk Module)
+
+- [ ] addons/helpdesk loaded (depends: base, mail)
+- [ ] Helpdesk > Tickets (kanban, list, form); Helpdesk > Configuration > Stages
+- [ ] helpdesk.ticket: stage_id, partner_id, user_id, message_ids
+- [ ] tests/test_helpdesk_phase190.py passes
 
 ## Phase 185 (Bulk Operations)
 

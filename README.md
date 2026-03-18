@@ -21,6 +21,12 @@ Then open http://localhost:8069/ - you will be redirected to login. Use the admi
 
 **Database:** Requires PostgreSQL. Set `PGUSER`, `PGPASSWORD`, `PGDATABASE` if needed. Default db_user is current system user.
 
+**PostgreSQL role:** If you see "role does not exist" or "database does not exist", run with `PGUSER=postgres` (or your PostgreSQL superuser):
+```bash
+PGUSER=postgres ./erp-bin db init -d erp
+PGUSER=postgres ./erp-bin server
+```
+
 ## Module Philosophy
 
 - **Metadata-driven**: Models, views, actions, menus declared as data

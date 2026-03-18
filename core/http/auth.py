@@ -1,8 +1,12 @@
 """Authentication - login, session check."""
 
+import logging
 import secrets
 import time
 from typing import Optional, Tuple
+
+# Suppress passlib bcrypt version warning (bcrypt 4.1+ removed __about__)
+logging.getLogger("passlib").setLevel(logging.ERROR)
 
 try:
     from passlib.hash import bcrypt

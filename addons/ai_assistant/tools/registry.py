@@ -461,6 +461,112 @@ def retrieve_chunks(env, query: str, limit: int = 10) -> List[Dict]:
     return result
 
 
+@_register("create_record", "Create a record in a model. Phase 214. Requires confirmation for state-changing ops.")
+def create_record(env, model: str, vals: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a record. Returns {id, error}."""
+    try:
+        Model = env[model]
+    except KeyError:
+        return {"id": None, "error": f"Model {model} not found"}
+    if not vals or not isinstance(vals, dict):
+        return {"id": None, "error": "vals must be a non-empty dict"}
+    try:
+        rec = Model.create(vals)
+        rid = rec.id if hasattr(rec, "id") and rec.id else (rec.ids[0] if rec.ids else None)
+        return {"id": rid, "error": None}
+    except Exception as e:
+        return {"id": None, "error": str(e)}
+
+
+@_register("update_record", "Update fields on existing records. Phase 214.")
+def update_record(env, model: str, ids: List[int], vals: Dict[str, Any]) -> Dict[str, Any]:
+    """Update records. Returns {updated: N, error}."""
+    try:
+        Model = env[model]
+    except KeyError:
+        return {"updated": 0, "error": f"Model {model} not found"}
+    if not ids or not vals or not isinstance(vals, dict):
+        return {"updated": 0, "error": "ids and vals required"}
+    try:
+        Model.browse(ids).write(vals)
+        return {"updated": len(ids), "error": None}
+    except Exception as e:
+        return {"updated": 0, "error": str(e)}
+
+
+@_register("generate_report", "Trigger report generation and return summary. Phase 214.")
+def generate_report(env, report_name: str, ids: Optional[List[int]] = None) -> Dict[str, Any]:
+    """Generate report for model/ids. Returns {url, summary, error}."""
+    try:
+        from core.http.report import _REPORT_REGISTRY, _get_report_from_db
+        db = getattr(env.registry, "db_name", None) or ""
+        registry = getattr(env, "registry", None)
+        reg = _REPORT_REGISTRY.get(report_name)
+        if not reg and db and registry:
+            reg = _get_report_from_db(report_name, db, registry)
+        if not reg:
+            return {"url": None, "summary": None, "error": f"Report {report_name} not found"}
+        model_name = reg[0]
+        ids = ids or []
+        if not ids:
+            recs = env[model_name].search_read([], ["id", "name"], limit=5)
+            ids = [r["id"] for r in recs if r.get("id")]
+        url = f"/report/html/{report_name}/{','.join(map(str, ids))}" if ids else None
+        summary = f"Report {report_name} for {model_name} ({len(ids)} record(s)). View at {url}" if url else f"Report {report_name} ready."
+        return {"url": url, "summary": summary, "error": None}
+    except Exception as e:
+        return {"url": None, "summary": None, "error": str(e)}
+
+
+@_register("suggest_products", "Suggest products for user (collaborative filtering). Phase 216.")
+def suggest_products(env, limit: int = 5, user_id: Optional[int] = None) -> List[Dict]:
+    """Suggest products based on purchase history. Returns [{id, name, list_price}]."""
+    try:
+        Product = env["product.product"]
+    except KeyError:
+        return []
+    try:
+        Line = env.get("sale.order.line")
+        if Line:
+            lines = Line.search_read([], ["product_id"], limit=100)
+            bought = [l.get("product_id") for l in lines if l.get("product_id")]
+            if bought:
+                from collections import Counter
+                top = [pid for pid, _ in Counter(bought).most_common(limit)]
+                recs = Product.search_read([("id", "in", top)], ["id", "name", "list_price"], limit=limit)
+                return [{"id": r["id"], "name": r.get("name", ""), "list_price": r.get("list_price", 0)} for r in recs]
+    except Exception:
+        pass
+    recs = Product.search_read([], ["id", "name", "list_price"], limit=limit)
+    return [{"id": r["id"], "name": r.get("name", ""), "list_price": r.get("list_price", 0)} for r in recs]
+
+
+@_register("schedule_action", "Create ir.cron entry for deferred execution. Phase 214.")
+def schedule_action(env, name: str, model: str, method: str, interval_minutes: int = 60) -> Dict[str, Any]:
+    """Create ir.cron record. Returns {id, error}."""
+    try:
+        Cron = env["ir.cron"]
+    except KeyError:
+        return {"id": None, "error": "ir.cron model not available"}
+    if not name or not model or not method:
+        return {"id": None, "error": "name, model, method required"}
+    try:
+        from datetime import datetime, timedelta, timezone
+        next_run = (datetime.now(timezone.utc) + timedelta(minutes=interval_minutes)).isoformat()
+        rec = Cron.create({
+            "name": name[:64],
+            "model": model,
+            "method": method,
+            "interval_minutes": interval_minutes,
+            "next_run": next_run,
+            "active": True,
+        })
+        rid = rec.id if hasattr(rec, "id") and rec.id else (rec.ids[0] if rec.ids else None)
+        return {"id": rid, "error": None}
+    except Exception as e:
+        return {"id": None, "error": str(e)}
+
+
 def get_tools() -> List[Dict[str, str]]:
     """Return list of available tools for /ai/tools."""
     return [

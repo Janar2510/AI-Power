@@ -16,6 +16,8 @@
 
   let llmEnabled = false;
   let conversationId = null;
+  const agentModeCheck = document.getElementById('chat-agent-mode');
+  const agentRow = document.getElementById('chat-agent-row');
 
   function fetchAiConfig() {
     fetch('/ai/config', { credentials: 'include' })
@@ -30,6 +32,7 @@
           if (toolRow) toolRow.style.display = llmEnabled ? 'none' : '';
           if (queryInput) queryInput.placeholder = llmEnabled ? 'Ask anything... (e.g. Show me leads with high revenue)' : (toolSelect && toolSelect.value === 'search_records' ? 'Search term (optional)' : '');
         }
+        if (agentRow) agentRow.style.display = llmEnabled ? 'block' : 'none';
         updatePlaceholder();
       })
       .catch(function () { llmEnabled = false; });
@@ -64,6 +67,25 @@
     const div = document.createElement('div');
     div.className = 'chat-msg ' + role + (isError ? ' error' : '');
     div.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function appendAgentResult(taskId, goal, status, result, steps) {
+    const div = document.createElement('div');
+    div.className = 'chat-msg assistant agent-result';
+    let html = '<div class="agent-status">' + (status || '').replace(/</g, '&lt;') + '</div>';
+    if (result) html += '<div class="agent-result-text">' + (result || '').replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</div>';
+    if (steps && steps.length) {
+      html += '<details class="agent-steps" style="margin-top:0.5rem"><summary>Steps (' + steps.length + ')</summary><ul style="margin:0.25rem 0;padding-left:1.25rem;font-size:0.9em">';
+      steps.forEach(function (s) {
+        const tool = (s.tool || '').replace(/</g, '&lt;');
+        const res = (s.result || '').replace(/</g, '&lt;').substring(0, 200);
+        html += '<li><strong>' + tool + '</strong>: ' + res + (res.length >= 200 ? '...' : '') + '</li>';
+      });
+      html += '</ul></details>';
+    }
+    div.innerHTML = html;
     messagesEl.appendChild(div);
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
@@ -114,14 +136,82 @@
     const tool = (toolSelect && toolSelect.value || 'search_records').trim();
     const model = (modelSelect && modelSelect.value || 'res.partner');
     const kwargs = buildKwargs(tool, model, prompt);
+    const agentMode = llmEnabled && agentModeCheck && agentModeCheck.checked;
 
     const userDisplay = prompt || (llmEnabled ? 'Ask' : tool + ' on ' + model);
     if (!userDisplay && !llmEnabled) return;
     if (llmEnabled && !prompt) return;
 
-    appendMessage('user', userDisplay);
+    appendMessage('user', agentMode ? '[Agent] ' + userDisplay : userDisplay);
     sendBtn.disabled = true;
     const loadingEl = appendLoading();
+
+    var aiChatHdrs = { 'Content-Type': 'application/json' };
+    if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(aiChatHdrs, window.Services.session.getAuthHeaders());
+
+    if (agentMode) {
+      fetch('/ai/agent/run', {
+        method: 'POST',
+        headers: aiChatHdrs,
+        credentials: 'include',
+        body: JSON.stringify({ goal: prompt, max_iter: 10 }),
+      })
+        .then(function (r) {
+          if (r.status === 401) {
+            removeLoading(loadingEl);
+            appendMessage('assistant', 'Session expired. Please log in again.', true);
+            return;
+          }
+          return r.json();
+        })
+        .then(function (data) {
+          if (!data) return;
+          if (data.error) {
+            sendBtn.disabled = false;
+            removeLoading(loadingEl);
+            appendMessage('assistant', data.error, true);
+            return;
+          }
+          var tid = data.task_id;
+          if (data.status === 'done' || data.status === 'failed') {
+            sendBtn.disabled = false;
+            removeLoading(loadingEl);
+            appendAgentResult(tid, data.goal, data.status, data.result, data.steps || []);
+            return;
+          }
+          var poll = function () {
+            fetch('/ai/agent/status?task_id=' + tid, { credentials: 'include' })
+              .then(function (rr) { return rr.json(); })
+              .then(function (st) {
+                if (st.error) {
+                  sendBtn.disabled = false;
+                  removeLoading(loadingEl);
+                  appendMessage('assistant', st.error, true);
+                  return;
+                }
+                if (st.status === 'done' || st.status === 'failed') {
+                  sendBtn.disabled = false;
+                  removeLoading(loadingEl);
+                  appendAgentResult(st.task_id, st.goal, st.status, st.result, st.steps || []);
+                  return;
+                }
+                setTimeout(poll, 800);
+              })
+              .catch(function (err) {
+                sendBtn.disabled = false;
+                removeLoading(loadingEl);
+                appendMessage('assistant', err.message || 'Poll failed', true);
+              });
+          };
+          setTimeout(poll, 800);
+        })
+        .catch(function (err) {
+          sendBtn.disabled = false;
+          removeLoading(loadingEl);
+          appendMessage('assistant', err.message || 'Request failed', true);
+        });
+      return;
+    }
 
     const ctx = (typeof window !== 'undefined' && window.chatContext) || {};
     const body = llmEnabled
@@ -130,7 +220,7 @@
 
     fetch('/ai/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: aiChatHdrs,
       credentials: 'include',
       body: JSON.stringify(body),
     })

@@ -15,4 +15,4 @@ class StockValuationLayer(Model):
     value = fields.Float(string="Value", default=0.0)
     stock_move_id = fields.Many2one("stock.move", string="Stock Move", ondelete="set null")
     description = fields.Char(string="Description")
-    create_date = fields.Datetime(string="Created", default=lambda self: datetime.utcnow().isoformat())
+    create_date = fields.Datetime(string="Created", default=lambda: datetime.utcnow().isoformat())

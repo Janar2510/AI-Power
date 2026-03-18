@@ -5,6 +5,7 @@ from core.orm import Model, fields
 
 class HrEmployee(Model):
     _name = "hr.employee"
+    _audit = True  # Phase 205
     _description = "Employee"
 
     name = fields.Char(required=True)

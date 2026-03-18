@@ -13,6 +13,7 @@ class ApprovalRule(Model):
     approver_user_id = fields.Many2one("res.users", string="Approver (User)")
     approver_group_id = fields.Many2one("res.groups", string="Approver (Group)")
     sequence = fields.Integer(default=10, string="Sequence")
+    parent_rule_id = fields.Many2one("approval.rule", string="Next Step", ondelete="set null")  # Phase 206: chain
     min_amount = fields.Float(string="Min Amount", default=0)
     amount_field = fields.Char(string="Amount Field", default="amount_total")
     active = fields.Boolean(default=True, string="Active")

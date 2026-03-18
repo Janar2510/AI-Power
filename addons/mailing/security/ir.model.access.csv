@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mailing_list,access_mailing_list,model_mailing_list,,1,1,1,1
+access_mailing_list_partner,access_mailing_list_partner,model_mailing_list_partner,,1,1,1,1
+access_mailing_mailing,access_mailing_mailing,model_mailing_mailing,,1,1,1,1
+access_mailing_tracking,access_mailing_tracking,model_mailing_tracking,,1,1,1,1

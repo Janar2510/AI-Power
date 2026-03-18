@@ -14,6 +14,7 @@ def _is_debug_assets(request: Request) -> bool:
     if request.args.get("debug") == "assets":
         return True
     return config.get_config().get("debug_assets", False)
+from core.http.session import ensure_session_csrf
 from core.http.auth import (
     authenticate,
     get_session_uid,
@@ -118,6 +119,41 @@ def health(request):
     return Response(body, content_type="application/json")
 
 
+def _try_init_database(db: str) -> tuple[bool, str]:
+    """Try to create and initialize database. Returns (success, message)."""
+    try:
+        from core.sql_db import create_database, get_cursor
+        from core.db import init_schema
+        from core.db.init_data import load_default_data, assign_admin_groups
+        from core.orm import Registry, Environment
+        from core.orm.models import ModelBase
+        from core.modules import clear_loaded_addon_modules, load_module_graph
+        from core.http.auth import hash_password
+        if db_exists(db):
+            return True, "Database already exists."
+        create_database(db)
+        registry = Registry(db)
+        ModelBase._registry = registry
+        clear_loaded_addon_modules()
+        load_module_graph()
+        with get_cursor(db) as cr:
+            init_schema(cr, registry)
+            env = Environment(registry, cr=cr, uid=1)
+            registry.set_env(env)
+            load_default_data(env)
+            User = env.get("res.users")
+            if User and not User.search([("login", "=", "admin")]):
+                User.create({
+                    "login": "admin",
+                    "password": hash_password("admin"),
+                    "name": "Administrator",
+                })
+            assign_admin_groups(env)
+        return True, "Database initialized. Log in with admin / admin."
+    except Exception as e:
+        return False, str(e)
+
+
 @route("/web/login", auth="public", methods=["GET", "POST"])
 def login(request):
     """Login page - GET shows form, POST authenticates."""
@@ -126,8 +162,18 @@ def login(request):
         password = request.form.get("password", "")
         db = request.form.get("db", "erp")
         if not db_exists(db):
+            ok, msg = _try_init_database(db)
+            if ok:
+                return Response(
+                    LOGIN_HTML.format(db=db, error=msg or "Database initialized. Log in with admin / admin."),
+                    content_type="text/html; charset=utf-8",
+                )
             return Response(
-                LOGIN_HTML.format(db=db, error=f"Database {db} does not exist. Run: erp-bin db init -d {db}"),
+                LOGIN_HTML.format(
+                    db=db,
+                    error=f"Database {db} does not exist. "
+                    f"<a href='/web/login?db={db}&init=1'>Click here to initialize</a> or run: erp-bin db init -d {db}. Error: {msg}",
+                ),
                 content_type="text/html; charset=utf-8",
                 status=400,
             )
@@ -147,8 +193,12 @@ def login(request):
             status=401,
         )
     db = request.args.get("db", "erp")
+    error_msg = ""
+    if request.args.get("init") == "1":
+        ok, msg = _try_init_database(db)
+        error_msg = msg if ok else f"Init failed: {msg}"
     return Response(
-        LOGIN_HTML.format(db=db, error=""),
+        LOGIN_HTML.format(db=db, error=error_msg),
         content_type="text/html; charset=utf-8",
     )
 
@@ -448,6 +498,83 @@ def import_execute(request):
             return Response(json.dumps({"error": str(e), "success": 0, "errors": []}), status=500, content_type="application/json")
 
 
+@route("/web/import/bank_statement", auth="user", methods=["POST"])
+def import_bank_statement(request):
+    """Phase 193: Import bank statement from CSV. Expects columns: date, amount, name; optional: partner."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    import json
+    f = request.files.get("file")
+    statement_id_str = (request.form.get("statement_id") or "").strip()
+    journal_id_str = (request.form.get("journal_id") or "").strip()
+    date_str = (request.form.get("date") or "").strip()
+    if not f:
+        return Response(json.dumps({"error": "file required"}), status=400, content_type="application/json")
+    headers, rows = _parse_import_file(f)
+    if headers is None or not rows:
+        return Response(json.dumps({"error": "Could not parse file. Use CSV."}), status=400, content_type="application/json")
+    db = get_session_db(request)
+    registry_obj = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry_obj, cr=cr, uid=uid)
+        registry_obj.set_env(env)
+        Statement = env.get("account.bank.statement")
+        Line = env.get("account.bank.statement.line")
+        Journal = env.get("account.journal")
+        Partner = env.get("res.partner")
+        if not Statement or not Line:
+            return Response(json.dumps({"error": "Bank statement models not found"}), status=500, content_type="application/json")
+        h = [str(x).lower() for x in headers]
+        date_col = next((i for i, x in enumerate(h) if x in ("date", "transaction date")), 0)
+        amount_col = next((i for i, x in enumerate(h) if x in ("amount", "credit", "debit", "value")), 1)
+        name_col = next((i for i, x in enumerate(h) if x in ("name", "description", "memo", "reference")), 2)
+        partner_col = next((i for i, x in enumerate(h) if x in ("partner", "counterparty", "payee")), None)
+        sid = int(statement_id_str) if statement_id_str and statement_id_str.isdigit() else None
+        if sid:
+            st = Statement.browse(sid)
+            if not st.ids:
+                return Response(json.dumps({"error": "Statement not found"}), status=404, content_type="application/json")
+        else:
+            if not journal_id_str or not date_str:
+                return Response(json.dumps({"error": "journal_id and date required when creating new statement"}), status=400, content_type="application/json")
+            try:
+                jid = int(journal_id_str)
+            except ValueError:
+                return Response(json.dumps({"error": "invalid journal_id"}), status=400, content_type="application/json")
+            if not Journal.browse(jid).ids:
+                return Response(json.dumps({"error": "Journal not found"}), status=404, content_type="application/json")
+            st = Statement.create({"journal_id": jid, "date": date_str[:10], "balance_start": 0.0})
+            sid = st.ids[0]
+        created = 0
+        for row in rows:
+            if len(row) <= max(date_col, amount_col, name_col):
+                continue
+            date_val = str(row[date_col] or "")[:10] if date_col < len(row) else date_str[:10]
+            try:
+                amt = float(str(row[amount_col] or "0").replace(",", "."))
+            except (ValueError, TypeError):
+                continue
+            name_val = str(row[name_col] or "Import")[:200] if name_col < len(row) else "Import"
+            partner_id = None
+            if partner_col is not None and partner_col < len(row) and row[partner_col]:
+                pname = str(row[partner_col]).strip()
+                if pname:
+                    partners = Partner.search([("name", "ilike", pname)], limit=1)
+                    if partners.ids:
+                        partner_id = partners.ids[0]
+            Line.create({
+                "statement_id": sid,
+                "name": name_val,
+                "date": date_val,
+                "amount": amt,
+                "partner_id": partner_id,
+            })
+            created += 1
+        return Response(json.dumps({"success": created, "line_count": created, "statement_id": sid}), content_type="application/json")
+
+
 @route("/web/attachment/upload", auth="user", methods=["POST"])
 def attachment_upload(request):
     """Phase 184: Upload file, create ir.attachment. Returns {id, name, mimetype, url}."""
@@ -477,12 +604,83 @@ def attachment_upload(request):
         data = f.read()
         import base64
         b64 = base64.b64encode(data).decode("ascii") if data else ""
+        mimetype = getattr(f, "content_type", None) or "application/octet-stream"
         att = Attachment.create({
             "name": name,
             "res_model": res_model,
             "res_id": res_id,
             "datas": b64,
+            "mimetype": mimetype,
         })
+        aid = att.ids[0] if att.ids else att.id
+        return Response(json.dumps({
+            "id": aid,
+            "name": name,
+            "mimetype": mimetype,
+            "url": f"/web/attachment/download/{aid}",
+        }), content_type="application/json")
+
+
+def _attachment_download_view(request, att_id: int):
+    """Phase 184/212: Serve attachment file (called from application for /web/attachment/download/<id>)."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response("Unauthorized", status=401)
+    db = get_session_db(request)
+    registry_obj = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry_obj, cr=cr, uid=uid)
+        registry_obj.set_env(env)
+        Attachment = env.get("ir.attachment")
+        if not Attachment:
+            return Response("Not found", status=404)
+        atts = Attachment.browse([att_id]).read(["name", "datas", "mimetype"])
+        if not atts or not atts[0].get("datas"):
+            return Response("Not found", status=404)
+        import base64
+        data = base64.b64decode(atts[0]["datas"])
+        name = atts[0].get("name", "download")
+        mimetype = atts[0].get("mimetype") or "application/octet-stream"
+        from werkzeug.utils import secure_filename
+        safe_name = secure_filename(name) or "download"
+        resp = Response(data, mimetype=mimetype)
+        resp.headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+        return resp
+
+
+@route("/web/binary/upload", auth="user", methods=["POST"])
+def binary_upload(request):
+    """Phase 212: Odoo-style binary upload. Creates ir.attachment. Optional res_model, res_id."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    import json
+    f = request.files.get("ufile") or request.files.get("file")
+    res_model = (request.form.get("res_model") or "").strip()
+    res_id_str = (request.form.get("res_id") or "").strip()
+    if not f:
+        return Response(json.dumps({"error": "file required (ufile or file)"}), status=400, content_type="application/json")
+    res_id = int(res_id_str) if res_id_str and res_id_str.isdigit() else None
+    db = get_session_db(request)
+    registry_obj = _get_registry(db)
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry_obj, cr=cr, uid=uid)
+        registry_obj.set_env(env)
+        Attachment = env.get("ir.attachment")
+        if not Attachment:
+            return Response(json.dumps({"error": "ir.attachment not found"}), status=500, content_type="application/json")
+        name = (f.filename or "attachment").strip() or "attachment"
+        data = f.read()
+        import base64
+        b64 = base64.b64encode(data).decode("ascii") if data else ""
+        vals = {"name": name, "datas": b64}
+        if res_model:
+            vals["res_model"] = res_model
+        if res_id is not None:
+            vals["res_id"] = res_id
+        att = Attachment.create(vals)
         aid = att.ids[0] if att.ids else att.id
         return Response(json.dumps({
             "id": aid,
@@ -492,8 +690,8 @@ def attachment_upload(request):
         }), content_type="application/json")
 
 
-def _attachment_download_view(request, att_id: int):
-    """Phase 184: Serve attachment file (called from application for /web/attachment/download/<id>)."""
+def _content_download_view(request, model: str, rec_id: int, field: str, filename: str):
+    """Phase 212: Serve binary field from any model. GET /web/content/<model>/<id>/<field>/<filename>."""
     uid = get_session_uid(request)
     if uid is None:
         return Response("Unauthorized", status=401)
@@ -503,41 +701,16 @@ def _attachment_download_view(request, att_id: int):
         from core.orm import Environment
         env = Environment(registry_obj, cr=cr, uid=uid)
         registry_obj.set_env(env)
-        Attachment = env.get("ir.attachment")
-        if not Attachment:
+        ModelCls = env.get(model)
+        if not ModelCls:
             return Response("Not found", status=404)
-        atts = Attachment.browse([att_id]).read(["name", "datas"])
-        if not atts or not atts[0].get("datas"):
-            return Response("Not found", status=404)
-        import base64
-        data = base64.b64decode(atts[0]["datas"])
-        name = atts[0].get("name", "download")
-        from werkzeug.utils import secure_filename
-        safe_name = secure_filename(name) or "download"
-        resp = Response(data, mimetype="application/octet-stream")
-        resp.headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
-        return resp
-    """Phase 184: Serve attachment file."""
-    uid = get_session_uid(request)
-    if uid is None:
-        return Response("Unauthorized", status=401)
-    db = get_session_db(request)
-    registry_obj = _get_registry(db)
-    with get_cursor(db) as cr:
-        from core.orm import Environment
-        env = Environment(registry_obj, cr=cr, uid=uid)
-        registry_obj.set_env(env)
-        Attachment = env.get("ir.attachment")
-        if not Attachment:
-            return Response("Not found", status=404)
-        atts = Attachment.browse([att_id]).read(["name", "datas"])
-        if not atts or not atts[0].get("datas"):
+        atts = ModelCls.browse([rec_id]).read([field])
+        if not atts or not atts[0].get(field):
             return Response("Not found", status=404)
         import base64
-        data = base64.b64decode(atts[0]["datas"])
-        name = atts[0].get("name", "download")
+        data = base64.b64decode(atts[0][field])
         from werkzeug.utils import secure_filename
-        safe_name = secure_filename(name) or "download"
+        safe_name = secure_filename(filename or "download") or "download"
         resp = Response(data, mimetype="application/octet-stream")
         resp.headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
         return resp
@@ -610,7 +783,9 @@ def get_session_info(request):
             status=401,
         )
     import json
-    result = {"uid": uid, "db": db, "lang": get_session_lang_from_request(request)}
+    sid = request.cookies.get("erp_session")
+    csrf_token = ensure_session_csrf(sid) if sid else None
+    result = {"uid": uid, "db": db, "lang": get_session_lang_from_request(request), "csrf_token": csrf_token}
     # Phase 90: user_companies for company switcher
     try:
         registry_obj = _get_registry(db)

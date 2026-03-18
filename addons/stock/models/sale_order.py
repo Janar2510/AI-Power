@@ -50,13 +50,16 @@ class SaleOrder(Model):
             IrSequence = self.env.get("ir.sequence")
             next_val = IrSequence.next_by_code("stock.picking") if IrSequence else None
             name = f"OUT/{next_val}" if next_val is not None else "New"
+            partner_val = order.read(["partner_id"])[0].get("partner_id") if order.ids else None
+            partner_id = partner_val[0] if isinstance(partner_val, (list, tuple)) and partner_val else partner_val
             picking_vals = {
                 "name": name,
                 "picking_type_id": out_type.ids[0],
-                "partner_id": order.read(["partner_id"])[0].get("partner_id") if order.ids else None,
+                "partner_id": partner_id,
                 "location_id": src_id,
                 "location_dest_id": dest_id,
                 "origin": order_name_val,
+                "sale_id": order.ids[0] if order.ids else None,
                 "state": "draft",
             }
             picking = Picking.create(picking_vals)
@@ -69,6 +72,8 @@ class SaleOrder(Model):
             for line in lines:
                 line_data = line.read(["product_id", "product_uom_qty", "name"])[0] if line.ids else {}
                 pid = line_data.get("product_id")
+                if isinstance(pid, (list, tuple)) and pid:
+                    pid = pid[0]
                 if not pid:
                     continue
                 qty = line_data.get("product_uom_qty", 0)

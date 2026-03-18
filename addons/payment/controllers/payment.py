@@ -72,24 +72,37 @@ def payment_status(request, reference):
         Transaction = env.get("payment.transaction")
         if not Transaction:
             return Response("<h1>Payment</h1><p>Not found.</p>", content_type="text/html; charset=utf-8")
-        rows = Transaction.search_read([("reference", "=", reference)], ["state", "amount", "currency_id", "sale_order_id"])
+        rows = Transaction.search_read(
+            [("reference", "=", reference)],
+            ["state", "amount", "currency_id", "sale_order_id", "account_move_id"],
+        )
         if not rows:
             return Response("<h1>Payment</h1><p>Transaction not found.</p>", content_type="text/html; charset=utf-8")
         tx = rows[0]
         state = tx.get("state", "")
         amount = tx.get("amount", 0)
         order_id = tx.get("sale_order_id")
+        move_id = tx.get("account_move_id")
         if isinstance(order_id, (list, tuple)) and order_id:
             order_id = order_id[0]
+        if isinstance(move_id, (list, tuple)) and move_id:
+            move_id = move_id[0]
         if state == "done":
-            return redirect(f"/shop/confirmation?order={order_id}")
+            if move_id:
+                Move = env.get("account.move")
+                if Move:
+                    Move.browse(move_id).write({"state": "paid"})
+                return redirect(f"/my/invoices/{move_id}")
+            if order_id:
+                return redirect(f"/shop/confirmation?order={order_id}")
+        back_url = f"/my/invoices/{move_id}" if move_id else (f"/shop/confirmation?order={order_id}" if order_id else "/shop")
         html = f"""
         <h1>Payment Pending</h1>
         <p>Reference: <strong>{reference}</strong></p>
         <p>Amount: <strong>{amount:,.2f}</strong></p>
         <p>Please transfer the amount to our bank account. We will confirm upon receipt.</p>
         <p>Bank: Demo Bank | IBAN: EE00 0000 0000 0000 0000</p>
-        <p><a href="/shop/confirmation?order={order_id}">View order status</a></p>
+        <p><a href="{back_url}">Back</a></p>
         <p><a href="/shop">Continue shopping</a></p>
         """
         return Response(html, content_type="text/html; charset=utf-8")

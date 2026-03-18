@@ -32,3 +32,4 @@ access_ir_ui_view,access_ir_ui_view,model_ir_ui_view,,1,1,1,1
 access_base_wizard_confirm,access_base_wizard_confirm,model_base_wizard_confirm,,1,1,1,1
 access_approval_rule,access_approval_rule,model_approval_rule,,1,1,1,1
 access_approval_request,access_approval_request,model_approval_request,,1,1,1,1
+access_audit_log,access_audit_log,model_audit_log,,1,0,1,0

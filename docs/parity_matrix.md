@@ -11,6 +11,8 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | Init sequence (version gates, GC) | `odoo/init.py` | `core/__init__.py`, `core/release.py` | done | - |
 | HTTP + jsonrpc dispatcher | `odoo/http.py` | `core/http/` | done | test_http.py |
 | ORM (models, fields, registry) | `odoo/orm/*` | `core/orm/` | done | test_orm.py |
+| Computed fields (store/non-store, depends) | `odoo/orm/fields.py` | `core/orm/fields.py` Computed | done | test_computed_fields.py |
+| Model inheritance (_inherit, _inherits) | `odoo/models.py` | `core/orm/registry.py` merge_model | done | test_model_inheritance.py |
 | Module loader + registry | `odoo/modules/*` | `core/modules/` | done | test_modules.py |
 | Base module (users, groups, meta) | `odoo/addons/base/` | `addons/base/` | done | - |
 | Web client (assets, services, views) | `addons/web/` | `addons/web/` | done | test_http, test_assets |
@@ -37,3 +39,7 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | External JSON-2 | Token/key-based, multi-db headers | `core/http/json2.py` | done |
 | Extension controllers | `@route`, auth modes | `core/http/controller.py` | done |
 | Report actions (ir.actions.report) | Metadata-driven, Jinja2 | `core/http/report.py`, `addons/base/models/ir_actions.py` | done |
+| Search view (filters, group_by) | `<search>` in view XML | `core/data/xml_loader.py`, `views_registry.py`, main.js filter chips | done |
+| Action domain/context | ir.actions.act_window | load_views returns domain/context; loadRecords applies | done |
+| Binary field + file upload | `ir.attachment` datas, `/web/binary/upload` | `core/orm/fields.py` Binary, `core/http/routes.py` | done |
+| TransientModel (wizards) | `odoo/models.py` TransientModel | `core/orm/models_transient.py` | done |

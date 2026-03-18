@@ -31,12 +31,15 @@
         <form>
           <header>
             <button name="button_confirm" string="Confirm" type="object"/>
+            <button name="action_create_bill" string="Create Bill" type="object" invisible="state != 'purchase'"/>
             <button name="action_cancel" string="Cancel" type="object"/>
           </header>
           <sheet>
             <field name="state" widget="statusbar"/>
             <field name="name"/>
+            <field name="bill_status"/>
             <field name="partner_id" comodel="res.partner"/>
+            <field name="payment_term_id" comodel="account.payment.term"/>
             <field name="order_line">
               <list>
                 <field name="product_id" comodel="product.product"/>
@@ -48,6 +51,18 @@
             </field>
           </sheet>
         </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="stock_picking_form_create_bill" inherit_id="stock.stock_picking_form">
+      <field name="name">stock.picking form (create bill)</field>
+      <field name="model">stock.picking</field>
+      <field name="arch" type="xml">
+        <xpath expr="//header" position="inside">
+          <button name="action_create_bill" string="Create Bill" type="object" invisible="state != 'done' or not purchase_id"/>
+        </xpath>
+        <xpath expr="//field[@name='origin']" position="after">
+          <field name="purchase_id" comodel="purchase.order"/>
+        </xpath>
       </field>
     </record>
     <record model="ir.actions.act_window" id="action_purchase_order">

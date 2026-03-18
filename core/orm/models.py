@@ -658,6 +658,18 @@ class ModelBase(metaclass=Model):
                         b = val.tobytes() if isinstance(val, memoryview) else (val if isinstance(val, bytes) else None)
                         if b is not None:
                             rows[i][fname] = base64.b64encode(b).decode("ascii")
+        # Phase 210: compute non-stored computed fields on read
+        non_stored_requested = [
+            f for f in requested
+            if f not in cols
+            and isinstance(getattr(self._model, f, None), fmod.Computed)
+            and not getattr(getattr(self._model, f, None), "store", False)
+        ]
+        if non_stored_requested:
+            computed_list = self._model._compute_non_stored_values(self, non_stored_requested)
+            for i, row in enumerate(rows):
+                if i < len(computed_list) and computed_list[i]:
+                    row.update(computed_list[i])
         self._prefetch_many2one_display(rows, requested)
         return rows
 
@@ -770,6 +782,16 @@ class ModelBase(metaclass=Model):
             k: v for k, v in vals.items()
             if k in stored and k not in related_stored and k not in computed_stored
         }
+        old_vals_audit = {}
+        if getattr(self._model, "_audit", False) and self._model._name != "audit.log" and vals_stored:
+            try:
+                rows = self.read(list(vals_stored.keys()))
+                for r in rows:
+                    rid = r.get("id")
+                    if rid is not None:
+                        old_vals_audit[rid] = {k: r.get(k) for k in vals_stored if k in r}
+            except Exception:
+                pass
         if vals_stored:
             table = self._model._table
             sets = ", ".join(f'"{k}" = %s' for k in vals_stored)
@@ -880,6 +902,13 @@ class ModelBase(metaclass=Model):
         registry = getattr(self._model, "_registry", None)
         if registry and cr and vals_stored:
             _trigger_dependant_recompute(registry, self._model._name, self._ids, list(vals_stored.keys()))
+        # Phase 205: audit log for models with _audit
+        if getattr(self._model, "_audit", False) and self._model._name != "audit.log" and (old_vals_audit or vals_stored):
+            try:
+                from addons.base.models.audit_log import log_audit
+                log_audit(env, self._model._name, "write", self._ids, old_vals_audit, vals_stored)
+            except Exception:
+                pass
         # Phase 119: base.automation on_write
         env = getattr(self, "env", None)
         if env and self._ids and vals:
@@ -889,6 +918,13 @@ class ModelBase(metaclass=Model):
                 from addons.base.models import ir_webhook
                 if hasattr(ir_webhook, "run_webhooks"):
                     ir_webhook.run_webhooks(env, "on_write", self._model._name, self._ids, vals)
+            except Exception:
+                pass
+        # Phase 206: approval rules - auto-create approval.request when amount crosses threshold
+        if env and self._ids and vals:
+            try:
+                from addons.base.models.approval_check import check_approval_rules
+                check_approval_rules(env, self._model._name, self._ids, vals, trigger="write")
             except Exception:
                 pass
         # Phase 171: field change tracking (audit trail to chatter)
@@ -1084,7 +1120,8 @@ class ModelBase(metaclass=Model):
             field = getattr(cls, fname, None)
             if not isinstance(field, fmod.Computed) or not getattr(field, "compute", None):
                 continue
-            method = getattr(cls, field.compute, None)
+            compute_spec = getattr(field, "compute", None)
+            method = getattr(cls, compute_spec, None) if isinstance(compute_spec, str) else compute_spec
             if not callable(method):
                 continue
             val = method(record)
@@ -1092,6 +1129,33 @@ class ModelBase(metaclass=Model):
             for i, v in enumerate(vals):
                 if i < n:
                     result[i][fname] = v
+        return result
+
+    @classmethod
+    def _compute_non_stored_values(
+        cls: Type[T], record: "Recordset", field_names: List[str]
+    ) -> List[Dict[str, Any]]:
+        """Phase 210: Run compute methods for non-stored computed fields on read."""
+        from core.orm import fields as fmod
+        n = len(record._ids) if record._ids else 0
+        result: List[Dict[str, Any]] = [{} for _ in range(n)]
+        for fname in field_names:
+            field = getattr(cls, fname, None)
+            if not isinstance(field, fmod.Computed) or getattr(field, "store", False):
+                continue
+            compute_spec = getattr(field, "compute", None)
+            method = getattr(cls, compute_spec, None) if isinstance(compute_spec, str) else compute_spec
+            if not callable(method):
+                continue
+            try:
+                val = method(record)
+                vals = val if isinstance(val, (list, tuple)) else [val] * n
+                for i, v in enumerate(vals):
+                    if i < n:
+                        result[i][fname] = v
+            except Exception:
+                for i in range(n):
+                    result[i][fname] = None
         return result
 
     _sql_constraints: List[tuple] = []
@@ -1273,6 +1337,20 @@ class ModelBase(metaclass=Model):
         registry = getattr(cls, "_registry", None)
         if registry and env and env.cr and vals_stored:
             _trigger_dependant_recompute(registry, cls._name, [new_id], list(vals_stored.keys()))
+        # Phase 205: audit log for models with _audit
+        if getattr(cls, "_audit", False) and cls._name != "audit.log":
+            try:
+                from addons.base.models.audit_log import log_audit
+                log_audit(env, cls._name, "create", [new_id], {}, vals_stored)
+            except Exception:
+                pass
+        # Phase 206: approval rules - auto-create approval.request when amount crosses threshold
+        if env:
+            try:
+                from addons.base.models.approval_check import check_approval_rules
+                check_approval_rules(env, cls._name, [new_id], vals_stored or {}, trigger="create")
+            except Exception:
+                pass
         return new_rec
 
     def _unlink_impl(self) -> bool:
@@ -1319,6 +1397,22 @@ class ModelBase(metaclass=Model):
                 from addons.base.models import ir_webhook
                 if hasattr(ir_webhook, "run_webhooks"):
                     ir_webhook.run_webhooks(env, "on_unlink", self._model._name, self._ids)
+            except Exception:
+                pass
+        # Phase 205: audit log before delete
+        old_vals_unlink = {}
+        if getattr(self._model, "_audit", False) and self._model._name != "audit.log" and env and self._ids:
+            try:
+                stored = self._model._get_stored_field_names()
+                read_f = [c for c in stored if c != "id"][:20]
+                if read_f:
+                    rows = self.read(["id"] + read_f)
+                    for r in rows:
+                        rid = r.get("id")
+                        if rid is not None:
+                            old_vals_unlink[rid] = {k: r.get(k) for k in read_f if k in r}
+                    from addons.base.models.audit_log import log_audit
+                    log_audit(env, self._model._name, "unlink", self._ids, old_vals_unlink, {})
             except Exception:
                 pass
         table = self._model._table

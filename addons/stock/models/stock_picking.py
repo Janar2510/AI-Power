@@ -18,6 +18,7 @@ class StockPicking(Model):
         string="Moves",
     )
     origin = fields.Char(string="Source")
+    sale_id = fields.Many2one("sale.order", string="Sale Order")  # Phase 196
 
     def action_confirm(self):
         """Validate transfer: set picking and moves to done."""

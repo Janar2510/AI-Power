@@ -9,6 +9,7 @@ from core.orm import Model, api, fields
 
 class CrmLead(MailActivityMixin, MailThreadMixin, Model):
     _name = "crm.lead"
+    _audit = True  # Phase 205
     _description = "Lead/Opportunity"
 
     name = fields.Char(required=True)

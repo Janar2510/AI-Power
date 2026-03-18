@@ -12,6 +12,7 @@ class PaymentTransaction(Model):
     currency_id = fields.Many2one("res.currency", string="Currency")
     partner_id = fields.Many2one("res.partner", string="Customer")
     sale_order_id = fields.Many2one("sale.order", string="Sale Order")
+    account_move_id = fields.Many2one("account.move", string="Invoice")  # Phase 199
     state = fields.Selection(
         selection=[
             ("draft", "Draft"),

@@ -24,6 +24,9 @@
           <field name="partner_id" comodel="res.partner"/>
           <field name="move_type"/>
           <field name="invoice_origin"/>
+          <field name="payment_term_id" comodel="account.payment.term"/>
+          <field name="invoice_date_due"/>
+          <field name="date"/>
           <field name="state"/>
         </list>
       </field>
@@ -44,6 +47,11 @@
             <field name="partner_id" comodel="res.partner"/>
             <field name="move_type"/>
             <field name="invoice_origin"/>
+            <field name="currency_id" comodel="res.currency"/>
+            <field name="amount_residual"/>
+            <field name="payment_term_id" comodel="account.payment.term"/>
+            <field name="invoice_date_due"/>
+            <field name="date"/>
             <field name="line_ids">
               <list>
                 <field name="account_id" comodel="account.account"/>
@@ -151,10 +159,16 @@
       <field name="url">#reports/balance-sheet</field>
       <field name="target">self</field>
     </record>
+    <record model="ir.actions.act_url" id="action_sales_revenue">
+      <field name="name">Sales Revenue</field>
+      <field name="url">#reports/sales-revenue</field>
+      <field name="target">self</field>
+    </record>
     <menuitem name="Reports" id="menu_account_reports" parent="account.menu_account_root" sequence="15"/>
     <menuitem name="Trial Balance" id="menu_trial_balance" action="account.action_trial_balance" parent="account.menu_account_reports" sequence="10"/>
     <menuitem name="Profit &amp; Loss" id="menu_profit_loss" action="account.action_profit_loss" parent="account.menu_account_reports" sequence="20"/>
     <menuitem name="Balance Sheet" id="menu_balance_sheet" action="account.action_balance_sheet" parent="account.menu_account_reports" sequence="30"/>
+    <menuitem name="Sales Revenue" id="menu_sales_revenue" action="account.action_sales_revenue" parent="account.menu_account_reports" sequence="40"/>
     <record model="ir.ui.view" id="analytic_account_list">
       <field name="name">analytic.account list</field>
       <field name="model">analytic.account</field>
@@ -187,5 +201,138 @@
       <field name="view_mode">list,form</field>
     </record>
     <menuitem name="Analytic Accounts" id="menu_analytic_account" action="account.action_analytic_account" parent="account.menu_account_config" sequence="30"/>
+    <record model="ir.ui.view" id="account_payment_term_list">
+      <field name="name">account.payment.term list</field>
+      <field name="model">account.payment.term</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="account_payment_term_form">
+      <field name="name">account.payment.term form</field>
+      <field name="model">account.payment.term</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="line_ids">
+              <list>
+                <field name="value"/>
+                <field name="value_amount"/>
+                <field name="days"/>
+                <field name="day_of_month"/>
+                <field name="sequence"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_account_payment_term">
+      <field name="name">Payment Terms</field>
+      <field name="res_model">account.payment.term</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Payment Terms" id="menu_account_payment_term" action="account.action_account_payment_term" parent="account.menu_account_config" sequence="25"/>
+    <record model="ir.ui.view" id="sale_order_form_payment_term" inherit_id="sale.sale_order_form">
+      <field name="name">sale.order form (payment term)</field>
+      <field name="model">sale.order</field>
+      <field name="arch" type="xml">
+        <xpath expr="//header" position="inside">
+          <button name="action_create_invoice" string="Create Invoice" type="object" invisible="state != 'sale' or invoice_status == 'invoiced'"/>
+        </xpath>
+        <xpath expr="//field[@name='pricelist_id']" position="after">
+          <field name="payment_term_id" comodel="account.payment.term"/>
+          <field name="delivery_status"/>
+          <field name="invoice_status"/>
+        </xpath>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="stock_picking_form_create_invoice" inherit_id="stock.stock_picking_form">
+      <field name="name">stock.picking form (create invoice)</field>
+      <field name="model">stock.picking</field>
+      <field name="arch" type="xml">
+        <xpath expr="//header" position="inside">
+          <button name="action_create_invoice" string="Create Invoice" type="object" invisible="state != 'done' or not sale_id"/>
+        </xpath>
+        <xpath expr="//field[@name='origin']" position="after">
+          <field name="sale_id" comodel="sale.order"/>
+        </xpath>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="account_bank_statement_list">
+      <field name="name">account.bank.statement list</field>
+      <field name="model">account.bank.statement</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="journal_id" comodel="account.journal"/>
+          <field name="date"/>
+          <field name="balance_start"/>
+          <field name="balance_end_real"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="account_bank_statement_form">
+      <field name="name">account.bank.statement form</field>
+      <field name="model">account.bank.statement</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="action_reconcile" string="Reconcile" type="object"/>
+            <button name="action_post" string="Post" type="object"/>
+            <button name="action_cancel" string="Cancel" type="object"/>
+          </header>
+          <sheet>
+            <field name="state" widget="statusbar"/>
+            <field name="name"/>
+            <field name="journal_id" comodel="account.journal"/>
+            <field name="currency_id" comodel="res.currency"/>
+            <field name="date"/>
+            <field name="balance_start"/>
+            <field name="balance_end_real"/>
+            <field name="line_ids">
+              <list>
+                <field name="name"/>
+                <field name="date"/>
+                <field name="amount"/>
+                <field name="partner_id" comodel="res.partner"/>
+                <field name="move_id" comodel="account.move"/>
+                <button name="_auto_reconcile" string="Reconcile" type="object" icon="fa-link"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_account_bank_statement">
+      <field name="name">Bank Statements</field>
+      <field name="res_model">account.bank.statement</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Bank Statements" id="menu_account_bank_statement" action="account.action_account_bank_statement" parent="account.menu_account_root" sequence="12"/>
+    <record model="ir.ui.view" id="account_reconcile_wizard_form">
+      <field name="name">account.reconcile.wizard form</field>
+      <field name="model">account.reconcile.wizard</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="action_reconcile" string="Reconcile" type="object"/>
+          </header>
+          <sheet>
+            <field name="statement_line_ids" widget="many2many_tags"/>
+            <field name="line_ids">
+              <list>
+                <field name="statement_line_id" comodel="account.bank.statement.line"/>
+                <field name="move_line_id" comodel="account.move.line"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
   </data>
 </odoo>

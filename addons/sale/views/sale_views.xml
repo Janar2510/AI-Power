@@ -41,6 +41,7 @@
             <field name="partner_id" comodel="res.partner"/>
             <field name="date_order"/>
             <field name="currency_id" comodel="res.currency"/>
+            <field name="pricelist_id" comodel="product.pricelist"/>
             <field name="amount_total"/>
             <field name="order_line">
               <list>
@@ -61,8 +62,46 @@
       <field name="res_model">sale.order</field>
       <field name="view_mode">list,form</field>
     </record>
+    <record model="ir.ui.view" id="product_pricelist_list">
+      <field name="name">product.pricelist list</field>
+      <field name="model">product.pricelist</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="currency_id" comodel="res.currency"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="product_pricelist_form">
+      <field name="name">product.pricelist form</field>
+      <field name="model">product.pricelist</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="currency_id" comodel="res.currency"/>
+            <field name="item_ids">
+              <list>
+                <field name="product_id" comodel="product.product"/>
+                <field name="min_qty"/>
+                <field name="price_surcharge"/>
+                <field name="percent_price"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+              </list>
+            </field>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_product_pricelist">
+      <field name="name">Pricelists</field>
+      <field name="res_model">product.pricelist</field>
+      <field name="view_mode">list,form</field>
+    </record>
     <menuitem name="Sales" id="menu_sale_root" sequence="15"/>
     <menuitem name="Orders" id="menu_sale_order" action="sale.action_sale_order" parent="sale.menu_sale_root" sequence="10"/>
     <menuitem name="Products" id="menu_product_product" action="sale.action_product_product" parent="sale.menu_sale_root" sequence="20"/>
+    <menuitem name="Pricelists" id="menu_product_pricelist" action="sale.action_product_pricelist" parent="sale.menu_sale_root" sequence="25"/>
   </data>
 </odoo>

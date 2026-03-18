@@ -39,6 +39,7 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
           pip install "passlib[bcrypt]>=1.7"
+          pip install pytest-cov
 
       - name: Init test databases
         env:
@@ -57,6 +58,23 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
         run: python3 run_tests.py
+
+      - name: Run unit tests with coverage
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: |
+          python -m pytest tests/ --ignore=tests/e2e -v --cov=core --cov=addons \
+            --cov-report=xml --cov-report=term --cov-fail-under=0 || true
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        if: hashFiles('coverage.xml') != ''
+        with:
+          name: coverage-report
+          path: coverage.xml
 
   e2e:
     runs-on: ubuntu-latest

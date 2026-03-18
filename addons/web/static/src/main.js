@@ -79,6 +79,7 @@
     if (m === 'ir_attachment') return 'attachments';
     if (m === 'res_users') return 'settings/users';
     if (m === 'approval_rule') return 'settings/approval_rules';
+    if (m === 'approval_request') return 'settings/approval_requests';
     if (m === 'hr_leave') return 'leaves';
     if (m === 'hr_leave_type') return 'leave_types';
     if (m === 'hr_leave_allocation') return 'allocations';
@@ -90,15 +91,26 @@
     if (m === 'mrp_workcenter') return 'workcenters';
     if (m === 'stock_picking') return 'transfers';
     if (m === 'stock_warehouse') return 'warehouses';
+    if (m === 'stock_lot') return 'lots';
     if (m === 'purchase_order') return 'purchase_orders';
     if (m === 'account_move') return 'invoices';
+    if (m === 'account_bank_statement') return 'bank_statements';
+    if (m === 'account_reconcile_wizard') return 'account_reconcile_wizard';
     if (m === 'account_journal') return 'journals';
     if (m === 'account_account') return 'accounts';
     if (m === 'hr_employee') return 'employees';
     if (m === 'hr_department') return 'departments';
     if (m === 'hr_job') return 'jobs';
+    if (m === 'hr_attendance') return 'attendance';
+    if (m === 'hr_applicant') return 'applicants';
+    if (m === 'hr_contract') return 'contracts';
     if (m === 'project_project') return 'projects';
     if (m === 'calendar_event') return 'meetings';
+    if (m === 'helpdesk_ticket') return 'tickets';
+    if (m === 'analytic_line') return 'timesheets';
+    if (m === 'audit_log') return 'audit_log';
+    if (m === 'mailing_list') return 'marketing/mailing_lists';
+    if (m === 'mailing_mailing') return 'marketing/mailings';
     return m || null;
   }
 
@@ -142,26 +154,38 @@
     if (route === 'attachments') return 'ir.attachment';
     if (route === 'settings/users') return 'res.users';
     if (route === 'settings/approval_rules') return 'approval.rule';
+    if (route === 'settings/approval_requests') return 'approval.request';
     if (route === 'leaves') return 'hr.leave';
     if (route === 'leave_types') return 'hr.leave.type';
     if (route === 'allocations') return 'hr.leave.allocation';
     if (route === 'cron') return 'ir.cron';
     if (route === 'server_actions') return 'ir.actions.server';
     if (route === 'sequences') return 'ir.sequence';
+    if (route === 'audit_log') return 'audit.log';
+    if (route === 'marketing/mailing_lists') return 'mailing.list';
+    if (route === 'marketing/mailings') return 'mailing.mailing';
     if (route === 'manufacturing') return 'mrp.production';
     if (route === 'boms') return 'mrp.bom';
     if (route === 'workcenters') return 'mrp.workcenter';
     if (route === 'transfers') return 'stock.picking';
     if (route === 'warehouses') return 'stock.warehouse';
+    if (route === 'lots') return 'stock.lot';
     if (route === 'purchase_orders') return 'purchase.order';
     if (route === 'invoices') return 'account.move';
+    if (route === 'bank_statements') return 'account.bank.statement';
+    if (route === 'account_reconcile_wizard') return 'account.reconcile.wizard';
     if (route === 'journals') return 'account.journal';
     if (route === 'accounts') return 'account.account';
     if (route === 'employees') return 'hr.employee';
     if (route === 'departments') return 'hr.department';
     if (route === 'jobs') return 'hr.job';
+    if (route === 'attendance') return 'hr.attendance';
+    if (route === 'applicants') return 'hr.applicant';
+    if (route === 'contracts') return 'hr.contract';
     if (route === 'projects') return 'project.project';
+    if (route === 'timesheets') return 'analytic.line';
     if (route === 'meetings') return 'calendar.event';
+    if (route === 'tickets') return 'helpdesk.ticket';
     return null;
   }
 
@@ -177,10 +201,14 @@
     return [];
   }
 
-  function parseFilterDomain(s) {
+  /** Phase 211: parseFilterDomain with optional uid substitution for domains like [('user_id','=',uid)]. */
+  function parseFilterDomain(s, uid) {
     if (!s || typeof s !== 'string') return [];
-    const t = s.trim();
+    let t = s.trim();
     if (!t) return [];
+    if (uid != null && typeof uid === 'number') {
+      t = t.replace(/\buid\b/g, String(uid));
+    }
     try {
       const json = t.replace(/\(/g, '[').replace(/\)/g, ']').replace(/'/g, '"');
       const parsed = JSON.parse(json);
@@ -272,7 +300,8 @@
       if (isXlsx) {
         const fd = new FormData();
         fd.append('file', f);
-        fetch('/web/import/preview', { method: 'POST', credentials: 'include', body: fd })
+      const authHdrs = (window.Services && window.Services.session && window.Services.session.getAuthHeaders) ? window.Services.session.getAuthHeaders() : {};
+      fetch('/web/import/preview', { method: 'POST', credentials: 'include', headers: authHdrs, body: fd })
           .then(function (r) { return r.json(); })
           .then(function (data) {
             if (data.error) { showToast(data.error, 'error'); return; }
@@ -343,7 +372,8 @@
       fd.append('file', importFile);
       fd.append('model', model);
       fd.append('mapping', JSON.stringify(mapping));
-      fetch('/web/import/execute', { method: 'POST', credentials: 'include', body: fd })
+      const authHdrsExec = (window.Services && window.Services.session && window.Services.session.getAuthHeaders) ? window.Services.session.getAuthHeaders() : {};
+      fetch('/web/import/execute', { method: 'POST', credentials: 'include', headers: authHdrsExec, body: fd })
         .then(function (r) {
           return r.json().then(function (data) {
             if (!r.ok) throw new Error(data.error || 'Import failed');
@@ -605,7 +635,9 @@
     }
     if (navbar.querySelector('.mark-all-read')) {
       navbar.querySelector('.mark-all-read').onclick = function () {
-        fetch('/mail/notifications/mark_read', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) }).then(function () { loadNotificationCount(); loadNotificationList(); });
+        var markReadHdrs = { 'Content-Type': 'application/json' };
+        if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(markReadHdrs, window.Services.session.getAuthHeaders());
+        fetch('/mail/notifications/mark_read', { method: 'POST', credentials: 'include', headers: markReadHdrs, body: JSON.stringify({ all: true }) }).then(function () { loadNotificationCount(); loadNotificationList(); });
       };
     }
     loadNotificationCount();
@@ -762,6 +794,10 @@
     if (route === 'products') return 'Products';
     if (route === 'attachments') return 'Attachments';
     if (route === 'settings/users') return 'Users';
+    if (route === 'settings/approval_rules') return 'Approval Rules';
+    if (route === 'settings/approval_requests') return 'Approval Requests';
+    if (route === 'marketing/mailing_lists') return 'Mailing Lists';
+    if (route === 'marketing/mailings') return 'Mailings';
     if (route === 'articles') return 'Articles';
     if (route === 'knowledge_categories') return 'Categories';
     if (route === 'leaves') return 'Leaves';
@@ -777,12 +813,15 @@
     if (route === 'warehouses') return 'Warehouses';
     if (route === 'purchase_orders') return 'Purchase Orders';
     if (route === 'invoices') return 'Invoices';
+    if (route === 'bank_statements') return 'Bank Statements';
     if (route === 'journals') return 'Journals';
     if (route === 'accounts') return 'Chart of Accounts';
     if (route === 'employees') return 'Employees';
     if (route === 'departments') return 'Departments';
     if (route === 'jobs') return 'Job Positions';
     if (route === 'projects') return 'Projects';
+    if (route === 'timesheets') return 'Timesheets';
+    if (route === 'tickets') return 'Tickets';
     return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records';
   }
 
@@ -853,10 +892,12 @@
     document.getElementById('discuss-new-channel').onclick = function () {
       const name = prompt('Channel name:');
       if (!name || !name.trim()) return;
+      var discussHdrs = { 'Content-Type': 'application/json' };
+      if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(discussHdrs, window.Services.session.getAuthHeaders());
       fetch('/discuss/channel/create', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: discussHdrs,
         body: JSON.stringify({ name: name.trim(), channel_type: 'channel' })
       }).then(function (r) { return r.json(); }).then(function (ch) {
         if (ch.error) { showToast(ch.error, 'error'); return; }
@@ -867,10 +908,12 @@
       document.getElementById('discuss-post-btn').onclick = function () {
         const body = document.getElementById('discuss-body').value.trim();
         if (!body) return;
+        var postHdrs = { 'Content-Type': 'application/json' };
+        if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(postHdrs, window.Services.session.getAuthHeaders());
         fetch('/discuss/channel/' + channelId + '/post', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
+          headers: postHdrs,
           body: JSON.stringify({ body: body })
         }).then(function (r) { return r.json(); }).then(function (msg) {
           if (msg.error) { showToast(msg.error, 'error'); return; }
@@ -924,14 +967,12 @@
           const container = document.getElementById('dashboard-kpis');
           if (!container) return;
           let html = '';
+          const modelToRoute = { 'crm.lead': 'leads', 'res.partner': 'contacts', 'sale.order': 'orders', 'account.move': 'invoices', 'product.product': 'products', 'project.task': 'tasks' };
           (data || []).forEach(function (d, i) {
             const w = widgets[i];
-            const route = w.model === 'crm.lead' ? 'leads' : (w.model === 'res.partner' ? 'contacts' : null);
-            let href = route ? '#leads' : '#';
-            if (route === 'contacts') href = '#contacts';
-            else if (route === 'leads' && d.domain && Array.isArray(d.domain) && d.domain.length) {
-              href = '#leads?domain=' + encodeURIComponent(JSON.stringify(d.domain));
-            } else if (route) href = '#' + route;
+            const route = modelToRoute[w.model] || null;
+            const hasDomain = d.domain && Array.isArray(d.domain) && d.domain.length;
+            const href = route ? '#' + route + (hasDomain ? '?domain=' + encodeURIComponent(JSON.stringify(d.domain)) : '') : '#';
             const val = typeof d.value === 'number' ? (d.value % 1 === 0 ? d.value : d.value.toFixed(1)) : d.value;
             html += '<a href="' + href + '" class="o-card o-card-gradient" style="display:block;padding:var(--space-lg);border-radius:var(--radius-md);text-decoration:none;color:inherit;border:1px solid var(--border-color)">';
             html += '<div style="font-size:1.75rem;font-weight:700">' + (val || '0') + '</div>';
@@ -966,19 +1007,27 @@
       var insightsEl = document.getElementById('dashboard-ai-insights');
       if (!insightsEl) return;
       insightsEl.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3><p style="color:var(--text-muted)">Loading...</p>';
-      fetch('/ai/chat', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'analyze_data', kwargs: { model: 'crm.lead', measure: 'expected_revenue', groupby: 'stage_id', use_llm: true } })
-      })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (data.error) { insightsEl.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3><p style="color:var(--text-muted)">' + (data.error || 'Unable to load').replace(/</g, '&lt;') + '</p>'; return; }
-          var text = (data.result || '').replace(/</g, '&lt;');
-          insightsEl.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3><p style="margin:0;line-height:1.5">' + (text || 'No insights available.') + '</p>';
-        })
-        .catch(function () { var el = document.getElementById('dashboard-ai-insights'); if (el) el.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3><p style="color:var(--text-muted)">Could not load.</p>'; });
+      var aiHdrs = { 'Content-Type': 'application/json' };
+      if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(aiHdrs, window.Services.session.getAuthHeaders());
+      Promise.all([
+        fetch('/ai/chat', { method: 'POST', credentials: 'include', headers: aiHdrs, body: JSON.stringify({ tool: 'analyze_data', kwargs: { model: 'crm.lead', measure: 'expected_revenue', groupby: 'stage_id', use_llm: true } }) }).then(function (r) { return r.json(); }),
+        fetch('/ai/chat', { method: 'POST', credentials: 'include', headers: aiHdrs, body: JSON.stringify({ tool: 'analyze_kpi', kwargs: { model: 'crm.lead', measure: 'expected_revenue', groupby: 'stage_id' } }) }).then(function (r) { return r.json(); }),
+        fetch('/ai/chat', { method: 'POST', credentials: 'include', headers: aiHdrs, body: JSON.stringify({ tool: 'forecast_metric', kwargs: { model: 'sale.order', measure: 'amount_total', periods_ahead: 4 } }) }).then(function (r) { return r.json(); })
+      ]).then(function (results) {
+        var analyzeRes = results[0];
+        var kpiRes = results[1];
+        var forecastRes = results[2];
+        var html = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3>';
+        if (!analyzeRes.error && analyzeRes.result) html += '<p style="margin:0 0 var(--space-sm);line-height:1.5">' + (analyzeRes.result || '').replace(/</g, '&lt;') + '</p>';
+        if (!kpiRes.error && kpiRes.result && kpiRes.result.anomalies && kpiRes.result.anomalies.length) {
+          html += '<div style="margin:var(--space-sm) 0;padding:var(--space-sm);background:rgba(255,200,0,0.15);border-radius:var(--radius-sm)"><strong>Anomaly alerts</strong>: ' + kpiRes.result.anomalies.length + ' metric(s) deviate from trend.</div>';
+        }
+        if (!forecastRes.error && forecastRes.result && forecastRes.result.forecast && forecastRes.result.forecast.length) {
+          html += '<div style="margin:var(--space-sm) 0;font-size:0.9em">Forecast (next 4 periods): ' + (forecastRes.result.forecast || []).slice(0, 4).join(', ') + '</div>';
+        }
+        if (!html.match(/<p |<div /)) html += '<p style="color:var(--text-muted)">No insights available.</p>';
+        insightsEl.innerHTML = html;
+      }).catch(function () { var el = document.getElementById('dashboard-ai-insights'); if (el) el.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3><p style="color:var(--text-muted)">Could not load.</p>'; });
     })();
     const shortcuts = document.getElementById('dashboard-shortcuts');
     if (shortcuts) {
@@ -1013,6 +1062,7 @@
     main.innerHTML += '<a href="#settings/dashboard-widgets" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Dashboard Widgets</a>';
     main.innerHTML += '<a href="#settings/apikeys" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">API Keys</a>';
     main.innerHTML += '<a href="#settings/approval_rules" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Approval Rules</a>';
+    main.innerHTML += '<a href="#settings/approval_requests" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Approval Requests</a>';
     main.innerHTML += '<a href="#settings/totp" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Two-Factor Authentication</a>';
     main.innerHTML += '</div>';
     rpc.callKw('res.company', 'search_read', [[]], { fields: ['id', 'name'], limit: 1 })
@@ -1352,7 +1402,9 @@
         if (btnBegin) {
           btnBegin.onclick = function () {
             btnBegin.disabled = true;
-            fetch('/web/totp/begin_setup', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+            var totpHdrs = { 'Content-Type': 'application/json' };
+            if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(totpHdrs, window.Services.session.getAuthHeaders());
+            fetch('/web/totp/begin_setup', { method: 'POST', credentials: 'include', headers: totpHdrs, body: '{}' })
               .then(function (r) { return r.json(); })
               .then(function (d) {
                 btnBegin.disabled = false;
@@ -1375,7 +1427,9 @@
             const code = (document.getElementById('totp-code').value || '').trim();
             if (!code || code.length !== 6) { showToast('Enter 6-digit code', 'error'); return; }
             btnConfirm.disabled = true;
-            fetch('/web/totp/confirm_setup', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code }) })
+            var totpConfirmHdrs = { 'Content-Type': 'application/json' };
+            if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(totpConfirmHdrs, window.Services.session.getAuthHeaders());
+            fetch('/web/totp/confirm_setup', { method: 'POST', credentials: 'include', headers: totpConfirmHdrs, body: JSON.stringify({ code: code }) })
               .then(function (r) { return r.json(); })
               .then(function (d) {
                 btnConfirm.disabled = false;
@@ -1389,7 +1443,9 @@
         if (btnDisable) {
           btnDisable.onclick = function () {
             if (!confirm('Disable two-factor authentication? Your account will be less secure.')) return;
-            fetch('/web/totp/disable', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+            var totpDisableHdrs = { 'Content-Type': 'application/json' };
+            if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(totpDisableHdrs, window.Services.session.getAuthHeaders());
+            fetch('/web/totp/disable', { method: 'POST', credentials: 'include', headers: totpDisableHdrs, body: '{}' })
               .then(function (r) { return r.json(); })
               .then(function (d) {
                 if (d.error) { showToast(d.error, 'error'); return; }
@@ -1737,7 +1793,7 @@
         const searchDom = buildSearchDomain(model, (document.getElementById('list-search') && document.getElementById('list-search').value) || '');
         if (searchDom && searchDom.length) domain = domain.concat(searchDom);
         const stageEl = document.getElementById('list-stage-filter');
-        if (model === 'crm.lead' && stageEl && stageEl.value) domain = domain.concat([['stage_id', '=', parseInt(stageEl.value, 10)]]);
+        if ((model === 'crm.lead' || model === 'helpdesk.ticket') && stageEl && stageEl.value) domain = domain.concat([['stage_id', '=', parseInt(stageEl.value, 10)]]);
         (currentListState.activeSearchFilters || []).forEach(function (fname) {
           const searchView = viewsSvc && viewsSvc.getView(model, 'search');
           const filters = (searchView && searchView.filters) || [];
@@ -2208,7 +2264,8 @@
           fd.append('file', f);
           fd.append('res_model', model);
           fd.append('res_id', recordId);
-          fetch('/web/attachment/upload', { method: 'POST', credentials: 'include', body: fd })
+          var uploadHdrs = (window.Services && window.Services.session && window.Services.session.getAuthHeaders) ? window.Services.session.getAuthHeaders() : {};
+          fetch('/web/attachment/upload', { method: 'POST', credentials: 'include', headers: uploadHdrs, body: fd })
             .then(function (r) { return r.json(); })
             .then(function (data) {
               done++;
@@ -2371,7 +2428,7 @@
     }
     const o2m = getOne2manyInfo(model, fname);
     const m2m = getMany2manyInfo(model, fname);
-    if (fname === 'message_ids' && (model === 'crm.lead' || model === 'project.task')) {
+    if (fname === 'message_ids' && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
       return '<p><label>' + label + '</label><div id="chatter-messages" class="o-chatter" data-model="' + model + '" style="margin-top:0.5rem;padding:var(--space-md,0.75rem);background:var(--color-bg,#f5f5f5);border-radius:var(--radius-md,8px);border:1px solid var(--border-color,#ddd)"><div class="chatter-messages-list" style="max-height:200px;overflow-y:auto;margin-bottom:var(--space-md,0.75rem)"></div><div class="chatter-compose"><textarea id="chatter-input" placeholder="Add a comment..." style="width:100%;min-height:60px;padding:0.5rem;border:1px solid var(--border-color,#ddd);border-radius:4px;resize:vertical"></textarea><div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap"><input type="file" id="chatter-file" multiple style="font-size:0.85rem"><span id="chatter-attachments" style="font-size:0.85rem;color:var(--text-muted)"></span></div><label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;font-size:0.9rem;cursor:pointer"><input type="checkbox" id="chatter-send-email"> Send as email</label><button type="button" id="chatter-send" style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--color-primary,#1a1a2e);color:white;border:none;border-radius:4px;cursor:pointer">Send</button></div></div></p>';
     }
     if (o2m) {
@@ -2502,7 +2559,7 @@
       html += ' <a href="#" id="btn-delete-form" style="margin-left:0.5rem;font-size:0.9rem;color:#c00">Delete</a>';
     }
     html += '</p></form>';
-    if (!isNew && (model === 'crm.lead' || model === 'project.task')) {
+    if (!isNew && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
       html += '<aside id="form-ai-sidebar" class="form-ai-sidebar" style="min-width:240px;max-width:280px;padding:var(--space-lg);background:var(--color-bg);border:1px solid var(--border-color);border-radius:var(--radius-md)">';
       html += '<h3 style="margin:0 0 var(--space-md);font-size:1rem">AI Suggestions</h3>';
       html += '<div id="ai-suggestions-list" style="font-size:0.9rem;color:var(--text-muted)">Loading...</div>';
@@ -2553,8 +2610,17 @@
       btn.onclick = function () {
         btn.disabled = true;
         rpc.callKw(model, actionName, [[parseInt(id, 10)]], {})
-          .then(function () {
+          .then(function (result) {
             btn.disabled = false;
+            if (result && typeof result === 'object' && result.type === 'ir.actions.act_window' && result.res_model) {
+              var actRoute = (result.res_model || '').replace(/\./g, '_');
+              var resId = result.res_id;
+              if (actRoute && resId) {
+                location.hash = '#' + actRoute + '/edit/' + resId;
+                renderContent();
+                return;
+              }
+            }
             showToast('Action completed', 'success');
             renderForm(model, route, id);
           })
@@ -3097,7 +3163,7 @@
             const m2m = getMany2manyInfo(model, n);
             if (m2m) {
               setM2mChecked(n, rec[n]);
-            } else if (n === 'message_ids' && (model === 'crm.lead' || model === 'project.task')) {
+            } else if (n === 'message_ids' && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
               loadChatter(model, id, rec[n]);
               setupChatter(form, model, id);
             } else if (o2m) {
@@ -3524,27 +3590,30 @@
     const prevFilters = (currentListState.route === route) ? { activeSearchFilters: currentListState.activeSearchFilters || [], groupBy: currentListState.groupBy } : {};
     currentListState = Object.assign({ model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: viewType, savedFilterId: savedFilterId || null, offset: offset, limit: limit, order: order, totalCount: 0, activeSearchFilters: [], groupBy: null }, prevCal, prevFilters);
     main.innerHTML = '<h2>' + title + '</h2><p>Loading...</p>';
-    getSavedFilters(model).then(function (savedFilters) {
-      let domain = actionDomain.slice();
-      const savedFilter = savedFilterId ? savedFilters.find(function (f) { return f.id == savedFilterId; }) : null;
-      if (savedFilter && savedFilter.domain && savedFilter.domain.length) {
-        domain = domain.concat(savedFilter.domain);
-      } else {
-        if (!domainOverrideProvided) {
-          const searchDom = buildSearchDomain(model, searchTerm && searchTerm.trim() ? searchTerm.trim() : '');
-          if (searchDom.length) domain = domain.concat(searchDom);
+    const sessionSvc = window.Services && window.Services.session;
+    const uidPromise = sessionSvc && sessionSvc.getSessionInfo ? sessionSvc.getSessionInfo().then(function (info) { return info && info.uid ? info.uid : 1; }).catch(function () { return 1; }) : Promise.resolve(1);
+    uidPromise.then(function (uid) {
+      return getSavedFilters(model).then(function (savedFilters) {
+        let domain = actionDomain.slice();
+        const savedFilter = savedFilterId ? savedFilters.find(function (f) { return f.id == savedFilterId; }) : null;
+        if (savedFilter && savedFilter.domain && savedFilter.domain.length) {
+          domain = domain.concat(savedFilter.domain);
+        } else {
+          if (!domainOverrideProvided) {
+            const searchDom = buildSearchDomain(model, searchTerm && searchTerm.trim() ? searchTerm.trim() : '');
+            if (searchDom.length) domain = domain.concat(searchDom);
+          }
+          if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
         }
-        if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
-      }
-      const searchView = viewsSvc && viewsSvc.getView(model, 'search');
-      const filters = (searchView && searchView.filters) || [];
-      (currentListState.activeSearchFilters || []).forEach(function (fname) {
-        const f = filters.find(function (x) { return x.name === fname && x.domain; });
-        if (f && f.domain) {
-          const fd = parseFilterDomain(f.domain);
-          if (fd.length) domain = domain.concat(fd);
-        }
-      });
+        const searchView = viewsSvc && viewsSvc.getView(model, 'search');
+        const filters = (searchView && searchView.filters) || [];
+        (currentListState.activeSearchFilters || []).forEach(function (fname) {
+          const f = filters.find(function (x) { return x.name === fname && x.domain; });
+          if (f && f.domain) {
+            const fd = parseFilterDomain(f.domain, uid);
+            if (fd.length) domain = domain.concat(fd);
+          }
+        });
       if (viewType === 'graph' && viewsSvc && viewsSvc.getView(model, 'graph')) {
         loadGraphData(model, route, domain, searchTerm, savedFilters);
         return Promise.resolve();
@@ -3570,13 +3639,14 @@
         const totalCount = results[0] != null ? results[0] : (results[1].length + offset);
         const records = results[1];
         currentListState.totalCount = totalCount;
-        if (viewType === 'kanban' && model === 'crm.lead' && window.ViewRenderers && window.ViewRenderers.kanban) {
+        if (viewType === 'kanban' && (model === 'crm.lead' || model === 'helpdesk.ticket') && window.ViewRenderers && window.ViewRenderers.kanban) {
           renderKanban(model, route, records, searchTerm);
         } else if (viewType === 'calendar' && model === 'crm.lead') {
           renderCalendar(model, route, records, searchTerm);
         } else {
           renderList(model, route, records, searchTerm, totalCount, offset, limit, savedFilters);
         }
+      });
       });
     }).catch(err => {
       main.innerHTML = '<h2>' + title + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load') + '</p>';
@@ -3596,7 +3666,7 @@
       }
       const searchDom = buildSearchDomain(model, searchTerm || '');
       const fullDomain = (domain || []).concat(searchDom || []);
-      const fields = model === 'crm.lead' ? ['id', 'name', 'stage_id'] : ['id', 'name', 'project_id', 'stage_id'];
+      const fields = model === 'crm.lead' ? ['id', 'name', 'stage_id'] : (model === 'helpdesk.ticket' ? ['id', 'name', 'stage_id'] : ['id', 'name', 'project_id', 'stage_id']);
       return Promise.all([
         rpc.callKw('mail.activity.type', 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence' }),
         rpc.callKw(model, 'search_read', [fullDomain], { fields: fields, limit: 50 }),
@@ -4203,7 +4273,7 @@
   function renderKanban(model, route, records, searchTerm) {
     const title = getTitle(route);
     actionStack = [{ label: title, hash: route }];
-    const addLabel = route === 'leads' ? 'Add lead' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add';
+    const addLabel = route === 'leads' ? 'Add lead' : route === 'tickets' ? 'Add ticket' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add';
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     const currentView = (currentListState.route === route && currentListState.viewType) || 'kanban';
     const kanbanView = viewsSvc && viewsSvc.getView(model, 'kanban');
@@ -4212,7 +4282,7 @@
     html += renderViewSwitcher(route, currentView);
     html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
     html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    if (model === 'crm.lead') {
+    if (model === 'crm.lead' || model === 'helpdesk.ticket') {
       html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
     }
     html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
@@ -4235,10 +4305,11 @@
       btnSearch.onclick = doSearch;
       searchInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
     }
-    if (model === 'crm.lead') {
+    if (model === 'crm.lead' || model === 'helpdesk.ticket') {
       const filterEl = document.getElementById('list-stage-filter');
+      const stageModel = model === 'helpdesk.ticket' ? 'helpdesk.stage' : 'crm.stage';
       if (filterEl) {
-        rpc.callKw('crm.stage', 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence' })
+        rpc.callKw(stageModel, 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence' })
           .then(function (stages) {
             stages.forEach(function (s) {
               const opt = document.createElement('option');
@@ -4262,7 +4333,7 @@
       if (id != null) stageIds.push(id);
     });
     const uniq = stageIds.filter(function (x, i, a) { return a.indexOf(x) === i; });
-    const comodelMap = { 'crm.lead': 'crm.stage', 'project.task': 'project.task.type' };
+    const comodelMap = { 'crm.lead': 'crm.stage', 'project.task': 'project.task.type', 'helpdesk.ticket': 'helpdesk.stage' };
     const comodel = comodelMap[model] || (groupBy === 'stage_id' ? 'crm.stage' : null);
     const nameMap = {};
     function renderKanbanWithOptions(opts) {
@@ -4350,6 +4421,90 @@
     loadReport();
   }
 
+  function renderStockValuationReport() {
+    actionStack = [{ label: 'Stock Valuation', hash: 'reports/stock-valuation' }];
+    main.innerHTML = '<h2>Stock Valuation</h2><p style="margin-bottom:1rem">' +
+      '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Refresh</button>' +
+      '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
+      '</p><div id="report-table" style="overflow-x:auto"><p style="color:var(--text-muted)">Loading...</p></div>';
+    function loadReport() {
+      rpc.callKw('product.product', 'get_stock_valuation_report', [], {})
+        .then(function (rows) {
+          const el = document.getElementById('report-table');
+          if (!el) return;
+          if (!rows || !rows.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data</p>'; return; }
+          const cols = ['product', 'category', 'qty_available', 'standard_price', 'total_value'];
+          let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
+          cols.forEach(function (c) { tbl += '<th style="padding:0.5rem;border:1px solid var(--border-color);text-align:left">' + String(c).replace(/_/g, ' ').replace(/</g, '&lt;') + '</th>'; });
+          tbl += '</tr></thead><tbody>';
+          rows.forEach(function (r) {
+            tbl += '<tr>';
+            cols.forEach(function (c) {
+              const v = r[c];
+              const val = (typeof v === 'number' && (c === 'standard_price' || c === 'total_value')) ? v.toFixed(2) : (v || '');
+              tbl += '<td style="padding:0.5rem;border:1px solid var(--border-color)">' + String(val).replace(/</g, '&lt;') + '</td>';
+            });
+            tbl += '</tr>';
+          });
+          tbl += '</tbody></table>';
+          el.innerHTML = tbl;
+        })
+        .catch(function (err) {
+          const el = document.getElementById('report-table');
+          if (el) el.innerHTML = '<p style="color:#c00">' + (err.message || 'Failed to load').replace(/</g, '&lt;') + '</p>';
+        });
+    }
+    document.getElementById('report-refresh').onclick = loadReport;
+    document.getElementById('report-print').onclick = function () { window.print(); };
+    loadReport();
+  }
+
+  function renderSalesRevenueReport() {
+    actionStack = [{ label: 'Sales Revenue', hash: 'reports/sales-revenue' }];
+    const today = new Date().toISOString().slice(0, 10);
+    const yearStart = today.slice(0, 4) + '-01-01';
+    main.innerHTML = '<h2>Sales Revenue</h2><p style="margin-bottom:1rem">' +
+      '<label>From <input type="date" id="report-date-from" value="' + yearStart + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
+      '<label>To <input type="date" id="report-date-to" value="' + today + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
+      '<label>Group by <select id="report-group-by" style="padding:0.35rem;margin:0 0.5rem"><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option><option value="product">Product</option></select></label>' +
+      '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
+      '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
+      '</p><div id="report-table" style="overflow-x:auto"><p style="color:var(--text-muted)">Loading...</p></div>';
+    function loadReport() {
+      const df = document.getElementById('report-date-from').value || yearStart;
+      const dt = document.getElementById('report-date-to').value || today;
+      const groupBy = (document.getElementById('report-group-by') && document.getElementById('report-group-by').value) || 'month';
+      rpc.callKw('sale.order', 'get_sales_revenue_report', [df, dt], { group_by: groupBy })
+        .then(function (rows) {
+          const el = document.getElementById('report-table');
+          if (!el) return;
+          if (!rows || !rows.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data</p>'; return; }
+          const cols = Object.keys(rows[0]);
+          let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
+          cols.forEach(function (c) { tbl += '<th style="padding:0.5rem;border:1px solid var(--border-color);text-align:left">' + String(c).replace(/_/g, ' ').replace(/</g, '&lt;') + '</th>'; });
+          tbl += '</tr></thead><tbody>';
+          rows.forEach(function (r) {
+            tbl += '<tr>';
+            cols.forEach(function (c) {
+              const v = r[c];
+              const val = (typeof v === 'number' && c === 'revenue') ? v.toFixed(2) : (v || '');
+              tbl += '<td style="padding:0.5rem;border:1px solid var(--border-color)">' + String(val).replace(/</g, '&lt;') + '</td>';
+            });
+            tbl += '</tr>';
+          });
+          tbl += '</tbody></table>';
+          el.innerHTML = tbl;
+        })
+        .catch(function (err) {
+          const el = document.getElementById('report-table');
+          if (el) el.innerHTML = '<p style="color:#c00">' + (err.message || 'Failed to load').replace(/</g, '&lt;') + '</p>';
+        });
+    }
+    document.getElementById('report-refresh').onclick = loadReport;
+    document.getElementById('report-print').onclick = function () { window.print(); };
+    loadReport();
+  }
+
   function route() {
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
@@ -4361,7 +4516,7 @@
       formDirty = false;
     }
     lastHash = hash;
-    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|leaves|leave_types|allocations|cron|server_actions|sequences|manufacturing|boms|workcenters|transfers|warehouses|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
+    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
     const editMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/edit\\/(\\d+)$'));
     const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
@@ -4374,6 +4529,8 @@
     const reportsTrialMatch = hash.match(/^reports\/trial-balance$/);
     const reportsPLMatch = hash.match(/^reports\/profit-loss$/);
     const reportsBSMatch = hash.match(/^reports\/balance-sheet$/);
+    const reportsStockValMatch = hash.match(/^reports\/stock-valuation$/);
+    const reportsSalesRevMatch = hash.match(/^reports\/sales-revenue$/);
 
     if (reportsTrialMatch) {
       renderAccountingReport('trial-balance', 'Trial Balance');
@@ -4381,6 +4538,10 @@
       renderAccountingReport('profit-loss', 'Profit & Loss');
     } else if (reportsBSMatch) {
       renderAccountingReport('balance-sheet', 'Balance Sheet');
+    } else if (reportsStockValMatch) {
+      renderStockValuationReport();
+    } else if (reportsSalesRevMatch) {
+      renderSalesRevenueReport();
     } else if (discussMatch || discussChannelMatch) {
       renderDiscuss(discussChannelMatch ? discussChannelMatch[1] : null);
     } else if (settingsApiKeysMatch) {
@@ -4417,7 +4578,7 @@
     if (!e.altKey) return;
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
-    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|leaves|leave_types|allocations|cron|server_actions|sequences|manufacturing|boms|workcenters|transfers|warehouses|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
+    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
     const formMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/(edit\\/\\d+|new)$'));
     if (e.key === 'n' && listMatch) {

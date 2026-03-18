@@ -24,9 +24,11 @@
 
   function poll() {
     if (!_channels.length) return;
+    var pollHdrs = { 'Content-Type': 'application/json' };
+    if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(pollHdrs, window.Services.session.getAuthHeaders());
     fetch('/longpolling/poll', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: pollHdrs,
       credentials: 'include',
       body: JSON.stringify({ channels: _channels, last: _lastId })
     }).then(function (r) {

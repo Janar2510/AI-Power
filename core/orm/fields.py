@@ -140,13 +140,13 @@ class Html(Field):
 
 
 class Computed(Field):
-    """Computed field - value from compute method, optionally stored."""
+    """Computed field - value from compute method, optionally stored. Phase 210: compute can be method name (str) or callable."""
 
     type = "computed"
 
     def __init__(
         self,
-        compute: Optional[str] = None,
+        compute: Optional[Union[str, Callable]] = None,
         store: bool = False,
         depends: Optional[List[str]] = None,
         inverse: Optional[Callable] = None,
@@ -154,7 +154,7 @@ class Computed(Field):
         **kwargs,
     ):
         super().__init__(string=string, readonly=True, **kwargs)
-        self.compute = compute or ""
+        self.compute = compute if compute is not None else ""
         self.store = store
         self.depends = depends or []
         self.inverse = inverse

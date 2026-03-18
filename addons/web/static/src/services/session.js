@@ -1,5 +1,5 @@
 /**
- * Session service - session info (uid, db)
+ * Session service - session info (uid, db, csrf_token)
  */
 (function () {
   let _cached = null;
@@ -18,6 +18,13 @@
         _cached = data;
         return data;
       });
+    },
+    getCsrfToken() {
+      return _cached && _cached.csrf_token ? _cached.csrf_token : null;
+    },
+    getAuthHeaders() {
+      const token = this.getCsrfToken();
+      return token ? { 'X-CSRF-Token': token } : {};
     },
     clearCache() { _cached = null; }
   };

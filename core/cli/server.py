@@ -57,6 +57,7 @@ class Server(Command):
         gevent_websocket: bool,
     ) -> None:
         """Single-process mode."""
+        self._ensure_default_db()
         app = Application()
         if gevent_websocket:
             try:
@@ -185,6 +186,42 @@ class Server(Command):
             use_debugger=False,
             use_reloader=False,
         )
+
+    def _ensure_default_db(self) -> None:
+        """Create and init default database if it does not exist."""
+        from core.sql_db import db_exists, create_database, get_cursor
+        dbname = config.get_config().get("db_name", "erp")
+        if db_exists(dbname):
+            return
+        try:
+            create_database(dbname)
+            _logger.info("Created database %s", dbname)
+            from core.db import init_schema
+            from core.db.init_data import load_default_data, assign_admin_groups
+            from core.orm import Registry, Environment
+            from core.orm.models import ModelBase
+            from core.modules import clear_loaded_addon_modules, load_module_graph
+            from core.http.auth import hash_password
+            registry = Registry(dbname)
+            ModelBase._registry = registry
+            clear_loaded_addon_modules()
+            load_module_graph()
+            with get_cursor(dbname) as cr:
+                init_schema(cr, registry)
+                env = Environment(registry, cr=cr, uid=1)
+                registry.set_env(env)
+                load_default_data(env)
+                User = env.get("res.users")
+                if User and not User.search([("login", "=", "admin")]):
+                    User.create({
+                        "login": "admin",
+                        "password": hash_password("admin"),
+                        "name": "Administrator",
+                    })
+                assign_admin_groups(env)
+            _logger.info("Database %s initialized. Log in with admin / admin.", dbname)
+        except Exception as e:
+            _logger.warning("Could not auto-init database %s: %s", dbname, e)
 
     def _check_root_user(self) -> None:
         if os.name == "posix" and os.getuid() == 0:

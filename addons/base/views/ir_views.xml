@@ -253,6 +253,42 @@
       <field name="view_mode">list,form</field>
     </record>
     <menuitem name="Sequences" id="menu_ir_sequence" action="base.action_ir_sequence" parent="base.menu_technical" sequence="30"/>
+    <record model="ir.ui.view" id="audit_log_list">
+      <field name="name">audit.log list</field>
+      <field name="model">audit.log</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="timestamp"/>
+          <field name="user_id" comodel="res.users"/>
+          <field name="model"/>
+          <field name="res_id"/>
+          <field name="operation"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="audit_log_form">
+      <field name="name">audit.log form</field>
+      <field name="model">audit.log</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="timestamp"/>
+            <field name="user_id" comodel="res.users"/>
+            <field name="model"/>
+            <field name="res_id"/>
+            <field name="operation"/>
+            <field name="old_values"/>
+            <field name="new_values"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_audit_log">
+      <field name="name">Audit Log</field>
+      <field name="res_model">audit.log</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Audit Log" id="menu_audit_log" action="base.action_audit_log" parent="base.menu_technical" sequence="35"/>
     <record model="ir.ui.view" id="approval_rule_list">
       <field name="name">approval.rule list</field>
       <field name="model">approval.rule</field>
@@ -280,6 +316,7 @@
             <field name="approver_user_id" comodel="res.users"/>
             <field name="approver_group_id" comodel="res.groups"/>
             <field name="sequence"/>
+            <field name="parent_rule_id" comodel="approval.rule"/>
             <field name="min_amount"/>
             <field name="amount_field"/>
             <field name="active"/>
@@ -301,17 +338,45 @@
           <field name="rule_id" comodel="approval.rule"/>
           <field name="res_model"/>
           <field name="res_id"/>
+          <field name="step"/>
           <field name="state"/>
           <field name="requested_value"/>
           <field name="approver_id" comodel="res.users"/>
+          <field name="delegate_to_user_id" comodel="res.users"/>
           <field name="create_date"/>
         </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="approval_request_form">
+      <field name="name">approval.request form</field>
+      <field name="model">approval.request</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="rule_id" comodel="approval.rule"/>
+            <field name="res_model"/>
+            <field name="res_id"/>
+            <field name="step"/>
+            <field name="state"/>
+            <field name="requested_value"/>
+            <field name="approver_id" comodel="res.users"/>
+            <field name="delegate_to_user_id" comodel="res.users"/>
+            <field name="approved_date"/>
+            <field name="note"/>
+            <field name="create_date"/>
+          </sheet>
+          <footer>
+            <button name="action_approve" string="Approve" type="object" class="btn-primary" invisible="state != 'pending'"/>
+            <button name="action_reject" string="Reject" type="object" invisible="state != 'pending'"/>
+            <button name="action_delegate" string="Delegate" type="object" invisible="state != 'pending'"/>
+          </footer>
+        </form>
       </field>
     </record>
     <record model="ir.actions.act_window" id="action_approval_request">
       <field name="name">Approval Requests</field>
       <field name="res_model">approval.request</field>
-      <field name="view_mode">list</field>
+      <field name="view_mode">list,form</field>
       <field name="domain">[('state','=','pending')]</field>
     </record>
     <menuitem name="Approval Requests" id="menu_approval_request" action="base.action_approval_request" parent="base.menu_settings" sequence="16"/>

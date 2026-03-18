@@ -3,6 +3,7 @@ Jinja2>=3.0
 Werkzeug>=2.0
 psycopg2-binary>=2.9
 passlib[bcrypt]>=1.7
+bcrypt>=4.0,<4.1
 simple-websocket>=1.0
 # Optional for --gevent-websocket (production WebSocket): pip install gevent
 # Optional for --workers=N (multi-worker prefork): pip install gunicorn

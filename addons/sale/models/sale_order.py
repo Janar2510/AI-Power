@@ -6,6 +6,7 @@ from core.orm import Model, api, fields
 class SaleOrder(Model):
     _name = "sale.order"
     _description = "Sales Order"
+    _audit = True  # Phase 205
 
     name = fields.Char(string="Order Reference", required=True, default="New")
 
@@ -29,7 +30,7 @@ class SaleOrder(Model):
                         vals = dict(vals, currency_id=cid)
         return super().create(vals)
     partner_id = fields.Many2one("res.partner", string="Customer", required=True, tracking=True)
-    date_order = fields.Datetime(string="Order Date", default=lambda self: self._default_date_order())
+    date_order = fields.Datetime(string="Order Date", default=lambda: __import__("datetime").datetime.utcnow().isoformat())
     state = fields.Selection(
         selection=[
             ("draft", "Quotation"),
@@ -41,6 +42,7 @@ class SaleOrder(Model):
         tracking=True,
     )
     currency_id = fields.Many2one("res.currency", string="Currency")  # Defaults from company (Phase 154)
+    pricelist_id = fields.Many2one("product.pricelist", string="Pricelist")  # Phase 187
     amount_total = fields.Computed(compute="_compute_amount_total", string="Total")
     order_line = fields.One2many(
         "sale.order.line",
@@ -91,9 +93,48 @@ class SaleOrder(Model):
         return result
 
     def action_confirm(self):
-        """Confirm the order (draft -> sale). Sends order confirmation email (Phase 143)."""
+        """Confirm the order (draft -> sale). Applies pricelist (Phase 187), sends confirmation email (Phase 143)."""
+        self._apply_pricelist()
         self.write({"state": "sale"})
         self._send_order_confirmation_email()
+
+    def _apply_pricelist(self):
+        """Apply pricelist to order lines (Phase 187)."""
+        env = getattr(self, "env", None) or (getattr(self._model._registry, "_env", None) if getattr(self._model, "_registry", None) else None)
+        if not env:
+            return
+        Pricelist = env.get("product.pricelist")
+        Line = env.get("sale.order.line")
+        if not Pricelist or not Line:
+            return
+        ids = self.ids if hasattr(self, "ids") and self.ids else (getattr(self, "_ids", None) or [])
+        if not ids and hasattr(self, "id") and self.id:
+            ids = [self.id]
+        for oid in ids:
+            order = self._model.browse(oid)
+            pricelist_id = None
+            pl_val = order.read(["pricelist_id"])[0].get("pricelist_id") if order.read(["pricelist_id"]) else None
+            if isinstance(pl_val, (list, tuple)) and pl_val:
+                pricelist_id = pl_val[0]
+            elif isinstance(pl_val, int):
+                pricelist_id = pl_val
+            if not pricelist_id:
+                continue
+            pricelist = Pricelist.browse(pricelist_id)
+            rows = Line.search_read([("order_id", "=", oid)], ["id", "product_id", "product_uom_qty"])
+            if not rows:
+                continue
+            for row in rows:
+                pid = row.get("product_id")
+                if isinstance(pid, (list, tuple)) and pid:
+                    pid = pid[0]
+                if not pid:
+                    continue
+                qty = float(row.get("product_uom_qty") or 0)
+                price = pricelist.get_product_price(pid, qty)
+                lid = row.get("id")
+                if lid:
+                    Line.browse(lid).write({"price_unit": price})
 
     def _send_order_confirmation_email(self):
         """Create mail.mail for order confirmation. Queued for cron to send."""

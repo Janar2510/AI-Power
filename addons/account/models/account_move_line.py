@@ -17,3 +17,4 @@ class AccountMoveLine(Model):
     partner_id = fields.Many2one("res.partner", string="Partner")
     analytic_account_id = fields.Many2one("analytic.account", string="Analytic Account")
     tax_ids = fields.Many2many("account.tax", string="Taxes", help="Phase 181")
+    reconciled_id = fields.Char(string="Reconciliation", help="Phase 195: group id for reconciled lines")

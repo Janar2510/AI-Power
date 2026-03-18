@@ -7,3 +7,4 @@ access_stock_move_user,stock.move user,model_stock_move,,1,1,1,1
 access_stock_quant_user,stock.quant user,model_stock_quant,,1,1,1,1
 access_stock_lot_user,stock.lot user,model_stock_lot,,1,1,1,1
 access_stock_valuation_layer_user,stock.valuation.layer user,model_stock_valuation_layer,,1,1,1,1
+access_stock_warehouse_orderpoint_user,stock.warehouse.orderpoint user,model_stock_warehouse_orderpoint,,1,1,1,1

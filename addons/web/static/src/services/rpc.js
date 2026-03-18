@@ -5,9 +5,12 @@
   const rpc = {
     url: '/web/dataset/call_kw',
     rpc(params) {
+      const headers = { 'Content-Type': 'application/json' };
+      const csrf = window.Services && window.Services.session && window.Services.session.getCsrfToken && window.Services.session.getCsrfToken();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
       return fetch(this.url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers,
         credentials: 'include',
         body: JSON.stringify({
           jsonrpc: '2.0',

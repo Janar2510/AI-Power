@@ -600,7 +600,83 @@ def portal_my_invoice_detail(request, move_id):
             html += f"<tr><td>{ln_name}</td><td>{debit:,.2f}</td><td>{credit:,.2f}</td></tr>"
         html += "</table>"
         html += f'<p><a href="/report/pdf/account.report_invoice/{move_id}">Download PDF</a></p>'
+        if state in ("draft", "posted") and state != "paid":
+            html += f'<p><a href="/my/invoices/{move_id}/pay" class="btn" style="display:inline-block;padding:0.5rem 1rem;background:#1a1a2e;color:white;text-decoration:none;border-radius:4px;margin-top:0.5rem">Pay Online</a></p>'
         return Response(PORTAL_MY_HTML.format(content=html), content_type="text/html; charset=utf-8")
+
+
+@route("/my/invoices/<int:move_id>/pay", auth="portal", methods=["GET", "POST"])
+def portal_my_invoice_pay(request, move_id):
+    """Pay invoice online (Phase 199). GET: form, POST: create transaction, redirect."""
+    uid, db = _require_portal_session(request)
+    if uid is None:
+        return redirect("/web/login")
+    registry = _get_registry(db)
+    if not _is_portal_user(registry, db, uid):
+        return redirect("/")
+    with get_cursor(db) as cr:
+        from core.orm import Environment
+        env = Environment(registry, cr=cr, uid=uid)
+        registry.set_env(env)
+        User = env.get("res.users")
+        Move = env.get("account.move")
+        MoveLine = env.get("account.move.line")
+        Provider = env.get("payment.provider")
+        Transaction = env.get("payment.transaction")
+        if not all([User, Move, Provider, Transaction]):
+            return redirect(f"/my/invoices/{move_id}")
+        rows = User.read_ids([uid], ["partner_id"])
+        partner_id = rows[0].get("partner_id") if rows else None
+        if not partner_id:
+            return redirect(f"/my/invoices/{move_id}")
+        pid = partner_id[0] if isinstance(partner_id, (list, tuple)) and partner_id else partner_id
+        allowed = Move.search([("id", "=", move_id), ("move_type", "=", "out_invoice"), ("partner_id", "=", pid)])
+        if not allowed or move_id not in (allowed.ids if hasattr(allowed, "ids") else []):
+            return redirect("/my/invoices")
+        m = Move.browse(move_id).read(["name", "state", "currency_id", "partner_id"])[0]
+        inv_state = m.get("state", "")
+        if inv_state == "paid":
+            return redirect(f"/my/invoices/{move_id}")
+        if request.method == "POST":
+            provider_code = request.form.get("provider", "demo")
+            lines = MoveLine.search([("move_id", "=", move_id)])
+            rows = lines.read(["debit", "credit"]) if lines else []
+            total = sum(float(r.get("debit") or 0) for r in rows)
+            if total <= 0:
+                return redirect(f"/my/invoices/{move_id}")
+            currency_id = m.get("currency_id")
+            currency_id = currency_id[0] if isinstance(currency_id, (list, tuple)) and currency_id else currency_id
+            providers = Provider.search_read([("code", "=", provider_code), ("state", "in", ["enabled", "test"])], ["id", "code"])
+            if not providers:
+                providers = Provider.search_read([("state", "in", ["enabled", "test"])], ["id", "code"], limit=1)
+            if not providers:
+                return redirect(f"/my/invoices/{move_id}")
+            import secrets
+            ref = f"INV-{secrets.token_hex(4).upper()}"
+            tx = Transaction.create({
+                "provider_id": providers[0]["id"],
+                "amount": total,
+                "currency_id": currency_id,
+                "partner_id": pid,
+                "account_move_id": move_id,
+                "reference": ref,
+                "state": "done" if providers[0].get("code") == "demo" else "pending",
+            })
+            if providers[0].get("code") == "demo":
+                Move.browse(move_id).write({"state": "paid"})
+                return redirect(f"/my/invoices/{move_id}")
+            return redirect(f"/payment/status/{ref}")
+        providers = Provider.search_read([("state", "in", ["enabled", "test"])], ["id", "code"])
+        opts = "".join(f'<option value="{p.get("code", "")}">{p.get("code", "demo").title()}</option>' for p in providers)
+        content = f"""
+        <h1>Pay Invoice</h1>
+        <p><a href="/my/invoices/{move_id}">&larr; Back to invoice</a></p>
+        <form method="post" style="max-width:400px;margin-top:1rem">
+          <p><label>Payment method<br/><select name="provider" style="width:100%;padding:0.5rem">{opts}</select></label></p>
+          <button type="submit" class="btn" style="margin-top:1rem;padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Pay Now</button>
+        </form>
+        """
+        return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
 
 
 @route("/my/orders/<int:order_id>", auth="portal", methods=["GET"])

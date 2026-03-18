@@ -208,6 +208,37 @@ def _ensure_pgvector_extension(cursor: Any) -> None:
         _logger.warning("pgvector extension not available: %s", e)
 
 
+def _create_performance_indexes(cursor: Any) -> None:
+    """Phase 204: Create indexes on high-traffic columns."""
+    indexes = [
+        ("res_partner", "res_partner_email_idx", ["email"]),
+        ("sale_order", "sale_order_partner_state_idx", ["partner_id", "state"]),
+        ("account_move", "account_move_partner_state_type_idx", ["partner_id", "state", "move_type"]),
+        ("account_move", "account_move_type_state_idx", ["move_type", "state"]),
+        ("stock_quant", "stock_quant_product_location_idx", ["product_id", "location_id"]),
+        ("crm_lead", "crm_lead_stage_idx", ["stage_id"]),
+        ("mail_message", "mail_message_res_idx", ["res_model", "res_id"]),
+        ("ir_attachment", "ir_attachment_res_idx", ["res_model", "res_id"]),
+    ]
+    for table, idx_name, columns in indexes:
+        if not table_exists(cursor, table):
+            continue
+        if not all(column_exists(cursor, table, c) for c in columns):
+            continue
+        try:
+            cursor.execute(
+                "SELECT 1 FROM pg_indexes WHERE indexname = %s",
+                (idx_name,),
+            )
+            if cursor.fetchone():
+                continue
+            col_list = ", ".join(f'"{c}"' for c in columns)
+            cursor.execute(f'CREATE INDEX IF NOT EXISTS "{idx_name}" ON "{table}" ({col_list})')
+            _logger.info("Created index %s on %s", idx_name, table)
+        except Exception as e:
+            _logger.warning("Could not create index %s: %s", idx_name, e)
+
+
 def init_schema(cursor: Any, registry: Any) -> None:
     """Create tables for all registered models; add missing columns; create Many2many tables."""
     _ensure_pgvector_extension(cursor)
@@ -231,3 +262,4 @@ def init_schema(cursor: Any, registry: Any) -> None:
     _apply_many2one_fk_constraints(cursor, registry)
     for model_name, model_class in registry._models.items():
         _apply_sql_constraints(cursor, model_class)
+    _create_performance_indexes(cursor)

@@ -5,3 +5,5 @@ access_ai_prompt_template_user,ai.prompt.template user,model_ai_prompt_template,
 access_ai_document_chunk_user,ai.document.chunk user,model_ai_document_chunk,,1,1,1,1
 access_ai_rag_reindex_admin,ai.rag.reindex admin,model_ai_rag_reindex,,1,0,0,0
 access_ai_conversation_user,ai.conversation user,model_ai_conversation,,1,1,1,1
+access_ai_agent_task_user,ai.agent.task user,model_ai_agent_task,,1,1,1,1
+access_ai_forecast_user,ai.forecast user,model_ai_forecast,,1,1,1,1

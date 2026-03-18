@@ -1,5 +1,298 @@
 # Changelog
 
+## 1.80.0 (Phase 217: HR Expansion - Attendance, Recruitment & Contracts)
+
+### Phase 217: HR Expansion
+- addons/hr_attendance: hr.attendance (employee_id, check_in, check_out, worked_hours computed); /hr/attendance/kiosk
+- addons/hr_recruitment: hr.applicant, hr.recruitment.stage; hr.job extended (department_id, no_of_recruitment, state); /jobs/<id>/apply
+- addons/hr_contract: hr.contract (employee_id, name, wage, date_start, date_end, state)
+- main.js: attendance, applicants, contracts routes; DEFAULT_SERVER_WIDE_MODULES
+
+## 1.79.0 (Phase 216: E-Commerce Module website_sale)
+
+### Phase 216: E-Commerce Module website_sale
+- addons/website_sale: new module (depends: website, sale, stock, payment)
+- suggest_products tool in ai_assistant (collaborative filtering from sale.order.line)
+- /shop overridden with "Recommended for you" section; /shop/ai-recommendations JSON API
+- website_sale in DEFAULT_SERVER_WIDE_MODULES
+
+## 1.78.0 (Phase 215: AI Analytics Dashboard & Predictive Forecasting)
+
+### Phase 215: AI Analytics Dashboard & Predictive Forecasting
+- addons/ai_assistant/tools/analytics.py: analyze_kpi, forecast_metric tools
+- addons/ai_assistant/models/ai_forecast.py: ai.forecast model (model, measure, periods_ahead, forecast_values, last_value)
+- Dashboard: AI Insights calls analyze_data, analyze_kpi (anomaly alerts), forecast_metric (forecast display)
+- Anomaly alerts: highlight metrics that deviate from trend
+
+## 1.77.0 (Phase 214: AI Autonomous Agents & Multi-Step Task Execution)
+
+### Phase 214: AI Autonomous Agents & Multi-Step Task Execution
+- addons/ai_assistant/agent.py: ReAct loop (plan -> execute tool -> observe -> decide next step)
+- addons/ai_assistant/models/ai_agent_task.py: ai.agent.task (user_id, goal, steps, status, result)
+- addons/ai_assistant/tools/registry.py: create_record, update_record, generate_report, schedule_action tools
+- addons/ai_assistant/controllers/ai_controller.py: POST /ai/agent/run, GET /ai/agent/status
+- addons/web/static/src/chat_panel.js: Agent mode checkbox; /ai/agent/run + poll; collapsible steps display
+- addons/web/views/webclient_templates.xml: chat-agent-row, chat-agent-mode checkbox
+
+## 1.76.0 (Phase 213: Transient Models & Confirmation Dialogs)
+
+### Phase 213: Transient Models (Wizards) & Confirmation Dialogs
+- core/orm/models_transient.py: _transient_ttl_hours; TTL-based vacuum when create_date column exists
+- TransientModel: count-based and TTL-based auto-vacuum
+- base.wizard.confirm, account.reconcile.wizard already use TransientModel
+- Wizard form opens as full form (reconcile wizard); ConfirmDialog pattern in wizard_confirm
+
+## 1.75.0 (Phase 212: Binary Fields & File Upload)
+
+### Phase 212: Binary Fields & File Upload
+- ir.attachment: mimetype, file_size, checksum; computed on create from datas
+- POST /web/binary/upload: Odoo-style upload (ufile or file; optional res_model/res_id)
+- GET /web/content/<model>/<id>/<field>/<filename>: download any binary field
+- _attachment_download_view: use mimetype from record; remove duplicate code
+- Binary and image widgets already in form (file input, base64 to hidden)
+
+## 1.74.0 (Phase 211: Search View, Saved Filters & Action Domain)
+
+### Phase 211: Search View, Saved Filters & Action Domain
+- parseFilterDomain(s, uid): uid substitution for filter domains like [('user_id','=',uid)]
+- loadRecords: get session uid first, pass to parseFilterDomain when applying search filters
+- Search view (filters, group_bys) already parsed from XML; action domain/context already in load_views
+- Saved filters (localStorage + ir.filters) and filter chips already in renderList
+
+## 1.73.0 (Phase 210: ORM Computed Fields & Model Inheritance)
+
+### Phase 210: ORM Computed Fields & Model Inheritance
+- core/orm/models.py: _compute_non_stored_values() for non-stored computed fields on read
+- read(): compute non-stored Computed fields when requested
+- core/orm/fields.py: Computed accepts compute as method name (str) or callable
+- core/orm/registry.py: deferred _inherit merge when base not yet registered; _pending_merges
+- _compute_stored_values: support compute as callable
+- tests/test_computed_fields.py, tests/test_model_inheritance.py
+
+## 1.72.0 (Phase 209: E2E Test Coverage & CI Enhancements)
+
+### Phase 209: E2E Test Coverage & CI Enhancements
+- tests/e2e/test_crm_lead_tour.py: create lead, verify in list
+- tests/e2e/test_orders_tour.py: login, navigate to Orders
+- pytest-cov in requirements-dev.txt
+- CI: Run unit tests with coverage (pytest --cov=core --cov=addons); upload coverage artifact
+- .github/workflows/ci.yml: coverage-report artifact when coverage.xml exists
+
+## 1.71.0 (Phase 208: REST API v1 & OpenAPI Spec)
+
+### Phase 208: REST API v1 & OpenAPI Spec
+- core/http/rest.py: /api/v1/<model> GET (list/read), POST (create), PUT (update), DELETE (unlink)
+- Query params: domain, fields, limit, offset, order
+- Auth: Bearer token (res.users.apikeys); same check_access and record rules
+- JSON envelope: { "data": [...], "total": N, "offset": 0 }
+- /api/v1/openapi.json: OpenAPI 3.0 spec; /api/v1/docs: Swagger UI
+- CSRF exempt for /api/v1/* (Bearer auth)
+- tests/test_rest_api_phase208.py
+
+## 1.70.0 (Phase 207: Mass Mailing & Email Marketing)
+
+### Phase 207: Mass Mailing & Email Marketing
+- addons/mailing: mailing.list, mailing.list.partner (is_subscribed), mailing.mailing, mailing.tracking
+- mailing.mailing: name, subject, body_html (Jinja2), mailing_list_id, state (draft/sending/sent), sent_count, opened_count, clicked_count
+- action_send: queues mail.mail per subscriber with tracking pixel and link rewriting
+- /mail/track/open/<token>: 1x1 pixel for opens; /mail/track/click/<token>?url=...: track and redirect
+- /mail/unsubscribe/<token>: set is_subscribed=False on mailing.list.partner
+- Marketing > Mailing Lists, Marketing > Mailings (list/form with stats)
+- addons/web/static/src/main.js: marketing/mailing_lists, marketing/mailings routes
+- tests/test_mailing_phase207.py
+
+## 1.69.0 (Phase 206: Multi-Step Approval Chains)
+
+### Phase 206: Multi-Step Approval Chains
+- approval.rule: parent_rule_id (Many2one self) for chaining; sequence for ordering
+- approval.request: step, next_rule_id, delegate_to_user_id; action_approve creates next step when chained
+- action_reject, action_delegate(user_id); form view with Approve/Reject/Delegate buttons
+- addons/base/models/approval_check.py: check_approval_rules on write/create when amount crosses min_amount
+- core/orm/models.py: wire approval check after write and create
+- Settings > Approval Rules (parent_rule_id in form); Settings > Approval Requests (list/form)
+- addons/web/static/src/main.js: settings/approval_requests route
+- tests/test_approval_phase206.py
+
+## 1.68.0 (Phase 205: Audit Trail)
+
+### Phase 205: Audit Trail & Activity Log
+- audit.log model: user_id, model, res_id, operation (create/write/unlink), old_values, new_values (JSON), timestamp
+- core/orm/models.py: audit hooks in create, write, unlink when model has _audit = True
+- _audit enabled on: sale.order, purchase.order, account.move, crm.lead, hr.employee, res.users
+- addons/base/models/audit_log.py, log_audit()
+- Settings > Technical > Audit Log (list/form)
+- tests/test_audit_phase205.py
+
+## 1.67.0 (Phase 202: Inventory & Sales Reports)
+
+### Phase 202: Inventory & Sales Reports
+- product.product.get_stock_valuation_report: product, qty_available, standard_price, total_value; grouped by category
+- sale.order.get_sales_revenue_report: period (day/week/month) or product grouping, date range
+- addons/stock/models/stock_report.py, addons/sale/models/sale_report.py
+- addons/web/static/src/main.js: renderStockValuationReport, renderSalesRevenueReport; #reports/stock-valuation, #reports/sales-revenue
+- Menu: Inventory > Reporting > Stock Valuation Report; Accounting > Reports > Sales Revenue
+- tests/test_reports_phase202.py
+
+## 1.66.0 (Phase 204: Database Indexing)
+
+### Phase 204: Database Indexing & Query Performance
+- core/db/schema.py: _create_performance_indexes on res_partner(email), sale_order(partner_id,state), account_move(partner_id,state,move_type), account_move(move_type,state), stock_quant(product_id,location_id), crm_lead(stage_id), mail_message(res_model,res_id), ir_attachment(res_model,res_id)
+- tests/test_indexes_phase204.py
+
+## 1.65.0 (Phase 203: Security Hardening)
+
+### Phase 203: Security Hardening
+- CSRF protection: per-session token, validate on state-changing POST; exempt login, signup, get_session_info, payment, Bearer APIs
+- core/http/security.py: validate_csrf, check_rate_limit, security headers
+- core/http/session.py: csrf_token in session, ensure_session_csrf for backward compat
+- Rate limiting: sliding window per IP+path; login 5/min, signup 3/min, default 120/min
+- Security headers: X-Frame-Options DENY, Referrer-Policy, Content-Security-Policy-Report-Only
+- Frontend: session.getAuthHeaders(), rpc and fetch calls send X-CSRF-Token
+- tests/test_security_phase203.py
+
+## 1.64.0 (Phase 201: Dashboard & Reporting Enhancements)
+
+### Phase 201: Dashboard & Reporting Enhancements
+- Default dashboard widgets: Sales This Month, Open Invoices, Low Stock, Overdue Tasks (in addition to Open Leads, Expected Revenue, My Activities)
+- core/db/init_data.py: _load_dashboard_widgets adds missing widgets on upgrade (not only when table empty)
+- addons/web/static/src/main.js: KPI drill-down for all models (model-to-route: sale.order→orders, account.move→invoices, product.product→products, project.task→tasks)
+- ir.dashboard.widget.get_data returns domain with each widget for filtered list drill-down
+- tests/test_dashboard_phase201.py
+
+## 1.63.0 (Phase 200: Multi-Currency Improvements)
+
+### Phase 200: Multi-Currency Improvements
+- account.move: amount_residual (computed, in invoice currency; 0 when paid)
+- account.bank.statement: currency_id for statement currency
+- account_reconcile._auto_reconcile: convert statement amount to company currency when statement has different currency
+- account move form: currency_id, amount_residual; bank statement form: currency_id
+- tests/test_multi_currency_phase200.py
+
+## 1.62.0 (Phase 199: Customer Portal - Invoice Payment)
+
+### Phase 199: Customer Portal (Orders & Invoices - Pay Online)
+- payment.transaction: account_move_id for invoice payments
+- Portal invoice detail: "Pay Online" button when not paid
+- /my/invoices/<id>/pay: GET form (provider selection), POST creates transaction, redirects
+- payment/status: when done + account_move_id, marks invoice paid, redirects to /my/invoices/<id>
+- tests/test_portal_invoice_pay_phase199.py
+
+## 1.61.0 (Phase 198: Lot/Serial Number Tracking)
+
+### Phase 198: Lot/Serial Number Tracking
+- stock.lot: expiry_date field
+- stock.move: lot_id Many2one
+- stock_move_quant._update_quants: handle lot_id on receipt (create quant with lot) and delivery (consume from lot or FIFO)
+- stock.picking form: lot_id on move_ids list
+- stock.lot: list/form views, Inventory > Configuration > Lots menu
+- addons/web/static/src/main.js: lots route
+- tests/test_lot_serial_phase198.py
+
+## 1.60.0 (Phase 197: Purchase → Receipt → Vendor Bill)
+
+### Phase 197: Purchase Order → Receipt → Vendor Bill Workflow
+- purchase.order: bill_status (no/partial/full), _update_bill_status(), _get_received_qty_by_product()
+- action_create_bill: uses received qty when available (from done moves in pickings)
+- stock.picking: purchase_id, action_create_bill() for vendor bill from received qty
+- addons/purchase/models/stock_picking.py: extend picking with purchase_id
+- addons/account/models/stock_picking.py: action_confirm updates bill_status on validate; action_create_bill
+- addons/purchase/models/purchase_order.py: bill_status, _create_bill_from_picking, _create_bill_with_quantities
+- tests/test_purchase_receipt_bill_phase197.py
+
+## 1.59.0 (Phase 196: Sale → Delivery → Invoice)
+
+### Phase 196: Sale Order → Delivery → Invoice Workflow
+- sale.order: delivery_status (no/partial/full), _update_delivery_status(), _get_delivered_qty_by_product()
+- action_create_invoice: uses delivered qty when available (from done moves in pickings)
+- stock.picking: sale_id, action_create_invoice() for invoice from delivered qty
+- account/models/stock_picking.py: extend picking to update delivery_status on validate, add Create Invoice button
+- stock/sale_order: set sale_id when creating picking; fix product_id unpack in move create
+- stock_valuation_layer: fix default lambda for create_date
+- tests/test_sale_delivery_invoice_phase196.py
+
+## 1.58.0 (Phase 195: Reconciliation Wizard)
+
+### Phase 195: Account Move Reconciliation Wizard
+- addons/account/models/account_reconcile_wizard.py: account.reconcile.wizard (TransientModel), account.reconcile.wizard.line
+- account.move.line: reconciled_id (Char) for grouping reconciled lines
+- account.bank.statement: action_reconcile() opens wizard with unreconciled lines; Reconcile button in header
+- account_reconcile: _auto_reconcile excludes lines with reconciled_id
+- addons/web/static/src/main.js: button handler handles action return (navigate to wizard form)
+- tests/test_reconcile_wizard_phase195.py
+
+## 1.57.0 (Phase 194: Platform Fixes)
+
+### Phase 194: Platform Fixes
+- requirements.txt: Pin bcrypt>=4.0,<4.1 for passlib compatibility (avoids __about__ AttributeError)
+- core/http/auth.py: Suppress passlib logger to avoid bcrypt version warning
+- README.md: Add PGUSER=postgres instructions for PostgreSQL role mismatch
+- DeploymentChecklist.md: PGUSER note, WebSocket (gevent) optional section
+
+## 1.56.0 (Phases 186–193: Payroll, Pricelists, Variants, Orderpoints, Helpdesk, Payment Terms, Timesheets, Bank Statements)
+
+### Phase 186: HR Payroll
+- addons/hr_payroll/: new addon (hr.payslip, hr.salary.rule, hr.payslip.line)
+- hr.employee: wage field (inherited)
+- compute_sheet(env=): applies salary rules, creates payslip lines, sets state done
+- Payroll > Payslips, Payroll > Salary Rules menus
+- core/db/init_data.py: ir.sequence hr.payslip; hr_payroll in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_payroll_phase186.py
+
+### Phase 190: Helpdesk Module
+- addons/helpdesk/: new addon (helpdesk.ticket, helpdesk.stage)
+- helpdesk.ticket: name, partner_id, user_id, stage_id, priority, deadline, description, message_ids (MailThreadMixin)
+- helpdesk.stage: name, sequence, fold
+- Kanban + list + form; Helpdesk > Tickets, Helpdesk > Configuration > Stages
+- addons/web/static/src/main.js: tickets route, kanban support for helpdesk.ticket
+- core/tools/config.py: helpdesk in DEFAULT_SERVER_WIDE_MODULES
+- core/db/init_data.py: default helpdesk.stage (New, In Progress, Solved)
+- tests/test_helpdesk_phase190.py
+
+### Phase 189: Inventory Reordering Rules
+- addons/stock/models/stock_orderpoint.py: stock.warehouse.orderpoint (product_id, location_id, product_min_qty, product_max_qty, qty_multiple, partner_id)
+- _procure_orderpoint_confirm(): creates purchase.order when partner_id set, else stock.move from supplier location
+- Inventory > Configuration > Reordering Rules menu
+- tests/test_orderpoint_phase189.py
+
+### Phase 188: Full Product Variants
+- addons/sale/models/product_template.py: _create_variant_ids() generates product.product from attribute_line_ids combinations
+- create/write triggers _create_variant_ids; no-attribute template gets one variant; attribute lines yield Cartesian product
+- tests/test_variants_phase188.py
+
+### Phase 193: Bank Statements & Reconciliation
+- addons/account/models/account_bank_statement.py: account.bank.statement (journal_id, date, balance_start, balance_end_real, line_ids), account.bank.statement.line (name, date, amount, partner_id, move_id)
+- addons/account/models/account_reconcile.py: _auto_reconcile(statement_line) matches open account.move.line by amount + partner (asset_cash)
+- account.journal: added type "bank"; init_data: BANK journal, account.bank.statement sequence
+- core/http/routes.py: POST /web/import/bank_statement (CSV parser: date, amount, name, partner)
+- Invoicing > Bank Statements; form with Reconcile button per line
+- addons/web/static/src/main.js: bank_statements route
+- tests/test_bank_statement_phase193.py
+
+### Phase 192: Timesheets
+- addons/hr_timesheet/: new addon (depends: account, hr, project)
+- analytic.line: employee_id, task_id, project_id (unit_amount, date already present)
+- project.task: timesheet_ids (One2many to analytic.line)
+- Timesheets > My Timesheets, Timesheets > All Timesheets; task form shows timesheet_ids
+- addons/web/static/src/main.js: timesheets route; hr_timesheet in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_timesheet_phase192.py
+
+### Phase 191: Payment Terms
+- addons/account/models/account_payment_term.py: account.payment.term (name, line_ids), account.payment.term.line (value, value_amount, days, day_of_month, sequence)
+- compute(value, date_ref): returns list of (amount, due_date); supports balance, percent, fixed
+- account.move: payment_term_id, invoice_date_due (computed from term and line totals)
+- sale.order (account): payment_term_id; action_create_invoice passes term to invoice
+- purchase.order: payment_term_id
+- Invoicing > Configuration > Payment Terms; payment_term_id on invoice, sale order, purchase order forms
+- tests/test_payment_terms_phase191.py
+
+### Phase 187: Product Pricelists
+- addons/sale/models/product_pricelist.py: product.pricelist (name, currency_id, item_ids)
+- addons/sale/models/product_pricelist_item.py: product.pricelist.item (pricelist_id, product_id, min_qty, price_surcharge, percent_price, date_start, date_end)
+- product.pricelist.get_product_price(product, qty, partner): returns price from first matching item or list_price
+- sale.order: pricelist_id (Many2one); _apply_pricelist() in action_confirm updates line price_unit
+- addons/sale/views/sale_views.xml: Pricelists menu, pricelist form/list, pricelist_id on sale order form
+- tests/test_pricelist_phase187.py
+
 ## 1.55.0 (Phases 178–185: Mail Templates, Import, Kanban DnD, Tax, Reports, PDF, Attachments, Bulk)
 
 ### Phase 185: Bulk Operations

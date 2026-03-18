@@ -13,6 +13,7 @@ class AccountJournal(Model):
         selection=[
             ("sale", "Sales"),
             ("purchase", "Purchase"),
+            ("bank", "Bank"),
             ("general", "General"),
         ],
         string="Type",

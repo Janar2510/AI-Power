@@ -79,6 +79,19 @@ def load_default_data(env) -> None:
         _logger.warning("Could not load default mail.activity.type: %s", e)
 
     try:
+        HelpdeskStage = env.get("helpdesk.stage")
+        if HelpdeskStage and not HelpdeskStage.search([]):
+            for name, seq, fold in [
+                ("New", 1, False),
+                ("In Progress", 2, False),
+                ("Solved", 3, True),
+            ]:
+                HelpdeskStage.create({"name": name, "sequence": seq, "fold": fold})
+            _logger.info("Created default helpdesk.stage records")
+    except Exception as e:
+        _logger.warning("Could not load default helpdesk.stage: %s", e)
+
+    try:
         Tag = env.get("crm.tag")
         if Tag and not Tag.search([]):
             for name in ["Hot", "Cold", "Follow-up", "Qualified", "Demo"]:
@@ -98,6 +111,8 @@ def load_default_data(env) -> None:
                 ("purchase.order", "Purchase Order Reference"),
                 ("mrp.production", "Manufacturing Order Reference"),
                 ("hr.expense.sheet", "Expense Report Reference"),
+                ("hr.payslip", "Payslip Reference"),
+                ("account.bank.statement", "Bank Statement Reference"),
             ]:
                 existing = IrSequence.search([("code", "=", code)])
                 if not existing:
@@ -565,26 +580,34 @@ def _load_ir_translations(env) -> None:
 
 
 def _load_dashboard_widgets(env) -> None:
-    """Load default dashboard widgets (Phase 93)."""
+    """Load default dashboard widgets (Phase 93, 201)."""
     try:
+        from datetime import date
         Widget = env.get("ir.dashboard.widget")
         CrmStage = env.get("crm.stage")
         if not Widget:
-            return
-        if Widget.search([]):
             return
         won_ids = []
         if CrmStage:
             won_stages = CrmStage.search([("is_won", "=", True)])
             won_ids = won_stages.ids if won_stages else []
         domain_open = "[('stage_id','not in',%s)]" % won_ids if won_ids else "[]"
+        today = date.today().isoformat()
+        month_start = date.today().replace(day=1).isoformat()
         widgets = [
             {"name": "Open Leads", "model": "crm.lead", "domain": domain_open, "aggregate": "count", "sequence": 1},
             {"name": "Expected Revenue", "model": "crm.lead", "domain": "[]", "measure_field": "expected_revenue", "aggregate": "sum", "sequence": 2},
             {"name": "My Activities", "model": "mail.activity", "domain": "[('user_id','=',uid)]", "aggregate": "count", "sequence": 3},
+            {"name": "Sales This Month", "model": "sale.order", "domain": "[('state','=','sale'),('date_order','>=','%s')]" % month_start, "aggregate": "count", "sequence": 4},
+            {"name": "Open Invoices", "model": "account.move", "domain": "[('move_type','=','out_invoice'),('state','=','posted')]", "measure_field": "amount_residual", "aggregate": "sum", "sequence": 5},
+            {"name": "Low Stock", "model": "product.product", "domain": "[('qty_available','<',5)]", "aggregate": "count", "sequence": 6},
+            {"name": "Overdue Tasks", "model": "project.task", "domain": "[('date_deadline','<','%s')]" % today, "aggregate": "count", "sequence": 7},
         ]
+        existing_names = set(w["name"] for w in Widget.search_read([], ["name"]))
         for w in widgets:
-            Widget.create(w)
+            if w["name"] not in existing_names:
+                Widget.create(w)
+                existing_names.add(w["name"])
         _logger.info("Created default dashboard widgets")
     except Exception as e:
         _logger.warning("Could not load dashboard widgets: %s", e)
@@ -612,6 +635,8 @@ def _load_account_data(env) -> None:
             Journal.create({"name": "Purchase", "code": "PURCH", "type": "purchase"})
         if not Journal.search([("code", "=", "MISC")]):
             Journal.create({"name": "Miscellaneous", "code": "MISC", "type": "general"})
+        if not Journal.search([("code", "=", "BANK")]):
+            Journal.create({"name": "Bank", "code": "BANK", "type": "bank"})
         _logger.info("Created default account accounts and journals")
     except Exception as e:
         _logger.warning("Could not load account data: %s", e)

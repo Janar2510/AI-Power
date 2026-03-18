@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="helpdesk_ticket_kanban">
+      <field name="name">helpdesk.ticket kanban</field>
+      <field name="model">helpdesk.ticket</field>
+      <field name="arch" type="xml">
+        <kanban default_group_by="stage_id">
+          <field name="name"/>
+          <field name="stage_id"/>
+          <field name="partner_id"/>
+          <field name="user_id"/>
+          <field name="priority"/>
+          <field name="deadline"/>
+        </kanban>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="helpdesk_ticket_list">
+      <field name="name">helpdesk.ticket list</field>
+      <field name="model">helpdesk.ticket</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="user_id" comodel="res.users"/>
+          <field name="stage_id" comodel="helpdesk.stage"/>
+          <field name="priority"/>
+          <field name="deadline"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="helpdesk_ticket_form">
+      <field name="name">helpdesk.ticket form</field>
+      <field name="model">helpdesk.ticket</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="user_id" comodel="res.users"/>
+            <field name="stage_id" comodel="helpdesk.stage"/>
+            <field name="priority"/>
+            <field name="deadline"/>
+            <field name="description"/>
+            <field name="message_ids" nolabel="1"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_helpdesk_ticket">
+      <field name="name">Tickets</field>
+      <field name="res_model">helpdesk.ticket</field>
+      <field name="view_mode">kanban,list,form</field>
+    </record>
+    <record model="ir.ui.view" id="helpdesk_stage_list">
+      <field name="name">helpdesk.stage list</field>
+      <field name="model">helpdesk.stage</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="sequence"/>
+          <field name="fold"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_helpdesk_stage">
+      <field name="name">Stages</field>
+      <field name="res_model">helpdesk.stage</field>
+      <field name="view_mode">list</field>
+    </record>
+    <menuitem name="Helpdesk" id="menu_helpdesk_root" sequence="14"/>
+    <menuitem name="Tickets" id="menu_helpdesk_ticket" action="helpdesk.action_helpdesk_ticket" parent="helpdesk.menu_helpdesk_root" sequence="10"/>
+    <menuitem name="Configuration" id="menu_helpdesk_config" parent="helpdesk.menu_helpdesk_root" sequence="20"/>
+    <menuitem name="Stages" id="menu_helpdesk_stage" action="helpdesk.action_helpdesk_stage" parent="helpdesk.menu_helpdesk_config" sequence="10"/>
+  </data>
+</odoo>

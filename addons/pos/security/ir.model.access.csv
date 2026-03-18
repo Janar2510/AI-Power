@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_pos_config_user,pos.config user,model_pos_config,,1,1,1,1
+access_pos_session_user,pos.session user,model_pos_session,,1,1,1,1
+access_pos_order_user,pos.order user,model_pos_order,,1,1,1,1
+access_pos_order_line_user,pos.order.line user,model_pos_order_line,,1,1,1,1

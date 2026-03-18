@@ -21,7 +21,19 @@ class IrActionsServer(Model):
                 if template_id and records and records.ids:
                     self._run_email(action, records, template_id)
                     return
-        return super().run(records=records)
+        try:
+            return super().run(records=records)
+        except TypeError:
+            # Recordset as self: super() fails; run base logic directly (Phase 226)
+            for action in self:
+                data = action.read(["state", "code"]) or [{}]
+                vals = data[0] if data else {}
+                state = vals.get("state")
+                code = vals.get("code")
+                if state == "code" and code:
+                    self._run_code(action, records, code)
+                elif state == "object_write" and records:
+                    self._run_object_write(action, records)
 
     def _run_email(self, action, records, template_id: int):
         """Send email using mail.template for each record."""

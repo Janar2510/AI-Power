@@ -303,6 +303,78 @@ _TOOL_SCHEMAS = {
             },
         },
     },
+    "forecast_demand": {
+        "type": "function",
+        "function": {
+            "name": "forecast_demand",
+            "description": "Forecast product demand from sales history. Phase 228.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {"type": "integer", "description": "Optional product ID to forecast"},
+                    "periods_ahead": {"type": "integer", "default": 4},
+                    "use_llm": {"type": "boolean", "default": True},
+                },
+            },
+        },
+    },
+    "forecast_cashflow": {
+        "type": "function",
+        "function": {
+            "name": "forecast_cashflow",
+            "description": "Forecast cash position from receivables/payables. Phase 228.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "periods_ahead": {"type": "integer", "default": 4},
+                    "use_llm": {"type": "boolean", "default": True},
+                },
+            },
+        },
+    },
+    "suggest_reorder": {
+        "type": "function",
+        "function": {
+            "name": "suggest_reorder",
+            "description": "Suggest reorder quantities by comparing stock vs forecasted demand. Phase 228.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {"type": "integer", "description": "Optional product ID"},
+                    "safety_stock_days": {"type": "integer", "default": 7},
+                },
+            },
+        },
+    },
+    "detect_anomalies": {
+        "type": "function",
+        "function": {
+            "name": "detect_anomalies",
+            "description": "Detect statistical anomalies in transactions, inventory, expenses. Phase 231.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Model to scan (e.g. account.move)", "default": "account.move"},
+                    "lookback_days": {"type": "integer", "description": "Days to look back", "default": 30},
+                },
+            },
+        },
+    },
+    "explain_anomaly": {
+        "type": "function",
+        "function": {
+            "name": "explain_anomaly",
+            "description": "Generate human-readable explanation for an anomaly. Phase 231.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "anomaly_id": {"type": "integer", "description": "ai.anomaly record ID"},
+                    "use_llm": {"type": "boolean", "default": True},
+                },
+                "required": ["anomaly_id"],
+            },
+        },
+    },
 }
 
 

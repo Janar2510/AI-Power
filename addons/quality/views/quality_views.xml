@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="quality_point_list">
+      <field name="name">quality.point list</field>
+      <field name="model">quality.point</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="product_id" comodel="product.product"/>
+          <field name="check_type"/>
+          <field name="active"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="quality_check_list">
+      <field name="name">quality.check list</field>
+      <field name="model">quality.check</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="point_id" comodel="quality.point"/>
+          <field name="state"/>
+          <field name="measure_value"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="quality_alert_list">
+      <field name="name">quality.alert list</field>
+      <field name="model">quality.alert</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="severity"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_quality_point">
+      <field name="name">Control Points</field>
+      <field name="res_model">quality.point</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_quality_check">
+      <field name="name">Quality Checks</field>
+      <field name="res_model">quality.check</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_quality_alert">
+      <field name="name">Quality Alerts</field>
+      <field name="res_model">quality.alert</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Quality" id="menu_quality_root" sequence="65"/>
+    <menuitem name="Control Points" id="menu_quality_point" action="action_quality_point" parent="menu_quality_root" sequence="10"/>
+    <menuitem name="Checks" id="menu_quality_check" action="action_quality_check" parent="menu_quality_root" sequence="20"/>
+    <menuitem name="Alerts" id="menu_quality_alert" action="action_quality_alert" parent="menu_quality_root" sequence="30"/>
+  </data>
+</odoo>

@@ -5,4 +5,5 @@ from . import ai_document_chunk
 from . import ai_conversation
 from . import ai_agent_task
 from . import ai_forecast
+from . import ai_anomaly
 from . import rag_reindex

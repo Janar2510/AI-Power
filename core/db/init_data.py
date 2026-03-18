@@ -114,6 +114,8 @@ def load_default_data(env) -> None:
                 ("hr.expense.sheet", "Expense Report Reference"),
                 ("hr.payslip", "Payslip Reference"),
                 ("account.bank.statement", "Bank Statement Reference"),
+                ("pos.session", "POS Session Reference"),
+                ("pos.order", "POS Order Reference"),
             ]:
                 existing = IrSequence.search([("code", "=", code)])
                 if not existing:
@@ -190,6 +192,17 @@ def load_default_data(env) -> None:
                 "active": True,
             })
             _logger.info("Created cron: Subscription recurring invoices")
+        if IrCron and env.get("base.automation") and not IrCron.search([("model", "=", "base.automation")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Automated Actions: Run on_time rules",
+                "model": "base.automation",
+                "method": "run_on_time",
+                "interval_minutes": 60,
+                "next_run": (datetime.utcnow() + timedelta(minutes=5)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: base.automation on_time")
     except Exception as e:
         _logger.warning("Could not create transient vacuum cron: %s", e)
 

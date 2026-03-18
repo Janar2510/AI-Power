@@ -71,6 +71,14 @@
 - [ ] _procure_orderpoint_confirm() creates purchase.order (with partner) or stock.move (replenishment)
 - [ ] tests/test_orderpoint_phase189.py passes
 
+## Phase 229-233 (Barcode, Quality, Anomaly, Maintenance, Event)
+
+- [ ] Phase 229: stock_barcode addon, /barcode/scan, /barcode/parse; product.product barcode
+- [ ] Phase 230: quality addon (quality.point, quality.check, quality.alert)
+- [ ] Phase 231: ai.anomaly model; detect_anomalies, explain_anomaly tools; llm.py schemas
+- [ ] Phase 232: maintenance addon (maintenance.equipment, maintenance.request); tests/test_maintenance_phase232.py
+- [ ] Phase 233: event addon (event.event, event.registration); tests/test_event_phase233.py
+
 ## Phase 218-225 (ERP Phases 218-225)
 
 - [ ] Phase 218: LLM tool schemas synced (all TOOL_REGISTRY tools in _TOOL_SCHEMAS)
@@ -414,6 +422,20 @@
 - [ ] sale.order.action_confirm creates stock.picking (delivery order) with stock.move lines
 - [ ] Default locations (Stock, Output, Vendors, Customers), warehouse, picking types seeded on db init
 - [ ] Inventory > Operations > Transfers, Configuration > Warehouses menus
+
+## Phase 227 (Point of Sale)
+
+- [ ] pos.config with journal_id, pricelist_id, warehouse_id
+- [ ] pos.session: open (starting cash), opened, closed
+- [ ] pos.order: lines, action_pay, action_done (stock moves + accounting)
+- [ ] Point of Sale menu: Configuration, Sessions, Orders
+- [ ] tests/test_pos_phase227.py passes
+
+## Phase 226 (Workflow Automation Engine)
+
+- [ ] base.automation on_create, on_write, on_unlink, on_time triggers work
+- [ ] action_type: update, webhook, server_action execute correctly
+- [ ] tests/test_automation_phase226.py passes (use _test_automation_226 and _test_automation_226_ontime DBs)
 
 ## Phase 152 (Server Action Fix + Technical Settings)
 

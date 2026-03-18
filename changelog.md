@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.88.0 (Phases 229–233: Barcode, Quality, Anomaly, Maintenance, Event)
+
+### Phase 229: Barcode Scanning
+- addons/stock_barcode: product.product barcode field, /barcode/scan, /barcode/parse
+- core/http/application.py: stock_barcode controller
+- core/tools/config.py: stock_barcode in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_barcode_phase229.py
+
+### Phase 230: Quality Control
+- addons/quality: quality.point, quality.check, quality.alert
+- views/quality_views.xml, menus
+
+### Phase 231: AI Anomaly Detection
+- addons/ai_assistant/models/ai_anomaly.py: ai.anomaly model
+- addons/ai_assistant/tools/anomaly_detection.py: detect_anomalies, explain_anomaly
+- addons/ai_assistant/llm.py: tool schemas for Phase 231
+- tests/test_anomaly_phase231.py
+
+### Phase 232: Maintenance Module
+- addons/maintenance: maintenance.equipment, maintenance.equipment.category, maintenance.team, maintenance.request
+- core/tools/config.py: maintenance in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_maintenance_phase232.py
+
+### Phase 233: Event Management
+- addons/event: event.event, event.registration
+- core/tools/config.py: event in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_event_phase233.py
+
+## 1.87.0 (Phase 228: AI Demand Forecasting)
+
+### Phase 228: AI Demand Forecasting
+- addons/ai_assistant/tools/forecasting.py: forecast_demand, forecast_cashflow, suggest_reorder
+- forecast_demand: aggregate sale.order.line by product, LLM trend analysis
+- forecast_cashflow: receivables/payables, projected cash position
+- suggest_reorder: stock vs demand, safety stock, reorder suggestions
+- addons/ai_assistant/llm.py: tool schemas for Phase 228 tools
+- tests/test_forecasting_phase228.py
+
+## 1.86.0 (Phase 227: Point of Sale)
+
+### Phase 227: Point of Sale (POS)
+- addons/pos: pos.config, pos.session, pos.order, pos.order.line
+- Session lifecycle: opening, opened, closed; cash_register_balance_start/end
+- Order: lines, amount_total, action_pay, action_done (stock moves + journal entry)
+- core/db/init_data.py: pos.session, pos.order sequences
+- core/tools/config.py: pos in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_pos_phase227.py
+
+## 1.85.0 (Phase 226: Workflow Automation Engine Fixes)
+
+### Phase 226: Workflow Automation Engine Fixes
+- core/orm/automation.py: robust update_vals parsing (dict/str/bytes); use env.registry.get for Model/Recordset
+- addons/base/models/base_automation.py: iterate rules directly (avoid browse() proxy issue)
+- addons/mail/models/ir_actions_server.py: fallback when super() fails with Recordset as self
+- tests/test_automation_phase226.py: isolated DB for on_time test (_test_automation_226_ontime)
+
 ## 1.84.0 (Phase 225: E2E Test Hardening & Performance Monitoring)
 
 ### Phase 225: E2E Test Hardening & Performance Monitoring

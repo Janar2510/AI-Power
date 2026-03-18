@@ -65,6 +65,10 @@ def _load_routes():
         import addons.hr_recruitment.controllers  # noqa: F401 - registers /jobs
     except ImportError:
         pass
+    try:
+        import addons.stock_barcode.controllers  # noqa: F401 - registers /barcode/scan, /barcode/parse
+    except ImportError:
+        pass
 
 _logger = logging.getLogger("erp.http")
 

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="pos_config_list">
+      <field name="name">pos.config list</field>
+      <field name="model">pos.config</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="pricelist_id" comodel="product.pricelist"/>
+          <field name="journal_id" comodel="account.journal"/>
+          <field name="active"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="pos_config_form">
+      <field name="name">pos.config form</field>
+      <field name="model">pos.config</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="pricelist_id" comodel="product.pricelist"/>
+            <field name="journal_id" comodel="account.journal"/>
+            <field name="warehouse_id" comodel="stock.warehouse"/>
+            <field name="active"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="pos_session_list">
+      <field name="name">pos.session list</field>
+      <field name="model">pos.session</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="config_id" comodel="pos.config"/>
+          <field name="user_id" comodel="res.users"/>
+          <field name="state"/>
+          <field name="cash_register_balance_start"/>
+          <field name="cash_register_balance_end"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="pos_session_form">
+      <field name="name">pos.session form</field>
+      <field name="model">pos.session</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="config_id" comodel="pos.config"/>
+            <field name="user_id" comodel="res.users"/>
+            <field name="state"/>
+            <field name="cash_register_balance_start"/>
+            <field name="cash_register_balance_end"/>
+            <field name="order_ids"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="pos_order_list">
+      <field name="name">pos.order list</field>
+      <field name="model">pos.order</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="session_id" comodel="pos.session"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="state"/>
+          <field name="amount_total"/>
+          <field name="payment_amount"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="pos_order_form">
+      <field name="name">pos.order form</field>
+      <field name="model">pos.order</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="session_id" comodel="pos.session"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="state"/>
+            <field name="amount_total"/>
+            <field name="payment_amount"/>
+            <field name="lines"/>
+          </sheet>
+          <group>
+            <button name="action_pay" string="Pay" type="object" invisible="state != 'draft'"/>
+            <button name="action_done" string="Done" type="object" invisible="state != 'paid'"/>
+          </group>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_pos_config">
+      <field name="name">POS Configurations</field>
+      <field name="res_model">pos.config</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_pos_session">
+      <field name="name">POS Sessions</field>
+      <field name="res_model">pos.session</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_pos_order">
+      <field name="name">POS Orders</field>
+      <field name="res_model">pos.order</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Point of Sale" id="menu_pos_root" sequence="25"/>
+    <menuitem name="Configuration" id="menu_pos_config" action="action_pos_config" parent="menu_pos_root" sequence="10"/>
+    <menuitem name="Sessions" id="menu_pos_session" action="action_pos_session" parent="menu_pos_root" sequence="20"/>
+    <menuitem name="Orders" id="menu_pos_order" action="action_pos_order" parent="menu_pos_root" sequence="30"/>
+  </data>
+</odoo>

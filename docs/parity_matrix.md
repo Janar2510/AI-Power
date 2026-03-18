@@ -45,3 +45,10 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | TransientModel (wizards) | `odoo/models.py` TransientModel | `core/orm/models_transient.py` | done |
 | LLM tool parity | OpenAI function-calling schemas | `addons/ai_assistant/llm.py` _TOOL_SCHEMAS sync with TOOL_REGISTRY | done |
 | ORM sudo/context | `recordset.sudo()`, `with_context()`, `with_user()`, `_order` | `core/orm/environment.py`, `core/orm/models.py`, `core/orm/security.py` | done |
+| base.automation | `base.automation` (on_create, on_write, on_unlink, on_time) | `addons/base/models/base_automation.py`, `core/orm/automation.py` | done |
+| Point of Sale | `pos.config`, `pos.session`, `pos.order` | `addons/pos/` | done |
+| Barcode scanning | `stock_barcode`, product barcode | `addons/stock_barcode/` | done |
+| Quality control | `quality.point`, `quality.check`, `quality.alert` | `addons/quality/` | done |
+| AI anomaly detection | `ai.anomaly`, detect_anomalies, explain_anomaly | `addons/ai_assistant/` | done |
+| Maintenance | `maintenance.equipment`, `maintenance.request` | `addons/maintenance/` | done |
+| Event management | `event.event`, `event.registration` | `addons/event/` | done |

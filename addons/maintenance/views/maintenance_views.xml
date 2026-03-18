@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="maintenance_equipment_list">
+      <field name="name">maintenance.equipment list</field>
+      <field name="model">maintenance.equipment</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="serial_no"/>
+          <field name="category_id" comodel="maintenance.equipment.category"/>
+          <field name="assign_to_id" comodel="res.users"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="maintenance_request_list">
+      <field name="name">maintenance.request list</field>
+      <field name="model">maintenance.request</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="equipment_id" comodel="maintenance.equipment"/>
+          <field name="request_type"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_maintenance_equipment">
+      <field name="name">Equipment</field>
+      <field name="res_model">maintenance.equipment</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_maintenance_request">
+      <field name="name">Requests</field>
+      <field name="res_model">maintenance.request</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Maintenance" id="menu_maintenance_root" sequence="70"/>
+    <menuitem name="Equipment" id="menu_maintenance_equipment" action="action_maintenance_equipment" parent="menu_maintenance_root" sequence="10"/>
+    <menuitem name="Requests" id="menu_maintenance_request" action="action_maintenance_request" parent="menu_maintenance_root" sequence="20"/>
+  </data>
+</odoo>

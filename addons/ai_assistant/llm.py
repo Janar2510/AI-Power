@@ -98,6 +98,211 @@ _TOOL_SCHEMAS = {
             },
         },
     },
+    # Phase 218: unified tool schemas for chat (all registry tools)
+    "analyze_data": {
+        "type": "function",
+        "function": {
+            "name": "analyze_data",
+            "description": "Analyze data: read_group by measure and groupby, return NL summary",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Model name (crm.lead, sale.order)"},
+                    "measure": {"type": "string", "description": "Measure field", "default": "expected_revenue"},
+                    "groupby": {"type": "string", "description": "Group-by field", "default": "stage_id"},
+                    "use_llm": {"type": "boolean", "description": "Use LLM for NL summary", "default": True},
+                },
+                "required": ["model"],
+            },
+        },
+    },
+    "analyze_kpi": {
+        "type": "function",
+        "function": {
+            "name": "analyze_kpi",
+            "description": "Analyze KPI: read_group by measure, groupby, period. Returns data, summary, anomalies.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Model (crm.lead, sale.order, account.move, stock.move)"},
+                    "measure": {"type": "string", "default": "expected_revenue"},
+                    "groupby": {"type": "string", "default": "stage_id"},
+                    "period": {"type": "string", "description": "Time period for time-series"},
+                },
+                "required": ["model"],
+            },
+        },
+    },
+    "forecast_metric": {
+        "type": "function",
+        "function": {
+            "name": "forecast_metric",
+            "description": "Forecast metric using exponential smoothing on recent records",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Model (sale.order, crm.lead, account.move)"},
+                    "measure": {"type": "string", "default": "amount_total"},
+                    "periods_ahead": {"type": "integer", "description": "Periods to forecast", "default": 4},
+                },
+                "required": ["model"],
+            },
+        },
+    },
+    "nl_search": {
+        "type": "function",
+        "function": {
+            "name": "nl_search",
+            "description": "Search records by natural language query; returns domain and results",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "query": {"type": "string", "description": "Natural language search query"},
+                    "limit": {"type": "integer", "default": 10},
+                    "use_llm": {"type": "boolean", "default": True},
+                },
+                "required": ["model", "query"],
+            },
+        },
+    },
+    "extract_fields": {
+        "type": "function",
+        "function": {
+            "name": "extract_fields",
+            "description": "Extract structured fields from pasted text for a model (AI-assisted data entry)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string", "description": "Model (res.partner, crm.lead)"},
+                    "text": {"type": "string", "description": "Pasted text to extract from"},
+                    "use_llm": {"type": "boolean", "default": True},
+                },
+                "required": ["model", "text"],
+            },
+        },
+    },
+    "create_record": {
+        "type": "function",
+        "function": {
+            "name": "create_record",
+            "description": "Create a record in a model. Requires confirmation for state-changing ops.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "vals": {"type": "object", "description": "Field values dict"},
+                },
+                "required": ["model", "vals"],
+            },
+        },
+    },
+    "update_record": {
+        "type": "function",
+        "function": {
+            "name": "update_record",
+            "description": "Update fields on existing records",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model": {"type": "string"},
+                    "ids": {"type": "array", "items": {"type": "integer"}},
+                    "vals": {"type": "object"},
+                },
+                "required": ["model", "ids", "vals"],
+            },
+        },
+    },
+    "generate_report": {
+        "type": "function",
+        "function": {
+            "name": "generate_report",
+            "description": "Trigger report generation and return summary/URL",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "report_name": {"type": "string"},
+                    "ids": {"type": "array", "items": {"type": "integer"}},
+                },
+                "required": ["report_name"],
+            },
+        },
+    },
+    "suggest_products": {
+        "type": "function",
+        "function": {
+            "name": "suggest_products",
+            "description": "Suggest products for user based on purchase history (collaborative filtering)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "limit": {"type": "integer", "default": 5},
+                    "user_id": {"type": "integer", "description": "Optional user ID"},
+                },
+            },
+        },
+    },
+    "schedule_action": {
+        "type": "function",
+        "function": {
+            "name": "schedule_action",
+            "description": "Create ir.cron entry for deferred execution",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "model": {"type": "string"},
+                    "method": {"type": "string"},
+                    "interval_minutes": {"type": "integer", "default": 60},
+                },
+                "required": ["name", "model", "method"],
+            },
+        },
+    },
+    "score_lead": {
+        "type": "function",
+        "function": {
+            "name": "score_lead",
+            "description": "Score a lead 0-100 based on revenue, type, stage. Writes ai_score, ai_score_label.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lead_id": {"type": "integer"},
+                },
+                "required": ["lead_id"],
+            },
+        },
+    },
+    "assign_lead": {
+        "type": "function",
+        "function": {
+            "name": "assign_lead",
+            "description": "Assign lead to salesperson with lowest open lead count",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "lead_id": {"type": "integer"},
+                    "user_ids": {"type": "array", "items": {"type": "integer"}, "description": "Optional list of user IDs to choose from"},
+                },
+                "required": ["lead_id"],
+            },
+        },
+    },
+    "process_document": {
+        "type": "function",
+        "function": {
+            "name": "process_document",
+            "description": "Extract vendor bill data from image/PDF using LLM vision. Optionally create draft vendor bill.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "attachment_id": {"type": "integer"},
+                    "create_bill": {"type": "boolean", "default": False},
+                },
+                "required": ["attachment_id"],
+            },
+        },
+    },
 }
 
 

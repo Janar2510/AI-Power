@@ -275,6 +275,27 @@ class Recordset:
             getattr(self._model._registry, "_env", None) if self._model._registry else None
         )
 
+    def sudo(self) -> "Recordset":
+        """Phase 219: Return recordset with env.su=True (bypass record rules)."""
+        e = self.env
+        if not e:
+            return Recordset(self._model, self._ids, _env=self._env)
+        return Recordset(self._model, self._ids, _env=e(su=True))
+
+    def with_context(self, **kwargs: Any) -> "Recordset":
+        """Phase 219: Return recordset with merged context."""
+        e = self.env
+        if not e:
+            return Recordset(self._model, self._ids, _env=self._env)
+        return Recordset(self._model, self._ids, _env=e(context=kwargs))
+
+    def with_user(self, user: int) -> "Recordset":
+        """Phase 219: Return recordset with different user (and su=False)."""
+        e = self.env
+        if not e:
+            return Recordset(self._model, self._ids, _env=self._env)
+        return Recordset(self._model, self._ids, _env=e(user=user, su=False))
+
     def mapped(self, func: Union[str, Any]) -> Union["Recordset", List[Any]]:
         """Phase 127: Map recordset by field name or callable. Many2one returns comodel recordset; else list."""
         if not self._ids:
@@ -1221,8 +1242,8 @@ class ModelBase(metaclass=Model):
         return set(Parent._get_stored_field_names()) | set(Parent._get_stored_computed_fields()) | set(Parent._get_stored_related_fields())
 
     @classmethod
-    def create(cls: Type[T], vals: Dict[str, Any]) -> T:
-        """Create a new record in DB. Phase 126: _inherits creates parent first."""
+    def create(cls: Type[T], vals: Dict[str, Any], env: Any = None) -> T:
+        """Create a new record in DB. Phase 126: _inherits creates parent first. Phase 219: env param."""
         from core.orm.api import ValidationError
         vals = cls._sanitize_html_vals(vals)
         vals = cls._decode_binary_vals(vals)
@@ -1231,7 +1252,7 @@ class ModelBase(metaclass=Model):
         for k, v in defaults.items():
             if k not in vals and v is not None:
                 vals[k] = v
-        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
             return cls.browse(1)
@@ -1569,9 +1590,10 @@ class ModelBase(metaclass=Model):
         limit: Optional[int] = None,
         order: Optional[str] = None,
         operation: str = "read",
+        env: Any = None,
     ) -> Recordset:
-        """Search records. domain format: [('field','op','value'), ...]."""
-        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        """Search records. domain format: [('field','op','value'), ...]. Phase 219: env param, _order fallback."""
+        env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
             return Recordset(cls, [])
@@ -1590,7 +1612,10 @@ class ModelBase(metaclass=Model):
             dom_where, dom_params = _domain_to_sql(domain, table, cr, cls)
             where = dom_where
             params = list(dom_params)
-        order_by = f' ORDER BY {order}' if order else ""
+        order_str = order
+        if not order_str and hasattr(cls, "_order") and cls._order:
+            order_str = str(cls._order).strip()
+        order_by = f' ORDER BY {order_str}' if order_str else ""
         limit_clause = f" LIMIT {limit}" if limit else ""
         params.append(offset)
         cr.execute(
@@ -1602,7 +1627,7 @@ class ModelBase(metaclass=Model):
 
     @classmethod
     def search_count(cls: Type[T], domain: Optional[List] = None, env: Any = None, operation: str = "read") -> int:
-        """Return count of records matching domain."""
+        """Return count of records matching domain. Phase 219: env param for sudo bypass."""
         env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
@@ -1634,9 +1659,10 @@ class ModelBase(metaclass=Model):
         offset: int = 0,
         limit: Optional[int] = None,
         order: Optional[str] = None,
+        env: Any = None,
     ) -> List[Dict[str, Any]]:
-        """Search and read in one call. Returns list of dicts."""
-        recs = cls.search(domain=domain, offset=offset, limit=limit, order=order)
+        """Search and read in one call. Returns list of dicts. Phase 219: env param."""
+        recs = cls.search(domain=domain, offset=offset, limit=limit, order=order, env=env)
         if not recs.ids:
             return []
         # Use recs.read() so env from search is preserved (Phase 105: avoids closed cursor)

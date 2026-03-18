@@ -75,6 +75,7 @@
     if (m === 'knowledge_article') return 'articles';
     if (m === 'knowledge_category') return 'knowledge_categories';
     if (m === 'sale_order') return 'orders';
+    if (m === 'sale_subscription') return 'subscriptions';
     if (m === 'product_product') return 'products';
     if (m === 'ir_attachment') return 'attachments';
     if (m === 'res_users') return 'settings/users';
@@ -150,6 +151,7 @@
     if (route === 'articles') return 'knowledge.article';
     if (route === 'knowledge_categories') return 'knowledge.category';
     if (route === 'orders') return 'sale.order';
+    if (route === 'subscriptions') return 'sale.subscription';
     if (route === 'products') return 'product.product';
     if (route === 'attachments') return 'ir.attachment';
     if (route === 'settings/users') return 'res.users';
@@ -182,6 +184,7 @@
     if (route === 'attendance') return 'hr.attendance';
     if (route === 'applicants') return 'hr.applicant';
     if (route === 'contracts') return 'hr.contract';
+    if (route === 'fleet') return 'fleet.vehicle';
     if (route === 'projects') return 'project.project';
     if (route === 'timesheets') return 'analytic.line';
     if (route === 'meetings') return 'calendar.event';
@@ -648,7 +651,7 @@
       const v = viewsSvc.getView(model, 'list');
       if (v && v.columns && v.columns.length) return v.columns.map(c => (typeof c === 'object' ? c.name : c) || c);
     }
-    if (model === 'crm.lead') return ['name', 'type', 'stage_id', 'date_deadline', 'expected_revenue', 'tag_ids'];
+    if (model === 'crm.lead') return ['name', 'type', 'stage_id', 'ai_score_label', 'date_deadline', 'expected_revenue', 'tag_ids'];
     if (model === 'sale.order') return ['name', 'partner_id', 'date_order', 'state', 'amount_total'];
     if (model === 'product.product') return ['name', 'list_price'];
     if (model === 'res.users') return ['name', 'login', 'active'];
@@ -779,7 +782,7 @@
         return out;
       }
     }
-    if (model === 'crm.lead') return ['name', 'type', 'partner_id', 'stage_id', 'currency_id', 'expected_revenue', 'description', 'note_html', 'tag_ids', 'activity_ids', 'message_ids'];
+    if (model === 'crm.lead') return ['name', 'type', 'partner_id', 'user_id', 'stage_id', 'ai_score', 'ai_score_label', 'currency_id', 'expected_revenue', 'description', 'note_html', 'tag_ids', 'activity_ids', 'message_ids'];
     if (model === 'sale.order') return ['name', 'partner_id', 'date_order', 'state', 'currency_id', 'amount_total', 'order_line'];
     if (model === 'product.product') return ['name', 'list_price'];
     if (model === 'res.users') return ['name', 'login', 'active', 'group_ids'];
@@ -956,9 +959,11 @@
     renderDashboard();
   }
 
+  var DEFAULT_DASHBOARD_LAYOUT = { widgets: ['kpis', 'activity', 'ai-insights', 'shortcuts', 'recent'] };
+
   function renderDashboard() {
     actionStack = [];
-    main.innerHTML = '<h2>Dashboard</h2><div id="dashboard-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--space-md);margin:var(--space-lg) 0"></div><div id="dashboard-activity" style="margin-top:var(--space-lg)"></div><div id="dashboard-ai-insights" style="margin-top:var(--space-lg)"></div><div id="dashboard-shortcuts" style="margin-top:var(--space-lg)"></div><div id="dashboard-recent" style="margin-top:var(--space-lg)"></div>';
+    main.innerHTML = '<h2>Dashboard</h2><button type="button" id="dashboard-customize-btn" style="margin-left:var(--space-md);padding:var(--space-xs) var(--space-sm);font-size:0.85rem;background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer">Customize</button><div id="dashboard-customize-drawer" style="display:none;position:fixed;top:0;right:0;width:280px;height:100%;background:var(--bg-color, #fff);border-left:1px solid var(--border-color);z-index:1000;padding:var(--space-lg);box-shadow:-4px 0 12px rgba(0,0,0,0.1)"><h3 style="margin:0 0 var(--space-md)">Customize Dashboard</h3><div id="dashboard-widget-toggles"></div><button type="button" id="dashboard-reset-btn" style="margin-top:var(--space-md);padding:var(--space-sm);background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer">Reset to Default</button><button type="button" id="dashboard-customize-close" style="margin-left:var(--space-sm);padding:var(--space-sm);cursor:pointer">Close</button></div><div id="dashboard-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--space-md);margin:var(--space-lg) 0" data-widget="kpis"></div><div id="dashboard-activity" style="margin-top:var(--space-lg)" data-widget="activity"></div><div id="dashboard-ai-insights" style="margin-top:var(--space-lg)" data-widget="ai-insights"></div><div id="dashboard-shortcuts" style="margin-top:var(--space-lg)" data-widget="shortcuts"></div><div id="dashboard-recent" style="margin-top:var(--space-lg)" data-widget="recent"></div>';
     rpc.callKw('ir.dashboard.widget', 'search_read', [[]], { fields: ['id', 'name', 'model', 'domain'], order: 'sequence' })
       .then(function (widgets) {
         if (!widgets || !widgets.length) return;
@@ -1048,6 +1053,67 @@
         recentEl.innerHTML += '</ul>';
       }
     } catch (e) {}
+    (function setupDashboardCustomize() {
+      var uidPromise = (window.Services && window.Services.session) ? window.Services.session.getSessionInfo() : Promise.resolve({ uid: 1 });
+      uidPromise.then(function (info) {
+        var uid = (info && info.uid) || 1;
+        return rpc.callKw('ir.dashboard.layout', 'search_read', [[['user_id', '=', uid]]], { fields: ['id', 'layout_json'], limit: 1 }).then(function (rows) {
+          var layout = DEFAULT_DASHBOARD_LAYOUT;
+          if (rows && rows[0] && rows[0].layout_json) {
+            try { layout = JSON.parse(rows[0].layout_json); } catch (e) {}
+          }
+          var widgets = layout.widgets || DEFAULT_DASHBOARD_LAYOUT.widgets;
+          ['kpis', 'activity', 'ai-insights', 'shortcuts', 'recent'].forEach(function (w) {
+            var el = document.querySelector('[data-widget="' + w + '"]');
+            if (el) el.style.display = widgets.indexOf(w) >= 0 ? '' : 'none';
+          });
+          var drawer = document.getElementById('dashboard-customize-drawer');
+          var togglesEl = document.getElementById('dashboard-widget-toggles');
+          if (togglesEl) {
+            togglesEl.innerHTML = '';
+            ['kpis', 'activity', 'ai-insights', 'shortcuts', 'recent'].forEach(function (w) {
+              var label = w === 'kpis' ? 'KPIs' : w === 'ai-insights' ? 'AI Insights' : w.charAt(0).toUpperCase() + w.slice(1);
+              var checked = widgets.indexOf(w) >= 0;
+              togglesEl.innerHTML += '<label style="display:block;margin:var(--space-sm) 0"><input type="checkbox" data-widget="' + w + '" ' + (checked ? 'checked' : '') + ' /> ' + label + '</label>';
+            });
+          }
+          var customizeBtn = document.getElementById('dashboard-customize-btn');
+        var closeBtn = document.getElementById('dashboard-customize-close');
+        var resetBtn = document.getElementById('dashboard-reset-btn');
+        if (customizeBtn && drawer) customizeBtn.onclick = function () { drawer.style.display = 'block'; };
+        if (closeBtn && drawer) closeBtn.onclick = function () { drawer.style.display = 'none'; };
+        if (resetBtn) resetBtn.onclick = function () {
+          var layoutJson = JSON.stringify(DEFAULT_DASHBOARD_LAYOUT);
+          rpc.callKw('ir.dashboard.layout', 'search_read', [[['user_id', '=', uid]]], { fields: ['id'], limit: 1 }).then(function (rows) {
+            if (rows && rows[0]) {
+              return rpc.callKw('ir.dashboard.layout', 'write', [[rows[0].id], { layout_json: layoutJson }], {});
+            }
+            return rpc.callKw('ir.dashboard.layout', 'create', [{ user_id: uid, layout_json: layoutJson }], {});
+          }).then(function () { renderDashboard(); }).catch(function () {});
+        };
+        if (togglesEl) {
+          togglesEl.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+            cb.onchange = function () {
+              var w = cb.getAttribute('data-widget');
+              var wlist = (layout.widgets || []).slice();
+              if (cb.checked) { if (wlist.indexOf(w) < 0) wlist.push(w); }
+              else { wlist = wlist.filter(function (x) { return x !== w; }); }
+              var layoutJson = JSON.stringify({ widgets: wlist });
+              rpc.callKw('ir.dashboard.layout', 'search_read', [[['user_id', '=', uid]]], { fields: ['id'], limit: 1 }).then(function (rows) {
+                if (rows && rows[0]) {
+                  return rpc.callKw('ir.dashboard.layout', 'write', [[rows[0].id], { layout_json: layoutJson }], {});
+                }
+                return rpc.callKw('ir.dashboard.layout', 'create', [{ user_id: uid, layout_json: layoutJson }], {});
+              }).then(function () {
+                var el = document.querySelector('[data-widget="' + w + '"]');
+                if (el) el.style.display = cb.checked ? '' : 'none';
+              }).catch(function () {});
+            };
+          });
+        }
+        });
+      }).catch(function () {});
+    })();
   }
 
   function renderSettings() {
@@ -3666,7 +3732,7 @@
       }
       const searchDom = buildSearchDomain(model, searchTerm || '');
       const fullDomain = (domain || []).concat(searchDom || []);
-      const fields = model === 'crm.lead' ? ['id', 'name', 'stage_id'] : (model === 'helpdesk.ticket' ? ['id', 'name', 'stage_id'] : ['id', 'name', 'project_id', 'stage_id']);
+      const fields = model === 'crm.lead' ? ['id', 'name', 'stage_id', 'ai_score_label', 'expected_revenue'] : (model === 'helpdesk.ticket' ? ['id', 'name', 'stage_id'] : ['id', 'name', 'project_id', 'stage_id']);
       return Promise.all([
         rpc.callKw('mail.activity.type', 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence' }),
         rpc.callKw(model, 'search_read', [fullDomain], { fields: fields, limit: 50 }),

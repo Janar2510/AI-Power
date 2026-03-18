@@ -71,6 +71,17 @@
 - [ ] _procure_orderpoint_confirm() creates purchase.order (with partner) or stock.move (replenishment)
 - [ ] tests/test_orderpoint_phase189.py passes
 
+## Phase 218-225 (ERP Phases 218-225)
+
+- [ ] Phase 218: LLM tool schemas synced (all TOOL_REGISTRY tools in _TOOL_SCHEMAS)
+- [ ] Phase 219: ORM sudo(), with_context(), with_user(), _order
+- [ ] Phase 220: AI lead scoring (score_lead, assign_lead), ai_score on crm.lead
+- [ ] Phase 221: sale_subscription module, recurring invoice cron
+- [ ] Phase 222: process_document tool, POST /ai/process-document
+- [ ] Phase 223: ir.dashboard.layout, Customize Dashboard
+- [ ] Phase 224: fleet module (vehicles, contracts, fuel, services)
+- [ ] Phase 225: /health returns version, /metrics Prometheus format
+
 ## Phase 217 (HR Expansion)
 
 - [ ] hr_attendance: hr.attendance, /hr/attendance/kiosk

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <record model="fleet.vehicle.model.brand" id="fleet_brand_toyota">
+      <field name="name">Toyota</field>
+    </record>
+    <record model="fleet.vehicle.model.brand" id="fleet_brand_ford">
+      <field name="name">Ford</field>
+    </record>
+  </data>
+</odoo>

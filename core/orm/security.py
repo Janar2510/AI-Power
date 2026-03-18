@@ -162,7 +162,10 @@ def _get_partner_id(env: Any, uid: int):
 def get_record_rules(model_name: str, uid: int, env: Any = None, operation: str = "read") -> List[List]:
     """Get record rule domains for model. Substitute uid and company_ids in domain.
     When env has ir.rule, read from DB; otherwise fallback to XML.
-    Phase 101: portal users get partner_id restriction for crm.lead."""
+    Phase 101: portal users get partner_id restriction for crm.lead.
+    Phase 219: when env.su is True, bypass record rules (return [])."""
+    if env and getattr(env, "su", False):
+        return []
     company_ids = _get_company_ids(env, uid) if env and uid else []
     if env and model_name != "ir.rule":
         try:

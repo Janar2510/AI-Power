@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.84.0 (Phase 225: E2E Test Hardening & Performance Monitoring)
+
+### Phase 225: E2E Test Hardening & Performance Monitoring
+- core/http/routes.py: /health returns version; /metrics Prometheus-compatible (erp_request_duration_seconds, erp_query_count)
+- tests/e2e/test_health_metrics.py
+- tests/e2e/test_dashboard_customize_tour.py
+
+## 1.83.1 (Phase 223: Dashboard Builder)
+
+### Phase 223: Dashboard Builder
+- addons/base/models/ir_dashboard_layout.py: user_id, layout_json
+- addons/web/static/src/main.js: Customize button, widget visibility toggles, save/load layout
+
+## 1.83.0 (Phase 222: AI Document Processing)
+
+### Phase 222: AI Document Processing (OCR)
+- addons/ai_assistant/tools/document_ocr.py: process_document tool (LLM vision extraction)
+- addons/ai_assistant/controllers/ai_controller.py: POST /ai/process-document
+- tests/test_document_ocr.py
+
+## 1.83.2 (Phase 224: Fleet Management)
+
+### Phase 224: Fleet Management Module
+- addons/fleet: fleet.vehicle, fleet.vehicle.model, fleet.vehicle.model.brand, fleet.vehicle.log.contract, fleet.vehicle.log.fuel, fleet.vehicle.log.services
+- core/tools/config.py: fleet in DEFAULT_SERVER_WIDE_MODULES
+
+## 1.82.1 (Phase 221: Subscription Management)
+
+### Phase 221: Subscription Management Module (sale_subscription)
+- addons/sale_subscription: sale.subscription, sale.subscription.line, sale.subscription.plan
+- Cron: _cron_recurring_invoice (daily)
+- core/db/init_data.py: subscription cron, sale.subscription sequence
+- core/tools/config.py: sale_subscription in DEFAULT_SERVER_WIDE_MODULES
+
+## 1.82.0 (Phase 220: AI Lead Scoring & Smart Assignment)
+
+### Phase 220: AI Lead Scoring & Smart Assignment
+- addons/ai_assistant/tools/lead_scoring.py: score_lead, assign_lead tools
+- addons/crm/models/crm_lead.py: ai_score, ai_score_label, user_id fields
+- addons/crm/views/crm_views.xml: ai_score_label in list/form/kanban
+- addons/web/static/src/main.js: ai_score_label in list/form/kanban fields
+- tests/test_lead_scoring.py
+
+## 1.81.0 (Phase 219: ORM Context Methods)
+
+### Phase 219: ORM sudo, with_context, with_user, _order
+- core/orm/environment.py: Environment.su, __call__(user=, su=, context=), _ModelProxy for env-bound model access
+- core/orm/models.py: Recordset.sudo(), with_context(**kw), with_user(uid); search/search_read/search_count/read_group accept env param; _order fallback when order not provided
+- core/orm/security.py: get_record_rules returns [] when env.su
+- tests/test_orm_sudo.py
+
+## 1.80.1 (Phase 218: LLM Tool Schema Unification)
+
+### Phase 218: LLM Tool Schema Unification
+- addons/ai_assistant/llm.py: add 10 tool schemas (analyze_data, analyze_kpi, forecast_metric, nl_search, extract_fields, create_record, update_record, generate_report, suggest_products, schedule_action)
+- tests/test_ai_llm.py: test_tool_schema_sync_phase218
+- docs/parity_matrix.md: LLM tool parity row
+
 ## 1.80.0 (Phase 217: HR Expansion - Attendance, Recruitment & Contracts)
 
 ### Phase 217: HR Expansion

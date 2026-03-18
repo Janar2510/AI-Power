@@ -1,0 +1,7 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_fleet_vehicle_user,fleet.vehicle user,model_fleet_vehicle,,1,1,1,1
+access_fleet_vehicle_model_user,fleet.vehicle.model user,model_fleet_vehicle_model,,1,1,1,1
+access_fleet_vehicle_model_brand_user,fleet.vehicle.model.brand user,model_fleet_vehicle_model_brand,,1,1,1,1
+access_fleet_vehicle_log_contract_user,fleet.vehicle.log.contract user,model_fleet_vehicle_log_contract,,1,1,1,1
+access_fleet_vehicle_log_fuel_user,fleet.vehicle.log.fuel user,model_fleet_vehicle_log_fuel,,1,1,1,1
+access_fleet_vehicle_log_services_user,fleet.vehicle.log.services user,model_fleet_vehicle_log_services,,1,1,1,1

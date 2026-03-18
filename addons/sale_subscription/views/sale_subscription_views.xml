@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="sale_subscription_list">
+      <field name="name">sale.subscription list</field>
+      <field name="model">sale.subscription</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="partner_id" comodel="res.partner"/>
+          <field name="stage"/>
+          <field name="recurring_amount"/>
+          <field name="recurring_next_date"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="sale_subscription_form">
+      <field name="name">sale.subscription form</field>
+      <field name="model">sale.subscription</field>
+      <field name="arch" type="xml">
+        <form>
+          <header>
+            <button name="action_start" string="Start" type="object" invisible="[('stage','!=','draft')]"/>
+            <button name="action_pause" string="Pause" type="object" invisible="[('stage','!=','running')]"/>
+            <button name="action_resume" string="Resume" type="object" invisible="[('stage','!=','paused')]"/>
+            <button name="action_close" string="Close" type="object" invisible="[('stage','in',['closed','cancelled'])]"/>
+            <button name="action_cancel" string="Cancel" type="object" invisible="[('stage','in',['closed','cancelled'])]"/>
+          </header>
+          <sheet>
+            <field name="name"/>
+            <field name="partner_id" comodel="res.partner"/>
+            <field name="currency_id" comodel="res.currency"/>
+            <field name="plan_id" comodel="sale.subscription.plan"/>
+            <field name="stage"/>
+            <field name="date_start"/>
+            <field name="date_end"/>
+            <field name="recurring_next_date"/>
+            <field name="recurring_rule_type"/>
+            <field name="recurring_amount"/>
+            <field name="line_ids"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="sale_subscription_kanban">
+      <field name="name">sale.subscription kanban</field>
+      <field name="model">sale.subscription</field>
+      <field name="arch" type="xml">
+        <kanban default_group_by="stage">
+          <field name="name"/>
+          <field name="partner_id"/>
+          <field name="stage"/>
+          <field name="recurring_amount"/>
+          <templates>
+            <t t-name="kanban-box">
+              <div class="oe_kanban_card"><field name="name"/><field name="recurring_amount"/></div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_sale_subscription">
+      <field name="name">Subscriptions</field>
+      <field name="res_model">sale.subscription</field>
+      <field name="view_mode">kanban,list,form</field>
+    </record>
+    <menuitem name="Subscriptions" id="menu_sale_subscription" action="action_sale_subscription" parent="sale.menu_sale_root" sequence="50"/>
+  </data>
+</odoo>

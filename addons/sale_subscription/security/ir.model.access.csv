@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_sale_subscription_user,sale.subscription user,model_sale_subscription,,1,1,1,1
+access_sale_subscription_plan_user,sale.subscription.plan user,model_sale_subscription_plan,,1,1,1,1
+access_sale_subscription_line_user,sale.subscription.line user,model_sale_subscription_line,,1,1,1,1

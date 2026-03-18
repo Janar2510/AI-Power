@@ -25,6 +25,7 @@
           <field name="name"/>
           <field name="type"/>
           <field name="stage_id" comodel="crm.stage"/>
+          <field name="ai_score_label" string="AI"/>
           <field name="date_deadline"/>
           <field name="expected_revenue"/>
           <field name="tag_ids" comodel="crm.tag" widget="many2many_tags"/>
@@ -44,6 +45,9 @@
             <field name="name"/>
             <field name="type"/>
             <field name="partner_id" comodel="res.partner"/>
+            <field name="user_id" comodel="res.users"/>
+            <field name="ai_score" readonly="1"/>
+            <field name="ai_score_label" readonly="1"/>
             <field name="currency_id" comodel="res.currency" invisible="[('type','=','lead')]"/>
             <field name="expected_revenue" invisible="[('type','=','lead')]"/>
             <field name="description"/>
@@ -63,11 +67,12 @@
         <kanban default_group_by="stage_id">
           <field name="name"/>
           <field name="stage_id"/>
+          <field name="ai_score_label"/>
           <field name="priority" widget="priority"/>
           <field name="expected_revenue"/>
           <templates>
             <t t-name="kanban-box">
-              <div class="oe_kanban_card"><field name="name"/><field name="expected_revenue"/></div>
+              <div class="oe_kanban_card"><field name="name"/><field name="ai_score_label"/><field name="expected_revenue"/></div>
             </t>
           </templates>
         </kanban>

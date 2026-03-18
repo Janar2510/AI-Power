@@ -108,15 +108,42 @@ TOTP_HTML = """<!DOCTYPE html>
 
 @route("/health", auth="public", methods=["GET"])
 def health(request):
-    """Health check endpoint for load balancers and monitoring (Phase 99)."""
+    """Health check endpoint for load balancers and monitoring (Phase 99, 225)."""
     import json
+    try:
+        from core import release
+        version = getattr(release, "version", "1.0")
+    except Exception:
+        version = "1.0"
     db = request.args.get("db", config.get_config().get("db_name", "erp"))
     db_ok = db_exists(db)
     try:
-        body = json.dumps({"status": "ok", "db": db_ok})
+        body = json.dumps({"status": "ok", "db": db_ok, "version": version})
     except Exception:
-        body = '{"status":"ok","db":false}'
+        body = '{"status":"ok","db":false,"version":"1.0"}'
     return Response(body, content_type="application/json")
+
+
+@route("/metrics", auth="public", methods=["GET"])
+def metrics(request):
+    """Prometheus-compatible metrics (Phase 225)."""
+    try:
+        from core.profiling import get_profiling_stats
+        stats = get_profiling_stats()
+        request_ms = stats.get("request_ms") or 0
+        query_count = stats.get("query_count", 0)
+    except Exception:
+        request_ms = 0
+        query_count = 0
+    lines = [
+        "# HELP erp_request_duration_seconds Request duration in seconds",
+        "# TYPE erp_request_duration_seconds gauge",
+        "erp_request_duration_seconds " + str(request_ms / 1000.0),
+        "# HELP erp_query_count Number of DB queries in last request",
+        "# TYPE erp_query_count gauge",
+        "erp_query_count " + str(query_count),
+    ]
+    return Response("\n".join(lines) + "\n", content_type="text/plain; charset=utf-8")
 
 
 def _try_init_database(db: str) -> tuple[bool, str]:

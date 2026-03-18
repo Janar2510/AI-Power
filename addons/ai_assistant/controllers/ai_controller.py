@@ -134,6 +134,37 @@ def ai_extract_fields(request: Request) -> Response:
         )
 
 
+@route("/ai/process-document", auth="public", methods=["POST"])
+def ai_process_document(request: Request) -> Response:
+    """Extract vendor bill data from attachment using LLM vision. Phase 222."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
+    try:
+        data = request.get_json() or {}
+        attachment_id = data.get("attachment_id")
+        if attachment_id is None:
+            return Response(
+                json.dumps({"error": "attachment_id required"}),
+                status=400,
+                content_type="application/json",
+            )
+        create_bill = bool(data.get("create_bill", False))
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            registry.set_env(env)
+            result = execute_tool(env, "process_document", attachment_id=int(attachment_id), create_bill=create_bill)
+        return Response(json.dumps(result), content_type="application/json")
+    except Exception as e:
+        return Response(
+            json.dumps({"data": None, "move_id": None, "error": str(e)}),
+            status=500,
+            content_type="application/json",
+        )
+
+
 @route("/ai/chat", auth="public", methods=["POST"])
 def ai_chat(request: Request) -> Response:
     """Handle AI chat - tool calls or LLM execute as requesting user."""

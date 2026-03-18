@@ -82,3 +82,10 @@ class TestAiLlm(unittest.TestCase):
         data = json.loads(r.get_data(as_text=True))
         self.assertIn("llm_enabled", data)
         self.assertIn("llm_model", data)
+
+    def test_tool_schema_sync_phase218(self):
+        """Phase 218: Every tool in TOOL_REGISTRY has a matching schema in _TOOL_SCHEMAS."""
+        from addons.ai_assistant.tools.registry import TOOL_REGISTRY
+        from addons.ai_assistant.llm import _TOOL_SCHEMAS
+        missing = [name for name in TOOL_REGISTRY if name not in _TOOL_SCHEMAS]
+        self.assertEqual(missing, [], f"Registry tools missing from _TOOL_SCHEMAS: {missing}")

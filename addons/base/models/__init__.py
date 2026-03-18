@@ -30,3 +30,4 @@ from . import db_backup
 from . import approval_rule
 from . import approval_request
 from . import audit_log
+from . import ir_dashboard_layout

@@ -62,6 +62,13 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
         names = {r["id"]: r.get("name") for r in Partner.browse(partner_ids).read(["id", "name"])}
         return [names.get(r.get("partner_id")) if r.get("partner_id") else None for r in rows]
     stage_id = fields.Many2one("crm.stage", string="Stage", tracking=True)
+    user_id = fields.Many2one("res.users", string="Salesperson")  # Phase 220: for assign_lead
+    ai_score = fields.Float(string="AI Score", readonly=True)  # Phase 220: 0-100
+    ai_score_label = fields.Selection(
+        selection=[("hot", "Hot"), ("warm", "Warm"), ("cold", "Cold")],
+        string="AI Score",
+        readonly=True,
+    )  # Phase 220
     priority = fields.Selection(
         selection=[("0", "Low"), ("1", "Normal"), ("2", "High"), ("3", "Urgent")],
         string="Priority",

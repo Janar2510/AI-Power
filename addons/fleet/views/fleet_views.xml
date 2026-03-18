@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="fleet_vehicle_list">
+      <field name="name">fleet.vehicle list</field>
+      <field name="model">fleet.vehicle</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="license_plate"/>
+          <field name="model_id" comodel="fleet.vehicle.model"/>
+          <field name="driver_id" comodel="res.partner"/>
+          <field name="state"/>
+          <field name="odometer"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="fleet_vehicle_form">
+      <field name="name">fleet.vehicle form</field>
+      <field name="model">fleet.vehicle</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="license_plate"/>
+            <field name="model_id" comodel="fleet.vehicle.model"/>
+            <field name="driver_id" comodel="res.partner"/>
+            <field name="state"/>
+            <field name="odometer"/>
+            <field name="fuel_type"/>
+            <field name="acquisition_date"/>
+            <field name="contract_ids"/>
+            <field name="fuel_log_ids"/>
+            <field name="service_ids"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="fleet_vehicle_kanban">
+      <field name="name">fleet.vehicle kanban</field>
+      <field name="model">fleet.vehicle</field>
+      <field name="arch" type="xml">
+        <kanban default_group_by="state">
+          <field name="name"/>
+          <field name="license_plate"/>
+          <field name="state"/>
+          <field name="odometer"/>
+          <templates>
+            <t t-name="kanban-box">
+              <div class="oe_kanban_card"><field name="name"/><field name="license_plate"/></div>
+            </t>
+          </templates>
+        </kanban>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_fleet_vehicle">
+      <field name="name">Vehicles</field>
+      <field name="res_model">fleet.vehicle</field>
+      <field name="view_mode">kanban,list,form</field>
+    </record>
+    <menuitem name="Fleet" id="menu_fleet_root" sequence="60"/>
+    <menuitem name="Vehicles" id="menu_fleet_vehicle" action="action_fleet_vehicle" parent="menu_fleet_root" sequence="10"/>
+  </data>
+</odoo>

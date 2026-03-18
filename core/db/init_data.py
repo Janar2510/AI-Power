@@ -108,6 +108,7 @@ def load_default_data(env) -> None:
                 ("stock.picking", "Transfer Reference"),
                 ("account.move", "Journal Entry Reference"),
                 ("sale.order", "Sales Order Reference"),
+                ("sale.subscription", "Subscription Reference"),
                 ("purchase.order", "Purchase Order Reference"),
                 ("mrp.production", "Manufacturing Order Reference"),
                 ("hr.expense.sheet", "Expense Report Reference"),
@@ -178,6 +179,17 @@ def load_default_data(env) -> None:
                 "active": True,
             })
             _logger.info("Created cron: Database backup")
+        if IrCron and env.get("sale.subscription") and not IrCron.search([("model", "=", "sale.subscription")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Subscription: Generate Recurring Invoices",
+                "model": "sale.subscription",
+                "method": "_cron_recurring_invoice",
+                "interval_minutes": 1440,
+                "next_run": (datetime.utcnow() + timedelta(minutes=60)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: Subscription recurring invoices")
     except Exception as e:
         _logger.warning("Could not create transient vacuum cron: %s", e)
 

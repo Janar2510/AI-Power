@@ -43,3 +43,5 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | Action domain/context | ir.actions.act_window | load_views returns domain/context; loadRecords applies | done |
 | Binary field + file upload | `ir.attachment` datas, `/web/binary/upload` | `core/orm/fields.py` Binary, `core/http/routes.py` | done |
 | TransientModel (wizards) | `odoo/models.py` TransientModel | `core/orm/models_transient.py` | done |
+| LLM tool parity | OpenAI function-calling schemas | `addons/ai_assistant/llm.py` _TOOL_SCHEMAS sync with TOOL_REGISTRY | done |
+| ORM sudo/context | `recordset.sudo()`, `with_context()`, `with_user()`, `_order` | `core/orm/environment.py`, `core/orm/models.py`, `core/orm/security.py` | done |

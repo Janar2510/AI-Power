@@ -1,5 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_ir_dashboard_widget,access_ir_dashboard_widget,model_ir_dashboard_widget,,1,1,1,1
+access_ir_dashboard_layout,access_ir_dashboard_layout,model_ir_dashboard_layout,,1,1,1,1
 access_ir_translation,access_ir_translation,model_ir_translation,,1,1,1,1
 access_ir_filters,access_ir_filters,model_ir_filters,,1,1,1,1
 access_res_users,access_res_users,model_res_users,,1,1,1,1

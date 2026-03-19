@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.126.0 - Phases 308-319: infrastructure, commerce, auth/mail, event and CRM extensions (2026-03-19)
+
+### Added
+- **p308**: `barcodes`, `barcodes_gs1_nomenclature`, `base_iban`, `base_vat`
+- **p309**: `board`, `http_routing`, `html_editor`, `html_builder`
+- **p310**: `product_matrix`, `product_email_template`, `sale_product_matrix`, `purchase_product_matrix`
+- **p311**: `sale_pdf_quote_builder`, `delivery_stock_picking_batch`, `stock_fleet`, `mrp_subcontracting_dropshipping`
+- **p312**: `auth_ldap`, `auth_passkey`, `auth_passkey_portal`, `auth_timeout`
+- **p313**: `mail_group`, `mail_plugin`, `snailmail`, `snailmail_account`
+- **p314**: `event_booth`, `event_booth_sale`, `website_event`, `website_event_sale`
+- **p315**: `website_event_crm`, `website_event_booth`, `website_event_booth_sale`, `project_mrp_stock_landed_costs`
+- **p316**: `website_sale_stock`, `website_sale_wishlist`, `website_sale_comparison`, `website_sale_comparison_wishlist`
+- **p317**: `website_customer`, `website_partner`, `website_profile`, `website_hr_recruitment`
+- **p318**: `iap_crm`, `crm_iap_enrich`, `crm_mail_plugin`, `marketing_card`
+- **p319**: `sms_twilio`, `web_unsplash`, `base_sparse_field`, `base_import_module`, `base_install_request`, `partnership`
+- `tests/test_phase308_319.py`
+
+### Changed
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all phase `308-319` modules.
+- **core/release.py**: `version_info = (1, 126, 0, ...)`.
+
+---
+
 ## 1.120.0 – Phases 296–307: plan-aligned bridges + cluster F addons (2026-03-19)
 
 ### Added

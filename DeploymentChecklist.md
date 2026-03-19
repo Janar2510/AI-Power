@@ -1,5 +1,31 @@
 # Deployment Checklist
 
+## Phases 308-319 - Infrastructure, website commerce, auth/mail and CRM extensions (2026-03-19)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase308_319 -v`
+- [ ] Run schema init/upgrade on target DB for new models and relations introduced in phases 308-319.
+
+### New modules (308-319)
+- `barcodes`, `barcodes_gs1_nomenclature`, `base_iban`, `base_vat`
+- `board`, `http_routing`, `html_editor`, `html_builder`
+- `product_matrix`, `product_email_template`, `sale_product_matrix`, `purchase_product_matrix`
+- `sale_pdf_quote_builder`, `delivery_stock_picking_batch`, `stock_fleet`, `mrp_subcontracting_dropshipping`
+- `auth_ldap`, `auth_passkey`, `auth_passkey_portal`, `auth_timeout`
+- `mail_group`, `mail_plugin`, `snailmail`, `snailmail_account`
+- `event_booth`, `event_booth_sale`, `website_event`, `website_event_sale`
+- `website_event_crm`, `website_event_booth`, `website_event_booth_sale`, `project_mrp_stock_landed_costs`
+- `website_sale_stock`, `website_sale_wishlist`, `website_sale_comparison`, `website_sale_comparison_wishlist`
+- `website_customer`, `website_partner`, `website_profile`, `website_hr_recruitment`
+- `iap_crm`, `crm_iap_enrich`, `crm_mail_plugin`, `marketing_card`
+- `sms_twilio`, `web_unsplash`, `base_sparse_field`, `base_import_module`, `base_install_request`, `partnership`
+
+### Config / release
+- [ ] `core/tools/config.py`: phase `308-319` entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.126.0`
+
+---
+
 ## Phases 296–307 – MRP/Project/HR alignment + sale/auth/stock/website cluster (2026-03-19)
 
 ### Pre-Deployment Steps

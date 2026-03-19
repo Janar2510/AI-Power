@@ -1,5 +1,100 @@
 # Deployment Checklist
 
+## Phases 296–307 – MRP/Project/HR alignment + sale/auth/stock/website cluster (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase296_307 -v`
+- [ ] Confirm Postgres schema init after new `Many2many` / `stock.picking.batch` tables (fresh `db init` or migration as per your process)
+
+### Validation Update (2026-03-19)
+- [x] `python3.11 -m unittest tests.test_phase296_307 -v` passed (`13` tests, `0` failures)
+- [x] Bridge compatibility fields aligned for p302-p306 (`sale_purchase_project_auto_count`, `sms_reminder_ids`, `portal_password_policy_level`, `maintenance_request_id`, `web_hierarchy_parent_field`)
+- [x] `website_mail` import/load issue resolved (`models/res_company.py`, `models/__init__.py`)
+
+### Field / module highlights (296–301)
+- Landed costs ↔ MO: `landed_cost_ids` / `mrp_production_ids`; subcontracting landed `subcontracting_production_ids`
+- Subcontracting: `subcontracting_account_move_count`, `is_subcontract_line`, `subcontract_move_id`
+- Project: computed counters + `production_cost`, `project_production_ids`, `project_stock_valuation_count`
+- HR: work entry ↔ leave types, attendance on leave, homeworking locations, TOTP/password portal bridges, recruitment SMS thread
+
+### New modules (302–307)
+- **p302**: `sale_purchase_project`, `sale_project_stock`, `sale_mrp_margin`, `sale_stock_product_expiry`
+- **p303**: `calendar_sms`, `resource_mail`, `survey_crm`, `event_crm_sale`, `mail_bot`
+- **p304**: `auth_password_policy_portal`, `auth_password_policy_signup`, `auth_totp_mail`, `auth_totp_portal`
+- **p305**: `stock_maintenance`, `stock_picking_batch`, `purchase_repair`, `stock_dropshipping`
+- **p306**: `web_hierarchy`, `website_mail`, `website_sms`, `website_links`
+- **p307**: `website_project`, `website_timesheet`, `hr_skills_event`, `hr_skills_survey`, `mail_bot_hr`, `hr_org_chart`
+
+### Config / release
+- [ ] `core/tools/config.py`: p302–p307 entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.120.0`
+
+---
+
+## Phases 289–295 – Event, Website, Inventory/Sale Bridges, Product & Base (Cluster E) (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase289_290 tests.test_phase291_295 -v`
+
+### New Modules
+- `addons/event_crm`: registrations ↔ CRM leads
+- `addons/event_sale`: sale lines ↔ events/tickets
+- `addons/website_crm`: lead website source fields (`website_id`, `website_form_url`)
+- `addons/website_payment`: payment providers on websites
+- `addons/account_fleet`: `account.move.line.vehicle_id` + `fleet.vehicle.invoice_count`
+- `addons/stock_sms`: `stock.picking.sms_ids/sms_count` + `sms.sms.picking_id`
+- `addons/stock_delivery`: `stock.picking.carrier_id`, `carrier_tracking_ref`, `weight`
+- `addons/sale_expense_margin`: `hr.expense.margin` computed from linked `sale.order.margin`
+- `addons/sale_loyalty_delivery`: minimal `loyalty.reward` (`reward_type`, `delivery_carrier_id`)
+- `addons/purchase_requisition_stock`: `purchase.requisition.picking_count` + `stock.picking.requisition_id`
+- `addons/purchase_requisition_sale`: `purchase.requisition.sale_order_count` + `sale.order.requisition_id`
+- `addons/product_margin`, `addons/product_expiry`: product/lot margin + expiry lifecycle fields
+- `addons/auth_password_policy`: `password.policy` + settings fields (`password_min_length`, `password_require_*`)
+- `addons/social_media`, `addons/base_address_extended`, `addons/base_geolocalize`
+
+### Config Changes
+- `core/tools/config.py`: cluster E modules in `DEFAULT_SERVER_WIDE_MODULES`
+- `core/release.py`: bumped to `1.114.0`
+
+---
+
+## Phases 287–288 – HR Bridge Modules (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase287_288 -v`
+
+### New Modules
+- `addons/hr_gamification`: `hr.employee.badge_ids` -> `gamification.badge.user`
+- `addons/hr_fleet`: `hr.employee.vehicle_ids` + `fleet.vehicle.employee_id`
+- `addons/hr_maintenance`: `hr.employee.equipment_ids` + `maintenance.equipment.employee_id`
+- `addons/hr_calendar`: `calendar.event.employee_id` + `hr.employee.meeting_count`
+- `addons/hr_homeworking`: `hr.employee.location` + `hr.employee.work_location_id`
+- `addons/hr_recruitment_skills`: `hr.applicant.skill_ids` (Many2many `hr.skill`)
+
+### Config Changes
+- `core/tools/config.py`: added all phase 287-288 modules to `DEFAULT_SERVER_WIDE_MODULES`
+
+---
+
+## Phases 284–286 – Project Bridge Modules (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase284_286 -v`
+
+### New Modules
+- `addons/project_todo`: to-do helpers on project tasks + onboarding hook
+- `addons/project_stock`: project linkage on stock pickings + project picking counters/actions
+- `addons/project_sms`: SMS template bridge on task stages + project/task SMS hooks
+- `addons/project_purchase`: purchase orders linked to projects + project purchase counter/action
+- `addons/project_hr_expense`: expenses linked to projects + project expense counter/action
+- `addons/project_sale_expense`: sale-expense profitability bridge methods
+- `addons/project_timesheet_holidays`: leave/global leave links for timesheets + company time-off defaults
+
+### Config Changes
+- `core/tools/config.py`: added all phase 284-286 modules to `DEFAULT_SERVER_WIDE_MODULES`
+
+---
+
 ## Phases 274–283 – Accounting, Gamification, Supply Chain and MRP Bridges (2026-03-19)
 
 ### Pre-Deployment Steps

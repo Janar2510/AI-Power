@@ -1,5 +1,114 @@
 # Changelog
 
+## 1.120.0 – Phases 296–307: plan-aligned bridges + cluster F addons (2026-03-19)
+
+### Added
+- **ORM**: `Recordset` resolves `One2many` inverses that point to `Many2many` (e.g. `mrp.production.landed_cost_ids` ↔ `stock.landed.cost.mrp_production_ids`)
+- **p296 (aligned)**: `mrp.production.landed_cost_ids`; `stock.lot.product_expiry_reminded`; `mrp.production` lot/expiry helpers; `repair.order.bom_id`; `mrp.bom.repair_count`
+- **p297 (aligned)**: `mrp.production.subcontracting_account_move_count`; `purchase.order.line.is_subcontract_line`; `repair.order.subcontract_move_id` (`mrp_subcontracting_repair`); `stock.landed.cost.subcontracting_production_ids`
+- **p298–299 (aligned)**: `project.project` counters (`production_count` computed, `stock_valuation_count`, `purchase_picking_count`, `landed_cost_count`, `production_cost`); `project.task.skill_ids`; `sale.order.line.project_production_ids`; `sale.order.project_stock_valuation_count`
+- **p300–301 (aligned)**: `hr.leave` / `hr.work.entry.type` / `hr.leave.type` work-entry links; `hr.leave.attendance_ids`, `hr.attendance.leave_id`, `hr.employee.attendance_leave_count`; `hr.leave.work_location_id`; `calendar.event.work_location_id`; `hr.employee.total_overtime`, `hr_presence_state`; `hr.employee.hourly_cost` (Float), `analytic.line.timesheet_cost`; `hr.applicant.sms_ids` / `sms_count`, `sms.sms.applicant_id`
+- **p302**: `sale_purchase_project`, `sale_project_stock`, `sale_mrp_margin`, `sale_stock_product_expiry`
+- **p303**: `calendar_sms`, `resource_mail`, `survey_crm`, `event_crm_sale`, `mail_bot`
+- **p304**: `auth_password_policy_portal`, `auth_password_policy_signup`, `auth_totp_mail`, `auth_totp_portal`
+- **p305**: `stock_maintenance`, `stock_picking_batch` (`stock.picking.batch`), `purchase_repair`, `stock_dropshipping`
+- **p306**: `web_hierarchy`, `website_mail`, `website_sms`, `website_links`
+- **p307**: `website_project`, `website_timesheet`, `hr_skills_event`, `hr_skills_survey`, `mail_bot_hr`, `hr_org_chart`
+- `tests/test_phase296_307.py`
+
+### Changed
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` includes all p302–p307 modules
+- **core/release.py**: `version_info = (1, 120, 0, ...)`
+- **mrp_subcontracting_account**: dropped redundant `product.product` extension (costing already on `stock`); MO uses `subcontracting_account_move_count` instead of `extra_cost`
+
+### Fixed
+- Phase 302 bridge naming parity on `sale.order` / `sale.order.line`: added `sale_purchase_project_auto_count`, `sale_project_stock_move_count`, `sale_mrp_margin_component_cost`, `sale_stock_expiry_risk` while keeping existing bridge stubs.
+- Phase 303 bridge model alignment: added `resource.resource.resource_mail_alias_id`, `survey.survey.crm_tag_ids`, `event.event.event_crm_sale_opportunity_id`, `res.users.mail_bot_partner_ref`, and `calendar.event.sms_reminder_ids`.
+- Phase 304–306 bridge compatibility fields: added `portal_password_policy_level`, `signup_password_strength`, `totp_mail_enabled`, `totp_portal_enabled`, `stock.picking.maintenance_request_id`, `ir.ui.view.web_hierarchy_parent_field`, and fixed `website_mail` model import/load path with `res.company.website_mail_contact_email`.
+
+### Removed
+- `tests/test_phase296_301.py` (replaced by `tests/test_phase296_307.py`)
+
+---
+
+## 1.115.0 – Phases 296–301: MRP/Project/HR bridge modules (2026-03-19)
+
+### Added
+- **p296**: `mrp_landed_costs`, `mrp_product_expiry`, `mrp_repair` (MO/repair/landed stubs aligned with Odoo 19)
+- **p297**: `mrp_subcontracting_account`, `mrp_subcontracting_purchase`, `mrp_subcontracting_repair`, `mrp_subcontracting_landed_costs`
+- **p298**: `project_mrp`, `project_hr_skills` (+ `hr.employee.skill`), `project_stock_account`, `project_purchase_stock`
+- **p299**: `project_stock_landed_costs` (`stock.valuation.adjustment.lines`), `project_mrp_account`, `project_mrp_sale`, `sale_project_stock_account`
+- **p300**: `hr_work_entry_holidays`, `hr_holidays_attendance`, `hr_holidays_homeworking`, `hr_homeworking_calendar`
+- **p301**: `hr_timesheet_attendance`, `hr_presence`, `hr_hourly_cost`, `hr_recruitment_sms`
+- `tests/test_phase296_301.py` (superseded by `tests/test_phase296_307.py` in 1.120.0)
+
+### Changed
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all modules above
+- **core/release.py**: `version_info = (1, 115, 0, ...)`
+
+---
+
+## 1.114.0 – Phases 289–295: Event, Website, Stock/Sale Bridges, Product & Base (Cluster E) (2026-03-19)
+
+### Added
+- **addons/event_crm/** (Phase 289): `event.registration.lead_id`, `crm.lead.registration_ids`, `event_registration_count`
+- **addons/event_sale/** (Phase 290): `sale.order.line.event_id` / `event_ticket_id`, `event.event.sale_order_line_ids`, `sale_count`
+- **addons/website_crm/** (Phase 290): `crm.lead.website_id`, `website_form_url`
+- **addons/website_payment/** (Phase 290): `payment.provider.website_id`, `is_published`
+- **addons/account_fleet/** (Phase 291): `account.move.line.vehicle_id`, `fleet.vehicle.invoice_count`
+- **addons/stock_sms/** (Phase 291): `stock.picking.sms_ids` / `sms_count`, `sms.sms.picking_id`
+- **addons/stock_delivery/** (Phase 291): `stock.picking.carrier_id`, `carrier_tracking_ref`, `weight`
+- **addons/sale_expense_margin/** (Phase 292): `hr.expense.margin` (computed from linked sale order margin)
+- **addons/sale_loyalty_delivery/** (Phase 292): minimal `loyalty.reward` model (`reward_type`, `delivery_carrier_id`)
+- **addons/purchase_requisition_stock/** (Phase 293): `purchase.requisition.picking_count`, `stock.picking.requisition_id`
+- **addons/purchase_requisition_sale/** (Phase 293): `purchase.requisition.sale_order_count`, `sale.order.requisition_id`
+- **addons/product_margin/** (Phase 294): `product.product.total_margin`, `expected_margin_rate`
+- **addons/product_expiry/** (Phase 294): `stock.lot.expiration_date`, `use_date`, `removal_date`, `alert_date`
+- **addons/auth_password_policy/** (Phase 295): `password.policy` + `res.config.settings.password_min_length/password_require_*`
+- **addons/social_media/** (Phase 295): partner social fields (`facebook`, `twitter`, `linkedin`, `github`, `instagram`)
+- **addons/base_address_extended/** (Phase 295): `res.partner.street_name`, `street_number`, `street_number2`
+- **addons/base_geolocalize/** (Phase 295): `res.partner.partner_latitude` / `partner_longitude`, `geo_localize()` stub
+- `tests/test_phase291_295.py`
+
+### Changed
+- **core/tools/config.py**: Registered all cluster E modules in `DEFAULT_SERVER_WIDE_MODULES`
+- **core/release.py**: `version_info = (1, 114, 0, ...)`
+
+---
+
+## 1.111.0 – Phases 287–288: HR Bridge Modules (2026-03-19)
+
+### Added
+- **addons/hr_gamification/** (Phase 287): `hr.employee.badge_ids` bridge to `gamification.badge.user`
+- **addons/hr_fleet/** (Phase 287): `hr.employee.vehicle_ids` and `fleet.vehicle.employee_id`
+- **addons/hr_maintenance/** (Phase 287): `hr.employee.equipment_ids` and `maintenance.equipment.employee_id`
+- **addons/hr_calendar/** (Phase 288): `calendar.event.employee_id`, `hr.employee.meeting_count` compute
+- **addons/hr_homeworking/** (Phase 288): `hr.employee.location` model and `hr.employee.work_location_id`
+- **addons/hr_recruitment_skills/** (Phase 288): `hr.applicant.skill_ids` to `hr.skill`
+- `tests/test_phase287_288.py`
+
+### Changed
+- **core/tools/config.py**: Added `hr_gamification`, `hr_fleet`, `hr_maintenance`, `hr_calendar`, `hr_homeworking`, `hr_recruitment_skills` to `DEFAULT_SERVER_WIDE_MODULES`
+
+---
+
+## 1.110.0 – Phases 284–286: Project Bridge Modules (2026-03-19)
+
+### Added
+- **addons/project_todo/** (Phase 284): `project.task` to-do helpers and `res.users` onboarding hook
+- **addons/project_stock/** (Phase 284): `stock.picking.project_id`, project picking counters/actions
+- **addons/project_sms/** (Phase 284): `project.task.type.sms_template_id`, project/task SMS hooks
+- **addons/project_purchase/** (Phase 285): `purchase.order.project_id`, project purchase counter/action
+- **addons/project_hr_expense/** (Phase 285): `hr.expense.project_id`, project expense counter/action
+- **addons/project_sale_expense/** (Phase 286): sale-expense profitability bridge hooks on `project.project`, `hr.expense`, `account.move.line`
+- **addons/project_timesheet_holidays/** (Phase 286): leave/global-leave timesheet links and company defaults
+- `tests/test_phase284_286.py`
+
+### Changed
+- **core/tools/config.py**: Added `project_todo`, `project_stock`, `project_sms`, `project_purchase`, `project_hr_expense`, `project_sale_expense`, `project_timesheet_holidays`
+
+---
+
 ## 1.109.0 – Phases 274–283: Accounting, Gamification, Supply Chain and MRP Bridges (2026-03-19)
 
 ### Added

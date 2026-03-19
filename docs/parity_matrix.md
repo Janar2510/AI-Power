@@ -106,3 +106,12 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | sale_purchase_stock | `addons/sale_purchase_stock/` | `addons/sale_purchase_stock/` Phase 283 | done |
 | sale_stock_margin | `addons/sale_stock_margin/` | `addons/sale_stock_margin/` Phase 283 | done |
 | sale_timesheet_margin | `addons/sale_timesheet_margin/` | `addons/sale_timesheet_margin/` Phase 283 | done |
+| event_product / event_sms / event_crm | `addons/event_*` | `addons/event_product`, `event_sms`, `event_crm` Phase 289 | done | test_phase289_290 |
+| event_sale / website_crm / website_payment | `addons/event_sale`, `website_crm`, `website_payment` | Phase 290 | done | test_phase289_290 |
+| account_fleet / stock_sms / stock_delivery | `addons/account_fleet`, `stock_sms`, `stock_delivery` | Phase 291 | done | test_phase291_295 |
+| sale_expense_margin / sale_loyalty_delivery | `addons/sale_expense_margin`, `sale_loyalty_delivery` | Phase 292 | done | test_phase291_295 |
+| purchase_requisition_stock / purchase_requisition_sale | `addons/purchase_requisition_stock`, `purchase_requisition_sale` | Phase 293 | done | test_phase291_295 |
+| product_margin / product_expiry | `addons/product_margin`, `product_expiry` | Phase 294 | done | test_phase291_295 |
+| auth_password_policy / social_media / base_* | `addons/auth_password_policy`, `social_media`, `base_address_extended`, `base_geolocalize` | Phase 295 | done | test_phase291_295 |
+| Phases 296–301 (MRP/project/HR bridges, plan fields) | `mrp_landed_costs`, `mrp_product_expiry`, `mrp_repair`, `mrp_subcontracting_*`, `project_*`, `sale_project_stock_account`, `hr_*` bridges | `addons/*` Phase 296–301 | done | test_phase296_307 |
+| Phases 302–307 (sale/auth/stock/website/HR cluster) | `sale_purchase_project`, `sale_project_stock`, `sale_mrp_margin`, `sale_stock_product_expiry`, `calendar_sms`, `resource_mail`, `survey_crm`, `event_crm_sale`, `mail_bot`, `auth_password_policy_portal`, `auth_password_policy_signup`, `auth_totp_mail`, `auth_totp_portal`, `stock_maintenance`, `stock_picking_batch`, `purchase_repair`, `stock_dropshipping`, `web_hierarchy`, `website_mail`, `website_sms`, `website_links`, `website_project`, `website_timesheet`, `hr_skills_event`, `hr_skills_survey`, `mail_bot_hr`, `hr_org_chart` | `addons/*` Phase 302–307 (bridge naming aligned to regression contract) | done | test_phase296_307 |

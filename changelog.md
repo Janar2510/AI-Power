@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.103.0 – Phases 262–267: Sales Stack, Communication, ORM _read_group (2026-03-19)
+
+### Added
+- **addons/utm/** (Phase 262): UTM trackers (utm.campaign, utm.medium, utm.source, utm.stage, utm.tag, utm.mixin)
+- **addons/phone_validation/** (Phase 262): phone.blacklist, res.partner/res.users _phone_format
+- **addons/iap_mail/** (Phase 262): iap.account extensions (company_ids, warning_threshold, warning_user_ids)
+- **addons/sales_team/** (Phase 263): crm.team, crm.team.member, crm.tag
+- **addons/link_tracker/** (Phase 263): link.tracker, link.tracker.click, link.tracker.code
+- **addons/partner_autocomplete/** (Phase 263): res.partner autocomplete_by_name/autocomplete_by_domain stubs
+- **addons/account_payment/** (Phase 264): account.payment, account.move payment_ids
+- **addons/account_check_printing/** (Phase 264): account.payment check_number, account.journal check_sequence_id
+- **addons/sale_management/** (Phase 265): sale.order.template, sale.order.template.line, sale.order template_id
+- **addons/project_account/** (Phase 265): project.project budget, total_invoiced, margin
+- **addons/sale_service/** (Phase 265): sale.order.line project_id, task_id
+- **addons/sale_project/** (Phase 265): sale.order project_id, sale.order.line project_id/task_id, project.task sale_line_id
+- **addons/sms/** (Phase 266): sms.sms, sms.template
+- **addons/privacy_lookup/** (Phase 266): privacy.log
+- **addons/web_tour/** (Phase 266): web_tour.tour
+- **core/orm/models.py** (Phase 267): _read_group (aggregates, having, date granularities), _read_grouping_sets
+- Tests: test_phase262, test_read_group_phase267
+
+### Changed
+- **core/orm/models.py**: _abstract support for AbstractModel; merge when _name == _inherit
+- **core/tools/config.py**: Added utm, phone_validation, iap_mail, sales_team, link_tracker, partner_autocomplete, account_payment, account_check_printing, sale_management, project_account, sale_service, sale_project, sms, privacy_lookup, web_tour
+- **addons/sale/__manifest__.py**: Added sales_team dependency
+
+### Migration Notes
+- New modules auto-load via DEFAULT_SERVER_WIDE_MODULES
+- read_group now wraps _read_group for backward compatibility
+
 ## 1.97.0 – Phases 254–261: ORM Parity, Auth, IAP, Business Modules (2026-03-19)
 
 ### Added

@@ -72,3 +72,19 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | portal_rating | `addons/portal_rating/` | `addons/portal_rating/` Phase 259 | done |
 | lunch | `addons/lunch/` | `addons/lunch/` Phase 260 | done |
 | data_recycle | `addons/data_recycle/` | `addons/data_recycle/` Phase 261 | done |
+| utm | `addons/utm/` | `addons/utm/` Phase 262 | done |
+| phone_validation | `addons/phone_validation/` | `addons/phone_validation/` Phase 262 | done |
+| iap_mail | `addons/iap_mail/` | `addons/iap_mail/` Phase 262 | done |
+| sales_team | `addons/sales_team/` | `addons/sales_team/` Phase 263 | done |
+| link_tracker | `addons/link_tracker/` | `addons/link_tracker/` Phase 263 | done |
+| partner_autocomplete | `addons/partner_autocomplete/` | `addons/partner_autocomplete/` Phase 263 | done |
+| account_payment | `addons/account_payment/` | `addons/account_payment/` Phase 264 | done |
+| account_check_printing | `addons/account_check_printing/` | `addons/account_check_printing/` Phase 264 | done |
+| sale_management | `addons/sale_management/` | `addons/sale_management/` Phase 265 | done |
+| project_account | `addons/project_account/` | `addons/project_account/` Phase 265 | done |
+| sale_service | `addons/sale_service/` | `addons/sale_service/` Phase 265 | done |
+| sale_project | `addons/sale_project/` | `addons/sale_project/` Phase 265 | done |
+| sms | `addons/sms/` | `addons/sms/` Phase 266 | done |
+| privacy_lookup | `addons/privacy_lookup/` | `addons/privacy_lookup/` Phase 266 | done |
+| web_tour | `addons/web_tour/` | `addons/web_tour/` Phase 266 | done |
+| _read_group / _read_grouping_sets | `odoo/orm/models.py` | `core/orm/models.py` Phase 267 | done |

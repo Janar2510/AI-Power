@@ -515,8 +515,10 @@ class Model(type):
 
     def __new__(mcs, name: str, bases: tuple, attrs: dict):
         cls = super().__new__(mcs, name, bases, attrs)
-        if cls._name:
+        if cls._name and not getattr(cls, "_abstract", False):
             cls._table = cls._table or cls._name.replace(".", "_")
+        elif getattr(cls, "_abstract", False):
+            cls._table = None
         return cls
 
     def __init__(cls, name: str, bases: tuple, attrs: dict):
@@ -526,7 +528,7 @@ class Model(type):
         if not isinstance(inherits, dict):
             inherits = {}
         cls._inherits = inherits
-        if inherit and not cls._name and cls._registry:
+        if inherit and cls._registry and (not cls._name or cls._name == inherit):
             cls._registry.merge_model(inherit, cls, attrs)
         elif cls._name and cls._registry:
             cls._registry.register_model(cls._name, cls)
@@ -1865,6 +1867,125 @@ class ModelBase(metaclass=Model):
         return recs.read(fields)
 
     @classmethod
+    def _read_group(
+        cls: Type[T],
+        domain: Optional[List] = None,
+        groupby: Optional[List[str]] = None,
+        aggregates: Optional[List[str]] = None,
+        having: Optional[List] = None,
+        offset: int = 0,
+        limit: Optional[int] = None,
+        order: Optional[str] = None,
+        env: Any = None,
+    ) -> List[Tuple]:
+        """Get aggregations grouped by groupby. Returns list of tuples (group_vals..., agg_vals...).
+        Phase 267: aggregates='field:sum', 'field:count_distinct'; groupby supports 'field:day', 'field:month'."""
+        env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
+        cr = env.cr if env and hasattr(env, "cr") else None
+        if not cr:
+            return []
+        groupby = list(groupby or [])
+        aggregates = list(aggregates or [])
+        if not groupby and not aggregates:
+            return []
+        from core.orm.security import get_record_rules
+        model_name = getattr(cls, "_name", "")
+        uid = getattr(env, "uid", 1)
+        rule_domains = get_record_rules(model_name, uid, env=env, operation="read")
+        combined = list(domain or [])
+        for rd in rule_domains:
+            combined = combined + [rd]
+        domain = combined
+        table = cls._table
+        stored = cls._get_stored_field_names()
+        where, params = _domain_to_sql(domain or [], table, cr, cls)
+        select_parts = []
+        group_exprs = []
+        for spec in groupby:
+            if ":" in spec:
+                fname, gran = spec.split(":", 1)
+                if gran in ("day", "week", "month", "quarter", "year") and fname in stored:
+                    if gran == "day":
+                        expr = f'DATE("{fname}")'
+                    elif gran == "week":
+                        expr = f'DATE_TRUNC(\'week\', "{fname}"::timestamp)'
+                    elif gran == "month":
+                        expr = f'DATE_TRUNC(\'month\', "{fname}"::timestamp)'
+                    elif gran == "quarter":
+                        expr = f'DATE_TRUNC(\'quarter\', "{fname}"::timestamp)'
+                    else:
+                        expr = f'DATE_TRUNC(\'year\', "{fname}"::timestamp)'
+                    select_parts.append(f'{expr} AS "{spec}"')
+                    group_exprs.append(expr)
+                else:
+                    if fname in stored:
+                        select_parts.append(f'"{fname}"')
+                        group_exprs.append(f'"{fname}"')
+            elif spec in stored:
+                select_parts.append(f'"{spec}"')
+                group_exprs.append(f'"{spec}"')
+        for agg_spec in aggregates:
+            if agg_spec == "__count":
+                select_parts.append("COUNT(*) AS __count")
+                continue
+            if ":" in agg_spec:
+                fname, func = agg_spec.split(":", 1)
+                if fname in stored:
+                    if func == "sum":
+                        select_parts.append(f'COALESCE(SUM("{fname}"), 0) AS "{agg_spec}"')
+                    elif func == "count_distinct":
+                        select_parts.append(f'COUNT(DISTINCT "{fname}") AS "{agg_spec}"')
+                    elif func == "avg":
+                        select_parts.append(f'AVG("{fname}") AS "{agg_spec}"')
+                    elif func in ("min", "max"):
+                        select_parts.append(f'{func.upper()}("{fname}") AS "{agg_spec}"')
+                    else:
+                        select_parts.append(f'COALESCE(SUM("{fname}"), 0) AS "{agg_spec}"')
+        if not group_exprs and not select_parts:
+            return []
+        group_clause = ", ".join(group_exprs) if group_exprs else ""
+        having_clause = ""
+        if having:
+            hav_where, hav_params = _domain_to_sql(having, table, cr, cls)
+            if hav_where and hav_where != "1=1":
+                having_clause = f" HAVING {hav_where}"
+                params = list(params) + list(hav_params)
+        order_clause = f" ORDER BY {order}" if order else ""
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        offset_clause = f" OFFSET {offset}" if offset else ""
+        sql = f'SELECT {", ".join(select_parts)} FROM "{table}" WHERE {where}'
+        if group_clause:
+            sql += f" GROUP BY {group_clause}{having_clause}"
+        sql += f"{order_clause}{limit_clause}{offset_clause}"
+        cr.execute(sql, params)
+        cols = [d[0] for d in cr.description]
+        return [tuple(row) for row in cr.fetchall()]
+
+    @classmethod
+    def _read_grouping_sets(
+        cls: Type[T],
+        domain: Optional[List] = None,
+        grouping_sets: Optional[List[List[str]]] = None,
+        aggregates: Optional[List[str]] = None,
+        order: Optional[str] = None,
+        env: Any = None,
+    ) -> List[List[Tuple]]:
+        """Multiple aggregations with different groupings in one query. Phase 267."""
+        if not grouping_sets:
+            return []
+        results = []
+        for gs in grouping_sets:
+            rows = cls._read_group(
+                domain=domain,
+                groupby=gs,
+                aggregates=aggregates or [],
+                order=order,
+                env=env,
+            )
+            results.append(rows)
+        return results
+
+    @classmethod
     def read_group(
         cls: Type[T],
         domain: Optional[List] = None,
@@ -1877,52 +1998,36 @@ class ModelBase(metaclass=Model):
         env: Any = None,
         operation: str = "read",
     ) -> List[Dict[str, Any]]:
-        """SQL GROUP BY with SUM/COUNT aggregation. Returns [{groupby_field: val, field: agg, __count: n}]."""
-        env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
-        cr = env.cr if env and hasattr(env, "cr") else None
-        if not cr or not groupby:
+        """SQL GROUP BY with SUM/COUNT. Backward compat: wraps _read_group. Returns [{groupby_field: val, field: agg, __count: n}]."""
+        if not groupby:
             return []
-        from core.orm.security import get_record_rules
-        model_name = getattr(cls, "_name", "")
-        uid = getattr(env, "uid", 1)
-        rule_domains = get_record_rules(model_name, uid, env=env, operation=operation)
-        combined = list(domain or [])
-        for rd in rule_domains:
-            combined = combined + [rd]  # Each rule is one term (e.g. ['|', A, B])
-        domain = combined
-        table = cls._table
-        stored = cls._get_stored_field_names()
         groupby = list(groupby)
         if lazy and len(groupby) > 1:
             groupby = groupby[:1]
-        groupby_valid = [g for g in groupby if g in stored]
+        stored = cls._get_stored_field_names()
+        groupby_valid = [g for g in groupby if (g.split(":")[0] if ":" in g else g) in stored]
         if not groupby_valid:
             return []
         fields = fields or []
         measure_fields = [f for f in fields if f in stored and f != "id"]
-        where = "1=1"
-        params: List[Any] = []
-        if domain:
-            dom_where, dom_params = _domain_to_sql(domain, table, cr, cls)
-            where = dom_where
-            params = list(dom_params)
-        select_parts = [f'"{g}"' for g in groupby_valid]
-        for m in measure_fields:
-            select_parts.append(f'COALESCE(SUM("{m}"), 0) AS "{m}"')
-        select_parts.append("COUNT(*) AS __count")
-        group_clause = ", ".join(f'"{g}"' for g in groupby_valid)
-        order_clause = f" ORDER BY {orderby}" if orderby else ""
-        limit_clause = f" LIMIT {limit}" if limit else ""
-        offset_clause = f" OFFSET {offset}" if offset else ""
-        query = f'SELECT {", ".join(select_parts)} FROM "{table}" WHERE {where} GROUP BY {group_clause}{order_clause}{limit_clause}{offset_clause}'
-        cr.execute(query, params)
-        rows = cr.fetchall()
+        aggregates = [f"{m}:sum" for m in measure_fields] + ["__count"]
+        rows = cls._read_group(
+            domain=domain,
+            groupby=groupby_valid,
+            aggregates=aggregates,
+            offset=offset,
+            limit=limit,
+            order=orderby,
+            env=env,
+        )
         result = []
+        col_names = groupby_valid + measure_fields + ["__count"]
         for row in rows:
-            r = dict(row)
-            for g in groupby_valid:
-                if r.get(g) is None:
-                    r[g] = False
+            r = {}
+            for i, name in enumerate(col_names):
+                if i < len(row):
+                    val = row[i]
+                    r[name] = val if val is not None else False
             result.append(r)
         return result
 

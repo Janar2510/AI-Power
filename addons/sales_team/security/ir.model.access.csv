@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_crm_team,access.crm.team,model_crm_team,,1,1,1,1
+access_crm_team_member,access.crm.team.member,model_crm_team_member,,1,1,1,1
+access_crm_tag,access.crm.tag,model_crm_tag,,1,1,1,1

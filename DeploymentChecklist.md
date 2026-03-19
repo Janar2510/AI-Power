@@ -1,5 +1,40 @@
 # Deployment Checklist
 
+## Phases 262–267 – Sales Stack, Communication, ORM _read_group (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Python 3.10+ required
+- [ ] Run `./erp-bin db init -d <db_name>`
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase262 tests.test_read_group_phase267 -v`
+
+### New Modules
+- `addons/utm`: utm.campaign, utm.medium, utm.source, utm.stage, utm.tag, utm.mixin
+- `addons/phone_validation`: phone.blacklist, res.partner/res.users _phone_format
+- `addons/iap_mail`: iap.account extensions
+- `addons/sales_team`: crm.team, crm.team.member, crm.tag
+- `addons/link_tracker`: link.tracker, link.tracker.click, link.tracker.code
+- `addons/partner_autocomplete`: res.partner autocomplete stubs
+- `addons/account_payment`: account.payment, account.move payment_ids
+- `addons/account_check_printing`: account.payment check_number, account.journal check_sequence_id
+- `addons/sale_management`: sale.order.template, sale.order.template.line
+- `addons/project_account`: project.project profitability fields
+- `addons/sale_service`: sale.order.line project_id, task_id
+- `addons/sale_project`: sale.order project_id, project.task sale_line_id
+- `addons/sms`: sms.sms, sms.template
+- `addons/privacy_lookup`: privacy.log
+- `addons/web_tour`: web_tour.tour
+
+### Config Changes
+- `core/tools/config.py`: added all new modules to DEFAULT_SERVER_WIDE_MODULES
+- `addons/sale/__manifest__.py`: added sales_team dependency
+- `core/release.py`: version_info = (1, 103, 0)
+
+### Migration Notes
+- ORM: _read_group, _read_grouping_sets added; read_group wraps _read_group
+- Model merge: when _name == _inherit, attrs are merged (extension inheritance)
+
+---
+
 ## Phases 254–261 – ORM Parity, Auth, IAP, Business Modules (2026-03-19)
 
 ### Pre-Deployment Steps

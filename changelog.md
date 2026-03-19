@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.131.0 - Phases 320-329: final accounting EDI, website event/sale, CRM, delivery and misc bridges (2026-03-19)
+
+### Added
+- **p320**: `account_edi`, `account_edi_proxy_client`, `account_edi_ubl_cii`, `account_add_gln`
+- **p321**: `account_peppol`, `account_peppol_advanced_fields`, `account_qr_code_emv`, `account_qr_code_sepa`
+- **p322**: `account_tax_python`, `account_update_tax_tags`, `sale_edi_ubl`, `purchase_edi_ubl_bis3`
+- **p323**: `website_event_track`, `website_event_track_quiz`, `website_event_track_live`, `website_event_track_live_quiz`
+- **p324**: `website_event_exhibitor`, `website_event_booth_exhibitor`, `website_event_booth_sale_exhibitor`
+- **p325**: `website_sale_loyalty`, `website_sale_mrp`, `website_sale_autocomplete`, `website_sale_stock_wishlist`
+- **p326**: `website_sale_collect`, `website_sale_collect_wishlist`, `website_crm_sms`, `website_cf_turnstile`
+- **p327**: `website_crm_iap_reveal`, `website_crm_partner_assign`, `website_mail_group`, `crm_iap_mine`
+- **p328**: `delivery_mondialrelay`, `website_sale_mondialrelay`, `sale_gelato`, `sale_gelato_stock`, `website_sale_gelato`
+- **p329**: `hr_recruitment_survey`, `project_mail_plugin`, `attachment_indexation`, `certificate`
+- `tests/test_phase320_329.py`
+
+### Changed
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all phase `320-329` modules.
+- **core/release.py**: `version_info = (1, 131, 0, ...)`.
+
+---
+
 ## 1.126.0 - Phases 308-319: infrastructure, commerce, auth/mail, event and CRM extensions (2026-03-19)
 
 ### Added

@@ -1,5 +1,29 @@
 # Deployment Checklist
 
+## Phases 320-329 - Final parity stretch (accounting EDI, website tracks/sale, CRM bridges, delivery and misc) (2026-03-19)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase320_329 -v`
+- [ ] Run schema init/upgrade on target DB for new models introduced in phases 320-329.
+
+### New modules (320-329)
+- `account_edi`, `account_edi_proxy_client`, `account_edi_ubl_cii`, `account_add_gln`
+- `account_peppol`, `account_peppol_advanced_fields`, `account_qr_code_emv`, `account_qr_code_sepa`
+- `account_tax_python`, `account_update_tax_tags`, `sale_edi_ubl`, `purchase_edi_ubl_bis3`
+- `website_event_track`, `website_event_track_quiz`, `website_event_track_live`, `website_event_track_live_quiz`
+- `website_event_exhibitor`, `website_event_booth_exhibitor`, `website_event_booth_sale_exhibitor`
+- `website_sale_loyalty`, `website_sale_mrp`, `website_sale_autocomplete`, `website_sale_stock_wishlist`
+- `website_sale_collect`, `website_sale_collect_wishlist`, `website_crm_sms`, `website_cf_turnstile`
+- `website_crm_iap_reveal`, `website_crm_partner_assign`, `website_mail_group`, `crm_iap_mine`
+- `delivery_mondialrelay`, `website_sale_mondialrelay`, `sale_gelato`, `sale_gelato_stock`, `website_sale_gelato`
+- `hr_recruitment_survey`, `project_mail_plugin`, `attachment_indexation`, `certificate`
+
+### Config / release
+- [ ] `core/tools/config.py`: phase `320-329` entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.131.0`
+
+---
+
 ## Phases 308-319 - Infrastructure, website commerce, auth/mail and CRM extensions (2026-03-19)
 
 ### Pre-Deployment Steps

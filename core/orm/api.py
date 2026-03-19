@@ -1,5 +1,6 @@
 """API decorators and exceptions for ORM models."""
 
+from . import decorators as _decorators
 
 class ValidationError(Exception):
     """Raised by Python constraints when validation fails."""
@@ -21,3 +22,18 @@ def depends(*field_paths):
         func._depends = list(field_paths)
         return func
     return decorator
+
+
+# Phase 235: Odoo-style api object for @api.onchange, @api.ondelete, etc.
+class api:
+    """Namespace for API decorators (Odoo-style: @api.constrains, @api.onchange, etc.)."""
+    constrains = staticmethod(constrains)
+    depends = staticmethod(depends)
+    onchange = staticmethod(_decorators.onchange)
+    ondelete = staticmethod(_decorators.ondelete)
+    depends_context = staticmethod(_decorators.depends_context)
+    autovacuum = staticmethod(_decorators.autovacuum)
+    model_create_multi = staticmethod(_decorators.model_create_multi)
+    model = staticmethod(_decorators.model)
+    private = staticmethod(_decorators.private)
+    readonly = staticmethod(_decorators.readonly)

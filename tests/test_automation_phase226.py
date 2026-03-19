@@ -103,7 +103,7 @@ class TestAutomationPhase226(unittest.TestCase):
                 "active": True,
             })
             lead = Lead.create({"name": "Lead for on_time", "type": "lead"})
-            from addons.base.models.base_automation import BaseAutomation
+            from addons.base_automation.models.base_automation import BaseAutomation
             count = BaseAutomation._run_on_time_automations(env)
             self.assertGreaterEqual(count, 1)
             data = lead.read(["description"])

@@ -1,5 +1,183 @@
 # Changelog
 
+## 1.97.0 – Phases 254–261: ORM Parity, Auth, IAP, Business Modules (2026-03-19)
+
+### Added
+- **core/orm/commands.py** (Phase 254): `Command` IntEnum for O2M/M2M writes
+- **core/orm/domains.py** (Phase 254): Domain operator constants (`any!`, `not any!`)
+- **core/orm/models.py** (Phase 254): `search_fetch`; `any!`/`not any!` in `_domain_to_sql`
+- **addons/base_setup/** (Phase 255): `res.config.settings` TransientModel
+- **addons/auth_signup/** (Phase 256): res.partner signup_token/type/expiration; res.users.signup(); res.config.settings auth_signup_*
+- **addons/auth_oauth/** (Phase 257): `auth.oauth.provider` model
+- **addons/iap/** (Phase 258): `iap.account` model
+- **addons/portal_rating/** (Phase 259): rating.rating portal extension
+- **addons/lunch/** (Phase 260): 9 models (lunch.order, lunch.product, lunch.supplier, etc.)
+- **addons/data_recycle/** (Phase 261): `data.recycle.model`, `data.recycle.record`
+- Tests for phases 254–261
+
+### Changed
+- **core/release.py**: `MIN_PY_VERSION = (3, 10)`; version_info = (1, 97, 0)
+- **core/orm/fields.py**: Field `__init__` accepts `**kwargs` (config_parameter)
+- **core/tools/config.py**: Added base_setup, auth_signup, auth_oauth, iap, portal_rating, lunch, data_recycle
+
+### Migration Notes
+- Python 3.10+ required
+- New modules auto-load via DEFAULT_SERVER_WIDE_MODULES
+
+## 1.93.0 – Phases 251–253: Digest, Base Automation, MRP Subcontracting (2026-03-19)
+
+### Added
+- **addons/digest/** (Phase 251): KPI email digests
+  - `digest.digest`: name, periodicity, next_run_date, user_ids, company_id, state; `_action_send_digest()`
+  - `digest.tip`: name, tip_description, group_id
+  - `res.users`: digest_ids (M2M)
+- **addons/base_automation/** (Phase 252): Extracted from base
+  - `base.automation`: same model, now in standalone module; views/menu under Settings > Technical
+- **addons/mrp_subcontracting/** (Phase 253): Subcontracting bridge
+  - `mrp.bom`: type=subcontracting, subcontractor_ids
+  - `stock.move`: is_subcontract
+  - `stock.warehouse`: subcontracting_location_id
+  - `res.partner`: property_stock_subcontractor
+- `tests/test_digest_phase251.py`, `tests/test_base_automation_phase252.py`, `tests/test_mrp_subcontracting_phase253.py`
+
+### Changed
+- **addons/base/**: Removed base.automation model, views, menu, access rule; model moved to base_automation
+- **core/tools/config.py**: Added `digest`, `base_automation`, `mrp_subcontracting` to DEFAULT_SERVER_WIDE_MODULES
+- **tests/test_automation_phase226.py**: Import updated to `addons.base_automation.models.base_automation`
+
+### Migration Notes
+- base_automation loads after base; Automated Actions menu now under base_automation
+- digest, base_automation, mrp_subcontracting auto-load via config
+
+## 1.92.0 – Phases 249–250: Onboarding + HR Work Entries (2026-03-19)
+
+### Added
+- **addons/onboarding/** (Phase 249): Setup wizard toolbox
+  - `onboarding.onboarding`: name, route_name, sequence, step_ids, is_per_company
+  - `onboarding.onboarding.step`: title, description, done_icon, panel_step_open_action_name, onboarding_id
+  - `onboarding.progress`: onboarding_id, company_id, is_onboarding_closed, progress_step_ids
+  - `onboarding.progress.step`: step_id, progress_id, state (not_started/in_progress/done)
+- **addons/hr_work_entry/** (Phase 250): Work entry tracking for payroll
+  - `hr.work.entry.type`: name, code, color, leave_id, is_leave, is_unforeseen, active
+  - `hr.work.entry`: name, employee_id, work_entry_type_id, date_start, date_stop, duration, state
+  - `hr.employee`: work_entry_source (calendar/manual)
+- `tests/test_onboarding_phase249.py`, `tests/test_hr_work_entry_phase250.py`
+
+### Changed
+- **core/tools/config.py**: Added `onboarding`, `hr_work_entry` to DEFAULT_SERVER_WIDE_MODULES
+- **addons/hr_holidays/__manifest__.py**: Added `hr_work_entry` dependency
+
+## 1.91.0 – Phase 248: Standalone Analytic Module (2026-03-19)
+
+### Added
+- **addons/analytic/**: New standalone analytic accounting module (Odoo 19 parity)
+  - `analytic.account`: name, code, plan_id, partner_id, company_id, active
+  - `analytic.line`: name, date, account_id, amount, unit_amount, product_id, partner_id, move_line_id
+  - `account.analytic.plan`: name, parent_id, color (plan hierarchy)
+  - security/ir.model.access.csv, views/analytic_views.xml
+  - Menu: Analytic > Analytic Accounts, Analytic > Analytic Plans
+- `tests/test_analytic_phase248.py`: Module load, analytic.account CRUD with plan_id, analytic.line links
+
+### Changed
+- **addons/account/**: Now depends on `analytic`; analytic models moved to analytic module
+  - Removed analytic_account.py, analytic_line.py; removed analytic views/menu from account_views.xml
+  - account.move.line, hr.expense, project.project continue to use analytic.account via analytic module
+- **core/tools/config.py**: Added `analytic` to DEFAULT_SERVER_WIDE_MODULES (before account)
+
+### Migration Notes
+- `analytic` loads before `account`; hr_timesheet extends analytic.line via account dependency chain
+- No data migration: analytic tables created by analytic module; account no longer owns them
+
+## 1.90.0 – Phase 247: Standalone Product Module (2026-03-18)
+
+### Added
+- **addons/product/**: New standalone product module (Odoo 19 parity)
+  - `product.template`: name, list_price, standard_price, type, categ_id, uom_id, description, active, attribute_line_ids; _create_variant_ids()
+  - `product.product`: _inherits product.template; product_template_id, default_code, barcode, attribute_value_ids, active
+  - `product.category`: name, parent_id
+  - `product.attribute`, `product.attribute.value`, `product.template.attribute.line`: variant attributes
+  - `product.pricelist`, `product.pricelist.item`: pricelists with get_product_price()
+  - `product.supplierinfo`: partner_id, product_tmpl_id, price, min_qty
+  - security/ir.model.access.csv, views/product_views.xml, views/product_pricelist_views.xml
+- `tests/test_product_phase247.py`: Module load, template create, product create via _inherits
+
+### Changed
+- **addons/sale/**: Now depends on `product`; product models moved to product module
+  - Removed product_template, product_product, product_attribute, product_category, product_pricelist, product_pricelist_item
+  - Removed product_views.xml; menu items now reference product.action_product_product, product.action_product_pricelist
+  - sale/security/ir.model.access.csv: removed product model access (now in product)
+- **core/tools/config.py**: Added `product` to DEFAULT_SERVER_WIDE_MODULES (before sale)
+
+### Migration Notes
+- `product` loads before `sale`; stock, purchase, website, etc. get product models via sale → product chain
+- No data migration needed: product tables created by product module; sale no longer owns them
+
+## 1.89.3 – Phase Plan 246–253 (Architect Analysis) (2026-03-18)
+
+### Added
+- `docs/erp_next_phases_plan_246_253.md`: Full architect plan for next 8 phases based on live Odoo 19.0 source analysis
+  - Phase 246: ORM parity (Command class, `any!`/`not any!` operators, `search_fetch`, Python 3.10 bump)
+  - Phase 247: `product` module extracted from `sale` as standalone (largest structural gap)
+  - Phase 248: `analytic` accounting (account, line, plan, mixin)
+  - Phase 249: `onboarding` toolbox
+  - Phase 250: `hr_work_entry` (payroll foundation)
+  - Phase 251: `digest` KPI email system
+  - Phase 252: `base_automation` extracted as standalone module
+  - Phase 253: `mrp_subcontracting` bridge
+- All phases include exact Odoo 19.0 source paths, model definitions, file lists, test DB names, and parity matrix update targets
+- Version target v1.90.0 on completion
+
+## 1.89.2 – Architect Odoo 19.0 Source Integration (2026-03-18)
+
+### Added
+- `docs/odoo19_reference.md`: Comprehensive Odoo 19.0 source map — 611 addons categorised, ORM file layout, all new 19.0 features vs 18, gap analysis table (15 high/medium priority gaps identified), Python version note (3.10 min), how-to-explore guide with exact file paths
+- `.cursor/rules/agents/system-architect.mdc`: Architect now has direct Odoo 19.0 source paths (`/Users/janarkuusk/AI Power/odoo-19.0/`) for gap analysis workflow
+- `.cursor/rules/core-protocol.mdc`: Added Odoo 19.0 source to long-term memory table for all agents
+
+## 1.89.1 – Multi-Agent Developer Team Setup (2026-03-18)
+
+### Added
+- `.cursor/rules/core-protocol.mdc`: Always-active core multi-agent protocol; defines agent roles, quality gates, and long-term memory map
+- `.cursor/rules/agents/system-architect.mdc`: System Architect persona — planning, gap analysis, phase coordination
+- `.cursor/rules/agents/feature-dev.mdc`: Feature Developer persona — implementation, models, tests, Odoo parity conventions
+- `.cursor/rules/agents/security-reviewer.mdc`: Security Reviewer persona — access rules, ORM safety, AI tool security
+- `.cursor/rules/agents/context-specialist.mdc`: Context Specialist persona — codebase navigation, pattern extraction
+- `.cursor/rules/agents/docs-writer.mdc`: Docs Writer persona — changelog, checklist, parity matrix maintenance
+- `docs/QUICK_START_AGENTS.md`: Team onboarding guide with trigger phrases, workflow loop, and file structure reference
+
+## 1.89.0 (Phases 234–245: ERP Next Phases Plan)
+
+### Phase 234: ORM Recordset Operations
+- core/orm/models.py: filtered_domain, grouped, concat, union, toggle_active, action_archive, action_unarchive, export_data
+- ModelBase.name_create(name, env) for Many2one 'Create'
+- tests/test_orm_recordset_phase234.py
+
+### Phase 235: API Decorators
+- core/orm/decorators.py: onchange, ondelete, depends_context, autovacuum, model_create_multi, model, private, readonly
+- core/orm/api.py: api namespace exposing decorators
+- addons/base/models/base_autovacuum.py: base.autovacuum model, run() discovers and runs @api.autovacuum
+- core/db/init_data.py: daily cron for base.autovacuum
+- tests/test_api_decorators_phase235.py
+
+### Phase 236: Missing Field Types
+- core/orm/fields.py: Reference, Many2oneReference, Json, Properties, PropertiesDefinition
+- core/orm/models.py: _prepare_jsonb_vals for JSONB serialization (psycopg2.extras.Json)
+- addons/base/models/base_field_test.py: test model for Phase 236 fields
+- tests/test_orm_fields_phase236.py
+
+### Phase 237: UoM + Product Module
+- addons/uom: uom.uom, uom.category (units, conversions)
+- addons/sale: product.template uom_id; sale depends on uom
+- core/db/init_data.py: _load_uom_data (Units, kg, g)
+- core/tools/config.py: uom in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_uom_product_phase237.py
+
+### Phase 238: Resource + HR Time Off
+- addons/resource: resource.calendar, resource.calendar.attendance, resource.resource
+- addons/hr_holidays: extends hr.employee with resource_calendar_id; depends on hr, resource
+- core/tools/config.py: resource, hr_holidays in DEFAULT_SERVER_WIDE_MODULES
+- tests/test_resource_hr_holidays_phase238.py
+
 ## 1.88.0 (Phases 229–233: Barcode, Quality, Anomaly, Maintenance, Event)
 
 ### Phase 229: Barcode Scanning

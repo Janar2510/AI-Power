@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_uom_category_user,uom.category user,model_uom_category,,1,1,1,1
+access_uom_uom_user,uom.uom user,model_uom_uom,,1,1,1,1

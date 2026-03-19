@@ -17,6 +17,7 @@ def load_default_data(env) -> None:
     _load_res_country_state(env)
     _load_res_lang(env)
     _load_res_company(env)
+    _load_uom_data(env)
     _load_stock_data(env)
     _load_mrp_data(env)
     _load_account_data(env)
@@ -170,6 +171,17 @@ def load_default_data(env) -> None:
                 "active": True,
             })
             _logger.info("Created cron: RAG bulk reindex")
+        if IrCron and env.get("base.autovacuum") and not IrCron.search([("model", "=", "base.autovacuum")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Autovacuum (@api.autovacuum methods)",
+                "model": "base.autovacuum",
+                "method": "run",
+                "interval_minutes": 1440,  # daily
+                "next_run": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: Autovacuum")
         if IrCron and env.get("base.db.backup") and not IrCron.search([("model", "=", "base.db.backup")]):
             from datetime import datetime, timedelta
             IrCron.create({
@@ -638,6 +650,43 @@ def _load_dashboard_widgets(env) -> None:
         _logger.warning("Could not load dashboard widgets: %s", e)
 
 
+def _load_uom_data(env) -> None:
+    """Load default UoM categories and units (Phase 237)."""
+    try:
+        UomCategory = env.get("uom.category")
+        UomUom = env.get("uom.uom")
+        if not UomCategory or not UomUom:
+            return
+        if UomUom.search([]):
+            return  # already seeded
+        categ_unit = UomCategory.create({"name": "Unit"})
+        UomUom.create({
+            "name": "Units",
+            "category_id": categ_unit.id,
+            "factor": 1.0,
+            "factor_inv": 1.0,
+            "rounding": 0.01,
+        })
+        categ_weight = UomCategory.create({"name": "Weight"})
+        UomUom.create({
+            "name": "kg",
+            "category_id": categ_weight.id,
+            "factor": 1.0,
+            "factor_inv": 1.0,
+            "rounding": 0.01,
+        })
+        UomUom.create({
+            "name": "g",
+            "category_id": categ_weight.id,
+            "factor": 0.001,
+            "factor_inv": 1000.0,
+            "rounding": 0.01,
+        })
+        _logger.info("Created default UoM categories and units")
+    except Exception as e:
+        _logger.warning("Could not load UoM data: %s", e)
+
+
 def _load_account_data(env) -> None:
     """Load default chart of accounts and journals (Phase 118)."""
     try:
@@ -671,10 +720,19 @@ def _load_product_demo(env) -> None:
     """Load demo products for shop (Phase 143). Ensures E2E shop tests have products."""
     try:
         Product = env.get("product.product")
+        Uom = env.get("uom.uom")
         if not Product or Product.search([]):
             return
+        uom_id = None
+        if Uom:
+            u = Uom.search([("name", "=", "Units")], limit=1)
+            if u.ids:
+                uom_id = u.ids[0]
         for name, price in [("Widget A", 9.99), ("Widget B", 19.50), ("Widget C", 4.99)]:
-            Product.create({"name": name, "list_price": price})
+            vals = {"name": name, "list_price": price}
+            if uom_id:
+                vals["uom_id"] = uom_id
+            Product.create(vals)
         _logger.info("Created demo products for shop")
     except Exception as e:
         _logger.warning("Could not load product demo: %s", e)

@@ -52,3 +52,23 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | AI anomaly detection | `ai.anomaly`, detect_anomalies, explain_anomaly | `addons/ai_assistant/` | done |
 | Maintenance | `maintenance.equipment`, `maintenance.request` | `addons/maintenance/` | done |
 | Event management | `event.event`, `event.registration` | `addons/event/` | done |
+| ORM recordset ops | `mapped`, `filtered`, `grouped`, `concat`, `union`, `name_create` | `core/orm/models.py` Phase 234 | done |
+| API decorators | `@api.onchange`, `@api.ondelete`, `@api.autovacuum` | `core/orm/decorators.py`, `base.autovacuum` Phase 235 | done |
+| Field types | `Reference`, `Json`, `Properties`, `Many2oneReference` | `core/orm/fields.py` Phase 236 | done |
+| Standalone product module | `addons/product/` | `addons/product/` Phase 247 | done |
+| Analytic accounting | `addons/analytic/` | `addons/analytic/` Phase 248 | done |
+| Onboarding toolbox | `addons/onboarding/` | `addons/onboarding/` Phase 249 | done |
+| HR work entries | `addons/hr_work_entry/` | `addons/hr_work_entry/` Phase 250 | done |
+| KPI Digest | `addons/digest/` | `addons/digest/` Phase 251 | done |
+| base_automation standalone | `addons/base_automation/` | `addons/base_automation/` Phase 252 | done |
+| MRP Subcontracting | `addons/mrp_subcontracting/` | `addons/mrp_subcontracting/` Phase 253 | done |
+| Command class | `odoo/orm/commands.py` | `core/orm/commands.py` Phase 254 | done |
+| Domain operators any!/not any! | `odoo/orm/domains.py` | `core/orm/domains.py` Phase 254 | done |
+| search_fetch | `odoo/orm/models.py` | `core/orm/models.py` Phase 254 | done |
+| base_setup | `addons/base_setup/` | `addons/base_setup/` Phase 255 | done |
+| auth_signup | `addons/auth_signup/` | `addons/auth_signup/` Phase 256 | done |
+| auth_oauth | `addons/auth_oauth/` | `addons/auth_oauth/` Phase 257 | done |
+| IAP | `addons/iap/` | `addons/iap/` Phase 258 | done |
+| portal_rating | `addons/portal_rating/` | `addons/portal_rating/` Phase 259 | done |
+| lunch | `addons/lunch/` | `addons/lunch/` Phase 260 | done |
+| data_recycle | `addons/data_recycle/` | `addons/data_recycle/` Phase 261 | done |

@@ -17,6 +17,7 @@ class Field:
         default: Any = None,
         help: str = "",
         tracking: bool = False,
+        **kwargs,
     ):
         self.string = string
         self.required = required
@@ -24,6 +25,8 @@ class Field:
         self.default = default
         self.help = help
         self.tracking = tracking
+        for k, v in kwargs.items():
+            setattr(self, k, v)
 
     def __set_name__(self, owner, name: str):
         self.name = name
@@ -133,10 +136,57 @@ class Selection(Field):
 
 
 class Html(Field):
-    """HTML field - stored as text, for rich content."""
+    """HTML field - stored as text, for rich content. Sanitized on write (script/style stripped)."""
 
     type = "html"
     column_type = "text"
+
+
+class Reference(Field):
+    """Phase 236: Reference field - stores 'model_name,id' for polymorphic reference."""
+
+    type = "reference"
+    column_type = "varchar"
+
+    def __init__(self, string: str = "", size: int = 255, **kwargs):
+        super().__init__(string=string, **kwargs)
+        self.size = size
+
+
+class Many2oneReference(Field):
+    """Phase 236: Many2oneReference - like Reference but with fixed model from context/discriminator."""
+
+    type = "many2one_reference"
+    column_type = "integer"
+
+    def __init__(self, model_field: str = "", string: str = "", **kwargs):
+        super().__init__(string=string, **kwargs)
+        self.model_field = model_field  # field holding model name (e.g. res_model)
+
+
+class Json(Field):
+    """Phase 236: JSON field - stores dict/list in PostgreSQL JSONB."""
+
+    type = "json"
+    column_type = "jsonb"
+
+
+class Properties(Field):
+    """Phase 236: Properties field - flexible schema key-value stored as JSONB."""
+
+    type = "properties"
+    column_type = "jsonb"
+
+    def __init__(self, string: str = "", definition: Optional[str] = None, **kwargs):
+        super().__init__(string=string, **kwargs)
+        self.definition = definition  # optional: model.field for PropertiesDefinition
+
+
+class PropertiesDefinition(Field):
+    """Phase 236: PropertiesDefinition - schema definition for Properties fields."""
+
+    type = "properties_definition"
+    column_type = "jsonb"  # stores definition as JSON
 
 
 class Computed(Field):

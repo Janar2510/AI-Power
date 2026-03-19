@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_resource_calendar_user,resource.calendar user,model_resource_calendar,,1,1,1,1
+access_resource_calendar_attendance_user,resource.calendar.attendance user,model_resource_calendar_attendance,,1,1,1,1
+access_resource_resource_user,resource.resource user,model_resource_resource,,1,1,1,1

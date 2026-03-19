@@ -51,6 +51,8 @@ def _column_def(field: fields.Field) -> str:
         return "BYTEA"
     if col_type == "numeric":
         return "NUMERIC(16,2)"
+    if col_type == "jsonb":
+        return "JSONB"
     return "VARCHAR(255)"
 
 

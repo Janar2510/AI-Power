@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_digest_digest_user,digest.digest user,model_digest_digest,,1,1,1,1
+access_digest_tip_user,digest.tip user,model_digest_tip,,1,1,1,1

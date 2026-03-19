@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_analytic_account_user,analytic.account user,model_analytic_account,,1,1,1,1
+access_analytic_line_user,analytic.line user,model_analytic_line,,1,1,1,1
+access_analytic_plan_user,account.analytic.plan user,model_account_analytic_plan,,1,1,1,1

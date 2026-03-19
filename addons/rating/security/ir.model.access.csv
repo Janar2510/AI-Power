@@ -1,0 +1,2 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_rating_rating_user,rating.rating user,model_rating_rating,,1,1,1,1

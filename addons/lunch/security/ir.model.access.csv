@@ -1,0 +1,9 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_lunch_product_category,access.lunch.product.category,model_lunch_product_category,,1,1,1,1
+access_lunch_supplier,access.lunch.supplier,model_lunch_supplier,,1,1,1,1
+access_lunch_product,access.lunch.product,model_lunch_product,,1,1,1,1
+access_lunch_topping,access.lunch.topping,model_lunch_topping,,1,1,1,1
+access_lunch_location,access.lunch.location,model_lunch_location,,1,1,1,1
+access_lunch_order,access.lunch.order,model_lunch_order,,1,1,1,1
+access_lunch_cashmove,access.lunch.cashmove,model_lunch_cashmove,,1,1,1,1
+access_lunch_alert,access.lunch.alert,model_lunch_alert,,1,1,1,1

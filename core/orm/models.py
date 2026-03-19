@@ -189,6 +189,35 @@ def _domain_to_sql(
                 ph = ", ".join("%s" for _ in parent_ids)
                 return f'"{fld}" IN ({ph})', parent_ids
             return f'"{fld}" = %s', [val]
+        # Phase 254: any! / not any! — relational subquery, bypasses record rules on comodel
+        if op in ("any!", "not any!") and isinstance(val, (list, tuple)):
+            from core.orm import fields as fmod
+            field = getattr(model_cls, fld, None)
+            if not isinstance(field, (fmod.Many2one, fmod.One2many)):
+                return "1=0" if op == "any!" else "1=1", []
+            registry = getattr(model_cls, "_registry", None)
+            if not registry or not hasattr(registry, "_models"):
+                return "1=0" if op == "any!" else "1=1", []
+            comodel_name = getattr(field, "comodel", "")
+            Comodel = registry._models.get(comodel_name) if comodel_name else None
+            if not Comodel or not getattr(Comodel, "_table", None):
+                return "1=0" if op == "any!" else "1=1", []
+            ct = Comodel._table
+            sub_where, sub_params = _domain_to_sql(list(val), ct, cr, Comodel)
+            if isinstance(field, fmod.Many2one):
+                # main.field stores FK to comodel; use IN to avoid correlation
+                sub_sql = f'(SELECT id FROM "{ct}" WHERE {sub_where})'
+                if op == "any!":
+                    return f'"{fld}" IN {sub_sql}', sub_params
+                return f'("{fld}" IS NULL OR "{fld}" NOT IN {sub_sql})', sub_params
+            inv = getattr(field, "inverse_name", "")
+            if not inv:
+                return "1=0" if op == "any!" else "1=1", []
+            # One2many: main.id referenced in subquery; use table alias for outer
+            exists_sql = f'EXISTS (SELECT 1 FROM "{ct}" _ct WHERE _ct."{inv}" = "{table}".id AND ({sub_where}))'
+            if op == "not any!":
+                exists_sql = f"NOT {exists_sql}"
+            return exists_sql, sub_params
 
     # Implicit AND: list of terms
     parts = []
@@ -373,6 +402,95 @@ class Recordset:
         if len(self._ids) > 1:
             raise ValueError(f"Expected singleton: {self._model._name}({len(self._ids)} records)")
         return self._model.browse(self._ids[0])
+
+    def filtered_domain(self, domain: List) -> "Recordset":
+        """Phase 234: Filter recordset by domain. Returns recordset of same model."""
+        if not self._ids or not domain:
+            return Recordset(self._model, self._ids or [], _env=self._env)
+        env = self._env or getattr(self._model._registry, "_env", None)
+        if not env or not hasattr(env, "cr") or not env.cr:
+            return Recordset(self._model, [], _env=self._env)
+        combined = [("id", "in", self._ids)] + list(domain)
+        return self._model.search(domain=combined, env=env)
+
+    def grouped(self, key: Union[str, Any]) -> Dict[Any, "Recordset"]:
+        """Phase 234: Group records by field name or callable. Returns {key_value: Recordset}."""
+        if not self._ids:
+            return {}
+        result: Dict[Any, List[int]] = {}
+        if isinstance(key, str):
+            rows = self.read([key])
+            for i, rid in enumerate(self._ids):
+                if i < len(rows):
+                    val = rows[i].get(key)
+                    val = False if val is None else val
+                    result.setdefault(val, []).append(rid)
+        elif callable(key):
+            for rec in self:
+                val = key(rec)
+                val = False if val is None else val
+                rid = rec.id if hasattr(rec, "id") else rec._ids[0]
+                result.setdefault(val, []).append(rid)
+        else:
+            return {}
+        return {k: Recordset(self._model, v, _env=self._env) for k, v in result.items()}
+
+    def concat(self, *args: "Recordset") -> "Recordset":
+        """Phase 234: Concatenate recordsets (preserves order, may have duplicates)."""
+        ids = list(self._ids)
+        for other in args:
+            if isinstance(other, Recordset) and other._model == self._model:
+                ids.extend(other._ids)
+        return Recordset(self._model, ids, _env=self._env)
+
+    def union(self, *args: "Recordset") -> "Recordset":
+        """Phase 234: Set union of recordsets (unique IDs, order preserved from self then others)."""
+        seen: set = set(self._ids)
+        ids = list(self._ids)
+        for other in args:
+            if isinstance(other, Recordset) and other._model == self._model:
+                for oid in other._ids:
+                    if oid not in seen:
+                        seen.add(oid)
+                        ids.append(oid)
+        return Recordset(self._model, ids, _env=self._env)
+
+    def toggle_active(self) -> bool:
+        """Phase 234: Toggle active field. Sets active=False if any active, else active=True."""
+        if not self._ids:
+            return True
+        from core.orm import fields as fmod
+        if not hasattr(self._model, "active") or not isinstance(getattr(self._model, "active"), fmod.Boolean):
+            return True
+        rows = self.read(["active"])
+        any_active = any(r.get("active") for r in rows)
+        return self.write({"active": not any_active})
+
+    def action_archive(self) -> bool:
+        """Phase 234: Set active=False (archive records)."""
+        if not self._ids:
+            return True
+        from core.orm import fields as fmod
+        if not hasattr(self._model, "active") or not isinstance(getattr(self._model, "active"), fmod.Boolean):
+            return True
+        return self.write({"active": False})
+
+    def action_unarchive(self) -> bool:
+        """Phase 234: Set active=True (unarchive records)."""
+        if not self._ids:
+            return True
+        from core.orm import fields as fmod
+        if not hasattr(self._model, "active") or not isinstance(getattr(self._model, "active"), fmod.Boolean):
+            return True
+        return self.write({"active": True})
+
+    def export_data(self, fields: Optional[List[str]] = None) -> List[List[Any]]:
+        """Phase 234: Export recordset as list of rows (for CSV/Excel export)."""
+        if not self._ids:
+            return []
+        fnames = fields or ["id"]
+        rows = self.read(fnames)
+        return [[r.get(f) for f in fnames] for r in rows]
 
     def __getattr__(self, name: str) -> Any:
         """Delegate model methods (e.g. activity_schedule) to Model, passing self as first arg."""
@@ -777,6 +895,7 @@ class ModelBase(metaclass=Model):
             return True
         vals = self._model._sanitize_html_vals(vals)
         vals = self._model._decode_binary_vals(vals)
+        vals = self._model._prepare_jsonb_vals(vals)
         cr = self._get_cr()
         if not cr:
             self._cache.update(vals)
@@ -1231,6 +1350,20 @@ class ModelBase(metaclass=Model):
         return out
 
     @classmethod
+    def _prepare_jsonb_vals(cls: Type[T], vals: Dict[str, Any]) -> Dict[str, Any]:
+        """Phase 236: Wrap dict/list in psycopg2.extras.Json for Json/Properties (JSONB) fields."""
+        from core.orm import fields as fmod
+        from psycopg2.extras import Json as PgJson
+        out = dict(vals)
+        for fname, val in vals.items():
+            field = getattr(cls, fname, None)
+            if field is None:
+                continue
+            if getattr(field, "column_type", None) == "jsonb" and isinstance(val, (dict, list)):
+                out[fname] = PgJson(val)
+        return out
+
+    @classmethod
     def _get_inherited_fields(cls, parent_model: str) -> set:
         """Phase 126: Return field names that belong to parent model (for _inherits)."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
@@ -1247,6 +1380,7 @@ class ModelBase(metaclass=Model):
         from core.orm.api import ValidationError
         vals = cls._sanitize_html_vals(vals)
         vals = cls._decode_binary_vals(vals)
+        vals = cls._prepare_jsonb_vals(vals)
         # Merge default values for stored fields not in vals (Phase 161)
         defaults = cls.default_get(list(cls._get_stored_field_names()), getattr(cls._registry, "_context", None))
         for k, v in defaults.items():
@@ -1409,6 +1543,18 @@ class ModelBase(metaclass=Model):
                             Other(env, refs._ids).unlink()
                     except Exception:
                         pass
+        # Phase 235: @api.ondelete - run before unlink (can raise to prevent delete)
+        env = getattr(self, "env", None)
+        for name in dir(self._model):
+            if name.startswith("__"):
+                continue
+            method = getattr(self._model, name, None)
+            if callable(method) and getattr(method, "_ondelete", False):
+                at_uninstall = getattr(method, "_ondelete_at_uninstall", False)
+                ctx = getattr(env, "context", {}) if env else {}
+                if not at_uninstall and ctx.get("module_uninstall"):
+                    continue
+                method(self)
         # Phase 119: base.automation on_unlink (before delete)
         env = getattr(self, "env", None)
         if env and self._ids:
@@ -1537,7 +1683,26 @@ class ModelBase(metaclass=Model):
 
     @classmethod
     def onchange(cls: Type[T], field_name: str, vals: Dict[str, Any]) -> Dict[str, Any]:
-        """Run onchange handler for field if defined. Returns dict of values to update form."""
+        """Run onchange handler for field. Supports _onchange_<field> naming and @api.onchange decorator."""
+        merged: Dict[str, Any] = {}
+        # Phase 235: discover methods via @api.onchange('field1', 'field2')
+        for name in dir(cls):
+            if name.startswith("__"):
+                continue
+            method = getattr(cls, name, None)
+            if not callable(method):
+                continue
+            onchange_fields = getattr(method, "_onchange_fields", ())
+            if field_name and field_name in onchange_fields:
+                try:
+                    result = method(vals)
+                    if isinstance(result, dict):
+                        merged.update(result)
+                except Exception:
+                    pass
+        if merged:
+            return merged
+        # Legacy: _onchange_<field> naming
         method_name = "_onchange_" + (field_name or "").replace(".", "_")
         method = getattr(cls, method_name, None)
         if callable(method):
@@ -1559,6 +1724,20 @@ class ModelBase(metaclass=Model):
         rows = cls.browse(ids).read(["id", "name", "display_name"])
         by_id = {r["id"]: (r.get("display_name") or r.get("name") or str(r["id"])) for r in rows}
         return [(i, by_id.get(i, str(i))) for i in ids]
+
+    @classmethod
+    def name_create(cls: Type[T], name: str, env: Any = None) -> Tuple[int, str]:
+        """Phase 234: Create record with given name. Returns (id, display_name). Used by Many2one 'Create'."""
+        env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
+        if not env:
+            raise ValueError("name_create requires env")
+        rec = cls.create({"name": name}, env=env)
+        rid = rec.id if hasattr(rec, "id") else (rec.ids[0] if rec.ids else None)
+        if not rid:
+            raise ValueError("name_create failed")
+        names = cls.name_get([rid])
+        display = names[0][1] if names else str(rid)
+        return (rid, display)
 
     @classmethod
     def name_search(
@@ -1624,6 +1803,23 @@ class ModelBase(metaclass=Model):
         )
         ids = [r["id"] if hasattr(r, "keys") else r[0] for r in cr.fetchall()]
         return Recordset(cls, ids, _env=env)
+
+    @classmethod
+    def search_fetch(
+        cls: Type[T],
+        domain: Optional[List] = None,
+        field_names: Optional[List[str]] = None,
+        offset: int = 0,
+        limit: Optional[int] = None,
+        order: Optional[str] = None,
+        env: Any = None,
+    ) -> Recordset:
+        """Phase 254: Search and fetch in one call. Returns recordset with fields pre-loaded.
+        Equivalent to search() + read(); combines both for convenience."""
+        recs = cls.search(domain=domain, offset=offset, limit=limit, order=order, env=env)
+        if recs.ids and field_names:
+            recs.read(field_names)
+        return recs
 
     @classmethod
     def search_count(cls: Type[T], domain: Optional[List] = None, env: Any = None, operation: str = "read") -> int:

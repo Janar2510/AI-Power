@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+  <record model="ir.ui.view" id="analytic_account_list">
+    <field name="name">analytic.account list</field>
+    <field name="model">analytic.account</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="name"/>
+        <field name="code"/>
+        <field name="plan_id"/>
+        <field name="partner_id"/>
+        <field name="active"/>
+      </list>
+    </field>
+  </record>
+  <record model="ir.ui.view" id="analytic_account_form">
+    <field name="name">analytic.account form</field>
+    <field name="model">analytic.account</field>
+    <field name="arch" type="xml">
+      <form>
+        <sheet>
+          <group>
+            <field name="name"/>
+            <field name="code"/>
+            <field name="plan_id"/>
+            <field name="partner_id"/>
+            <field name="company_id"/>
+            <field name="active"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+  <record model="ir.actions.act_window" id="action_analytic_account">
+    <field name="name">Analytic Accounts</field>
+    <field name="res_model">analytic.account</field>
+    <field name="view_mode">list,form</field>
+  </record>
+  <record model="ir.ui.menu" id="menu_analytic_root">
+    <field name="name">Analytic</field>
+    <field name="sequence">50</field>
+  </record>
+  <record model="ir.ui.menu" id="menu_analytic_account">
+    <field name="name">Analytic Accounts</field>
+    <field name="parent_id" ref="menu_analytic_root"/>
+    <field name="action" ref="action_analytic_account"/>
+    <field name="sequence">10</field>
+  </record>
+  <record model="ir.ui.view" id="analytic_plan_list">
+    <field name="name">account.analytic.plan list</field>
+    <field name="model">account.analytic.plan</field>
+    <field name="arch" type="xml">
+      <list>
+        <field name="name"/>
+        <field name="parent_id"/>
+        <field name="color"/>
+      </list>
+    </field>
+  </record>
+  <record model="ir.ui.view" id="analytic_plan_form">
+    <field name="name">account.analytic.plan form</field>
+    <field name="model">account.analytic.plan</field>
+    <field name="arch" type="xml">
+      <form>
+        <sheet>
+          <group>
+            <field name="name"/>
+            <field name="parent_id"/>
+            <field name="color"/>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+  <record model="ir.actions.act_window" id="action_analytic_plan">
+    <field name="name">Analytic Plans</field>
+    <field name="res_model">account.analytic.plan</field>
+    <field name="view_mode">list,form</field>
+  </record>
+  <record model="ir.ui.menu" id="menu_analytic_plan">
+    <field name="name">Analytic Plans</field>
+    <field name="parent_id" ref="menu_analytic_root"/>
+    <field name="action" ref="action_analytic_plan"/>
+    <field name="sequence">20</field>
+  </record>
+  </data>
+</odoo>

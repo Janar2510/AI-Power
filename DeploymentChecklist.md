@@ -1,5 +1,120 @@
 # Deployment Checklist
 
+## Phases 254–261 – ORM Parity, Auth, IAP, Business Modules (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Python 3.10+ required; run tests with `python3.11 -m unittest tests.test_orm_commands_phase254 tests.test_base_setup_phase255 tests.test_auth_signup_phase256 -v`
+- [ ] Run `./erp-bin db init -d <db_name>`
+
+### New Modules
+- `addons/base_setup`: res.config.settings
+- `addons/auth_signup`: res.partner signup fields, res.users.signup
+- `addons/auth_oauth`: auth.oauth.provider
+- `addons/iap`: iap.account
+- `addons/portal_rating`: rating.rating portal extension
+- `addons/lunch`: 9 models (lunch.order, lunch.product, etc.)
+- `addons/data_recycle`: data.recycle.model, data.recycle.record
+
+### Config Changes
+- `core/tools/config.py`: added base_setup, auth_signup, auth_oauth, iap, portal_rating, lunch, data_recycle
+- `core/release.py`: MIN_PY_VERSION = (3, 10)
+
+### Migration Notes
+- Python 3.10+ required for platform
+
+---
+
+## Phases 251–253 – Digest, Base Automation, MRP Subcontracting (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run `./erp-bin db init -d <db_name>`
+- [ ] Run tests: `python3 -m pytest tests/test_digest_phase251.py tests/test_base_automation_phase252.py tests/test_mrp_subcontracting_phase253.py tests/test_automation_phase226.py -v`
+
+### New Modules
+- `addons/digest`: digest.digest, digest.tip; res.users digest_ids
+- `addons/base_automation`: base.automation (extracted from base)
+- `addons/mrp_subcontracting`: extends mrp.bom, stock.move, stock.warehouse, res.partner
+
+### Config Changes
+- `core/tools/config.py`: added `digest` (after portal), `base_automation` (after base_import), `mrp_subcontracting` (after mrp_account)
+
+### Migration Notes
+- base.automation moved from addons/base to addons/base_automation
+- Automated Actions menu under Settings > Technical (base_automation)
+
+---
+
+## Phases 249–250 – Onboarding + HR Work Entries (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run `./erp-bin db init -d <db_name>`
+- [ ] Run tests: `python3 -m pytest tests/test_onboarding_phase249.py tests/test_hr_work_entry_phase250.py -v`
+
+### New Modules
+- `addons/onboarding`: onboarding.onboarding, onboarding.onboarding.step, onboarding.progress, onboarding.progress.step
+- `addons/hr_work_entry`: hr.work.entry, hr.work.entry.type; extends hr.employee with work_entry_source
+
+### Config Changes
+- `core/tools/config.py`: added `onboarding` (after web), `hr_work_entry` (before hr_holidays)
+- `addons/hr_holidays`: depends on `hr_work_entry`
+
+---
+
+## Phase 248 – Standalone Analytic Module (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run `./erp-bin db init -d <db_name>` (analytic auto-loads via DEFAULT_SERVER_WIDE_MODULES)
+- [ ] Verify analytic tables: `\d analytic_account`, `\d analytic_line`, `\d account_analytic_plan`
+- [ ] Run tests: `python3 -m pytest tests/test_analytic_phase248.py tests/test_analytic_phase168.py -v`
+
+### Config Changes
+- `core/tools/config.py`: added `analytic` to DEFAULT_SERVER_WIDE_MODULES (before account)
+
+### New Module
+- `addons/analytic`: analytic.account, analytic.line, account.analytic.plan
+
+### Migration Notes
+- account no longer defines analytic models; depends on analytic
+- hr_timesheet, hr_expense, project get analytic via account → analytic chain
+
+---
+
+## Phase 247 – Standalone Product Module (2026-03-18)
+
+### Pre-Deployment Steps
+- [ ] Run `./erp-bin db init -d <db_name>` (product auto-loads via DEFAULT_SERVER_WIDE_MODULES)
+- [ ] Verify product tables: `\d product_template`, `\d product_product`, `\d product_category`, etc.
+- [ ] Run tests: `python3 -m pytest tests/test_product_phase247.py tests/test_variants_phase188.py -v`
+
+### Config Changes
+- `core/tools/config.py`: added `product` to DEFAULT_SERVER_WIDE_MODULES (before sale)
+
+### New Module
+- `addons/product`: product.template, product.product, product.category, product.attribute, product.pricelist, product.supplierinfo
+
+### Migration Notes
+- sale no longer defines product models; depends on product
+- stock, purchase, website, stock_barcode, etc. get product via sale → product
+
+---
+
+## Multi-Agent Workflow Setup (2026-03-18)
+
+### What Was Added
+- `.cursor/rules/core-protocol.mdc` — always-active agent protocol (no DB change)
+- `.cursor/rules/agents/*.mdc` — 5 agent persona rule files (no DB change)
+- `docs/QUICK_START_AGENTS.md` — team onboarding guide (no DB change)
+
+### No Deployment Action Required
+These are IDE-level Cursor rules and documentation. No DB migration, no `DEFAULT_SERVER_WIDE_MODULES` change, no `./erp-bin db init` required.
+
+### Developer Action
+- Open Cursor and verify `.cursor/rules/agents/` folder is visible in the file tree
+- The `core-protocol.mdc` rule fires automatically (`alwaysApply: true`)
+- Agent persona rules fire on trigger phrases (see `docs/QUICK_START_AGENTS.md`)
+
+---
+
 ## Pre-deployment
 
 - [ ] Follow docs/ai-rules.md for development and deployment decisions
@@ -70,6 +185,21 @@
 - [ ] stock.warehouse.orderpoint model; Inventory > Configuration > Reordering Rules
 - [ ] _procure_orderpoint_confirm() creates purchase.order (with partner) or stock.move (replenishment)
 - [ ] tests/test_orderpoint_phase189.py passes
+
+## Phase 234-245 (ERP Next Phases Plan)
+
+- [ ] Phase 234: Recordset filtered_domain, grouped, concat, union, toggle_active, export_data; name_create
+- [ ] Phase 235: @api.onchange, @api.ondelete, @api.autovacuum; base.autovacuum model, daily cron
+- [ ] Phase 236: Reference, Many2oneReference, Json, Properties fields; _prepare_jsonb_vals; tests/test_orm_fields_phase236.py
+- [ ] Phase 237: addons/uom (uom.uom, uom.category); product.template uom_id; tests/test_uom_product_phase237.py
+- [ ] Phase 238: addons/resource, addons/hr_holidays; tests/test_resource_hr_holidays_phase238.py
+- [ ] Phase 239: addons/contacts, portal, rating
+- [ ] Phase 240: addons/sale_stock, purchase_stock, stock_account, mrp_account
+- [ ] Phase 241: addons/delivery, loyalty
+- [ ] Phase 242: addons/repair
+- [ ] Phase 243: addons/survey
+- [ ] Phase 244: addons/base_import (base.import.mapping)
+- [ ] Phase 245: addons/hr_skills (hr.skill, hr.skill.type, hr.resume.line)
 
 ## Phase 229-233 (Barcode, Quality, Anomaly, Maintenance, Event)
 

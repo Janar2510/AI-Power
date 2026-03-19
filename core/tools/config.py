@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 # Defaults (Odoo 19 parity)
-DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web", "mail", "mailing", "calendar", "project", "crm", "helpdesk", "fetchmail", "hr", "hr_attendance", "hr_recruitment", "hr_contract", "hr_expense", "hr_payroll", "hr_timesheet", "knowledge", "sale", "sale_subscription", "stock", "stock_barcode", "purchase", "account", "payment", "ai_assistant", "auth_totp", "bus", "website", "website_sale", "mrp", "fleet", "pos", "quality", "maintenance", "event"]
+DEFAULT_SERVER_WIDE_MODULES = ["base", "rpc", "web", "base_setup", "auth_signup", "auth_oauth", "iap", "onboarding", "mail", "mailing", "calendar", "project", "crm", "helpdesk", "fetchmail", "hr", "hr_attendance", "hr_recruitment", "hr_contract", "hr_expense", "hr_payroll", "hr_timesheet", "hr_work_entry", "hr_holidays", "resource", "knowledge", "uom", "product", "sale", "sale_subscription", "stock", "stock_barcode", "purchase", "analytic", "account", "payment", "ai_assistant", "auth_totp", "bus", "website", "website_sale", "mrp", "fleet", "pos", "quality", "maintenance", "event", "contacts", "portal", "lunch", "rating", "portal_rating", "digest", "delivery", "loyalty", "repair", "survey", "base_automation", "base_import", "data_recycle", "hr_skills", "sale_stock", "purchase_stock", "stock_account", "mrp_account", "mrp_subcontracting"]
 REQUIRED_SERVER_WIDE_MODULES = ["base", "web"]
 
 

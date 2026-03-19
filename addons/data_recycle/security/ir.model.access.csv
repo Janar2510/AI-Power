@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_data_recycle_model,access.data.recycle.model,model_data_recycle_model,,1,1,1,1
+access_data_recycle_record,access.data.recycle.record,model_data_recycle_record,,1,1,1,1

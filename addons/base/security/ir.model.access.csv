@@ -19,11 +19,11 @@ access_ir_attachment,access_ir_attachment,model_ir_attachment,,1,1,1,1
 access_ir_model,access_ir_model,model_ir_model,,1,1,1,1
 access_ir_config_parameter,access_ir_config_parameter,model_ir_config_parameter,,1,1,1,1
 access_base_transient_vacuum,access_base_transient_vacuum,model_base_transient_vacuum,,1,1,1,1
+access_base_autovacuum,access_base_autovacuum,model_base_autovacuum,,1,1,1,1
 access_ir_actions_act_window,access_ir_actions_act_window,model_ir_actions_act_window,,1,1,1,1
 access_ir_actions_act_url,access_ir_actions_act_url,model_ir_actions_act_url,,1,1,1,1
 access_ir_actions_report,access_ir_actions_report,model_ir_actions_report,,1,1,1,1
 access_ir_actions_server,access_ir_actions_server,model_ir_actions_server,,1,1,1,1
-access_base_automation,access_base_automation,model_base_automation,,1,1,1,1
 access_ir_webhook,access_ir_webhook,model_ir_webhook,,1,1,1,1
 access_ir_webhook_log,access_ir_webhook_log,model_ir_webhook_log,,1,1,1,1
 access_ir_rule,access_ir_rule,model_ir_rule,,1,1,1,1
@@ -34,3 +34,4 @@ access_base_wizard_confirm,access_base_wizard_confirm,model_base_wizard_confirm,
 access_approval_rule,access_approval_rule,model_approval_rule,,1,1,1,1
 access_approval_request,access_approval_request,model_approval_request,,1,1,1,1
 access_audit_log,access_audit_log,model_audit_log,,1,0,1,0
+access_base_field_test,access_base_field_test,model_base_field_test,,1,1,1,1

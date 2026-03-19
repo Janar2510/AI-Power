@@ -18,13 +18,14 @@ from . import ir_model
 from . import ir_config_parameter
 from . import ir_actions
 from . import ir_actions_server
-from . import base_automation
 from . import ir_webhook
 from . import ir_rule
 from . import ir_module_module
 from . import ir_ui_view
 from . import ir_ui_menu
 from . import transient_vacuum
+from . import base_autovacuum
+from . import base_field_test
 from . import wizard_confirm
 from . import db_backup
 from . import approval_rule

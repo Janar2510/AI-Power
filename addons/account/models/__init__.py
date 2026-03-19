@@ -8,7 +8,5 @@ from . import account_report
 from . import account_tax
 from . import account_move
 from . import account_move_line
-from . import analytic_account
-from . import analytic_line
 from . import sale_order
 from . import stock_picking

@@ -4,8 +4,6 @@ access_account_journal_user,account.journal user,model_account_journal,,1,1,1,1
 access_account_move_user,account.move user,model_account_move,,1,1,1,1
 access_account_move_line_user,account.move.line user,model_account_move_line,,1,1,1,1
 access_account_tax_user,account.tax user,model_account_tax,,1,1,1,1
-access_analytic_account_user,analytic.account user,model_analytic_account,,1,1,1,1
-access_analytic_line_user,analytic.line user,model_analytic_line,,1,1,1,1
 access_account_payment_term_user,account.payment.term user,model_account_payment_term,,1,1,1,1
 access_account_payment_term_line_user,account.payment.term.line user,model_account_payment_term_line,,1,1,1,1
 access_account_bank_statement_user,account.bank.statement user,model_account_bank_statement,,1,1,1,1

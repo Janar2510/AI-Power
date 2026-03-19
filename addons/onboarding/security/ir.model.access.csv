@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_onboarding_onboarding_user,onboarding.onboarding user,model_onboarding_onboarding,,1,1,1,1
+access_onboarding_step_user,onboarding.onboarding.step user,model_onboarding_onboarding_step,,1,1,1,1
+access_onboarding_progress_user,onboarding.progress user,model_onboarding_progress,,1,1,1,1
+access_onboarding_progress_step_user,onboarding.progress.step user,model_onboarding_progress_step,,1,1,1,1

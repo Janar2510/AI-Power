@@ -1,0 +1,4 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hr_skill_user,hr.skill user,model_hr_skill,,1,1,1,1
+access_hr_skill_type_user,hr.skill.type user,model_hr_skill_type,,1,1,1,1
+access_hr_resume_line_user,hr.resume.line user,model_hr_resume_line,,1,1,1,1

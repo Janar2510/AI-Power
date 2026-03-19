@@ -88,3 +88,21 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | privacy_lookup | `addons/privacy_lookup/` | `addons/privacy_lookup/` Phase 266 | done |
 | web_tour | `addons/web_tour/` | `addons/web_tour/` Phase 266 | done |
 | _read_group / _read_grouping_sets | `odoo/orm/models.py` | `core/orm/models.py` Phase 267 | done |
+| sale_crm | `addons/sale_crm/` | `addons/sale_crm/` Phase 268 | done |
+| sale_purchase | `addons/sale_purchase/` | `addons/sale_purchase/` Phase 269 | done |
+| sale_timesheet | `addons/sale_timesheet/` | `addons/sale_timesheet/` Phase 270 | done |
+| sale_margin | `addons/sale_margin/` | `addons/sale_margin/` Phase 271 | done |
+| sale_sms | `addons/sale_sms/` | `addons/sale_sms/` Phase 272 | done |
+| sale_expense | `addons/sale_expense/` | `addons/sale_expense/` Phase 273 | done |
+| account_debit_note | `addons/account_debit_note/` | `addons/account_debit_note/` Phase 274 | done |
+| crm_sms | `addons/crm_sms/` | `addons/crm_sms/` Phase 275 | done |
+| gamification | `addons/gamification/` | `addons/gamification/` Phase 276 | done |
+| sale_loyalty | `addons/sale_loyalty/` | `addons/sale_loyalty/` Phase 277 | done |
+| gamification_sale_crm | `addons/gamification_sale_crm/` | `addons/gamification_sale_crm/` Phase 278 | done |
+| purchase_requisition | `addons/purchase_requisition/` | `addons/purchase_requisition/` Phase 279 | done |
+| stock_landed_costs | `addons/stock_landed_costs/` | `addons/stock_landed_costs/` Phase 280 | done |
+| sale_mrp | `addons/sale_mrp/` | `addons/sale_mrp/` Phase 281 | done |
+| purchase_mrp | `addons/purchase_mrp/` | `addons/purchase_mrp/` Phase 282 | done |
+| sale_purchase_stock | `addons/sale_purchase_stock/` | `addons/sale_purchase_stock/` Phase 283 | done |
+| sale_stock_margin | `addons/sale_stock_margin/` | `addons/sale_stock_margin/` Phase 283 | done |
+| sale_timesheet_margin | `addons/sale_timesheet_margin/` | `addons/sale_timesheet_margin/` Phase 283 | done |

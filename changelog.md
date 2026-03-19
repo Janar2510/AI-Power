@@ -1,5 +1,50 @@
 # Changelog
 
+## 1.109.0 – Phases 274–283: Accounting, Gamification, Supply Chain and MRP Bridges (2026-03-19)
+
+### Added
+- **addons/account_debit_note/** (Phase 274): `account.debit.note` wizard + `account.move.debit_origin_id`/`debit_note_ids`
+- **addons/crm_sms/** (Phase 275): CRM/SMS bridge with `crm.lead.sms_ids` and `sms_count`
+- **addons/gamification/** (Phase 276): badge/challenge/goal/karma models and `res.users` karma/rank
+- **addons/sale_loyalty/** (Phase 277): `sale.order.coupon.points`, loyalty fields on `sale.order`
+- **addons/gamification_sale_crm/** (Phase 278): badge signal hook when opportunities are marked won
+- **addons/purchase_requisition/** (Phase 279): purchase agreements (`purchase.requisition`, lines) + `purchase.order.requisition_id`
+- **addons/stock_landed_costs/** (Phase 280): `stock.landed.cost` and `stock.landed.cost.line`
+- **addons/sale_mrp/** (Phase 281): production linkage fields on `sale.order` and `sale.order.line`
+- **addons/purchase_mrp/** (Phase 282): BOM link fields on `mrp.bom` and `purchase.order.line`
+- **addons/sale_purchase_stock/**, **addons/sale_stock_margin/**, **addons/sale_timesheet_margin/** (Phase 283): composite stock/margin/timesheet bridges
+- `tests/test_phase274_283.py`
+
+### Changed
+- **core/tools/config.py**: Added `account_debit_note`, `crm_sms`, `gamification`, `sale_loyalty`, `gamification_sale_crm`, `purchase_requisition`, `stock_landed_costs`, `sale_mrp`, `purchase_mrp`, `sale_purchase_stock`, `sale_stock_margin`, `sale_timesheet_margin`
+- **core/release.py**: version_info = (1, 109, 0)
+
+---
+
+## 1.105.0 – Phases 271–273: Sale Extensions (2026-03-19)
+
+### Added
+- **addons/sale_margin/** (Phase 271): purchase_price, margin, margin_percent on sale.order.line; margin, margin_percent on sale.order
+- **addons/sale_sms/** (Phase 272): SMS integration with sales (security bridge)
+- **addons/sale_expense/** (Phase 273): sale_order_id on hr.expense for reinvoicing
+
+### Changed
+- **core/tools/config.py**: Added sale_margin, sale_sms, sale_expense
+
+---
+
+## 1.104.0 – Phases 268–270: Sale Bridges (2026-03-19)
+
+### Added
+- **addons/sale_crm/** (Phase 268): opportunity_id on sale.order, order_ids on crm.lead, action_new_quotation, action_view_sale_quotation/action_view_sale_order
+- **addons/sale_purchase/** (Phase 269): service_to_purchase on product.template, sale_line_id on purchase.order.line, auto-create PO on SO confirm for service products with vendor
+- **addons/sale_timesheet/** (Phase 270): so_line_id on analytic.line, timesheet_ids/qty_delivered on sale.order.line
+
+### Changed
+- **core/tools/config.py**: Added sale_crm, sale_purchase, sale_timesheet to DEFAULT_SERVER_WIDE_MODULES
+
+---
+
 ## 1.103.0 – Phases 262–267: Sales Stack, Communication, ORM _read_group (2026-03-19)
 
 ### Added
@@ -9,7 +54,7 @@
 - **addons/sales_team/** (Phase 263): crm.team, crm.team.member, crm.tag
 - **addons/link_tracker/** (Phase 263): link.tracker, link.tracker.click, link.tracker.code
 - **addons/partner_autocomplete/** (Phase 263): res.partner autocomplete_by_name/autocomplete_by_domain stubs
-- **addons/account_payment/** (Phase 264): account.payment, account.move payment_ids
+- **addons/account_payment/** (Phase 264): account.payment, account.move payment_ids, transaction_ids/invoice_ids bridge (portal payment)
 - **addons/account_check_printing/** (Phase 264): account.payment check_number, account.journal check_sequence_id
 - **addons/sale_management/** (Phase 265): sale.order.template, sale.order.template.line, sale.order template_id
 - **addons/project_account/** (Phase 265): project.project budget, total_invoiced, margin

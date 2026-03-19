@@ -1,5 +1,59 @@
 # Deployment Checklist
 
+## Phases 274–283 – Accounting, Gamification, Supply Chain and MRP Bridges (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase274_283 -v`
+
+### New Modules
+- `addons/account_debit_note`: debit note wizard + debit origin links on account moves
+- `addons/crm_sms`: CRM/SMS bridge
+- `addons/gamification`: badge/challenge/goal/karma models
+- `addons/sale_loyalty`: loyalty fields on sale orders
+- `addons/gamification_sale_crm`: CRM win -> gamification signal
+- `addons/purchase_requisition`: purchase agreements
+- `addons/stock_landed_costs`: landed costs models
+- `addons/sale_mrp`: sales to manufacturing bridge
+- `addons/purchase_mrp`: purchasing to BOM bridge
+- `addons/sale_purchase_stock`, `addons/sale_stock_margin`, `addons/sale_timesheet_margin`: composite bridges
+
+### Config Changes
+- `core/tools/config.py`: added all phase 274-283 modules
+- `core/release.py`: bumped to `1.109.0`
+
+---
+
+## Phases 271–273 – Sale Extensions (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase262 -v`
+
+### New Modules
+- `addons/sale_margin`: margin, purchase_price on sale orders
+- `addons/sale_sms`: SMS integration with sales
+- `addons/sale_expense`: sale_order_id on hr.expense
+
+### Config Changes
+- `core/tools/config.py`: added sale_margin, sale_sms, sale_expense
+
+---
+
+## Phases 268–270 – Sale Bridges (2026-03-19)
+
+### Pre-Deployment Steps
+- [ ] Run tests: `python3.11 -m unittest tests.test_phase262 -v`
+- [ ] Run `./erp-bin db init -d <db_name>` if needed
+
+### New Modules
+- `addons/sale_crm`: opportunity_id on sale.order, order_ids on crm.lead
+- `addons/sale_purchase`: service_to_purchase, sale_line_id, auto-PO on SO confirm
+- `addons/sale_timesheet`: so_line_id on analytic.line, timesheet_ids on sale.order.line
+
+### Config Changes
+- `core/tools/config.py`: added sale_crm, sale_purchase, sale_timesheet
+
+---
+
 ## Phases 262–267 – Sales Stack, Communication, ORM _read_group (2026-03-19)
 
 ### Pre-Deployment Steps
@@ -14,7 +68,7 @@
 - `addons/sales_team`: crm.team, crm.team.member, crm.tag
 - `addons/link_tracker`: link.tracker, link.tracker.click, link.tracker.code
 - `addons/partner_autocomplete`: res.partner autocomplete stubs
-- `addons/account_payment`: account.payment, account.move payment_ids
+- `addons/account_payment`: account.payment, account.move payment_ids, transaction_ids/invoice_ids bridge (portal payment)
 - `addons/account_check_printing`: account.payment check_number, account.journal check_sequence_id
 - `addons/sale_management`: sale.order.template, sale.order.template.line
 - `addons/project_account`: project.project profitability fields

@@ -1,5 +1,27 @@
 # Deployment Checklist
 
+## Phases 330-341 - Deferred Categories Wave 1 (mass mailing, livechat, website content, POS sub-modules) (2026-03-19)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase330_341 -v`
+- [ ] Run schema init/upgrade on target DB for new models introduced in phases 330-341.
+
+### New modules (330-341)
+- `mass_mailing`, `mass_mailing_crm`, `mass_mailing_event`, `mass_mailing_sale`
+- `mass_mailing_sms`, `mass_mailing_themes`
+- `im_livechat`, `crm_livechat`, `hr_livechat`, `website_livechat`
+- `website_blog`, `website_forum`, `website_slides`, `hr_skills_slides`
+- `pos_discount`, `pos_loyalty`, `pos_sale`, `pos_sale_loyalty`
+- `pos_sale_margin`, `pos_hr`, `pos_restaurant`, `pos_hr_restaurant`
+- `pos_restaurant_loyalty`, `pos_mrp`, `pos_event`, `pos_event_sale`
+- `pos_sms`, `pos_self_order`, `pos_online_payment`, `pos_account_tax_python`
+
+### Config / release
+- [ ] `core/tools/config.py`: phase `330-341` entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.136.0`
+
+---
+
 ## Phases 320-329 - Final parity stretch (accounting EDI, website tracks/sale, CRM bridges, delivery and misc) (2026-03-19)
 
 ### Pre-Deployment Steps

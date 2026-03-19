@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.136.0 - Phases 330-341: deferred wave 1 (mass mailing, livechat, website content, POS sub-modules) (2026-03-19)
+
+### Added
+- **p330**: `mass_mailing`, `mass_mailing_crm`, `mass_mailing_event`, `mass_mailing_sale`
+- **p331**: `mass_mailing_sms`, `mass_mailing_themes`
+- **p332**: `im_livechat`, `crm_livechat`
+- **p333**: `hr_livechat`, `website_livechat`
+- **p334**: `website_blog`
+- **p335**: `website_forum`
+- **p336**: `website_slides`, `hr_skills_slides`
+- **p337**: `pos_discount`, `pos_loyalty`, `pos_sale`, `pos_sale_loyalty`
+- **p338**: `pos_sale_margin`, `pos_hr`, `pos_restaurant`, `pos_hr_restaurant`
+- **p339**: `pos_restaurant_loyalty`, `pos_mrp`, `pos_event`, `pos_event_sale`
+- **p340**: `pos_sms`, `pos_self_order`, `pos_online_payment`
+- **p341**: `pos_account_tax_python`
+- `tests/test_phase330_341.py`
+
+### Changed
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all phase `330-341` modules.
+- **core/release.py**: `version_info = (1, 136, 0, ...)`.
+
+---
+
 ## 1.131.0 - Phases 320-329: final accounting EDI, website event/sale, CRM, delivery and misc bridges (2026-03-19)
 
 ### Added

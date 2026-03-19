@@ -103,3 +103,10 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] **323-326** in `DEFAULT_SERVER_WIDE_MODULES`: `website_event_track`, `website_event_track_quiz`, `website_event_track_live`, `website_event_track_live_quiz`, `website_event_exhibitor`, `website_event_booth_exhibitor`, `website_event_booth_sale_exhibitor`, `website_sale_loyalty`, `website_sale_mrp`, `website_sale_autocomplete`, `website_sale_stock_wishlist`, `website_sale_collect`, `website_sale_collect_wishlist`, `website_crm_sms`, `website_cf_turnstile`
 - [ ] **327-329** in `DEFAULT_SERVER_WIDE_MODULES`: `website_crm_iap_reveal`, `website_crm_partner_assign`, `website_mail_group`, `crm_iap_mine`, `delivery_mondialrelay`, `website_sale_mondialrelay`, `sale_gelato`, `sale_gelato_stock`, `website_sale_gelato`, `hr_recruitment_survey`, `project_mail_plugin`, `attachment_indexation`, `certificate`
 - [x] Run: `python3.11 -m unittest tests.test_phase320_329 -v`
+
+## Phases 330-341 Module Rollout
+
+- [ ] **330-333** in `DEFAULT_SERVER_WIDE_MODULES`: `mass_mailing`, `mass_mailing_crm`, `mass_mailing_event`, `mass_mailing_sale`, `mass_mailing_sms`, `mass_mailing_themes`, `im_livechat`, `crm_livechat`, `hr_livechat`, `website_livechat`
+- [ ] **334-336** in `DEFAULT_SERVER_WIDE_MODULES`: `website_blog`, `website_forum`, `website_slides`, `hr_skills_slides`
+- [ ] **337-341** in `DEFAULT_SERVER_WIDE_MODULES`: `pos_discount`, `pos_loyalty`, `pos_sale`, `pos_sale_loyalty`, `pos_sale_margin`, `pos_hr`, `pos_restaurant`, `pos_hr_restaurant`, `pos_restaurant_loyalty`, `pos_mrp`, `pos_event`, `pos_event_sale`, `pos_sms`, `pos_self_order`, `pos_online_payment`, `pos_account_tax_python`
+- [x] Run: `python3.11 -m unittest tests.test_phase330_341 -v`

@@ -110,3 +110,11 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] **334-336** in `DEFAULT_SERVER_WIDE_MODULES`: `website_blog`, `website_forum`, `website_slides`, `hr_skills_slides`
 - [ ] **337-341** in `DEFAULT_SERVER_WIDE_MODULES`: `pos_discount`, `pos_loyalty`, `pos_sale`, `pos_sale_loyalty`, `pos_sale_margin`, `pos_hr`, `pos_restaurant`, `pos_hr_restaurant`, `pos_restaurant_loyalty`, `pos_mrp`, `pos_event`, `pos_event_sale`, `pos_sms`, `pos_self_order`, `pos_online_payment`, `pos_account_tax_python`
 - [x] Run: `python3.11 -m unittest tests.test_phase330_341 -v`
+
+## Phases 342-353 Module Rollout
+
+- [ ] **342-343** in `DEFAULT_SERVER_WIDE_MODULES`: `payment_stripe`, `payment_paypal`, `payment_adyen`, `payment_authorize`, `payment_mollie`, `payment_razorpay`, `payment_custom`, `payment_demo`
+- [ ] **344-346** in `DEFAULT_SERVER_WIDE_MODULES`: `pos_adyen`, `pos_stripe`, `pos_restaurant_adyen`, `google_calendar`, `google_drive`, `microsoft_calendar`, `microsoft_outlook`
+- [ ] **347-349** in `DEFAULT_SERVER_WIDE_MODULES`: `spreadsheet`, `spreadsheet_dashboard`, `spreadsheet_account`, `spreadsheet_dashboard_account`, `spreadsheet_crm`, `spreadsheet_dashboard_crm`, `cloud_storage`, `iot`
+- [ ] **350-353** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_generic_coa`, `l10n_us`, `l10n_uk`, `l10n_de`, `l10n_fr`
+- [x] Run: `python3.11 -m unittest tests.test_phase342_353 -v`

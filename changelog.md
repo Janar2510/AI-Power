@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.142.0 - Phases 342-353: deferred wave 2 (payments, POS payment bridges, Google/MS, spreadsheet, cloud/iot, starter l10n) (2026-03-19)
+
+### Added
+- **p342**: `payment_stripe`, `payment_paypal`, `payment_adyen`, `payment_authorize`
+- **p343**: `payment_mollie`, `payment_razorpay`, `payment_custom`, `payment_demo`
+- **p344**: `pos_adyen`, `pos_stripe`, `pos_restaurant_adyen`
+- **p345**: `google_calendar`, `google_drive`
+- **p346**: `microsoft_calendar`, `microsoft_outlook`
+- **p347**: `spreadsheet`, `spreadsheet_dashboard`, `spreadsheet_account`
+- **p348**: `spreadsheet_dashboard_account`, `spreadsheet_crm`, `spreadsheet_dashboard_crm`
+- **p349**: `cloud_storage`, `iot`
+- **p350**: `l10n_generic_coa`
+- **p351**: `l10n_us`, `l10n_uk`
+- **p352**: `l10n_de`
+- **p353**: `l10n_fr`
+- `tests/test_phase342_353.py`
+
+### Changed
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all phase `342-353` modules.
+- **core/release.py**: `version_info = (1, 142, 0, ...)`.
+
+---
+
 ## 1.136.0 - Phases 330-341: deferred wave 1 (mass mailing, livechat, website content, POS sub-modules) (2026-03-19)
 
 ### Added

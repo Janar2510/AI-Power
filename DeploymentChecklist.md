@@ -1,5 +1,27 @@
 # Deployment Checklist
 
+## Phases 342-353 - Deferred Categories Wave 2 (payments, POS payment bridges, Google/MS, spreadsheet, cloud/iot, starter l10n) (2026-03-19)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase342_353 -v`
+- [ ] Run schema init/upgrade on target DB for new models introduced in phases 342-353.
+
+### New modules (342-353)
+- `payment_stripe`, `payment_paypal`, `payment_adyen`, `payment_authorize`
+- `payment_mollie`, `payment_razorpay`, `payment_custom`, `payment_demo`
+- `pos_adyen`, `pos_stripe`, `pos_restaurant_adyen`
+- `google_calendar`, `google_drive`, `microsoft_calendar`, `microsoft_outlook`
+- `spreadsheet`, `spreadsheet_dashboard`, `spreadsheet_account`
+- `spreadsheet_dashboard_account`, `spreadsheet_crm`, `spreadsheet_dashboard_crm`
+- `cloud_storage`, `iot`
+- `l10n_generic_coa`, `l10n_us`, `l10n_uk`, `l10n_de`, `l10n_fr`
+
+### Config / release
+- [ ] `core/tools/config.py`: phase `342-353` entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.142.0`
+
+---
+
 ## Phases 330-341 - Deferred Categories Wave 1 (mass mailing, livechat, website content, POS sub-modules) (2026-03-19)
 
 ### Pre-Deployment Steps

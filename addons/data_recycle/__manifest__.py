@@ -6,6 +6,7 @@
     "depends": ["mail"],
     "data": [
         "security/ir.model.access.csv",
+        "views/data_recycle_views.xml",
     ],
     "installable": True,
     "application": True,

@@ -112,6 +112,16 @@
     },
     setChannels: function (channels) {
       _channels = channels || [];
+    },
+    addChannel: function (channel) {
+      if (!channel) return;
+      if (_channels.indexOf(channel) < 0) _channels.push(channel);
+    },
+    removeChannel: function (channel) {
+      _channels = (_channels || []).filter(function (c) { return c !== channel; });
+    },
+    preferWebSocket: function (enabled) {
+      _useWebSocket = !!enabled;
     }
   };
 

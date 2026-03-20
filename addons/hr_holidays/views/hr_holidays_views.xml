@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <menuitem name="Time Off" id="menu_hr_holidays_root" sequence="23"/>
+    <menuitem name="My Time Off" id="menu_hr_holidays_my_leaves" parent="menu_hr_holidays_root" action="hr.action_hr_leave" sequence="1"/>
+    <menuitem name="Configuration" id="menu_hr_holidays_configuration" parent="menu_hr_holidays_root" sequence="2"/>
+    <menuitem name="Leave Types" id="menu_hr_holidays_leave_types" parent="menu_hr_holidays_configuration" action="hr.action_hr_leave_type" sequence="1"/>
+    <menuitem name="Allocations" id="menu_hr_holidays_allocations" parent="menu_hr_holidays_configuration" action="hr.action_hr_leave_allocation" sequence="2"/>
+  </data>
+</odoo>

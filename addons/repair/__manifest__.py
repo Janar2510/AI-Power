@@ -6,6 +6,8 @@
     "depends": ["base", "stock"],
     "data": [
         "security/ir.model.access.csv",
+        "views/repair_views.xml",
     ],
     "installable": True,
+    "application": True,
 }

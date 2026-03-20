@@ -51,7 +51,8 @@
       <field name="res_model">hr.recruitment.stage</field>
       <field name="view_mode">list</field>
     </record>
-    <menuitem name="Applicants" id="menu_hr_applicant" action="action_hr_applicant" parent="hr.menu_hr_root" sequence="25"/>
-    <menuitem name="Recruitment Stages" id="menu_hr_recruitment_stage" action="action_hr_recruitment_stage" parent="hr.menu_hr_root" sequence="26"/>
+    <menuitem name="Recruitment" id="menu_hr_recruitment_root" sequence="22"/>
+    <menuitem name="Applicants" id="menu_hr_applicant" action="action_hr_applicant" parent="menu_hr_recruitment_root" sequence="25"/>
+    <menuitem name="Recruitment Stages" id="menu_hr_recruitment_stage" action="action_hr_recruitment_stage" parent="menu_hr_recruitment_root" sequence="26"/>
   </data>
 </odoo>

@@ -16,6 +16,7 @@ class Registry:
         self._models: Dict[str, Type[ModelBase]] = {}
         self._env: Optional[Any] = None
         self._pending_merges: List[tuple] = []  # [(model_name, extending_class, attrs), ...]
+        self._hooks_registered: bool = False
 
     def __getitem__(self, model_name: str) -> Type[ModelBase]:
         return self._models[model_name]
@@ -59,6 +60,30 @@ class Registry:
 
     def set_env(self, env: Any) -> None:
         self._env = env
+        if env is not None and not self._hooks_registered:
+            self._call_register_hooks()
+            self._hooks_registered = True
+        if env is None and self._hooks_registered:
+            self._call_unregister_hooks()
+            self._hooks_registered = False
 
     def keys(self) -> List[str]:
         return list(self._models.keys())
+
+    def _call_register_hooks(self) -> None:
+        for model_class in self._models.values():
+            hook = getattr(model_class, "_register_hook", None)
+            if callable(hook):
+                try:
+                    hook()
+                except Exception:
+                    _logger.exception("Model _register_hook failed: %s", getattr(model_class, "_name", model_class))
+
+    def _call_unregister_hooks(self) -> None:
+        for model_class in self._models.values():
+            hook = getattr(model_class, "_unregister_hook", None)
+            if callable(hook):
+                try:
+                    hook()
+                except Exception:
+                    _logger.exception("Model _unregister_hook failed: %s", getattr(model_class, "_name", model_class))

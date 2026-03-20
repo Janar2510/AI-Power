@@ -9,4 +9,5 @@
         "views/hr_attendance_views.xml",
     ],
     "installable": True,
+    "application": True,
 }

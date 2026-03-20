@@ -541,6 +541,9 @@ class ModelBase(metaclass=Model):
     _description = ""
     _table = None
     _registry = None
+    _log_access = True
+    _auto_init = True
+    _table_query = None
 
     def __init__(self, env: Any, ids: List[int], vals: Optional[Dict[str, Any]] = None):
         self.env = env
@@ -580,6 +583,22 @@ class ModelBase(metaclass=Model):
     @property
     def ids(self) -> List[int]:
         return self._ids.copy()
+
+    @classmethod
+    def _register_hook(cls) -> None:
+        """Called once when the registry receives an active env."""
+        return None
+
+    @classmethod
+    def _unregister_hook(cls) -> None:
+        """Called when registry env is cleared."""
+        return None
+
+    @classmethod
+    def _get_table_query(cls) -> Optional[str]:
+        """SQL query used for view-backed models (Phase 403)."""
+        q = getattr(cls, "_table_query", None)
+        return q() if callable(q) else q
 
     def _get_cr(self):
         """Get cursor from env if available."""
@@ -947,6 +966,16 @@ class ModelBase(metaclass=Model):
                 if msg:
                     raise ValidationError(msg) from e
                 raise
+        if cr and getattr(self._model, "_log_access", True):
+            uid = getattr(getattr(self, "env", None), "uid", None) or 1
+            for rid in self._ids:
+                try:
+                    cr.execute(
+                        f'UPDATE "{self._model._table}" SET "write_uid" = %s, "write_date" = NOW() WHERE id = %s',
+                        [uid, rid],
+                    )
+                except Exception:
+                    pass
         self._model._run_python_constraints(self, vals)
         for fname, val in vals.items():
             field = getattr(self._model, fname, None)
@@ -1446,6 +1475,15 @@ class ModelBase(metaclass=Model):
             raise
         row = cr.fetchone()
         new_id = row["id"] if hasattr(row, "keys") else row[0]
+        if getattr(cls, "_log_access", True):
+            uid = getattr(env, "uid", None) or 1
+            try:
+                cr.execute(
+                    f'UPDATE "{table}" SET "create_uid" = %s, "create_date" = NOW(), "write_uid" = %s, "write_date" = NOW() WHERE id = %s',
+                    [uid, uid, new_id],
+                )
+            except Exception:
+                pass
         new_rec = cls.browse(new_id)
         cls._run_python_constraints(new_rec, vals)
         computed_list = cls._compute_stored_values(new_rec)

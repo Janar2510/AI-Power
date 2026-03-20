@@ -6,6 +6,8 @@
     "depends": ["base", "hr"],
     "data": [
         "security/ir.model.access.csv",
+        "views/hr_skills_views.xml",
     ],
     "installable": True,
+    "application": True,
 }

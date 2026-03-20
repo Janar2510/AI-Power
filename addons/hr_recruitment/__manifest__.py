@@ -10,4 +10,5 @@
         "views/hr_recruitment_views.xml",
     ],
     "installable": True,
+    "application": True,
 }

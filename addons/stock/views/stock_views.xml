@@ -93,9 +93,9 @@
       <field name="view_mode">list,form</field>
     </record>
     <menuitem name="Inventory" id="menu_stock_root" sequence="12"/>
-    <menuitem name="Operations" id="menu_stock_operations" sequence="10"/>
+    <menuitem name="Operations" id="menu_stock_operations" parent="stock.menu_stock_root" sequence="10"/>
     <menuitem name="Transfers" id="menu_stock_picking" action="stock.action_stock_picking" parent="stock.menu_stock_operations" sequence="10"/>
-    <menuitem name="Configuration" id="menu_stock_config" sequence="20"/>
+    <menuitem name="Configuration" id="menu_stock_config" parent="stock.menu_stock_root" sequence="20"/>
     <menuitem name="Warehouses" id="menu_stock_warehouse" action="stock.action_stock_warehouse" parent="stock.menu_stock_config" sequence="10"/>
     <record model="ir.ui.view" id="stock_warehouse_orderpoint_list">
       <field name="name">stock.warehouse.orderpoint list</field>
@@ -155,7 +155,7 @@
       <field name="res_model">stock.valuation.layer</field>
       <field name="view_mode">list</field>
     </record>
-    <menuitem name="Reporting" id="menu_stock_reporting" sequence="15"/>
+    <menuitem name="Reporting" id="menu_stock_reporting" parent="stock.menu_stock_root" sequence="15"/>
     <menuitem name="Valuation" id="menu_stock_valuation" action="stock.action_stock_valuation_layer" parent="stock.menu_stock_reporting" sequence="10"/>
     <record model="ir.actions.act_url" id="action_stock_valuation_report">
       <field name="name">Stock Valuation Report</field>

@@ -13,3 +13,6 @@ class IrUiMenu(Model):
     parent_ref = fields.Char(string="Parent")  # xml_id of parent menu
     sequence = fields.Integer(default=10)
     groups_ref = fields.Char(string="Groups")  # comma-separated xml_ids; empty = visible to all
+    web_icon = fields.Char(string="Web Icon")  # "module,icon_path" or "fa-icon,color,bg"
+    web_icon_data = fields.Char(string="Web Icon Data")  # base64 data URI for custom icon
+    active = fields.Boolean(default=True)

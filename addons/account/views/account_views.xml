@@ -106,7 +106,7 @@
     </record>
     <menuitem name="Invoicing" id="menu_account_root" sequence="11"/>
     <menuitem name="Invoices" id="menu_account_move" action="account.action_account_move" parent="account.menu_account_root" sequence="10"/>
-    <menuitem name="Configuration" id="menu_account_config" sequence="20"/>
+    <menuitem name="Configuration" id="menu_account_config" parent="account.menu_account_root" sequence="20"/>
     <menuitem name="Journals" id="menu_account_journal" action="account.action_account_journal" parent="account.menu_account_config" sequence="10"/>
     <menuitem name="Chart of Accounts" id="menu_account_account" action="account.action_account_account" parent="account.menu_account_config" sequence="20"/>
     <record model="ir.ui.view" id="account_tax_list">

@@ -1,5 +1,95 @@
 # Deployment Checklist
 
+## Missing apps parity rollout (1.200.0)
+
+### Pre-Deployment
+- [ ] Run DB upgrade to load new menu/action XML records: `python3.11 erp-bin db upgrade -d <db>`.
+- [ ] Hard-refresh browser after deploy (`main.js` route matrix expanded; app roots changed).
+- [ ] Verify app grid now includes CRM (not only Leads) and Discuss as app tiles.
+- [ ] Verify promoted HR apps appear as top-level apps: Expenses, Attendances, Recruitment, Time Off.
+- [ ] Verify standalone Analytic tile is gone; analytic menus appear under Invoicing > Configuration.
+- [ ] Smoke routes: `#pipeline`, `#crm/activities`, `#expenses`, `#attendances`, `#recruitment`, `#time_off`.
+- [ ] Smoke scaffolded app routes: `#repair_orders`, `#surveys`, `#lunch_orders`, `#livechat_channels`, `#project_todos`, `#recycle_models`, `#skills`, `#elearning`.
+- [ ] Restart server and validate app-grid + sidebar behavior end-to-end.
+
+### Verification
+- [x] `python3 -m unittest tests.test_missing_apps_parity_phase408`
+
+### Release
+- [ ] `core/release.py`: `1.200.0`
+
+---
+
+## Working menu + apps home launcher (1.199.0)
+
+### Pre-Deployment
+- [ ] Run DB upgrade to reload menu hierarchy updates: `python3.11 erp-bin db upgrade -d <db>`.
+- [ ] Hard-refresh browser after deploy (`main.js` routing/home/nav behavior + new app-grid CSS changed).
+- [ ] Verify `#home` shows app tiles and clicking a tile routes to that app's default screen.
+- [ ] Verify navbar logo and `Apps` button route to `#home` and current app label updates by route.
+- [ ] Verify sidebar shows only selected app sections and links for Taxes, Payment Terms, Pricelists, Bank Statements, Reordering Rules, Analytic Accounts, Analytic Plans are routable.
+- [ ] Smoke route forms/lists for `#invoices`, `#taxes`, `#payment_terms`, `#pricelists`, `#reordering_rules`, `#analytic_accounts`.
+- [ ] Restart server after deployment and confirm it binds on `http://127.0.0.1:8069`.
+
+### Release
+- [ ] `core/release.py`: `1.199.0`
+
+---
+
+## Frontend/Backend roadmap scaffold (1.198.0)
+
+### Pre-Deployment
+- [ ] Hard-refresh browser (new service/component/core assets added before `main.js`).
+- [ ] Verify command palette hotkey `Ctrl/Cmd+K` opens and route navigation works.
+- [ ] Verify debug toggle button appears in navbar and persists state.
+- [ ] Verify PWA manifest is served at `/web/static/manifest.webmanifest` and service worker registration succeeds.
+- [ ] Smoke sidebar/navbar/list/form/report routes to ensure legacy renderers still execute when core stubs return `false`.
+- [ ] Verify `fetchmail.server` model is readable/writable and ACL is loaded.
+- [ ] Verify bus longpolling/websocket fallback still works after `bus_service.js` changes.
+- [ ] Run DB migration/bootstrap and verify `_log_access` audit columns are present on newly created tables.
+
+### Release
+- [ ] `core/release.py`: `1.198.0`
+
+---
+
+## Sidebar Odoo 19.0 parity (2026-03-20)
+
+### Pre-Deployment
+- [ ] Hard-refresh browser after deploy (sidebar HTML structure changed in `main.js`, new CSS tokens in `webclient.css`, menu caching in `views.js`).
+- [ ] Smoke sidebar: categories fold/unfold, fold state persists across refresh (`erp_sidebar_folds` in localStorage).
+- [ ] Verify active link highlights on navigation and auto-expands parent category.
+- [ ] If `web_icon` / `web_icon_data` are set on menu records, verify icons render (img or FA icon).
+- [ ] Verify recursive sub-menus render for menus with 3+ nesting levels.
+- [ ] Check menu caching: first load populates `erp_menus` in localStorage; offline/error falls back to cache.
+- [ ] Verify `active = False` menus are excluded from sidebar.
+
+### New localStorage Keys
+- `erp_sidebar_folds` — JSON object: `{ menuId: true/false }` for per-category fold state.
+- `erp_menus` — Cached menu JSON from last successful load.
+- `erp_menus_hash` — Hash of cached menus for invalidation.
+
+### New DB Fields
+- `ir_ui_menu.web_icon` (VARCHAR) — icon class or module path.
+- `ir_ui_menu.web_icon_data` (VARCHAR) — base64 data URI for custom icon.
+- `ir_ui_menu.active` (BOOLEAN, default TRUE) — soft-delete flag.
+
+### Release
+- [ ] `core/release.py`: `1.181.0`
+
+---
+
+## List view componentization (2026-03-20)
+
+### Pre-Deployment
+- [ ] Hard-refresh browser after deploy (`control_panel.js`, `view_switcher.js`, `pager.js`, `bulk_action_bar.js`, `core/list_view.js` before `main.js`).
+- [ ] Smoke list pages: search, AI search, sort, grouping, saved filters, stage filter (`crm.lead`), bulk delete, CSV/XLSX export, pager, row keyboard navigation.
+
+### Release
+- [ ] `core/release.py`: `1.180.0`
+
+---
+
 ## Settings page componentization (2026-03-20)
 
 ### Pre-Deployment

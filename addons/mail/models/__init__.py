@@ -10,3 +10,4 @@ from . import ir_attachment
 from . import mail_channel
 from . import mail_channel_member
 from . import mail_notification
+from . import fetchmail_server

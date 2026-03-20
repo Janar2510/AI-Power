@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="im_livechat_channel_list">
+      <field name="name">im_livechat.channel list</field>
+      <field name="model">im_livechat.channel</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="web_page"/>
+          <field name="button_text"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="im_livechat_channel_form">
+      <field name="name">im_livechat.channel form</field>
+      <field name="model">im_livechat.channel</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="web_page"/>
+            <field name="button_text"/>
+            <field name="default_message"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_im_livechat_channel">
+      <field name="name">Live Chat</field>
+      <field name="res_model">im_livechat.channel</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Live Chat" id="menu_im_livechat_root" sequence="42"/>
+    <menuitem name="Channels" id="menu_im_livechat_channel" parent="menu_im_livechat_root" action="action_im_livechat_channel" sequence="1"/>
+  </data>
+</odoo>

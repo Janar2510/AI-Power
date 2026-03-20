@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.actions.act_window" id="action_project_todo_tasks">
+      <field name="name">To-Do</field>
+      <field name="res_model">project.task</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="To-Do" id="menu_project_todo_root" sequence="43"/>
+    <menuitem name="My To-Do" id="menu_project_todo_tasks" parent="menu_project_todo_root" action="action_project_todo_tasks" sequence="1"/>
+  </data>
+</odoo>

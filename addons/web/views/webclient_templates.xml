@@ -6,6 +6,7 @@
   <head>
     <meta charset="utf-8"/>
     <title>ERP Platform</title>
+    <link rel="manifest" href="/web/static/manifest.webmanifest"/>
     <link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
   </head>
   <body>
@@ -52,6 +53,10 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js" crossorigin="anonymous"></script>
     <script src="/web/static/src/services/rpc.js"></script>
     <script src="/web/static/src/services/session.js"></script>
+    <script src="/web/static/src/services/hotkey.js"></script>
+    <script src="/web/static/src/services/command_palette.js"></script>
+    <script src="/web/static/src/services/debug_menu.js"></script>
+    <script src="/web/static/src/services/pwa.js"></script>
     <script src="/web/static/src/components/card.js"></script>
     <script src="/web/static/src/components/button.js"></script>
     <script src="/web/static/src/components/badge.js"></script>
@@ -60,9 +65,31 @@
     <script src="/web/static/src/components/activity_feed.js"></script>
     <script src="/web/static/src/components/shortcuts_bar.js"></script>
     <script src="/web/static/src/components/recent_items.js"></script>
+    <script src="/web/static/src/components/control_panel.js"></script>
+    <script src="/web/static/src/components/view_switcher.js"></script>
+    <script src="/web/static/src/components/pager.js"></script>
+    <script src="/web/static/src/components/bulk_action_bar.js"></script>
+    <script src="/web/static/src/components/form_field.js"></script>
+    <script src="/web/static/src/components/statusbar.js"></script>
+    <script src="/web/static/src/components/one2many.js"></script>
+    <script src="/web/static/src/components/many2many_tags.js"></script>
+    <script src="/web/static/src/components/breadcrumbs.js"></script>
+    <script src="/web/static/src/components/confirm_dialog.js"></script>
+    <script src="/web/static/src/components/select_create_dialog.js"></script>
+    <script src="/web/static/src/components/search_panel.js"></script>
     <script src="/web/static/src/components/settings_field.js"></script>
     <script src="/web/static/src/components/settings_table.js"></script>
     <script src="/web/static/src/components/settings_section.js"></script>
+    <script src="/web/static/src/core/form_view.js"></script>
+    <script src="/web/static/src/core/navbar.js"></script>
+    <script src="/web/static/src/core/graph_view.js"></script>
+    <script src="/web/static/src/core/pivot_view.js"></script>
+    <script src="/web/static/src/core/calendar_view.js"></script>
+    <script src="/web/static/src/core/gantt_view.js"></script>
+    <script src="/web/static/src/core/activity_view.js"></script>
+    <script src="/web/static/src/core/discuss.js"></script>
+    <script src="/web/static/src/core/import.js"></script>
+    <script src="/web/static/src/core/list_view.js"></script>
     <script src="/web/static/src/core/settings.js"></script>
     <script src="/web/static/src/core/dashboard.js"></script>
     <script src="/web/static/src/main.js"></script>

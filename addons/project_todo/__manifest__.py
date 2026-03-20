@@ -7,7 +7,9 @@
     "depends": ["project"],
     "data": [
         "security/ir.model.access.csv",
+        "views/project_todo_views.xml",
     ],
     "auto_install": True,
     "installable": True,
+    "application": True,
 }

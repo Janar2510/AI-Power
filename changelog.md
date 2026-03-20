@@ -1,5 +1,132 @@
 # Changelog
 
+## 1.200.0 - Missing apps parity implementation (2026-03-20)
+
+### Added
+- New regression coverage: `tests/test_missing_apps_parity_phase408.py` validates CRM hierarchy, Discuss app root, promoted HR apps, analytic relocation, route mappings, and scaffolded app menus.
+- New app/menu scaffolds (views + actions + roots):
+  - `addons/hr_holidays/views/hr_holidays_views.xml` (Time Off app root and links to leave actions).
+  - `addons/repair/views/repair_views.xml` (Repairs app root + repair orders views/action).
+  - `addons/survey/views/survey_views.xml` (Surveys app root + survey views/action).
+  - `addons/lunch/views/lunch_views.xml` (Lunch app root + order views/action).
+  - `addons/im_livechat/views/im_livechat_views.xml` (Live Chat app root + channel views/action).
+  - `addons/project_todo/views/project_todo_views.xml` (To-Do app root + task action).
+  - `addons/data_recycle/views/data_recycle_views.xml` (Data Recycle app root + rules views/action).
+  - `addons/hr_skills/views/hr_skills_views.xml` (Skills app root + skill views/action).
+  - `addons/website_slides/views/website_slides_views.xml` (eLearning app root + channel views/action).
+
+### Changed
+- CRM menu architecture now follows Odoo-style app hierarchy in `addons/crm/views/crm_views.xml`:
+  - `CRM` root with `Sales`, `Leads`, `Reporting`, `Configuration`.
+  - Added `My Pipeline` and `My Activities` actions for app-level navigation.
+- Discuss is promoted to an app root (`menu_discuss_root`) so it appears in the app grid instead of only as a navbar shortcut.
+- HR app promotion:
+  - `hr_expense`: new top-level `Expenses` root and child menus.
+  - `hr_attendance`: promoted to top-level `Attendances` root.
+  - `hr_recruitment`: promoted to top-level `Recruitment` root.
+  - `hr_holidays`: now provides its own views and top-level `Time Off` root.
+- App-grid cleanup:
+  - `addons/analytic/views/analytic_views.xml`: analytic root moved under `account.menu_account_config`, removing standalone Analytic app tile behavior.
+  - `addons/analytic/__manifest__.py`: depends on `account` to ensure parent menu ref integrity.
+- Web client routing in `addons/web/static/src/main.js` expanded for parity routes:
+  - CRM: `pipeline`, `crm/activities`.
+  - HR/apps: `expenses`, `attendances`, `recruitment`, `time_off`.
+  - Scaffolded apps: `repair_orders`, `surveys`, `lunch_orders`, `livechat_channels`, `project_todos`, `recycle_models`, `skills`, `elearning`.
+  - Added corresponding `menuToRoute`, `actionToRoute`, `getModelForRoute`, `dataRoutes`, and titles.
+- Manifest hygiene and app metadata updates:
+  - Added missing view files into module `data` lists for new scaffolds.
+  - Normalized malformed quoted paths in `im_livechat` and `website_slides` manifests.
+  - Marked promoted/scaffolded app modules as `application: True` where appropriate.
+
+### Verification
+- `python3 -m unittest tests.test_missing_apps_parity_phase408` passes.
+
+---
+
+## 1.199.0 - Working menu + Odoo-style apps home (2026-03-20)
+
+### Added
+- Home apps launcher in `addons/web/static/src/main.js`: `#home` now renders an app-tile grid from menu app roots (`getAppRoots`) and keeps Dashboard visible below the launcher.
+- App navigation helpers in `main.js`: `getDefaultRouteForAppNode()` and `selectApp()` for app-root based routing and `erp_sidebar_app` persistence.
+- New home/nav styles in `addons/web/static/src/scss/webclient.css`: `.o-home-apps*`, `.o-app-grid`, `.o-app-tile*`, `.nav-current-app`, `.logo-link`.
+
+### Changed
+- Fixed menu hierarchy definitions:
+  - `addons/stock/views/stock_views.xml`: `Operations`, `Configuration`, `Reporting` now parented under `menu_stock_root`.
+  - `addons/account/views/account_views.xml`: `Configuration` now parented under `menu_account_root`.
+- `main.js` route coverage expanded to make menu links actionable:
+  - `actionToRoute()` + `getModelForRoute()` include `account.tax`, `account.payment.term`, `product.pricelist`, `analytic.account`, `analytic.plan`, `stock.warehouse.orderpoint`.
+  - `menuToRoute()` extended for app-level menu names (`Invoicing`, `Inventory`, `Sales`, `HR`, `Analytic`, etc.).
+  - `dataRoutes` patterns updated for `taxes`, `payment_terms`, `pricelists`, `bank_statements`, `reordering_rules`, `analytic_accounts`, `analytic_plans`.
+- Navbar/sidebar app UX moved from `<select>` to app-home flow:
+  - Logo and `Apps` button route to `#home`.
+  - Current app label shown in navbar.
+  - Sidebar keeps app-scoped section rendering based on selected/current route app.
+
+### Notes
+- `tests.test_views_registry` passes after this change.
+- `tests.test_menu_fix_phase170` currently fails due to pre-existing schema duplication (`create_date` duplicate) unrelated to this menu/home patch.
+
+---
+
+## 1.198.0 - Frontend/Backend roadmap implementation scaffold (2026-03-20)
+
+### Added
+- Frontend phase scaffolding files: `core/form_view.js`, `core/navbar.js`, `core/{graph,pivot,calendar,gantt,activity}_view.js`, `core/discuss.js`, `core/import.js`.
+- New UI components: `form_field.js`, `statusbar.js`, `one2many.js`, `many2many_tags.js`, `breadcrumbs.js`, `confirm_dialog.js`, `select_create_dialog.js`, `search_panel.js`.
+- New services: `hotkey.js`, `command_palette.js`, `debug_menu.js`, `pwa.js`.
+- PWA artifacts: `web/static/manifest.webmanifest`, `web/static/src/pwa/sw.js`.
+- Backend tools expansion: `core/tools/{safe_eval,date_utils,float_utils,image,misc,mail}.py`.
+- Mail gateway model: `mail.models.fetchmail_server`.
+
+### Changed
+- `main.js`: non-breaking AppCore delegation hooks for navbar, discuss, form, report views, calendar/pivot/graph/gantt/activity; `Breadcrumbs` and import preview delegation; command palette hotkey and PWA init.
+- `web/__manifest__.py` and `webclient_templates.xml`: registered new services/components/core assets.
+- ORM/registry/schema enrichment for roadmap backend phases:
+  - `core/orm/registry.py`: `_register_hook` / `_unregister_hook` invocation lifecycle.
+  - `core/orm/models.py`: `_log_access`, `_auto_init`, `_table_query` plumbing plus create/write audit timestamp updates.
+  - `core/db/schema.py`: `_log_access` audit columns and SQL view creation via `_table_query`.
+- `addons/bus`: web dependency + richer bus service channel helpers.
+- `addons/mail`: depends on `bus`, `web`; added fetchmail access rights.
+
+---
+
+## 1.181.0 - Sidebar Odoo 19.0 parity (2026-03-20)
+
+### Added
+- `ir.ui.menu` model: `web_icon`, `web_icon_data`, `active` fields (Odoo 19 parity).
+- `app_id` computation on menus: root menus are "apps"; descendants share the same `app_id`.
+- Recursive sidebar nesting: unlimited-depth collapsible sub-groups (`o-sidebar-subgroup`).
+- Active link highlighting: `o-sidebar-link--active` class on current page, updated on `hashchange`, auto-expands parent categories.
+- App icons in sidebar: `<img>` from `web_icon_data`, FA icon from `web_icon`, letter abbreviation fallback.
+- Per-category fold persistence via `localStorage` key `erp_sidebar_folds`.
+- Menu caching in `localStorage` (`erp_menus` + `erp_menus_hash`) with hash-based invalidation.
+- CSS tokens: `.o-sidebar-link--active`, `.o-sidebar-icon`, `.o-sidebar-link--nested`, `.o-sidebar-subgroup`, `.o-sidebar-subgroup-head`, `.o-sidebar-subgroup-body`.
+
+### Changed
+- `buildMenuTree`: recursive sorting at all depths.
+- `buildSidebarNavHtml`: renders icons, active state, recursive children, reads fold state from localStorage.
+- `wireSidebarAfterRender`: persists fold state on toggle, tracks active link on hashchange, wires subgroup toggles.
+- `views.js`: caches menus in localStorage on load, falls back to cache on network error.
+- `views_registry.py`: reads `web_icon`, `web_icon_data`, `active` from DB; filters inactive menus; assigns `app_id`.
+
+---
+
+## 1.180.0 - List view componentization + control panel extraction (2026-03-20)
+
+### Added
+- `design-system/specs/list-view.md` — control panel, view switcher, table, bulk actions, pager, responsive and a11y contract.
+- `addons/web/static/src/components/control_panel.js`, `view_switcher.js`, `pager.js`, `bulk_action_bar.js`.
+- `addons/web/static/src/core/list_view.js` — `AppCore.ListView` renderer with delegated list rendering and table behaviors.
+- List/control-panel CSS tokens in `webclient.css`: `.o-control-panel`, `.o-search-bar`, `.o-view-switcher`, `.o-list-table`, `.o-bulk-action-bar`, `.o-pager`, chip classes.
+
+### Changed
+- `addons/web/static/src/main.js`: list rendering delegates to `AppCore.ListView.render`; view switcher delegates to `AppCore.ListView.renderViewSwitcher`.
+- `design-system/MASTER.md` and `docs/design-system.md`: list view + control panel references.
+- `addons/web/__manifest__.py` and `addons/web/views/webclient_templates.xml`: load list components/core before `main.js`.
+
+---
+
 ## 1.179.0 - Settings page componentization (2026-03-20)
 
 ### Added

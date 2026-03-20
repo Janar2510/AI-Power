@@ -113,7 +113,8 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
     if Menu:
         try:
             rows = Menu.search_read(
-                [], ["xml_id", "name", "action_ref", "parent_ref", "sequence", "groups_ref"]
+                [], ["xml_id", "name", "action_ref", "parent_ref", "sequence",
+                     "groups_ref", "web_icon", "web_icon_data", "active"]
             )
             if rows:
                 from core.orm.security import get_user_groups
@@ -121,8 +122,15 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                 uid = getattr(env, "uid", 1)
                 registry = getattr(env, "registry", None)
                 user_groups = get_user_groups(registry, db, uid) if db and registry else set()
+                # Backward-compat guard:
+                # If all existing menu rows evaluate to inactive after introducing the `active` field,
+                # do not hide the full menu tree.
+                active_values = [r.get("active") for r in rows if "active" in r]
+                has_any_active = any(v is True for v in active_values)
                 menus_filtered: List[Dict] = []
                 for r in rows:
+                    if has_any_active and r.get("active", True) is False:
+                        continue
                     groups_ref = (r.get("groups_ref") or "").strip()
                     if groups_ref:
                         allowed = [g.strip() for g in groups_ref.split(",") if g.strip()]
@@ -134,10 +142,11 @@ def load_views_registry_from_db(env: Any) -> Dict[str, Any]:
                         "action": r.get("action_ref", ""),
                         "parent": r.get("parent_ref", ""),
                         "sequence": r.get("sequence", 10),
+                        "web_icon": r.get("web_icon", "") or "",
+                        "web_icon_data": r.get("web_icon_data", "") or "",
                     })
-                # Only overwrite XML menus when we have DB menus; keep XML fallback if filtered empty
                 if menus_filtered:
-                    reg["menus"] = menus_filtered
+                    reg["menus"] = _assign_app_ids(menus_filtered)
         except Exception:
             pass
     # Phase 110: report actions from ir.actions.report (model -> report_name)
@@ -313,7 +322,36 @@ def load_views_registry(loaded_modules: Optional[List[str]] = None) -> Dict[str,
         if xpath_ops:
             _apply_xpath_ops(base_view, xpath_ops)
 
-    return {"views": views, "actions": actions, "menus": menus}
+    return {"views": views, "actions": actions, "menus": _assign_app_ids(menus)}
+
+
+def _assign_app_ids(menus: List[Dict]) -> List[Dict]:
+    """Recursively assign app_id from root menus (Odoo 19 parity).
+
+    Root menus (parent == '') are apps; their descendants share the same app_id.
+    """
+    by_id: Dict[str, Dict] = {}
+    children_of: Dict[str, List[str]] = {}
+    for m in menus:
+        mid = m.get("id", "")
+        by_id[mid] = m
+        parent = m.get("parent", "")
+        children_of.setdefault(parent, []).append(mid)
+
+    def _set_app_id(app_id: str, menu_id: str) -> None:
+        menu = by_id.get(menu_id)
+        if menu:
+            menu["app_id"] = app_id
+        for child_id in children_of.get(menu_id, []):
+            _set_app_id(app_id, child_id)
+
+    for root_id in children_of.get("", []):
+        _set_app_id(root_id, root_id)
+
+    for m in menus:
+        m.setdefault("app_id", m.get("id", ""))
+
+    return menus
 
 
 def _find_node_in_children(children, expr):

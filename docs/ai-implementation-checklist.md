@@ -2,6 +2,34 @@
 
 Verification checklist for AI assistant module deployment and feature additions.
 
+## Missing apps parity (1.200)
+
+- [ ] CRM app root is `CRM` with nested Sales/Leads/Reporting/Configuration menus (no flat single-menu CRM).
+- [ ] Discuss has a top-level app menu (`menu_discuss_root`) and still routes to `#discuss`.
+- [ ] HR sub-apps promoted to top-level: Expenses, Attendances, Recruitment, Time Off.
+- [ ] Analytic root moved under Invoicing Configuration (not a standalone top-level app tile).
+- [ ] App menu/routing matrix supports: `pipeline`, `crm/activities`, `expenses`, `attendances`, `recruitment`, `time_off`, `repair_orders`, `surveys`, `lunch_orders`, `livechat_channels`, `project_todos`, `recycle_models`, `skills`, `elearning`.
+- [ ] Scaffold modules expose at least one root menu + list/form action view: repair, survey, lunch, im_livechat, project_todo, data_recycle, hr_skills, website_slides.
+- [x] Regression check passes: `python3 -m unittest tests.test_missing_apps_parity_phase408`.
+
+## Working menu + apps home launcher (1.199)
+
+- [ ] `main.js` home route renders app launcher tiles from app-root menus (`getAppRoots`) instead of dashboard-only output.
+- [ ] `main.js` keeps dashboard available on home below app launcher (no regression to KPI/activity widgets).
+- [ ] `main.js` routing maps include: `taxes`, `payment_terms`, `pricelists`, `bank_statements`, `reordering_rules`, `analytic_accounts`, `analytic_plans`.
+- [ ] Sidebar app context remains route-driven (`getAppIdForRoute`) and current app label appears in navbar.
+- [ ] Menu XML hierarchy is corrected in `stock_views.xml` and `account_views.xml` so app roots are not fragmented.
+
+## Frontend/Backend roadmap scaffold (1.198)
+
+- [ ] `web.assets_web` includes new service layer files: `hotkey.js`, `command_palette.js`, `debug_menu.js`, `pwa.js`.
+- [ ] `main.js` initializes command palette hotkey and PWA registration without breaking existing routes.
+- [ ] New component contracts are loaded: `form_field`, `statusbar`, `one2many`, `many2many_tags`, `breadcrumbs`, `confirm_dialog`, `select_create_dialog`, `search_panel`.
+- [ ] ORM registry hooks are called (`_register_hook`, `_unregister_hook`) when env is attached/cleared.
+- [ ] `_log_access` writes `create_uid/create_date/write_uid/write_date` on create/write where available.
+- [ ] Schema manager creates audit columns for `_log_access` models and supports SQL views via `_table_query`.
+- [ ] Tooling helpers are available from `core.tools`: `safe_eval`, `date_utils`, `float_utils`, `image`, `misc`, `mail`.
+
 ## Web client / dashboard (1.178)
 
 - [ ] Home dashboard loads via `AppCore.Dashboard.render` + `design-system/specs/dashboard-home.md` tokens (no inline dashboard HTML in `main.js`)

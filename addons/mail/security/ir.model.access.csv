@@ -8,3 +8,4 @@ access_mail_channel,access_mail_channel,model_mail_channel,,1,1,1,1
 access_mail_channel_member,access_mail_channel_member,model_mail_channel_member,,1,1,1,1
 access_mail_notification,access_mail_notification,model_mail_notification,,1,1,1,1
 access_mail_template,access_mail_template,model_mail_template,,1,1,1,1
+access_fetchmail_server,access_fetchmail_server,model_fetchmail_server,,1,1,1,1

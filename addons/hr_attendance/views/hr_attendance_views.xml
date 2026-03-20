@@ -36,7 +36,8 @@
       <field name="name">Attendance Kiosk</field>
       <field name="url">/hr/attendance/kiosk</field>
     </record>
-    <menuitem name="Attendance" id="menu_hr_attendance" action="action_hr_attendance" parent="hr.menu_hr_root" sequence="12"/>
-    <menuitem name="Kiosk" id="menu_hr_attendance_kiosk" action="action_hr_attendance_kiosk" parent="hr.menu_hr_root" sequence="13"/>
+    <menuitem name="Attendances" id="menu_hr_attendance_root" sequence="21"/>
+    <menuitem name="Attendance" id="menu_hr_attendance" action="action_hr_attendance" parent="menu_hr_attendance_root" sequence="12"/>
+    <menuitem name="Kiosk" id="menu_hr_attendance_kiosk" action="action_hr_attendance_kiosk" parent="menu_hr_attendance_root" sequence="13"/>
   </data>
 </odoo>

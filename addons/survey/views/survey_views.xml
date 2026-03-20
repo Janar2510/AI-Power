@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="survey_survey_list">
+      <field name="name">survey.survey list</field>
+      <field name="model">survey.survey</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="title"/>
+          <field name="survey_url"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="survey_survey_form">
+      <field name="name">survey.survey form</field>
+      <field name="model">survey.survey</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="title"/>
+            <field name="survey_url"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_survey_survey">
+      <field name="name">Surveys</field>
+      <field name="res_model">survey.survey</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Surveys" id="menu_survey_root" sequence="40"/>
+    <menuitem name="Surveys" id="menu_survey_survey" parent="menu_survey_root" action="action_survey_survey" sequence="1"/>
+  </data>
+</odoo>

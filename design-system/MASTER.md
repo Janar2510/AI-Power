@@ -30,6 +30,21 @@ Full layout, fields, tables, and sub-pages: [specs/settings.md](specs/settings.m
 | Fields | `.o-settings-field`, `.o-settings-input`, `.o-settings-toggle`, `.o-settings-password` |
 | Tables | `.o-settings-table` via `UIComponents.SettingsTable` |
 
+## List View
+
+Full list/control-panel contract: [specs/list-view.md](specs/list-view.md).
+
+### Surfaces -> tokens / classes
+
+| Surface | Classes / components |
+|---------|----------------------|
+| List shell | `.o-list-shell`, `.o-list-table-wrapper`, `.o-pager` |
+| Control panel | `.o-control-panel`, `.o-search-bar`, `.o-control-panel-actions` |
+| View switcher | `UIComponents.ViewSwitcher` -> `.o-view-switcher` |
+| Filter chips | `.o-filter-chips`, `.o-filter-chip` |
+| Table rows | `.o-list-table`, `.o-list-data-row`, `.o-list-group-header`, `.o-list-group-subtotal` |
+| Bulk actions | `UIComponents.BulkActionBar` -> `.o-bulk-action-bar` |
+
 ## Dashboard (home)
 
 Full layout and component contracts: [specs/dashboard-home.md](specs/dashboard-home.md).

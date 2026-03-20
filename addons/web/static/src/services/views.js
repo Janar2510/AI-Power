@@ -3,6 +3,30 @@
  */
 (function () {
   let _cache = null;
+  var _MENUS_CACHE_KEY = 'erp_menus';
+  var _MENUS_HASH_KEY = 'erp_menus_hash';
+
+  function _simpleHash(str) {
+    var h = 0;
+    for (var i = 0; i < str.length; i++) {
+      h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    }
+    return h.toString(36);
+  }
+
+  function _tryLoadMenusFromCache() {
+    try {
+      var raw = localStorage.getItem(_MENUS_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function _cacheMenus(menus, hash) {
+    try {
+      localStorage.setItem(_MENUS_CACHE_KEY, JSON.stringify(menus));
+      localStorage.setItem(_MENUS_HASH_KEY, hash);
+    } catch (e) { /* quota exceeded or private mode */ }
+  }
 
   const views = {
     load() {
@@ -16,10 +40,20 @@
         })
         .then(data => {
           _cache = data || { views: {}, actions: {}, menus: [] };
+          if (_cache.menus && _cache.menus.length) {
+            var menuStr = JSON.stringify(_cache.menus);
+            var newHash = _simpleHash(menuStr);
+            var oldHash = '';
+            try { oldHash = localStorage.getItem(_MENUS_HASH_KEY) || ''; } catch (e) { /* noop */ }
+            if (newHash !== oldHash) {
+              _cacheMenus(_cache.menus, newHash);
+            }
+          }
           return _cache;
         })
         .catch(() => {
-          _cache = { views: {}, actions: {}, menus: [] };
+          var cachedMenus = _tryLoadMenusFromCache();
+          _cache = { views: {}, actions: {}, menus: cachedMenus || [] };
           return _cache;
         });
     },

@@ -120,9 +120,12 @@ def _render_report_html(report_name: str, ids: List[int], request: Request) -> O
                         rec[f] = Move.read_ids(list(val), ["name", "product_uom_qty"])
 
     try:
+        template_engine = (config.get_config().get("report_template_engine", "jinja2") or "jinja2").lower()
+        if template_engine != "jinja2":
+            template_engine = "jinja2"
         from jinja2 import Template
         template = Template(content)
-        html = template.render(records=records)
+        html = template.render(records=records, report_name=report_name)
         return Response(html, mimetype="text/html; charset=utf-8")
     except Exception as e:
         return Response(f"Template error: {e}", status=500)
@@ -134,8 +137,10 @@ def _render_report_pdf(report_name: str, ids: List[int], request: Request) -> Op
     if not html_resp or html_resp.status_code != 200:
         return html_resp
     try:
+        pdf_engine = (config.get_config().get("report_pdf_engine", "weasyprint") or "weasyprint").lower()
+        if pdf_engine != "weasyprint":
+            pdf_engine = "weasyprint"
         from weasyprint import HTML
-        from io import BytesIO
         pdf_bytes = HTML(string=html_resp.get_data(as_text=True)).write_pdf()
         return Response(pdf_bytes, mimetype="application/pdf")
     except ImportError:

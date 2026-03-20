@@ -31,12 +31,29 @@
   const ViewManagerCore = window.AppCore && window.AppCore.ViewManager ? window.AppCore.ViewManager : null;
   const DashboardCore = window.AppCore && window.AppCore.Dashboard ? window.AppCore.Dashboard : null;
   const SettingsCore = window.AppCore && window.AppCore.Settings ? window.AppCore.Settings : null;
+  const ListViewCore = window.AppCore && window.AppCore.ListView ? window.AppCore.ListView : null;
+  const FormViewCore = window.AppCore && window.AppCore.FormView ? window.AppCore.FormView : null;
+  const NavbarCore = window.AppCore && window.AppCore.Navbar ? window.AppCore.Navbar : null;
+  const DiscussViewCore = window.AppCore && window.AppCore.DiscussView ? window.AppCore.DiscussView : null;
+  const GraphViewCore = window.AppCore && window.AppCore.GraphView ? window.AppCore.GraphView : null;
+  const PivotViewCore = window.AppCore && window.AppCore.PivotView ? window.AppCore.PivotView : null;
+  const CalendarViewCore = window.AppCore && window.AppCore.CalendarView ? window.AppCore.CalendarView : null;
+  const GanttViewCore = window.AppCore && window.AppCore.GanttView ? window.AppCore.GanttView : null;
+  const ActivityViewCore = window.AppCore && window.AppCore.ActivityView ? window.AppCore.ActivityView : null;
+  const ImportCore = window.AppCore && window.AppCore.Import ? window.AppCore.Import : null;
   const ChatterCore = window.AppCore && window.AppCore.Chatter ? window.AppCore.Chatter : null;
   const FieldUtilsCore = window.AppCore && window.AppCore.FieldUtils ? window.AppCore.FieldUtils : null;
 
   var actionStack = [];
   var formDirty = false;
   var lastHash = (window.location.hash || '#home').slice(1);
+  var navContext = { userCompanies: null, userLangs: [], currentLang: 'en_US' };
+  if (window.Services && window.Services.commandPalette && typeof window.Services.commandPalette.initHotkey === "function") {
+    window.Services.commandPalette.initHotkey();
+  }
+  if (window.Services && window.Services.pwa && typeof window.Services.pwa.register === "function") {
+    window.Services.pwa.register();
+  }
 
   function pushBreadcrumb(label, hash) {
     actionStack.push({ label: label, hash: hash });
@@ -51,6 +68,9 @@
   }
 
   function renderBreadcrumbs() {
+    if (window.UIComponents && window.UIComponents.Breadcrumbs && typeof window.UIComponents.Breadcrumbs.renderHTML === "function") {
+      return window.UIComponents.Breadcrumbs.renderHTML(actionStack || []);
+    }
     if (actionStack.length <= 1) return '';
     var html = '<nav class="breadcrumbs" aria-label="Breadcrumb">';
     actionStack.forEach(function (entry, i) {
@@ -78,7 +98,12 @@
     if (!action || action.type !== 'ir.actions.act_window') return null;
     const m = (action.res_model || '').replace(/\./g, '_');
     if (m === 'res_partner') return 'contacts';
-    if (m === 'crm_lead') return 'leads';
+    if (m === 'crm_lead') {
+      const name = (action.name || '').toLowerCase();
+      if (name.indexOf('pipeline') >= 0) return 'pipeline';
+      if (name.indexOf('activit') >= 0) return 'crm/activities';
+      return 'leads';
+    }
     if (m === 'project_task') return 'tasks';
     if (m === 'knowledge_article') return 'articles';
     if (m === 'knowledge_category') return 'knowledge_categories';
@@ -107,16 +132,30 @@
     if (m === 'account_reconcile_wizard') return 'account_reconcile_wizard';
     if (m === 'account_journal') return 'journals';
     if (m === 'account_account') return 'accounts';
+    if (m === 'account_tax') return 'taxes';
+    if (m === 'account_payment_term') return 'payment_terms';
     if (m === 'hr_employee') return 'employees';
     if (m === 'hr_department') return 'departments';
     if (m === 'hr_job') return 'jobs';
-    if (m === 'hr_attendance') return 'attendance';
+    if (m === 'hr_attendance') return 'attendances';
     if (m === 'hr_applicant') return 'applicants';
     if (m === 'hr_contract') return 'contracts';
     if (m === 'project_project') return 'projects';
     if (m === 'calendar_event') return 'meetings';
     if (m === 'helpdesk_ticket') return 'tickets';
     if (m === 'analytic_line') return 'timesheets';
+    if (m === 'analytic_account') return 'analytic_accounts';
+    if (m === 'analytic_plan') return 'analytic_plans';
+    if (m === 'product_pricelist') return 'pricelists';
+    if (m === 'stock_warehouse_orderpoint') return 'reordering_rules';
+    if (m === 'hr_expense') return 'expenses';
+    if (m === 'repair_order') return 'repair_orders';
+    if (m === 'survey_survey') return 'surveys';
+    if (m === 'lunch_order') return 'lunch_orders';
+    if (m === 'im_livechat_channel') return 'livechat_channels';
+    if (m === 'data_recycle_model') return 'recycle_models';
+    if (m === 'hr_skill') return 'skills';
+    if (m === 'slide_channel') return 'elearning';
     if (m === 'audit_log') return 'audit_log';
     if (m === 'mailing_list') return 'marketing/mailing_lists';
     if (m === 'mailing_mailing') return 'marketing/mailings';
@@ -131,10 +170,36 @@
     if (name === 'settings') return 'settings';
     if (name === 'api keys') return 'settings/apikeys';
     if (name === 'contacts') return 'contacts';
+    if (name === 'crm') return 'pipeline';
     if (name === 'leads') return 'leads';
+    if (name === 'my pipeline') return 'pipeline';
+    if (name === 'my activities') return 'crm/activities';
+    if (name === 'discuss') return 'discuss';
     if (name === 'orders') return 'orders';
     if (name === 'products') return 'products';
     if (name === 'tasks') return 'tasks';
+    if (name === 'invoicing') return 'invoices';
+    if (name === 'inventory') return 'transfers';
+    if (name === 'sales') return 'orders';
+    if (name === 'hr') return 'employees';
+    if (name === 'employees') return 'employees';
+    if (name === 'departments') return 'departments';
+    if (name === 'job positions' || name === 'jobs') return 'jobs';
+    if (name === 'expenses' || name === 'my expenses') return 'expenses';
+    if (name === 'attendances' || name === 'attendance') return 'attendances';
+    if (name === 'recruitment' || name === 'applicants') return 'recruitment';
+    if (name === 'time off') return 'time_off';
+    if (name === 'repairs') return 'repair_orders';
+    if (name === 'surveys') return 'surveys';
+    if (name === 'lunch') return 'lunch_orders';
+    if (name === 'live chat') return 'livechat_channels';
+    if (name === 'to-do') return 'project_todos';
+    if (name === 'data recycle') return 'recycle_models';
+    if (name === 'skills') return 'skills';
+    if (name === 'elearning') return 'elearning';
+    if (name === 'website') return 'website';
+    if (name === 'ecommerce') return 'ecommerce';
+    if (name === 'reports') return 'reports/trial-balance';
     return null;
   }
 
@@ -161,6 +226,8 @@
     const action = getActionForRoute(route);
     if (action) return action.res_model || action.resModel;
     if (route === 'contacts') return 'res.partner';
+    if (route === 'pipeline') return 'crm.lead';
+    if (route === 'crm/activities') return 'crm.lead';
     if (route === 'leads') return 'crm.lead';
     if (route === 'tasks') return 'project.task';
     if (route === 'articles') return 'knowledge.article';
@@ -193,15 +260,32 @@
     if (route === 'account_reconcile_wizard') return 'account.reconcile.wizard';
     if (route === 'journals') return 'account.journal';
     if (route === 'accounts') return 'account.account';
+    if (route === 'taxes') return 'account.tax';
+    if (route === 'payment_terms') return 'account.payment.term';
     if (route === 'employees') return 'hr.employee';
     if (route === 'departments') return 'hr.department';
     if (route === 'jobs') return 'hr.job';
-    if (route === 'attendance') return 'hr.attendance';
+    if (route === 'attendances') return 'hr.attendance';
     if (route === 'applicants') return 'hr.applicant';
+    if (route === 'recruitment') return 'hr.applicant';
     if (route === 'contracts') return 'hr.contract';
+    if (route === 'time_off') return 'hr.leave';
+    if (route === 'expenses') return 'hr.expense';
     if (route === 'fleet') return 'fleet.vehicle';
     if (route === 'projects') return 'project.project';
     if (route === 'timesheets') return 'analytic.line';
+    if (route === 'project_todos') return 'project.task';
+    if (route === 'recycle_models') return 'data.recycle.model';
+    if (route === 'repair_orders') return 'repair.order';
+    if (route === 'surveys') return 'survey.survey';
+    if (route === 'lunch_orders') return 'lunch.order';
+    if (route === 'livechat_channels') return 'im_livechat.channel';
+    if (route === 'skills') return 'hr.skill';
+    if (route === 'elearning') return 'slide.channel';
+    if (route === 'analytic_accounts') return 'analytic.account';
+    if (route === 'analytic_plans') return 'analytic.plan';
+    if (route === 'pricelists') return 'product.pricelist';
+    if (route === 'reordering_rules') return 'stock.warehouse.orderpoint';
     if (route === 'meetings') return 'calendar.event';
     if (route === 'tickets') return 'helpdesk.ticket';
     return null;
@@ -342,6 +426,15 @@
       importFile = f;
     };
     function renderImportPreview() {
+      if (ImportCore && typeof ImportCore.renderPreview === "function") {
+        var previewHtml = ImportCore.renderPreview(csvHeaders || [], csvRows || [], modelFields || []);
+        if (previewHtml && previewHtml.table && previewHtml.mapping) {
+          document.getElementById('import-preview-table').innerHTML = previewHtml.table;
+          document.getElementById('import-mapping').innerHTML = previewHtml.mapping;
+          document.getElementById('import-preview').style.display = 'block';
+          return;
+        }
+      }
       const preview = csvRows.slice(0, 5);
       let tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem"><tr>';
       csvHeaders.forEach(function (h) { tbl += '<th style="padding:0.35rem;border:1px solid #ddd;text-align:left">' + String(h).replace(/</g, '&lt;') + '</th>'; });
@@ -445,11 +538,74 @@
         byId[parentRef].children.push(node);
       }
     });
-    roots.sort(function (a, b) { return (a.menu.sequence || 0) - (b.menu.sequence || 0); });
-    roots.forEach(function (n) {
-      n.children.sort(function (a, b) { return (a.menu.sequence || 0) - (b.menu.sequence || 0); });
-    });
+    function sortRecursive(nodes) {
+      nodes.sort(function (a, b) { return (a.menu.sequence || 0) - (b.menu.sequence || 0); });
+      nodes.forEach(function (n) { if (n.children.length) sortRecursive(n.children); });
+    }
+    sortRecursive(roots);
     return roots;
+  }
+
+  function getAppRoots(tree, menus) {
+    var byId = {};
+    (menus || []).forEach(function (m) { if (m && m.id) byId[m.id] = m; });
+    return (tree || []).filter(function (node) {
+      var m = node.menu || {};
+      if (!m.id) return false;
+      if (m.app_id) return m.id === m.app_id;
+      return !m.parent || !byId[m.parent];
+    });
+  }
+
+  function getAppIdForRoute(route, menus) {
+    var out = null;
+    (menus || []).some(function (m) {
+      var action = m.action && viewsSvc ? viewsSvc.getAction(m.action) : null;
+      var r = action ? actionToRoute(action) : menuToRoute(m);
+      if (r && r === route) {
+        out = m.app_id || m.id || null;
+        return true;
+      }
+      return false;
+    });
+    return out;
+  }
+
+  function getDefaultRouteForAppNode(node) {
+    if (!node) return null;
+    var queue = [node];
+    while (queue.length) {
+      var cur = queue.shift();
+      var m = cur && cur.menu ? cur.menu : null;
+      if (m) {
+        var action = m.action && viewsSvc ? viewsSvc.getAction(m.action) : null;
+        var route = action ? actionToRoute(action) : menuToRoute(m);
+        if (route) return route;
+      }
+      var children = cur && cur.children ? cur.children : [];
+      for (var i = 0; i < children.length; i++) queue.push(children[i]);
+    }
+    return null;
+  }
+
+  function selectApp(appId) {
+    if (!appId) return;
+    var menus = (viewsSvc && viewsSvc.getMenus()) ? viewsSvc.getMenus() : [];
+    var tree = menus.length ? buildMenuTree(menus) : [];
+    var appRoots = getAppRoots(tree, menus);
+    var selectedRoot = appRoots.find(function (n) {
+      return String((n.menu && n.menu.id) || '') === String(appId);
+    });
+    if (!selectedRoot) return;
+    if (typeof localStorage !== 'undefined') localStorage.setItem('erp_sidebar_app', String(appId));
+    var targetRoute = getDefaultRouteForAppNode(selectedRoot) || 'home';
+    var nextHash = '#' + targetRoute;
+    if (window.location.hash === nextHash) {
+      renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
+      route();
+      return;
+    }
+    window.location.hash = nextHash;
   }
 
   function escNavHtml(s) {
@@ -461,6 +617,63 @@
     return n ? n.charAt(0).toUpperCase() : '\u2022';
   }
 
+  function _getSidebarFolds() {
+    try { return JSON.parse(localStorage.getItem('erp_sidebar_folds') || '{}'); } catch (e) { return {}; }
+  }
+
+  function _setSidebarFolds(folds) {
+    try { localStorage.setItem('erp_sidebar_folds', JSON.stringify(folds)); } catch (e) { /* noop */ }
+  }
+
+  function _sidebarIconHtml(m) {
+    if (m.web_icon_data) {
+      return '<img class="o-sidebar-icon" src="' + escNavHtml(m.web_icon_data) + '" alt="" />';
+    }
+    if (m.web_icon) {
+      var parts = (m.web_icon || '').split(',');
+      if (parts.length === 1 && /^fa[a-z-]*\s/.test(parts[0].trim())) {
+        return '<i class="o-sidebar-icon ' + escNavHtml(parts[0].trim()) + '" aria-hidden="true"></i>';
+      }
+      if (parts.length >= 1 && parts[0].trim().startsWith('fa')) {
+        return '<i class="o-sidebar-icon ' + escNavHtml(parts[0].trim()) + '" aria-hidden="true"></i>';
+      }
+    }
+    return '<span class="o-sidebar-abbrev">' + escNavHtml(sidebarAbbrev(m.name)) + '</span>';
+  }
+
+  function _renderSidebarChildren(children, currentHash, depth) {
+    var html = '';
+    children.forEach(function (ch) {
+      var cm = ch.menu;
+      var caction = cm.action && viewsSvc ? viewsSvc.getAction(cm.action) : null;
+      var croute = caction ? actionToRoute(caction) : menuToRoute(cm);
+      var chref = croute ? '#' + croute : '#';
+      var hasGrandkids = ch.children && ch.children.length > 0;
+      var isActive = croute && currentHash === croute;
+
+      if (hasGrandkids) {
+        var folds = _getSidebarFolds();
+        var subFolded = folds[cm.id] !== undefined ? folds[cm.id] : true;
+        var subFoldedCls = subFolded ? ' o-sidebar-subgroup--folded' : '';
+        html += '<div class="o-sidebar-subgroup' + subFoldedCls + '" data-menu-id="' + escNavHtml(cm.id || '') + '">';
+        html += '<button type="button" class="o-sidebar-subgroup-head" aria-expanded="' + (subFolded ? 'false' : 'true') + '">';
+        html += '<span class="o-sidebar-chevron o-sidebar-chevron--sub" aria-hidden="true">\u25bc</span>';
+        html += '<span class="o-sidebar-link-text">' + escNavHtml(cm.name) + '</span>';
+        html += '</button>';
+        html += '<div class="o-sidebar-subgroup-body">';
+        html += _renderSidebarChildren(ch.children, currentHash, depth + 1);
+        html += '</div></div>';
+      } else {
+        var ccls = croute ? 'o-sidebar-link' : 'o-sidebar-link o-sidebar-link-disabled';
+        if (isActive) ccls += ' o-sidebar-link--active';
+        if (depth > 0) ccls += ' o-sidebar-link--nested';
+        html += '<a href="' + escNavHtml(chref) + '" class="' + ccls + '" data-menu-id="' + escNavHtml(cm.id || '') + '">';
+        html += '<span class="o-sidebar-link-text">' + escNavHtml(cm.name) + '</span></a>';
+      }
+    });
+    return html;
+  }
+
   function buildSidebarNavHtml(tree, staleInnerHtml) {
     var html = '<div class="o-sidebar-inner"><div class="o-sidebar-scroll">';
     if (staleInnerHtml) {
@@ -470,35 +683,34 @@
     if (!tree || !tree.length) {
       html += '<p class="o-sidebar-empty">No menu items.</p>';
     } else {
+      var currentHash = (location.hash || '#home').replace(/^#/, '');
+      var folds = _getSidebarFolds();
       tree.forEach(function (node) {
         var m = node.menu;
         var action = m.action && viewsSvc ? viewsSvc.getAction(m.action) : null;
         var route = action ? actionToRoute(action) : menuToRoute(m);
         var href = route ? '#' + route : '#';
         var hasKids = node.children && node.children.length > 0;
-        var abbrev = escNavHtml(sidebarAbbrev(m.name));
+        var iconHtml = _sidebarIconHtml(m);
         if (hasKids) {
-          html += '<section class="o-sidebar-category" data-expanded="true">';
-          html += '<button type="button" class="o-sidebar-category-head" aria-expanded="true">';
+          var folded = folds[m.id] !== undefined ? folds[m.id] : true;
+          var foldedCls = folded ? ' o-sidebar-category--folded' : '';
+          html += '<section class="o-sidebar-category' + foldedCls + '" data-menu-id="' + escNavHtml(m.id || '') + '" data-expanded="' + (folded ? 'false' : 'true') + '">';
+          html += '<button type="button" class="o-sidebar-category-head" aria-expanded="' + (folded ? 'false' : 'true') + '">';
           html += '<span class="o-sidebar-chevron" aria-hidden="true">\u25bc</span>';
-          html += '<span class="o-sidebar-abbrev">' + abbrev + '</span>';
+          html += iconHtml;
           html += '<span class="o-sidebar-category-name">' + escNavHtml(m.name) + '</span>';
           html += '</button>';
           html += '<div class="o-sidebar-category-body">';
-          node.children.forEach(function (ch) {
-            var cm = ch.menu;
-            var caction = cm.action && viewsSvc ? viewsSvc.getAction(cm.action) : null;
-            var croute = caction ? actionToRoute(caction) : menuToRoute(cm);
-            var chref = croute ? '#' + croute : '#';
-            var ccls = croute ? 'o-sidebar-link' : 'o-sidebar-link o-sidebar-link-disabled';
-            html += '<a href="' + escNavHtml(chref) + '" class="' + ccls + '" data-menu-id="' + escNavHtml(cm.id || '') + '"><span class="o-sidebar-link-text">' + escNavHtml(cm.name) + '</span></a>';
-          });
+          html += _renderSidebarChildren(node.children, currentHash, 0);
           html += '</div></section>';
         } else {
+          var isActive = route && currentHash === route;
           var leafCls = route ? 'o-sidebar-link' : 'o-sidebar-link o-sidebar-link-disabled';
+          if (isActive) leafCls += ' o-sidebar-link--active';
           html += '<section class="o-sidebar-category o-sidebar-category--flat">';
           html += '<a href="' + escNavHtml(href) + '" class="' + leafCls + '" data-menu-id="' + escNavHtml(m.id || '') + '">';
-          html += '<span class="o-sidebar-abbrev">' + abbrev + '</span>';
+          html += iconHtml;
           html += '<span class="o-sidebar-link-text">' + escNavHtml(m.name) + '</span></a></section>';
         }
       });
@@ -517,10 +729,42 @@
     }
   }
 
+  function _updateSidebarActiveLink() {
+    if (!appSidebar) return;
+    var currentHash = (location.hash || '#home').replace(/^#/, '');
+    appSidebar.querySelectorAll('a.o-sidebar-link').forEach(function (a) {
+      var linkHash = (a.getAttribute('href') || '').replace(/^#/, '');
+      var isActive = linkHash && linkHash !== '' && linkHash === currentHash;
+      a.classList.toggle('o-sidebar-link--active', isActive);
+      if (isActive) {
+        var category = a.closest('.o-sidebar-category');
+        if (category && category.classList.contains('o-sidebar-category--folded')) {
+          category.classList.remove('o-sidebar-category--folded');
+          var head = category.querySelector('.o-sidebar-category-head');
+          if (head) head.setAttribute('aria-expanded', 'true');
+          category.setAttribute('data-expanded', 'true');
+          var folds = _getSidebarFolds();
+          var menuId = category.getAttribute('data-menu-id');
+          if (menuId) { folds[menuId] = false; _setSidebarFolds(folds); }
+        }
+        var subgroup = a.closest('.o-sidebar-subgroup');
+        if (subgroup && subgroup.classList.contains('o-sidebar-subgroup--folded')) {
+          subgroup.classList.remove('o-sidebar-subgroup--folded');
+          var subHead = subgroup.querySelector('.o-sidebar-subgroup-head');
+          if (subHead) subHead.setAttribute('aria-expanded', 'true');
+          var folds2 = _getSidebarFolds();
+          var subId = subgroup.getAttribute('data-menu-id');
+          if (subId) { folds2[subId] = false; _setSidebarFolds(folds2); }
+        }
+      }
+    });
+  }
+
   function wireSidebarAfterRender() {
     if (!appSidebar || !appShell) return;
     var sidebar = appSidebar;
     var shell = appShell;
+
     sidebar.querySelectorAll('.o-sidebar-category-head').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var sec = btn.closest('.o-sidebar-category');
@@ -528,13 +772,32 @@
         sec.classList.toggle('o-sidebar-category--folded');
         var folded = sec.classList.contains('o-sidebar-category--folded');
         btn.setAttribute('aria-expanded', folded ? 'false' : 'true');
+        sec.setAttribute('data-expanded', folded ? 'false' : 'true');
+        var folds = _getSidebarFolds();
+        var menuId = sec.getAttribute('data-menu-id');
+        if (menuId) { folds[menuId] = folded; _setSidebarFolds(folds); }
       });
     });
+
+    sidebar.querySelectorAll('.o-sidebar-subgroup-head').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var grp = btn.closest('.o-sidebar-subgroup');
+        if (!grp) return;
+        grp.classList.toggle('o-sidebar-subgroup--folded');
+        var folded = grp.classList.contains('o-sidebar-subgroup--folded');
+        btn.setAttribute('aria-expanded', folded ? 'false' : 'true');
+        var folds = _getSidebarFolds();
+        var menuId = grp.getAttribute('data-menu-id');
+        if (menuId) { folds[menuId] = folded; _setSidebarFolds(folds); }
+      });
+    });
+
     sidebar.querySelectorAll('a.o-sidebar-link').forEach(function (a) {
       a.addEventListener('click', function () {
         if (window.innerWidth <= 1023) closeMobileSidebar();
       });
     });
+
     var bd = document.getElementById('o-sidebar-backdrop');
     if (bd) {
       bd.addEventListener('click', closeMobileSidebar);
@@ -572,6 +835,7 @@
     }
     window.addEventListener('hashchange', function () {
       if (window.innerWidth <= 1023) closeMobileSidebar();
+      _updateSidebarActiveLink();
     });
     if (!window._erpNavEscapeBound) {
       window._erpNavEscapeBound = true;
@@ -580,14 +844,37 @@
         if (appShell && appShell.classList.contains('o-app-shell--sidebar-mobile-open')) closeMobileSidebar();
       });
     }
+    _updateSidebarActiveLink();
   }
 
   function renderNavbar(userCompanies, userLangs, currentLang) {
+    if (NavbarCore && typeof NavbarCore.render === "function") {
+      var coreHandled = NavbarCore.render({
+        navbar: navbar,
+        appShell: appShell,
+        appSidebar: appSidebar,
+        userCompanies: userCompanies || [],
+        userLangs: userLangs || [],
+        currentLang: currentLang || "en_US",
+        viewsSvc: viewsSvc,
+      });
+      if (coreHandled) return;
+    }
     if (!navbar) return;
     userLangs = userLangs || [];
     currentLang = currentLang || 'en_US';
     var menus = (viewsSvc && viewsSvc.getMenus()) ? viewsSvc.getMenus() : [];
     var tree = menus.length ? buildMenuTree(menus) : [];
+    var appRoots = getAppRoots(tree, menus);
+    var routeHash = (window.location.hash || '#home').replace(/^#/, '');
+    var autoAppId = getAppIdForRoute(routeHash, menus);
+    var storedAppId = typeof localStorage !== 'undefined' ? (localStorage.getItem('erp_sidebar_app') || '') : '';
+    var selectedAppId = autoAppId || storedAppId || (appRoots[0] && appRoots[0].menu && appRoots[0].menu.id) || '';
+    var selectedRoot = appRoots.find(function (n) {
+      return String((n.menu && n.menu.id) || '') === String(selectedAppId);
+    }) || null;
+    var selectedAppName = (selectedRoot && selectedRoot.menu && selectedRoot.menu.name) ? selectedRoot.menu.name : '';
+    if (selectedAppId && typeof localStorage !== 'undefined') localStorage.setItem('erp_sidebar_app', selectedAppId);
     var useSidebar = !!appSidebar;
     var staleBannerHtml = '';
     if (menus.length === 0) {
@@ -601,7 +888,13 @@
     } else {
       html += '<button type="button" class="nav-hamburger" aria-label="Toggle menu" style="display:none">&#9776;</button>';
     }
-    html += '<span class="nav-toolbar-left"><span class="logo">ERP Platform</span>';
+    html += '<span class="nav-toolbar-left"><a href="#home" class="logo logo-link" title="Apps">ERP Platform</a>';
+    if (useSidebar) {
+      html += '<button type="button" id="nav-apps-home" class="nav-link nav-apps-home" title="Apps">Apps</button>';
+      if (selectedAppName) {
+        html += '<span class="nav-current-app">' + escNavHtml(selectedAppName) + '</span>';
+      }
+    }
     if (!useSidebar) {
       html += '<nav role="navigation" class="nav-menu" aria-label="Main navigation" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
       if (staleBannerHtml) {
@@ -673,8 +966,22 @@
     html += '</span>';
     navbar.innerHTML = html;
     if (appSidebar) {
-      appSidebar.innerHTML = buildSidebarNavHtml(tree, staleBannerHtml);
+      var sidebarTree = tree;
+      if (appRoots.length && selectedAppId) {
+        if (selectedRoot) {
+          sidebarTree = selectedRoot.children && selectedRoot.children.length
+            ? selectedRoot.children
+            : [selectedRoot];
+        }
+      }
+      appSidebar.innerHTML = buildSidebarNavHtml(sidebarTree, staleBannerHtml);
       wireSidebarAfterRender();
+    }
+    var appsHomeBtn = navbar.querySelector('#nav-apps-home');
+    if (appsHomeBtn) {
+      appsHomeBtn.addEventListener('click', function () {
+        window.location.hash = '#home';
+      });
     }
     var hamburger = navbar.querySelector('.nav-hamburger');
     var navMenu = navbar.querySelector('.nav-menu');
@@ -965,6 +1272,8 @@
 
   function getTitle(route) {
     if (route === 'contacts') return 'Contacts';
+    if (route === 'pipeline') return 'Pipeline';
+    if (route === 'crm/activities') return 'CRM Activities';
     if (route === 'leads') return 'Leads';
     if (route === 'orders') return 'Orders';
     if (route === 'products') return 'Products';
@@ -995,7 +1304,19 @@
     if (route === 'employees') return 'Employees';
     if (route === 'departments') return 'Departments';
     if (route === 'jobs') return 'Job Positions';
+    if (route === 'attendances') return 'Attendances';
+    if (route === 'recruitment') return 'Recruitment';
+    if (route === 'time_off') return 'Time Off';
+    if (route === 'expenses') return 'Expenses';
     if (route === 'projects') return 'Projects';
+    if (route === 'repair_orders') return 'Repairs';
+    if (route === 'surveys') return 'Surveys';
+    if (route === 'lunch_orders') return 'Lunch';
+    if (route === 'livechat_channels') return 'Live Chat';
+    if (route === 'project_todos') return 'To-Do';
+    if (route === 'recycle_models') return 'Data Recycle';
+    if (route === 'skills') return 'Skills';
+    if (route === 'elearning') return 'eLearning';
     if (route === 'timesheets') return 'Timesheets';
     if (route === 'tickets') return 'Tickets';
     return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records';
@@ -1008,6 +1329,14 @@
   };
 
   function renderDiscuss(channelId) {
+    if (DiscussViewCore && typeof DiscussViewCore.render === "function") {
+      var coreHandled = DiscussViewCore.render(main, {
+        channelId: channelId,
+        rpc: rpc,
+        showToast: showToast,
+      });
+      if (coreHandled) return;
+    }
     actionStack = [];
     const container = document.createElement('div');
     container.id = 'discuss-container';
@@ -1129,7 +1458,57 @@
 
   function renderHome() {
     if (typeof window !== 'undefined') window.chatContext = {};
-    renderDashboard();
+    actionStack = [];
+    var menus = (viewsSvc && viewsSvc.getMenus()) ? viewsSvc.getMenus() : [];
+    var tree = menus.length ? buildMenuTree(menus) : [];
+    var appRoots = getAppRoots(tree, menus);
+    var storedAppId = typeof localStorage !== 'undefined' ? (localStorage.getItem('erp_sidebar_app') || '') : '';
+
+    main.innerHTML = '';
+    var root = document.createElement('section');
+    root.className = 'o-home-apps';
+
+    var header = document.createElement('header');
+    header.className = 'o-home-apps-header';
+    header.innerHTML = '<h2 class="o-home-apps-title">Apps</h2><p class="o-home-apps-subtitle">Choose a module to start working.</p>';
+    root.appendChild(header);
+
+    var grid = document.createElement('div');
+    grid.className = 'o-app-grid';
+    if (!appRoots.length) {
+      grid.innerHTML = '<p class="o-app-grid-empty">No apps available.</p>';
+    } else {
+      appRoots.forEach(function (node) {
+        var menu = node.menu || {};
+        var appId = menu.id || '';
+        var tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'o-app-tile o-card-gradient';
+        if (String(appId) === String(storedAppId)) tile.className += ' o-app-tile--active';
+        var icon = _sidebarIconHtml(menu);
+        var defaultRoute = getDefaultRouteForAppNode(node) || 'home';
+        tile.innerHTML =
+          '<span class="o-app-tile-icon-wrap">' + icon + '</span>' +
+          '<span class="o-app-tile-name">' + escNavHtml(menu.name || 'App') + '</span>' +
+          '<span class="o-app-tile-route">' + escNavHtml(defaultRoute) + '</span>';
+        tile.addEventListener('click', function () {
+          selectApp(appId);
+        });
+        grid.appendChild(tile);
+      });
+    }
+    root.appendChild(grid);
+
+    var dashboardWrap = document.createElement('section');
+    dashboardWrap.className = 'o-home-dashboard-wrap';
+    root.appendChild(dashboardWrap);
+    main.appendChild(root);
+
+    if (DashboardCore && typeof DashboardCore.render === 'function') {
+      DashboardCore.render(dashboardWrap, { rpc: rpc });
+      return;
+    }
+    dashboardWrap.innerHTML = '<p class="o-dashboard-fallback">Dashboard module not loaded.</p>';
   }
 
   function renderDashboard() {
@@ -1245,6 +1624,9 @@
   }
 
   function renderViewSwitcher(route, currentView) {
+    if (ListViewCore && typeof ListViewCore.renderViewSwitcher === 'function') {
+      return ListViewCore.renderViewSwitcher(route, currentView, { getAvailableViewModes: getAvailableViewModes });
+    }
     const modes = getAvailableViewModes(route).filter(function (m) { return m === 'list' || m === 'kanban' || m === 'graph' || m === 'calendar' || m === 'activity' || m === 'pivot' || m === 'gantt'; });
     if (modes.length < 2) return '';
     const labels = { list: 'List', kanban: 'Kanban', graph: 'Graph', pivot: 'Pivot', calendar: 'Calendar', activity: 'Activity', gantt: 'Gantt' };
@@ -1258,6 +1640,47 @@
 
   function renderList(model, route, records, searchTerm, totalCount, offset, limit, savedFiltersList) {
     savedFiltersList = savedFiltersList || [];
+    if (ListViewCore && typeof ListViewCore.render === 'function') {
+      actionStack = [{ label: getTitle(route), hash: route }];
+      ListViewCore.render(main, {
+        rpc: rpc,
+        viewsSvc: viewsSvc,
+        showToast: showToast,
+        model: model,
+        route: route,
+        records: records,
+        searchTerm: searchTerm,
+        totalCount: totalCount,
+        offset: offset,
+        limit: limit,
+        savedFiltersList: savedFiltersList,
+        currentListState: currentListState,
+        helpers: {
+          getAvailableViewModes: getAvailableViewModes,
+          getListColumns: getListColumns,
+          getTitle: getTitle,
+          getReportName: getReportName,
+          loadRecords: loadRecords,
+          setViewAndReload: setViewAndReload,
+          deleteRecord: deleteRecord,
+          getMany2oneComodel: getMany2oneComodel,
+          getMany2manyInfo: getMany2manyInfo,
+          isMonetaryField: isMonetaryField,
+          getMonetaryCurrencyField: getMonetaryCurrencyField,
+          getSelectionLabel: getSelectionLabel,
+          getDisplayNames: getDisplayNames,
+          getDisplayNamesForMany2many: getDisplayNamesForMany2many,
+          getActionForRoute: getActionForRoute,
+          parseActionDomain: parseActionDomain,
+          buildSearchDomain: buildSearchDomain,
+          parseFilterDomain: parseFilterDomain,
+          saveSavedFilter: saveSavedFilter,
+          showImportModal: showImportModal,
+          getHashDomainParam: getHashDomainParam,
+        }
+      });
+      return;
+    }
     if (typeof window !== 'undefined') window.chatContext = { model: model, active_id: null };
     const cols = getListColumns(model);
     const title = getTitle(route);
@@ -2262,6 +2685,14 @@
   }
 
   function renderForm(model, route, id) {
+    if (FormViewCore && typeof FormViewCore.render === "function") {
+      var coreHandled = FormViewCore.render(main, {
+        model: model,
+        route: route,
+        id: id,
+      });
+      if (coreHandled) return;
+    }
     formDirty = false;
     if (typeof window !== 'undefined') window.chatContext = { model: model, active_id: id ? parseInt(id, 10) : null };
     const fields = getFormFields(model);
@@ -3442,6 +3873,15 @@
   }
 
   function renderGanttView(model, route, records, searchTerm, savedFiltersList, dateStart, dateStop, groupBy) {
+    if (GanttViewCore && typeof GanttViewCore.render === "function") {
+      var coreHandled = GanttViewCore.render(main, {
+        model: model,
+        route: route,
+        records: records || [],
+        searchTerm: searchTerm || "",
+      });
+      if (coreHandled) return;
+    }
     const title = getTitle(route);
     const currentView = 'gantt';
     const addLabel = route === 'tasks' ? 'Add task' : route === 'manufacturing' ? 'Add MO' : 'Add';
@@ -3490,6 +3930,15 @@
   }
 
   function renderActivityMatrix(model, route, records, activityTypes, activities, searchTerm, savedFiltersList, userId) {
+    if (ActivityViewCore && typeof ActivityViewCore.render === "function") {
+      var coreHandled = ActivityViewCore.render(main, {
+        model: model,
+        route: route,
+        records: records || [],
+        activityTypes: activityTypes || [],
+      });
+      if (coreHandled) return;
+    }
     const title = getTitle(route);
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     const currentView = 'activity';
@@ -3620,6 +4069,15 @@
   }
 
   function renderGraph(model, route, graphView, rows, groupbyField, measureFields, labelMap, searchTerm, savedFiltersList) {
+    if (GraphViewCore && typeof GraphViewCore.render === "function") {
+      var coreHandled = GraphViewCore.render(main, {
+        model: model,
+        route: route,
+        graphView: graphView || {},
+        rows: rows || [],
+      });
+      if (coreHandled) return;
+    }
     savedFiltersList = savedFiltersList || [];
     const title = getTitle(route);
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
@@ -3783,6 +4241,17 @@
   }
 
   function renderPivot(model, route, pivotView, rows, rowNames, colNames, measures, rowLabelMap, colLabelMap, searchTerm, savedFiltersList) {
+    if (PivotViewCore && typeof PivotViewCore.render === "function") {
+      var coreHandled = PivotViewCore.render(main, {
+        model: model,
+        route: route,
+        rows: rows || [],
+        rowNames: rowNames || [],
+        colNames: colNames || [],
+        measures: measures || [],
+      });
+      if (coreHandled) return;
+    }
     savedFiltersList = savedFiltersList || [];
     const title = getTitle(route);
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
@@ -3921,6 +4390,14 @@
   }
 
   function renderCalendar(model, route, records, searchTerm) {
+    if (CalendarViewCore && typeof CalendarViewCore.render === "function") {
+      var coreHandled = CalendarViewCore.render(main, {
+        model: model,
+        route: route,
+        records: records || [],
+      });
+      if (coreHandled) return;
+    }
     const calendarView = viewsSvc && viewsSvc.getView(model, 'calendar');
     const dateField = (calendarView && calendarView.date_start) || 'date_deadline';
     const stringField = (calendarView && calendarView.string) || 'name';
@@ -4111,11 +4588,15 @@
   }
 
   function isFormRoute(hash) {
-    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings\\/users';
+    const dataRoutes = 'contacts|pipeline|crm\\/activities|leads|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings\\/users|settings\\/approval_rules|settings\\/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing\\/mailing_lists|marketing\\/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
     return new RegExp('^(' + dataRoutes + ')\\/edit\\/\\d+$').test(hash) || new RegExp('^(' + dataRoutes + ')\\/new$').test(hash);
   }
 
   function renderAccountingReport(reportType, title) {
+    if (GraphViewCore && typeof GraphViewCore.renderAccountingReport === "function") {
+      var graphHandled = GraphViewCore.renderAccountingReport(main, { reportType: reportType, title: title, rpc: rpc });
+      if (graphHandled) return;
+    }
     actionStack = [{ label: title, hash: 'reports/' + reportType }];
     const today = new Date().toISOString().slice(0, 10);
     const yearStart = today.slice(0, 4) + '-01-01';
@@ -4162,6 +4643,10 @@
   }
 
   function renderStockValuationReport() {
+    if (GraphViewCore && typeof GraphViewCore.renderStockValuationReport === "function") {
+      var stockHandled = GraphViewCore.renderStockValuationReport(main, { rpc: rpc });
+      if (stockHandled) return;
+    }
     actionStack = [{ label: 'Stock Valuation', hash: 'reports/stock-valuation' }];
     main.innerHTML = '<h2>Stock Valuation</h2><p style="margin-bottom:1rem">' +
       '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Refresh</button>' +
@@ -4200,6 +4685,10 @@
   }
 
   function renderSalesRevenueReport() {
+    if (GraphViewCore && typeof GraphViewCore.renderSalesRevenueReport === "function") {
+      var salesHandled = GraphViewCore.renderSalesRevenueReport(main, { rpc: rpc });
+      if (salesHandled) return;
+    }
     actionStack = [{ label: 'Sales Revenue', hash: 'reports/sales-revenue' }];
     const today = new Date().toISOString().slice(0, 10);
     const yearStart = today.slice(0, 4) + '-01-01';
@@ -4248,6 +4737,7 @@
   function route() {
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
+    renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
     if (formDirty && isFormRoute(lastHash) && hash !== lastHash) {
       if (!confirm('Leave without saving?')) {
         window.location.hash = lastHash;
@@ -4256,7 +4746,7 @@
       formDirty = false;
     }
     lastHash = hash;
-    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
+    const dataRoutes = 'contacts|pipeline|crm/activities|leads|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
     const editMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/edit\\/(\\d+)$'));
     const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
@@ -4318,7 +4808,7 @@
     if (!e.altKey) return;
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
-    const dataRoutes = 'contacts|leads|orders|products|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|purchase_orders|invoices|journals|accounts|employees|departments|jobs|projects';
+    const dataRoutes = 'contacts|pipeline|crm/activities|leads|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
     const formMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/(edit\\/\\d+|new)$'));
     if (e.key === 'n' && listMatch) {
@@ -4376,6 +4866,9 @@
       const userCompanies = sessionData && sessionData.user_companies ? sessionData.user_companies : null;
       const userLangs = sessionData && sessionData.user_langs ? sessionData.user_langs : [];
       const currentLang = sessionData && sessionData.lang ? sessionData.lang : 'en_US';
+      navContext.userCompanies = userCompanies;
+      navContext.userLangs = userLangs;
+      navContext.currentLang = currentLang;
       if (window.Services && window.Services.i18n) {
         window.Services.i18n.loadFromServer(currentLang).then(function () {
           renderNavbar(userCompanies, userLangs, currentLang);

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="hr_skill_list">
+      <field name="name">hr.skill list</field>
+      <field name="model">hr.skill</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="skill_type_id"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="hr_skill_form">
+      <field name="name">hr.skill form</field>
+      <field name="model">hr.skill</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="skill_type_id"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_hr_skill">
+      <field name="name">Skills</field>
+      <field name="res_model">hr.skill</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Skills" id="menu_hr_skills_root" sequence="45"/>
+    <menuitem name="Skills" id="menu_hr_skill" parent="menu_hr_skills_root" action="action_hr_skill" sequence="1"/>
+  </data>
+</odoo>

@@ -39,6 +39,7 @@
   </record>
   <record model="ir.ui.menu" id="menu_analytic_root">
     <field name="name">Analytic</field>
+    <field name="parent_id" ref="account.menu_account_config"/>
     <field name="sequence">50</field>
   </record>
   <record model="ir.ui.menu" id="menu_analytic_account">

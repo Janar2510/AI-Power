@@ -120,6 +120,33 @@
       <field name="res_model">crm.lead</field>
       <field name="view_mode">activity,kanban,list,graph,pivot,calendar,form</field>
     </record>
-    <menuitem name="Leads" id="menu_crm_lead" action="action_crm_lead" sequence="30"/>
+    <record model="ir.actions.act_window" id="action_crm_pipeline">
+      <field name="name">My Pipeline</field>
+      <field name="res_model">crm.lead</field>
+      <field name="domain">[('type','=','opportunity')]</field>
+      <field name="view_mode">kanban,list,activity,graph,pivot,calendar,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_crm_activity_leads">
+      <field name="name">My Activities</field>
+      <field name="res_model">crm.lead</field>
+      <field name="view_mode">activity,kanban,list,graph,pivot,calendar,form</field>
+    </record>
+
+    <menuitem name="CRM" id="crm_menu_root" sequence="30"/>
+    <menuitem name="Sales" id="crm_menu_sales" parent="crm_menu_root" sequence="1"/>
+    <menuitem name="My Pipeline" id="menu_crm_opportunities" parent="crm_menu_sales" action="action_crm_pipeline" sequence="1"/>
+    <menuitem name="My Activities" id="crm_menu_my_activities" parent="crm_menu_sales" action="action_crm_activity_leads" sequence="2"/>
+    <menuitem name="Customers" id="crm_menu_customers" parent="crm_menu_sales" action="base.action_partner_form" sequence="3"/>
+
+    <menuitem name="Leads" id="menu_crm_lead" parent="crm_menu_root" action="action_crm_lead" sequence="5"/>
+
+    <menuitem name="Reporting" id="crm_menu_report" parent="crm_menu_root" sequence="20"/>
+    <menuitem name="Pipeline" id="crm_menu_report_pipeline" parent="crm_menu_report" action="action_crm_pipeline" sequence="1"/>
+    <menuitem name="Activities" id="crm_menu_report_activities" parent="crm_menu_report" action="action_crm_activity_leads" sequence="2"/>
+
+    <menuitem name="Configuration" id="crm_menu_config" parent="crm_menu_root" sequence="25"/>
+    <menuitem name="Stages" id="menu_crm_stage_config" parent="crm_menu_config" sequence="1"/>
+    <menuitem name="Tags" id="menu_crm_tag_config" parent="crm_menu_config" sequence="2"/>
+    <menuitem name="Lost Reasons" id="menu_crm_lost_reason_config" parent="crm_menu_config" sequence="3"/>
   </data>
 </odoo>

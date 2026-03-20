@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="data_recycle_model_list">
+      <field name="name">data.recycle.model list</field>
+      <field name="model">data.recycle.model</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="res_model_id"/>
+          <field name="recycle_mode"/>
+          <field name="time_field_delta"/>
+          <field name="time_field_delta_unit"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="data_recycle_model_form">
+      <field name="name">data.recycle.model form</field>
+      <field name="model">data.recycle.model</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="res_model_id"/>
+            <field name="recycle_mode"/>
+            <field name="time_field_name"/>
+            <field name="time_field_delta"/>
+            <field name="time_field_delta_unit"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_data_recycle_model">
+      <field name="name">Data Recycle</field>
+      <field name="res_model">data.recycle.model</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Data Recycle" id="menu_data_recycle_root" sequence="44"/>
+    <menuitem name="Rules" id="menu_data_recycle_model" parent="menu_data_recycle_root" action="action_data_recycle_model" sequence="1"/>
+  </data>
+</odoo>

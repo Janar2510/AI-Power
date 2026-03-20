@@ -73,12 +73,31 @@ def create_table(cursor: Any, model_class: Type[ModelBase]) -> None:
     table = model_class._table
     if not table:
         return
+    if not getattr(model_class, "_auto_init", True):
+        return
+    table_query = model_class._get_table_query() if hasattr(model_class, "_get_table_query") else None
+    if table_query:
+        try:
+            cursor.execute(f'CREATE OR REPLACE VIEW "{table}" AS {table_query}')
+            _logger.info("Created/updated SQL view %s", table)
+        except Exception as e:
+            _logger.warning("Could not create SQL view %s: %s", table, e)
+        return
     if table_exists(cursor, table):
         return
     field_defs = _get_model_fields(model_class)
     if not field_defs:
         return
     columns = ["id SERIAL PRIMARY KEY"]
+    if getattr(model_class, "_log_access", True):
+        columns.extend(
+            [
+                '"create_uid" INTEGER',
+                '"create_date" TIMESTAMP',
+                '"write_uid" INTEGER',
+                '"write_date" TIMESTAMP',
+            ]
+        )
     for name, field in field_defs.items():
         if getattr(field, "column_type", None) is None:
             continue  # virtual fields (One2many, Many2many)
@@ -107,7 +126,21 @@ def add_missing_columns(cursor: Any, registry: Any) -> None:
         table = getattr(model_class, "_table", None)
         if not table or not table_exists(cursor, table):
             continue
+        if getattr(model_class, "_get_table_query", None) and model_class._get_table_query():
+            continue
         field_defs = _get_model_fields(model_class)
+        if getattr(model_class, "_log_access", True):
+            for audit_col, audit_type in (
+                ("create_uid", "INTEGER"),
+                ("create_date", "TIMESTAMP"),
+                ("write_uid", "INTEGER"),
+                ("write_date", "TIMESTAMP"),
+            ):
+                if not column_exists(cursor, table, audit_col):
+                    try:
+                        cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{audit_col}" {audit_type}')
+                    except Exception as e:
+                        _logger.warning("Could not add audit column %s.%s: %s", table, audit_col, e)
         for col_name, field in field_defs.items():
             if col_name == "id":
                 continue

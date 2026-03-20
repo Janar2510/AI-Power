@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record model="ir.ui.view" id="repair_order_list">
+      <field name="name">repair.order list</field>
+      <field name="model">repair.order</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+          <field name="product_id"/>
+          <field name="state"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="repair_order_form">
+      <field name="name">repair.order form</field>
+      <field name="model">repair.order</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="product_id"/>
+            <field name="state"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_repair_order">
+      <field name="name">Repairs</field>
+      <field name="res_model">repair.order</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <menuitem name="Repairs" id="menu_repair_root" sequence="39"/>
+    <menuitem name="Repair Orders" id="menu_repair_order" parent="menu_repair_root" action="action_repair_order" sequence="1"/>
+  </data>
+</odoo>

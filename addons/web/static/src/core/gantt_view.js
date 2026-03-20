@@ -1,8 +1,15 @@
 /**
- * AppCore.GanttView (Phase 393).
+ * AppCore.GanttView (Phase 415).
  */
 (function () {
-  function render(_container, _opts) { return false; }
+  var impl = null;
   window.AppCore = window.AppCore || {};
-  window.AppCore.GanttView = { render: render };
+  window.AppCore.GanttView = {
+    setImpl: function (fn) {
+      impl = fn;
+    },
+    render: function () {
+      return impl ? impl.apply(null, arguments) : false;
+    },
+  };
 })();

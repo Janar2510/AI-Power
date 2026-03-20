@@ -8,6 +8,7 @@
         "security/ir.model.access.csv",
         "views/sale_views.xml",
     ],
+    "demo": ["demo/demo_sale.xml"],
     "installable": True,
     "application": True,
 }

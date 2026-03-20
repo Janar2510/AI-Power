@@ -754,9 +754,26 @@ class ModelBase(metaclass=Model):
         col_list = ", ".join(f'"{c}"' for c in cols)
         placeholders = ", ".join("%s" for _ in self._ids)
         query = f'SELECT {col_list} FROM "{table}" WHERE id IN ({placeholders})'
-        cr.execute(query, self._ids)
-        raw_rows = cr.fetchall()
-        rows = [dict(row) for row in raw_rows]
+        env_read = getattr(self, "env", None)
+        mbucket = getattr(env_read, "_prefetch_cache", {}).get(self._model._name, {}) if env_read else {}
+        if mbucket and self._ids and not inherits:
+            need_cols = [c for c in cols if c != "id"]
+            if need_cols and all(
+                rid in mbucket and all(c in mbucket[rid] for c in need_cols) for rid in self._ids
+            ):
+                rows = []
+                for rid in self._ids:
+                    row = {c: mbucket[rid].get(c) for c in cols}
+                    row.setdefault("id", rid)
+                    rows.append(row)
+            else:
+                cr.execute(query, self._ids)
+                raw_rows = cr.fetchall()
+                rows = [dict(row) for row in raw_rows]
+        else:
+            cr.execute(query, self._ids)
+            raw_rows = cr.fetchall()
+            rows = [dict(row) for row in raw_rows]
         for parent_model, fk_field in inherits.items():
             if parent_model not in inherited_requested:
                 continue
@@ -1112,6 +1129,7 @@ class ModelBase(metaclass=Model):
         for rid in self._ids:
             old_vals = old_vals_by_id.get(rid, {})
             lines: List[str] = []
+            tracked_pairs: List[tuple] = []
             for fname in old_vals:
                 if fname not in vals:
                     continue
@@ -1126,10 +1144,29 @@ class ModelBase(metaclass=Model):
                 old_str = self._format_tracked_value(env, field, old_v)
                 new_str = self._format_tracked_value(env, field, new_v)
                 lines.append(f"{label}: {old_str} -> {new_str}")
+                if getattr(field, "tracking", False):
+                    tracked_pairs.append((fname, old_str, new_str))
             if lines:
                 try:
                     rec = self._model.browse(rid)
-                    rec.message_post(body="\n".join(lines), message_type="note")
+                    msg_rs = rec.message_post(body="\n".join(lines), message_type="note")
+                    TV = env.get("mail.tracking.value")
+                    mid = None
+                    if msg_rs is not None and getattr(msg_rs, "ids", None):
+                        mid = msg_rs.ids[0] if msg_rs.ids else None
+                    if TV and mid and tracked_pairs:
+                        for fname, old_str, new_str in tracked_pairs:
+                            try:
+                                TV.create(
+                                    {
+                                        "mail_message_id": mid,
+                                        "field_name": fname,
+                                        "old_value_char": old_str or "",
+                                        "new_value_char": new_str or "",
+                                    }
+                                )
+                            except Exception:
+                                pass
                 except Exception:
                     pass
 
@@ -2068,6 +2105,32 @@ class ModelBase(metaclass=Model):
                     r[name] = val if val is not None else False
             result.append(r)
         return result
+
+    @classmethod
+    def prefetch_read(
+        cls: Type[T],
+        ids: List[int],
+        field_names: Optional[List[str]] = None,
+    ) -> None:
+        """Phase 421: Batch-read into env._prefetch_cache; subsequent read() may skip SQL (no _inherits)."""
+        if not ids:
+            return
+        env = getattr(cls._registry, "_env", None) if cls._registry else None
+        if not env or getattr(cls, "_inherits", None):
+            return
+        if not hasattr(env, "_prefetch_cache"):
+            env._prefetch_cache = {}
+        fnames = list(field_names or [])
+        if "id" not in fnames:
+            fnames = ["id"] + fnames
+        rows = cls.read_ids(ids, fnames)
+        bucket = env._prefetch_cache.setdefault(cls._name, {})
+        for row in rows:
+            rid = row.get("id")
+            if rid is not None:
+                prev = dict(bucket.get(rid, {}))
+                prev.update(row)
+                bucket[rid] = prev
 
     @classmethod
     def read_ids(cls: Type[T], ids: List[int], fields: Optional[List[str]] = None) -> List[Dict[str, Any]]:

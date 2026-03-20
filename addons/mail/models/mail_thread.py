@@ -12,6 +12,14 @@ class MailThreadMixin:
     Use: class CrmLead(MailThreadMixin, Model): ...
     """
 
+    message_follower_ids = fields.One2many(
+        "mail.followers",
+        "res_id",
+        domain=lambda m: [("res_model", "=", m._name)],
+        inverse_extra=lambda m: {"res_model": m._name},
+        string="Followers",
+    )
+
     message_ids = fields.One2many(
         "mail.message",
         "res_id",
@@ -19,6 +27,56 @@ class MailThreadMixin:
         inverse_extra=lambda m: {"res_model": m._name},
         string="Messages",
     )
+
+    def message_subscribe(self, partner_ids: list) -> None:
+        """Subscribe partners as followers on these records (Phase 3a)."""
+        env = getattr(self, "env", None)
+        if not env or not partner_ids:
+            return
+        Follow = env.get("mail.followers")
+        if not Follow or not hasattr(self, "ids") or not self.ids:
+            return
+        model_name = self._model._name
+        for rid in self.ids:
+            for pid in partner_ids:
+                if not pid:
+                    continue
+                existing = Follow.search(
+                    [
+                        ("res_model", "=", model_name),
+                        ("res_id", "=", rid),
+                        ("partner_id", "=", pid),
+                    ]
+                )
+                if not existing.ids:
+                    Follow.create(
+                        {
+                            "res_model": model_name,
+                            "res_id": rid,
+                            "partner_id": pid,
+                            "subtype_ids": [],
+                        }
+                    )
+
+    def message_unsubscribe(self, partner_ids: list) -> None:
+        """Remove partner followers from these records (Phase 3a)."""
+        env = getattr(self, "env", None)
+        if not env or not partner_ids:
+            return
+        Follow = env.get("mail.followers")
+        if not Follow or not hasattr(self, "ids") or not self.ids:
+            return
+        model_name = self._model._name
+        for rid in self.ids:
+            recs = Follow.search(
+                [
+                    ("res_model", "=", model_name),
+                    ("res_id", "=", rid),
+                    ("partner_id", "in", list(partner_ids)),
+                ]
+            )
+            if recs.ids:
+                recs.unlink()
 
     def message_post(
         self,

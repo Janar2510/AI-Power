@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.202.0 - Phases 409–422 (Odoo parity continuation) (2026-03-19)
+
+### Added
+- **Data:** `ir.model.data` model; `core/data/data_loader.py` generic XML `<record>` / `<function>` / `<delete>` loader with `ref()` / `eval` on fields; `noupdate` on upgrade; manifest `demo` XML loading when `--demo` or `ERP_LOAD_DEMO`; demo files under `addons/{base,crm,sale,stock}/demo/`; `erp-bin db init --demo`; `-u` alias for `-m` on `db upgrade`.
+- **ORM:** `ir.model.fields` model; `ir.model.sync_registry()`; `Environment._prefetch_cache`, `clear_prefetch_cache`, `Model.prefetch_read()`; optional read short-circuit when prefetch bucket covers columns (no `_inherits`); `core/tools/sql_debug.explain_analyze`.
+- **i18n:** `core/tools/translate.py` (minimal `.po` parser + `load_module_po_translations`); sample `addons/base/i18n/en_US.po`.
+- **Web client:** `window.__erpForm` + `AppCore.FormView` wrappers; `SelectCreateDialog` modal with `name_search` / `name_create`; `DiscussView` RPC UI; `GraphView`/`PivotView`/`CalendarView`/`GanttView`/`ActivityView` `setImpl` wiring from `main.js`; fuzzy command palette with menu-derived commands; `AppCore.Import.parseCsv` + `runBatchImport`.
+- **Utilities:** `partner_autocomplete` uses `name_search`; `base_geolocalize` tries Nominatim then hash fallback; `image_process` uses Pillow when installed.
+
+### Changed
+- **HTTP / web assets:** `core/http/security.py` uses enforcing `Content-Security-Policy` only (drops `Content-Security-Policy-Report-Only` without `report-to`); `application.py` reuses `SECURITY_HEADERS`. **`import.js`:** fix `return rpc.callKw(...);` + chained `.then` — removed stray semicolon that broke `web.assets_web.js` parse (`Unexpected token '.'`).
+- **XML:** `load_xml_data` attaches `_noupdate` from parent `<data>`; `parse_record_element` supports `eval` on `<field>`.
+- **Kanban:** Any model with a kanban view can use the kanban renderer (not only CRM/helpdesk).
+- **`load_default_data`:** Optional `update_mode=True` for upgrades; generic + demo XML + ir.model sync + PO load.
+
+## 1.201.0 - Next development phases (Odoo parity) (2026-03-19)
+
+### Added
+- **Web client:** Native `date` / `datetime-local` inputs in form `renderFieldHtml`; modal `ConfirmDialog` (replaces `window.confirm` for deletes and unsaved navigation); `field_registry.js` widgets (`color_picker`, `badge`, `percentage`, `progressbar`, `signature`, `domain`); `search_model.js`; `action_manager.js` (breadcrumb stack persistence + optional `?stack=` hash); list inline editing when list view has `editable="bottom"` (Tab/Enter/Escape, quick create name row); control panel **Filters / Group by / Favorites** dropdowns + chips; Kanban **Quick create** per column.
+- **Mail:** `mail.followers` model; `message_follower_ids`, `message_subscribe`, `message_unsubscribe` on `MailThreadMixin`; `mail.tracking.value` rows linked to tracking chatter messages.
+- **Server:** In-process cron scheduler thread (`core/service/cron_scheduler.py`) with PostgreSQL `LISTEN erp_cron_wake`; `ir.cron` failure counting / auto-deactivate; `ir.cron._trigger()` NOTIFY helper.
+- **Base:** Attachment optional disk filestore (`attachment_location=file`, `data_dir` / `filestore_path`), SHA1 sharded paths, optional Pillow image downscale; enriched `ir.sequence` (prefix/suffix with `%(year)s` etc., padding, formatted string return) and `ir.sequence.date_range` model.
+
+### Changed
+- `sale.order` create accepts sequence `next_by_code` returning either `int` or formatted `str`.
+- `core/cli/server.py` starts the cron scheduler thread in single-process mode.
+
 ## 1.200.0 - Missing apps parity implementation (2026-03-20)
 
 ### Added

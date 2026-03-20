@@ -1,8 +1,15 @@
 /**
- * AppCore.PivotView (Phase 393).
+ * AppCore.PivotView (Phase 415).
  */
 (function () {
-  function render(_container, _opts) { return false; }
+  var impl = null;
   window.AppCore = window.AppCore || {};
-  window.AppCore.PivotView = { render: render };
+  window.AppCore.PivotView = {
+    setImpl: function (fn) {
+      impl = fn;
+    },
+    render: function () {
+      return impl ? impl.apply(null, arguments) : false;
+    },
+  };
 })();

@@ -2,6 +2,21 @@
 
 Verification checklist for AI assistant module deployment and feature additions.
 
+## Phases 409–422 (1.202)
+
+- [ ] DB upgrade after pull: `ir.model.data`, `ir.model.fields`, generic XML loader paths.
+- [ ] Demo optional: `erp-bin db init --demo` or `ERP_LOAD_DEMO=1`.
+- [ ] Web: `__erpForm`, Discuss RPC view, SelectCreateDialog modal, fuzzy command palette (`mod+k`), import CSV helpers.
+- [ ] Prefetch: call sites may use `Model.prefetch_read` before iterating recordsets (optional optimization).
+
+## Next phases / Odoo parity (1.201)
+
+- [ ] `web.assets_web` loads `field_registry.js`, `search_model.js`, `action_manager.js` before `list_view.js` / `main.js`.
+- [ ] Confirm modal works for bulk delete, row delete, and unsaved form navigation (`UIComponents.ConfirmDialog`).
+- [ ] Optional: set `attachment_location=file` and `data_dir` (or `filestore_path`) for disk attachments; Pillow optional for image resize (`attachment_image_max`).
+- [ ] In-process cron runs in dev (`erp-bin server` single worker); `ir.cron._trigger` issues `NOTIFY erp_cron_wake` when DB supports it.
+- [ ] `mail.followers` / `mail.tracking.value` access rows present; upgrade DB after pull so new tables/columns exist.
+
 ## Missing apps parity (1.200)
 
 - [ ] CRM app root is `CRM` with nested Sales/Leads/Reporting/Configuration menus (no flat single-menu CRM).

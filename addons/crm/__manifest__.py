@@ -8,6 +8,7 @@
         "security/ir.model.access.csv",
         "views/crm_views.xml",
     ],
+    "demo": ["demo/demo_crm.xml"],
     "installable": True,
     "application": True,
 }

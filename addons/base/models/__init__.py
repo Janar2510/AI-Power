@@ -15,6 +15,8 @@ from . import ir_cron
 from . import ir_sequence
 from . import ir_attachment
 from . import ir_model
+from . import ir_model_fields
+from . import ir_model_data
 from . import ir_config_parameter
 from . import ir_actions
 from . import ir_actions_server

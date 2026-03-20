@@ -50,8 +50,14 @@ class Environment:
         self.uid = uid
         self.context = context or {}
         self.su = su
+        # Phase 421: optional batch row cache { model_name: { id: {field: val} } }
+        self._prefetch_cache: dict = {}
         if _set_registry:
             registry.set_env(self)
+
+    def clear_prefetch_cache(self) -> None:
+        """Clear Phase 421 prefetch store (e.g. after writes)."""
+        self._prefetch_cache.clear()
 
     def __call__(
         self,

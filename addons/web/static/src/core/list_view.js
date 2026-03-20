@@ -54,6 +54,52 @@
     var activeFilters = currentListState.activeSearchFilters || [];
     var currentGroupBy = currentListState.groupBy || null;
 
+    var listViewDef = viewsSvc && viewsSvc.getView ? viewsSvc.getView(model, "list") : null;
+    var listEditable = !!(listViewDef && (listViewDef.editable === "bottom" || listViewDef.editable === "top"));
+
+    var dropdownsHtml = "";
+    if (searchFilters.length) {
+      dropdownsHtml += '<div class="o-cp-dropdown-wrap" data-cp-dd="1"><button type="button" class="o-cp-dropdown-toggle">Filters</button><div class="o-cp-dropdown-menu">';
+      searchFilters.forEach(function (f) {
+        var active = activeFilters.indexOf(f.name) >= 0;
+        dropdownsHtml +=
+          '<button type="button" class="o-cp-dropdown-item cp-filter-item' +
+          (active ? " active" : "") +
+          '" data-filter-toggle="' +
+          String(f.name || "").replace(/"/g, "&quot;") +
+          '">' +
+          escHtml(f.string || f.name || "") +
+          "</button>";
+      });
+      dropdownsHtml += "</div></div>";
+    }
+    if (searchGroupBys.length) {
+      dropdownsHtml += '<div class="o-cp-dropdown-wrap" data-cp-dd="1"><button type="button" class="o-cp-dropdown-toggle">Group by</button><div class="o-cp-dropdown-menu">';
+      dropdownsHtml += '<button type="button" class="o-cp-dropdown-item cp-groupby-item" data-group-by="">(None)</button>';
+      searchGroupBys.forEach(function (g) {
+        dropdownsHtml +=
+          '<button type="button" class="o-cp-dropdown-item cp-groupby-item' +
+          (currentGroupBy === g.group_by ? " active" : "") +
+          '" data-group-by="' +
+          String(g.group_by || "").replace(/"/g, "&quot;") +
+          '">' +
+          escHtml(g.string || g.name || "") +
+          "</button>";
+      });
+      dropdownsHtml += "</div></div>";
+    }
+    dropdownsHtml += '<div class="o-cp-dropdown-wrap" data-cp-dd="1"><button type="button" class="o-cp-dropdown-toggle">Favorites</button><div class="o-cp-dropdown-menu">';
+    savedFiltersList.forEach(function (sf) {
+      dropdownsHtml +=
+        '<button type="button" class="o-cp-dropdown-item cp-fav-item" data-saved-filter-id="' +
+        String(sf.id != null ? sf.id : "").replace(/"/g, "&quot;") +
+        '">' +
+        escHtml(sf.name || "Filter") +
+        "</button>";
+    });
+    dropdownsHtml +=
+      '<button type="button" class="o-cp-dropdown-item cp-save-fav" data-save-favorite="1">Save current search…</button></div></div>';
+
     var filtersHtml = "";
     searchFilters.forEach(function (f) {
       var active = activeFilters.indexOf(f.name) >= 0;
@@ -88,6 +134,7 @@
     html += (UI.ControlPanel && UI.ControlPanel.renderHTML ? UI.ControlPanel.renderHTML({
       viewSwitcherHtml: renderViewSwitcher(route, currentView, h),
       searchTerm: searchTerm,
+      dropdownsHtml: dropdownsHtml,
       filtersHtml: filtersHtml,
       actionsHtml: actionsHtml,
     }) : "");
@@ -201,6 +248,84 @@
           h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, 0, null);
         };
       });
+
+      function closeCpDropdowns() {
+        container.querySelectorAll(".o-cp-dropdown-wrap.o-open").forEach(function (w) {
+          w.classList.remove("o-open");
+        });
+      }
+      if (!container._erpCpCloseBound) {
+        container._erpCpCloseBound = true;
+        container.addEventListener("click", function () {
+          closeCpDropdowns();
+        });
+      }
+      container.querySelectorAll(".o-cp-dropdown-wrap[data-cp-dd]").forEach(function (wrap) {
+        var toggler = wrap.querySelector(".o-cp-dropdown-toggle");
+        if (toggler) {
+          toggler.onclick = function (e) {
+            e.stopPropagation();
+            var open = wrap.classList.contains("o-open");
+            closeCpDropdowns();
+            if (!open) wrap.classList.add("o-open");
+          };
+        }
+      });
+      container.querySelectorAll(".cp-filter-item").forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          var fname = btn.getAttribute("data-filter-toggle");
+          if (!fname) return;
+          var cur = currentListState.activeSearchFilters || [];
+          var idx = cur.indexOf(fname);
+          var next = idx >= 0 ? cur.filter(function (_, i) { return i !== idx; }) : cur.concat(fname);
+          currentListState.activeSearchFilters = next;
+          closeCpDropdowns();
+          var si = container.querySelector("#list-search");
+          h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, 0, null);
+        };
+      });
+      container.querySelectorAll(".cp-groupby-item").forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          currentListState.groupBy = btn.getAttribute("data-group-by") || null;
+          closeCpDropdowns();
+          var si = container.querySelector("#list-search");
+          h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, 0, null);
+        };
+      });
+      container.querySelectorAll(".cp-fav-item").forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          var fid = btn.getAttribute("data-saved-filter-id");
+          currentListState.savedFilterId = fid || null;
+          var sel = container.querySelector("#list-saved-filter");
+          if (sel) sel.value = fid || "";
+          closeCpDropdowns();
+          var si = container.querySelector("#list-search");
+          h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, 0, null);
+        };
+      });
+      var saveFavBtn = container.querySelector(".cp-save-fav");
+      if (saveFavBtn && h.saveSavedFilter) {
+        saveFavBtn.onclick = function (e) {
+          e.stopPropagation();
+          closeCpDropdowns();
+          var name = window.prompt("Filter name:");
+          if (!name || !name.trim()) return;
+          var si = container.querySelector("#list-search");
+          var st = si ? si.value.trim() : "";
+          var action = h.getActionForRoute ? h.getActionForRoute(route) : null;
+          var actionDomain = h.parseActionDomain ? h.parseActionDomain(action && action.domain ? action.domain : "") : [];
+          var domain = actionDomain.slice();
+          var searchDom = h.buildSearchDomain ? h.buildSearchDomain(model, st) : [];
+          if (searchDom.length) domain = domain.concat(searchDom);
+          if (model === "crm.lead" && stageFilter) domain = domain.concat([["stage_id", "=", stageFilter]]);
+          h.saveSavedFilter(model, name.trim(), domain).then(function () {
+            h.loadRecords(model, route, st, stageFilter, null, null, 0, null);
+          });
+        };
+      }
     }
 
     if (!records || !records.length) {
@@ -263,31 +388,58 @@
           tbl += "<td></td></tr>";
           return;
         }
-        tbl += '<tr role="row" tabindex="0" data-id="' + (r.id || "") + '" class="o-list-data-row">';
+        tbl +=
+          '<tr role="row" tabindex="0" data-id="' +
+          (r.id || "") +
+          '" class="o-list-data-row"' +
+          (listEditable && !groups ? ' data-inline-edit="1"' : "") +
+          ">";
         tbl += '<td role="gridcell"><input type="checkbox" class="list-row-select" data-id="' + (r.id || "") + '" aria-label="Select row"></td>';
         cols.forEach(function (c) {
           var f = typeof c === "object" ? c.name : c;
           var val = r[f];
-          if (nameMap && nameMap[f] && val != null) {
-            if (Array.isArray(val)) val = val.map(function (id) { return nameMap[f][id] || id; }).join(", ");
-            else val = nameMap[f][val] || val;
-          } else if (val != null) {
-            if (typeof val === "boolean") val = val ? "Yes" : "No";
+          var rawJson = "";
+          try {
+            rawJson = encodeURIComponent(JSON.stringify(val === undefined ? null : val));
+          } catch (e2) {
+            rawJson = encodeURIComponent("null");
+          }
+          var displayVal = val;
+          if (nameMap && nameMap[f] && displayVal != null) {
+            if (Array.isArray(displayVal)) displayVal = displayVal.map(function (id) { return nameMap[f][id] || id; }).join(", ");
+            else displayVal = nameMap[f][displayVal] || displayVal;
+          } else if (displayVal != null) {
+            if (typeof displayVal === "boolean") displayVal = displayVal ? "Yes" : "No";
             else if (h.isMonetaryField(model, f)) {
-              var n = Number(val);
-              var formatted = !isNaN(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : val;
+              var n = Number(displayVal);
+              var formatted = !isNaN(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : displayVal;
               var currField = h.getMonetaryCurrencyField(model, f);
               if (currField && r[currField] && nameMap && nameMap[currField]) {
                 var sym = nameMap[currField][r[currField]];
                 if (sym) formatted = (sym + " " + formatted).trim();
               }
-              val = formatted;
+              displayVal = formatted;
             } else {
-              var selLabel = h.getSelectionLabel(model, f, val);
-              if (selLabel !== val) val = selLabel;
+              var selLabel = h.getSelectionLabel(model, f, displayVal);
+              if (selLabel !== displayVal) displayVal = selLabel;
             }
           }
-          tbl += "<td role=\"gridcell\">" + escHtml(val != null ? String(val) : "") + "</td>";
+          var displayStr = displayVal != null ? String(displayVal) : "";
+          var useInline = listEditable && !groups && h.getFieldMeta;
+          var meta = useInline ? h.getFieldMeta(model, f) : null;
+          var t = meta && meta.type;
+          if (useInline && t && t !== "many2one" && t !== "many2many" && t !== "one2many" && t !== "binary" && t !== "image" && t !== "html") {
+            tbl +=
+              '<td role="gridcell" class="o-list-editable-cell" data-field="' +
+              escHtml(f) +
+              '" data-json="' +
+              rawJson +
+              '"><span class="o-cell-display">' +
+              escHtml(displayStr) +
+              "</span></td>";
+          } else {
+            tbl += "<td role=\"gridcell\">" + escHtml(displayStr) + "</td>";
+          }
         });
         tbl += '<td role="gridcell"><a href="#' + route + "/edit/" + (r.id || "") + '" class="o-list-edit-link">Edit</a>';
         tbl += '<a href="#" class="btn-delete o-list-delete-link" data-id="' + (r.id || "") + '">Delete</a></td></tr>';
@@ -305,6 +457,12 @@
         });
       } else {
         records.forEach(function (r) { renderRow(r, false); });
+      }
+      if (listEditable && !groups) {
+        tbl +=
+          '<tr class="o-list-add-line"><td colspan="' +
+          (cols.length + 2) +
+          '"><button type="button" class="o-list-add-line-btn o-btn o-btn-secondary">Add a line</button></td></tr>';
       }
       tbl += "</tbody></table></div>";
 
@@ -356,6 +514,7 @@
         table.addEventListener("keydown", function (e) {
           var row = e.target.closest && e.target.closest("tr.o-list-data-row");
           if (!row) return;
+          if (row.classList.contains("o-list-row-editing")) return;
           var rows = Array.prototype.slice.call(table.querySelectorAll("tr.o-list-data-row"));
           var idx = rows.indexOf(row);
           if (idx < 0) return;
@@ -363,6 +522,221 @@
           else if (e.key === "ArrowUp" && idx > 0) { e.preventDefault(); rows[idx - 1].focus(); }
           else if (e.key === "Enter") { var id = row.getAttribute("data-id"); if (id) { e.preventDefault(); window.location.hash = route + "/edit/" + id; } }
         });
+      })();
+
+      (function setupInlineListEdit() {
+        if (!listEditable || groups) return;
+        function pad2(n) {
+          return n < 10 ? "0" + n : "" + n;
+        }
+        function rawFromCell(td) {
+          try {
+            var s = td.getAttribute("data-json");
+            if (s) return JSON.parse(decodeURIComponent(s));
+          } catch (e0) {}
+          return null;
+        }
+        function cellToInput(td, field) {
+          var meta = (h.getFieldMeta && h.getFieldMeta(model, field)) || {};
+          var ty = meta.type || "char";
+          var raw = rawFromCell(td);
+          var v = raw;
+          if (v === null || v === undefined) v = "";
+          var inp = "";
+          if (ty === "boolean") {
+            inp = '<input type="checkbox" class="o-list-inline-input" data-field="' + escHtml(field) + '" ' + (v ? "checked" : "") + ">";
+          } else if (ty === "selection") {
+            var selOpts = typeof h.getSelectionOptions === "function" ? h.getSelectionOptions(model, field) : null;
+            inp = '<select class="o-list-inline-input" data-field="' + escHtml(field) + '"><option value="">--</option>';
+            (selOpts || []).forEach(function (pair) {
+              inp +=
+                '<option value="' +
+                String(pair[0]).replace(/"/g, "&quot;") +
+                '"' +
+                (String(pair[0]) === String(v) ? " selected" : "") +
+                ">" +
+                escHtml(String(pair[1] != null ? pair[1] : pair[0])) +
+                "</option>";
+            });
+            inp += "</select>";
+          } else if (ty === "integer" || ty === "float" || ty === "monetary") {
+            inp =
+              '<input class="o-list-inline-input" data-field="' +
+              escHtml(field) +
+              '" type="number" step="' +
+              (ty === "integer" ? "1" : "0.01") +
+              '" value="' +
+              escHtml(String(v !== "" && v != null ? v : "")) +
+              '">';
+          } else if (ty === "date") {
+            var ds = "";
+            if (v) {
+              var s = String(v);
+              if (/^\d{4}-\d{2}-\d{2}/.test(s)) ds = s.slice(0, 10);
+              else {
+                var d = new Date(s.replace(" ", "T"));
+                if (!isNaN(d.getTime())) ds = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+              }
+            }
+            inp = '<input class="o-list-inline-input" data-field="' + escHtml(field) + '" type="date" value="' + escHtml(ds) + '">';
+          } else if (ty === "datetime") {
+            var dl = "";
+            if (v) {
+              var d2 = new Date(String(v).replace(" ", "T"));
+              if (!isNaN(d2.getTime())) {
+                dl =
+                  d2.getFullYear() +
+                  "-" +
+                  pad2(d2.getMonth() + 1) +
+                  "-" +
+                  pad2(d2.getDate()) +
+                  "T" +
+                  pad2(d2.getHours()) +
+                  ":" +
+                  pad2(d2.getMinutes());
+              }
+            }
+            inp = '<input class="o-list-inline-input" data-field="' + escHtml(field) + '" type="datetime-local" value="' + escHtml(dl) + '">';
+          } else {
+            inp =
+              '<input class="o-list-inline-input" data-field="' +
+              escHtml(field) +
+              '" type="text" value="' +
+              escHtml(String(v != null ? v : "")) +
+              '">';
+          }
+          td.innerHTML = inp;
+        }
+        function collectVals(tr) {
+          var vals = {};
+          tr.querySelectorAll(".o-list-inline-input").forEach(function (inp) {
+            var field = inp.getAttribute("data-field");
+            if (!field) return;
+            var meta = (h.getFieldMeta && h.getFieldMeta(model, field)) || {};
+            var ty = meta.type || "char";
+            if (inp.type === "checkbox") vals[field] = !!inp.checked;
+            else if (ty === "integer") vals[field] = inp.value ? parseInt(inp.value, 10) : 0;
+            else if (ty === "float" || ty === "monetary") vals[field] = inp.value ? parseFloat(inp.value) : 0;
+            else if (ty === "date") vals[field] = inp.value || false;
+            else if (ty === "datetime") {
+              if (!inp.value) vals[field] = false;
+              else {
+                var dx = new Date(inp.value);
+                vals[field] = isNaN(dx.getTime()) ? false : dx.toISOString().replace(/\.\d{3}Z$/, "").replace("T", " ");
+              }
+            } else vals[field] = inp.value;
+          });
+          return vals;
+        }
+        var table = container.querySelector(".o-list-table");
+        if (!table) return;
+        table.addEventListener("click", function (e) {
+          var tr = e.target.closest && e.target.closest("tr.o-list-data-row[data-inline-edit]");
+          if (!tr || tr.getAttribute("data-unsaved-new") === "1") return;
+          if (e.target.closest("a") || e.target.closest("input.list-row-select") || e.target.closest(".o-list-inline-input")) return;
+          if (tr.classList.contains("o-list-row-editing")) return;
+          table.querySelectorAll("tr.o-list-row-editing").forEach(function (o) {
+            o.classList.remove("o-list-row-editing");
+          });
+          tr.classList.add("o-list-row-editing");
+          tr.querySelectorAll(".o-list-editable-cell").forEach(function (td) {
+            var field = td.getAttribute("data-field");
+            if (field) cellToInput(td, field);
+          });
+          var first = tr.querySelector(".o-list-inline-input");
+          if (first && first.focus) first.focus();
+        });
+        table.addEventListener("keydown", function (e) {
+          var tr = e.target.closest && e.target.closest("tr.o-list-row-editing");
+          if (!tr) return;
+          if (e.key === "Escape") {
+            e.preventDefault();
+            var si = container.querySelector("#list-search");
+            h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, offset, limit, h.getHashDomainParam ? h.getHashDomainParam() : undefined);
+            return;
+          }
+          if (e.key === "Enter" && tr.getAttribute("data-unsaved-new") !== "1") {
+            e.preventDefault();
+            var id = parseInt(tr.getAttribute("data-id"), 10);
+            if (!id) return;
+            var vals = collectVals(tr);
+            rpc
+              .callKw(model, "write", [[id], vals], {})
+              .then(function () {
+                showToast("Saved", "success");
+                var si = container.querySelector("#list-search");
+                h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, offset, limit, h.getHashDomainParam ? h.getHashDomainParam() : undefined);
+              })
+              .catch(function (err) {
+                showToast(err.message || "Save failed", "error");
+              });
+            return;
+          }
+          if (e.key === "Tab") {
+            var inputs = Array.prototype.slice.call(tr.querySelectorAll(".o-list-inline-input"));
+            var idx = inputs.indexOf(e.target);
+            if (idx >= 0) {
+              e.preventDefault();
+              var next = e.shiftKey ? inputs[idx - 1] : inputs[idx + 1];
+              if (next && next.focus) next.focus();
+            }
+          }
+        });
+        var addBtn = container.querySelector(".o-list-add-line-btn");
+        if (addBtn) {
+          addBtn.onclick = function () {
+            var hasName = cols.some(function (c) {
+              return (typeof c === "object" ? c.name : c) === "name";
+            });
+            if (!hasName) {
+              window.location.hash = route + "/new";
+              return;
+            }
+            var tbody = table.querySelector("tbody");
+            var tr = document.createElement("tr");
+            tr.className = "o-list-data-row o-list-row-editing";
+            tr.setAttribute("data-id", "");
+            tr.setAttribute("data-inline-edit", "1");
+            tr.setAttribute("data-unsaved-new", "1");
+            var htmlRow = '<td role="gridcell"><input type="checkbox" class="list-row-select" disabled aria-label="New row"></td>';
+            cols.forEach(function (c) {
+              var f = typeof c === "object" ? c.name : c;
+              if (f === "name") {
+                htmlRow +=
+                  '<td role="gridcell"><input class="o-list-inline-input" data-field="name" type="text" placeholder="Name" style="width:100%;padding:var(--space-xs)"></td>';
+              } else {
+                htmlRow += "<td role=\"gridcell\"></td>";
+              }
+            });
+            htmlRow +=
+              '<td role="gridcell"><button type="button" class="o-inline-create-btn o-btn o-btn-primary">Create</button> <button type="button" class="o-inline-discard-btn o-btn o-btn-secondary">Discard</button></td>';
+            tr.innerHTML = htmlRow;
+            tbody.insertBefore(tr, tbody.querySelector(".o-list-add-line"));
+            var nameInp = tr.querySelector('input[data-field="name"]');
+            if (nameInp && nameInp.focus) nameInp.focus();
+            tr.querySelector(".o-inline-discard-btn").onclick = function () {
+              tr.remove();
+            };
+            tr.querySelector(".o-inline-create-btn").onclick = function () {
+              var nm = tr.querySelector('input[data-field="name"]');
+              var nv = nm && nm.value ? nm.value.trim() : "";
+              if (!nv) {
+                showToast("Name is required", "error");
+                return;
+              }
+              rpc
+                .callKw(model, "create", [[{ name: nv }]], {})
+                .then(function () {
+                  showToast("Created", "success");
+                  var si = container.querySelector("#list-search");
+                  h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, 0, limit, h.getHashDomainParam ? h.getHashDomainParam() : undefined);
+                })
+                .catch(function (err) {
+                  showToast(err.message || "Create failed", "error");
+                });
+            };
+          };
+        }
       })();
 
       var btnExportExcel = container.querySelector("#btn-export-excel");
@@ -443,7 +817,13 @@
       }
 
       container.querySelectorAll(".btn-delete").forEach(function (a) {
-        a.onclick = function (e) { e.preventDefault(); if (confirm("Delete this record?")) h.deleteRecord(model, route, a.dataset.id); };
+        a.onclick = function (e) {
+          e.preventDefault();
+          var cm = h.confirmModal || function (o) { return Promise.resolve(window.confirm((o && o.message) || "")); };
+          cm({ title: "Delete record", message: "Delete this record?", confirmLabel: "Delete", cancelLabel: "Cancel" }).then(function (ok) {
+            if (ok) h.deleteRecord(model, route, a.dataset.id);
+          });
+        };
       });
       container.querySelectorAll(".sortable-col").forEach(function (th) {
         th.onclick = function () {

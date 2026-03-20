@@ -28,7 +28,17 @@ class Db(Command):
             help="create, init, list, drop, upgrade, backup, or restore database",
         )
         parser.add_argument("-d", "--database", help="Database name")
-        parser.add_argument("-m", "--module", help="Module(s) to upgrade (comma-separated)")
+        parser.add_argument(
+            "-m",
+            "-u",
+            "--module",
+            help="Module(s) to upgrade (comma-separated); -u is an alias for -m",
+        )
+        parser.add_argument(
+            "--demo",
+            action="store_true",
+            help="Load demo XML from module manifests (Phase 410)",
+        )
         parser.add_argument("-f", "--file", help="Backup file for restore")
         parser.add_argument("-o", "--output", help="Output path for backup")
 
@@ -58,9 +68,12 @@ class Db(Command):
         create_database(dbname)
         print(f"Database {dbname} created.")
 
-    def _init(self, dbname: str) -> None:
+    def _init(self, dbname: str, load_demo: bool = False) -> None:
         """Initialize database: create if needed, load modules, create tables, create admin user."""
-        config.parse_config(["--addons-path=addons"])
+        args = ["--addons-path=addons"]
+        if load_demo:
+            args.append("--demo")
+        config.parse_config(args)
         if not db_exists(dbname):
             create_database(dbname)
             print(f"Database {dbname} created.")

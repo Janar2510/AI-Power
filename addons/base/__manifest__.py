@@ -8,7 +8,7 @@
         "security/ir.model.access.csv",
         "views/ir_views.xml",
     ],
-    "demo": [],
+    "demo": ["demo/demo_base.xml"],
     "installable": True,
     "auto_install": True,
 }

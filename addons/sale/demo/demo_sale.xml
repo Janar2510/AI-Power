@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <record id="product_demo_xml" model="product.template">
+      <field name="name">Demo Product (sale demo XML)</field>
+      <field name="list_price" eval="19.99"/>
+      <field name="type">consu</field>
+    </record>
+  </data>
+</odoo>

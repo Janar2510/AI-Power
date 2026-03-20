@@ -75,7 +75,7 @@ def run_upgrade(cr: Any, dbname: str, module_names: Optional[List[str]] = None) 
     # Phase 162: full idempotent data reload (menus, actions, views, sequences, stages, etc.)
     try:
         from core.db.init_data import load_default_data
-        load_default_data(env)
+        load_default_data(env, update_mode=True)
         _logger.info("Reloaded default data (menus, actions, views, etc.)")
     except Exception as e:
         _logger.warning("Could not reload default data on upgrade: %s", e)

@@ -1,5 +1,31 @@
 # Deployment Checklist
 
+## Phases 409–422 (1.202.0)
+
+### Pre-Deployment
+- [ ] Run `python3.11 erp-bin db upgrade -d <db>` so `ir_model_data`, `ir_model_fields`, and generic XML data apply cleanly.
+- [ ] Optional demo: `python3.11 erp-bin db init -d <db> --demo` or set `ERP_LOAD_DEMO=1` before init.
+- [ ] Hard-refresh web client (`form_view.js`, `discuss.js`, `select_create_dialog.js`, `command_palette.js`, `import.js`, `graph_*` / `pivot` / `calendar` / `gantt` / `activity` views, `main.js`).
+- [ ] If using geolocation, ensure outbound HTTPS to Nominatim is allowed (or rely on deterministic fallback).
+
+### Release
+- [ ] `core/release.py`: `1.202.0`
+
+---
+
+## Next phases / Odoo parity (1.201.0)
+
+### Pre-Deployment
+- [ ] Run DB upgrade so new models/columns load: `mail.followers`, `mail.tracking.value`, `ir.sequence` fields, `ir.sequence.date_range`, `ir.cron` failure fields, `ir_attachment.store_fname`, etc.
+- [ ] Hard-refresh static assets (`field_registry.js`, `search_model.js`, `action_manager.js`, `confirm_dialog`, `control_panel`, `list_view`, `kanban_renderer`, `main.js`, `webclient.css`).
+- [ ] Optional filestore: set config `attachment_location=file` and `data_dir` (or `filestore_path`); ensure write permissions on filestore directory.
+- [ ] Cron: single-process server now runs an in-process cron thread; prefork mode still uses separate cron worker. Verify `LISTEN/NOTIFY` is allowed on PostgreSQL if using `_trigger`.
+
+### Release
+- [ ] `core/release.py`: `1.201.0`
+
+---
+
 ## Missing apps parity rollout (1.200.0)
 
 ### Pre-Deployment

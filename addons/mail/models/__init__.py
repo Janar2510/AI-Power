@@ -1,4 +1,6 @@
 from . import mail_activity_type
+from . import mail_followers
+from . import mail_tracking_value
 from . import mail_message
 from . import mail_template
 from . import mail_thread

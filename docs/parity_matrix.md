@@ -125,3 +125,15 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 | Phases 391–407 roadmap scaffold | Form/navbar/report/discuss/import AppCore delegation hooks; command palette/hotkey/debug/PWA services; ORM hooks + `_log_access`/`_table_query` plumbing; tools expansion; fetchmail model | `addons/web/static/src/{core,components,services}`, `core/orm/*`, `core/db/schema.py`, `core/tools/*`, `addons/mail/*`, `addons/bus/*` | done | - |
 | Sidebar Odoo 19 parity | `ir.ui.menu` web_icon/web_icon_data/active, app_id, recursive menus, navbar.xml SectionMenu | `ir_ui_menu.py`, `views_registry.py`, `main.js`, `webclient.css`, `views.js` v1.181.0 | done | - |
 | Missing apps parity (CRM/Discuss/HR app promotion) | Odoo 19 app roots + CRM hierarchy + Discuss app root + HR sub-apps as top-level apps | `addons/crm/views/crm_views.xml`, `addons/mail/views/mail_template_views.xml`, `addons/hr_*`, `addons/web/static/src/main.js`, `tests/test_missing_apps_parity_phase408.py` | done | test_missing_apps_parity_phase408 |
+| Phases 409–410 (generic data + demo) | `ir.model.data`, `core/data/data_loader.py`, `noupdate`, `--demo`, manifest `demo` XML | `addons/base/models/ir_model_data.py`, `core/data/data_loader.py`, `core/db/init_data.py`, `core/cli/db.py` | done | - |
+| Phase 411 (FormView API) | `window.__erpForm` + `AppCore.FormView` wrappers | `addons/web/static/src/core/form_view.js`, `main.js` | done | - |
+| Phase 412 (Select/Create dialog) | Modal `name_search` + `name_create` | `select_create_dialog.js` | done | - |
+| Phase 413 (Discuss UI) | RPC channel list + `message_post` | `core/discuss.js` | done | - |
+| Phase 414 (Fetchmail) | IMAP in `addons/fetchmail` (existing) | `addons/fetchmail/models/fetchmail_server.py` | done | test_fetchmail_phase130 |
+| Phases 415–416 (views + command palette) | `setImpl` bridges; fuzzy palette | `core/{graph,pivot,calendar,gantt,activity}_view.js`, `command_palette.js`, `main.js` | done | - |
+| Phase 417 (Import pipeline helpers) | CSV parse + `import_data` batch | `core/import.js` | done | - |
+| Phase 418 (i18n PO) | `translate.load_module_po_translations` + sample `.po` | `core/tools/translate.py`, `addons/base/i18n/en_US.po` | done | - |
+| Phase 419 (ir.model reflection) | `sync_registry`, `ir.model.fields` model | `addons/base/models/ir_model.py`, `ir_model_fields.py` | done | - |
+| Phase 420 (utilities) | `partner_autocomplete`, Nominatim geolocalize, Pillow `image_process`, kanban any model | `partner_autocomplete`, `base_geolocalize`, `core/tools/image.py`, `main.js` | done | - |
+| Phase 421 (prefetch) | `Environment._prefetch_cache`, `prefetch_read`, read short-circuit | `core/orm/environment.py`, `core/orm/models.py` | done | - |
+| Phase 422 (SQL debug) | `sql_debug.explain_analyze` | `core/tools/sql_debug.py` | done | - |

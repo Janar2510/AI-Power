@@ -73,22 +73,11 @@ def _load_routes():
 _logger = logging.getLogger("erp.http")
 
 # Security headers (Phase 99, 203)
-from .security import check_rate_limit, validate_csrf
+from .security import SECURITY_HEADERS, check_rate_limit, validate_csrf
 from .session import get_session, ensure_session_csrf
 
-# Phase 203: X-Frame-Options DENY, Referrer-Policy; CSP report-only + enforce for script/style
-_SECURITY_HEADERS = [
-    ("X-Content-Type-Options", "nosniff"),
-    ("X-Frame-Options", "DENY"),
-    ("Referrer-Policy", "strict-origin-when-cross-origin"),
-    (
-        "Content-Security-Policy-Report-Only",
-        "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob:; "
-        "font-src 'self' https://cdn.jsdelivr.net;",
-    ),
-    ("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net;"),
-]
+# Phase 203: shared with core/http/security.py (enforcing CSP only)
+_SECURITY_HEADERS = list(SECURITY_HEADERS)
 
 
 def _needs_cors(path: str) -> bool:

@@ -16,7 +16,12 @@ class SaleOrder(Model):
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
             next_val = IrSequence.next_by_code("sale.order") if IrSequence else None
-            vals = dict(vals, name=f"SO/{next_val:05d}" if next_val is not None else "New")
+            if isinstance(next_val, str):
+                vals = dict(vals, name=next_val)
+            elif next_val is not None:
+                vals = dict(vals, name=f"SO/{next_val:05d}")
+            else:
+                vals = dict(vals, name="New")
         if env and ("currency_id" not in vals or not vals.get("currency_id")):
             Company = env.get("res.company")
             if Company:

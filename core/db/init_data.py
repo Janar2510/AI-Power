@@ -5,8 +5,11 @@ import logging
 _logger = logging.getLogger("erp.db")
 
 
-def load_default_data(env) -> None:
-    """Load default records (stages, sequences, company, groups, etc.) when tables are empty."""
+def load_default_data(env, *, update_mode: bool = False) -> None:
+    """Load default records (stages, sequences, company, groups, etc.) when tables are empty.
+
+    Phase 409/410: ``update_mode=True`` skips noupdate XML records on upgrade; enables generic data reload.
+    """
     _load_ir_module_module(env)
     _load_ir_actions_menus(env)
     _load_ir_actions_reports(env)
@@ -221,6 +224,28 @@ def load_default_data(env) -> None:
     assign_admin_groups(env)
     _load_dashboard_widgets(env)
     _load_ir_translations(env)
+    try:
+        from core.data.data_loader import load_demo_data_for_modules, load_generic_data_for_modules
+        from core.tools import config as _cfg
+
+        mods = _cfg.get_config().get("server_wide_modules", ["base", "web"])
+        load_generic_data_for_modules(env, mods, update_mode=update_mode)
+        load_demo_data_for_modules(env, mods)
+    except Exception as e:
+        _logger.warning("Generic/demo XML data load: %s", e)
+    try:
+        IrModel = env.get("ir.model")
+        if IrModel and hasattr(IrModel, "sync_registry"):
+            IrModel.sync_registry(env)
+            _logger.info("Synced ir.model / ir.model.fields from registry")
+    except Exception as e:
+        _logger.warning("ir.model sync_registry: %s", e)
+    try:
+        from core.tools.translate import load_module_po_translations
+
+        load_module_po_translations(env, "base", "en_US")
+    except Exception as e:
+        _logger.debug("PO translation load: %s", e)
 
 
 def _load_ir_module_module(env) -> None:

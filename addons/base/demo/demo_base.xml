@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <record id="partner_demo_xml" model="res.partner">
+      <field name="name">Demo Partner (base demo XML)</field>
+      <field name="email">demo.base@example.com</field>
+      <field name="is_company" eval="True"/>
+    </record>
+  </data>
+</odoo>

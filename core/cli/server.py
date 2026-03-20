@@ -59,6 +59,12 @@ class Server(Command):
         """Single-process mode."""
         self._ensure_default_db()
         app = Application()
+        try:
+            from core.service.cron_scheduler import start_cron_scheduler_thread
+
+            start_cron_scheduler_thread()
+        except Exception as e:
+            _logger.warning("Could not start in-process cron scheduler: %s", e)
         if gevent_websocket:
             try:
                 from gevent.pywsgi import WSGIServer

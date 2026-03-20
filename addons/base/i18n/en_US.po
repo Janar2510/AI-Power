@@ -1,16 +1,2 @@
-# Base module - English (source)
-msgid ""
-msgstr ""
-"Content-Type: text/plain; charset=UTF-8\n"
-
-msgid "Contacts"
-msgstr "Contacts"
-
-msgid "Leads"
-msgstr "Leads"
-
-msgid "Settings"
-msgstr "Settings"
-
-msgid "Home"
-msgstr "Home"
+msgid "Save"
+msgstr "Save"

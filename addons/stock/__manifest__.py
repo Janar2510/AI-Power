@@ -8,6 +8,7 @@
         "security/ir.model.access.csv",
         "views/stock_views.xml",
     ],
+    "demo": ["demo/demo_stock.xml"],
     "installable": True,
     "application": True,
 }

@@ -29,8 +29,19 @@
       const label = sid ? (stageNames[sid] || "Stage " + sid) : "No stage";
       const recs = byStage[sid] || [];
       const colClass = "kanban-column" + (onStageChange ? " kanban-drop-target" : "");
-      html += '<div class="' + colClass + '" data-stage-id="' + sid + '" style="min-width:280px;background:#f8f9fa;border-radius:8px;padding:0.5rem;transition:background 0.15s">';
-      html += '<h4 style="margin:0 0 0.5rem;font-size:0.9rem">' + (label + " (" + recs.length + ")").replace(/</g, "&lt;") + "</h4>";
+      html += '<div class="' + colClass + '" data-stage-id="' + sid + '" style="min-width:280px;background:var(--color-surface-2);border-radius:var(--radius-md);padding:var(--space-sm);transition:background var(--duration-fast);border:1px solid var(--border-color)">';
+      html += '<h4 style="margin:0 0 var(--space-sm) 0;font-size:0.9rem">' + (label + " (" + recs.length + ")").replace(/</g, "&lt;") + "</h4>";
+      if (options && options.onQuickCreate) {
+        html +=
+          '<div class="kanban-quick-create" style="margin-bottom:var(--space-sm)">' +
+          '<button type="button" class="kanban-qc-toggle o-btn o-btn-secondary" data-stage-id="' +
+          sid +
+          '" style="width:100%;margin-bottom:var(--space-xs)">+ Quick create</button>' +
+          '<div class="kanban-qc-form" style="display:none;gap:var(--space-xs);flex-direction:column">' +
+          '<input type="text" class="kanban-qc-name" placeholder="Name" style="width:100%;padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)">' +
+          '<div style="display:flex;gap:var(--card-gap)"><button type="button" class="kanban-qc-save o-btn o-btn-primary">Create</button>' +
+          '<button type="button" class="kanban-qc-cancel o-btn o-btn-secondary">Discard</button></div></div></div>';
+      }
       recs.forEach(function (r) {
         const name = (r.name || "—").replace(/</g, "&lt;");
         const rev = r.expected_revenue != null ? r.expected_revenue : "";
@@ -53,6 +64,54 @@
         }
       };
     });
+
+    if (options && options.onQuickCreate) {
+      container.querySelectorAll(".kanban-qc-toggle").forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          const col = btn.closest(".kanban-column");
+          const form = col && col.querySelector(".kanban-qc-form");
+          if (!form) return;
+          const open = form.style.display === "flex";
+          container.querySelectorAll(".kanban-qc-form").forEach(function (f) {
+            f.style.display = "none";
+          });
+          form.style.display = open ? "none" : "flex";
+          if (!open) {
+            const inp = form.querySelector(".kanban-qc-name");
+            if (inp) inp.focus();
+          }
+        };
+      });
+      container.querySelectorAll(".kanban-qc-cancel").forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          const form = btn.closest(".kanban-qc-form");
+          if (form) {
+            form.style.display = "none";
+            const inp = form.querySelector(".kanban-qc-name");
+            if (inp) inp.value = "";
+          }
+        };
+      });
+      container.querySelectorAll(".kanban-qc-save").forEach(function (btn) {
+        btn.onclick = function (e) {
+          e.stopPropagation();
+          const col = btn.closest(".kanban-column");
+          const form = col && col.querySelector(".kanban-qc-form");
+          const sid = col ? parseInt(col.getAttribute("data-stage-id"), 10) || 0 : 0;
+          const inp = form && form.querySelector(".kanban-qc-name");
+          const name = inp && inp.value ? inp.value.trim() : "";
+          if (!name) return;
+          options.onQuickCreate(sid, name, function () {
+            if (form) {
+              form.style.display = "none";
+              if (inp) inp.value = "";
+            }
+          });
+        };
+      });
+    }
 
     if (onStageChange) {
       let draggedId = null;

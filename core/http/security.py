@@ -132,15 +132,8 @@ def check_rate_limit(request, path: Optional[str] = None) -> Tuple[bool, Optiona
 
 # --- Security headers ---
 
+# Enforcing CSP only — Report-Only without report-to triggers browser console noise and has no effect.
 SECURITY_HEADERS = [
-    ("X-Content-Type-Options", "nosniff"),
-    ("X-Frame-Options", "DENY"),
-    ("Referrer-Policy", "strict-origin-when-cross-origin"),
-    ("Content-Security-Policy-Report-Only", "default-src 'self'; report-uri /csp-report"),
-]
-
-# Full CSP (stricter, can replace above when ready)
-CSP_HEADERS = [
     ("X-Content-Type-Options", "nosniff"),
     ("X-Frame-Options", "DENY"),
     ("Referrer-Policy", "strict-origin-when-cross-origin"),
@@ -152,9 +145,10 @@ CSP_HEADERS = [
     ),
 ]
 
+# Alias for callers expecting CSP_HEADERS (same list as SECURITY_HEADERS).
+CSP_HEADERS = SECURITY_HEADERS
 
-def get_security_headers(use_report_only_csp: bool = True) -> list:
-    """Return security headers. use_report_only_csp=True uses report-only CSP."""
-    if use_report_only_csp:
-        return SECURITY_HEADERS
-    return CSP_HEADERS
+
+def get_security_headers(use_report_only_csp: bool = False) -> list:
+    """Return standard security headers (enforcing CSP). use_report_only_csp is ignored."""
+    return list(SECURITY_HEADERS)

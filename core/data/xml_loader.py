@@ -13,7 +13,7 @@ def _text(el: ET.Element) -> str:
     return (el.text or "").strip()
 
 
-def _parse_record(el: ET.Element) -> Dict[str, Any]:
+def parse_record_element(el: ET.Element) -> Dict[str, Any]:
     """Parse <record model="..." id="...">."""
     model = el.get("model", "")
     xml_id = el.get("id", "")
@@ -23,7 +23,10 @@ def _parse_record(el: ET.Element) -> Dict[str, Any]:
         if not name:
             continue
         ref = field.get("ref")
-        if ref:
+        eval_attr = field.get("eval")
+        if eval_attr is not None:
+            data[name] = {"_eval": str(eval_attr)}
+        elif ref:
             data[name] = {"_ref": ref}
         elif field.get("type") == "xml":
             child = list(field)
@@ -41,6 +44,10 @@ def _parse_record(el: ET.Element) -> Dict[str, Any]:
         else:
             data[name] = _text(field)
     return data
+
+
+# Backward-compatible alias
+_parse_record = parse_record_element
 
 
 def _parse_form_child(child: ET.Element) -> Dict[str, Any]:
@@ -252,11 +259,16 @@ def load_xml_data(module_name: str, rel_path: str) -> List[Dict[str, Any]]:
 
     result = []
     for data_el in root.findall(".//data"):
+        noupdate = data_el.get("noupdate", "0") in ("1", "true", "True")
         for el in data_el:
             if el.tag == "record":
-                result.append(_parse_record(el))
+                rec = parse_record_element(el)
+                rec["_noupdate"] = noupdate
+                result.append(rec)
             elif el.tag == "menuitem":
-                result.append(_parse_menuitem(el))
+                m = _parse_menuitem(el)
+                m["_noupdate"] = noupdate
+                result.append(m)
     return result
 
 

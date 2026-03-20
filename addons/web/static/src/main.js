@@ -57,13 +57,25 @@
 
   function pushBreadcrumb(label, hash) {
     actionStack.push({ label: label, hash: hash });
+    if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
+      window.ActionManager.saveToStorage(actionStack);
+    }
   }
 
   function popBreadcrumbTo(index) {
     if (index < actionStack.length) {
       actionStack = actionStack.slice(0, index + 1);
+      if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
+        window.ActionManager.saveToStorage(actionStack);
+      }
       var entry = actionStack[actionStack.length - 1];
-      if (entry) window.location.hash = entry.hash;
+      if (entry) {
+        var h = entry.hash;
+        if (window.ActionManager && actionStack.length > 1 && typeof window.ActionManager.syncHashWithStack === 'function') {
+          h = window.ActionManager.syncHashWithStack(h, actionStack);
+        }
+        window.location.hash = h;
+      }
     }
   }
 
@@ -1677,6 +1689,9 @@
           saveSavedFilter: saveSavedFilter,
           showImportModal: showImportModal,
           getHashDomainParam: getHashDomainParam,
+          confirmModal: confirmModal,
+          getFieldMeta: getFieldMeta,
+          getSelectionOptions: getSelectionOptions,
         }
       });
       return;
@@ -1882,13 +1897,15 @@
             bulkDelete.onclick = function () {
               const ids = getSelectedIds();
               if (!ids.length) return;
-              if (!confirm('Delete ' + ids.length + ' record(s)?')) return;
-              rpc.callKw(model, 'unlink', [ids], {})
+              confirmModal({ title: 'Delete records', message: 'Delete ' + ids.length + ' record(s)?', confirmLabel: 'Delete', cancelLabel: 'Cancel' }).then(function (ok) {
+                if (!ok) return;
+                rpc.callKw(model, 'unlink', [ids], {})
                 .then(function () {
                   showToast('Deleted', 'success');
                   loadRecords(model, route, currentListState.searchTerm, stageFilter, undefined, currentListState.savedFilterId, offset, limit, getHashDomainParam());
                 })
                 .catch(function (err) { showToast(err.message || 'Delete failed', 'error'); });
+              });
             };
           }
           if (bulkClear) bulkClear.onclick = function () { main.querySelectorAll('.list-row-select').forEach(function (cb) { cb.checked = false; }); if (selectAll) selectAll.checked = false; updateBar(); };
@@ -2068,8 +2085,13 @@
           .finally(function () { btnAiSearch.disabled = false; btnAiSearch.textContent = 'AI Search'; });
       };
     }
-    main.querySelectorAll('.btn-delete').forEach(a => {
-      a.onclick = (e) => { e.preventDefault(); if (confirm('Delete this record?')) deleteRecord(model, route, a.dataset.id); };
+      main.querySelectorAll('.btn-delete').forEach(a => {
+      a.onclick = (e) => {
+        e.preventDefault();
+        confirmModal({ title: 'Delete record', message: 'Delete this record?', confirmLabel: 'Delete', cancelLabel: 'Cancel' }).then(function (ok) {
+          if (ok) deleteRecord(model, route, a.dataset.id);
+        });
+      };
     });
     main.querySelectorAll('.btn-view').forEach(btn => {
       btn.onclick = () => { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
@@ -2245,6 +2267,45 @@
   function getMonetaryCurrencyField(model, fname) {
     const meta = getFieldMeta(model, fname);
     return (meta && meta.type === 'monetary' && meta.currency_field) ? meta.currency_field : null;
+  }
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function serverValueToDateInput(val) {
+    if (val == null || val === false || val === '') return '';
+    const s = String(val);
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const d = new Date(s.replace(' ', 'T'));
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function serverValueToDatetimeLocal(val) {
+    if (val == null || val === false || val === '') return '';
+    const s = String(val);
+    const d = new Date(s.replace(' ', 'T'));
+    if (isNaN(d.getTime())) return '';
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+
+  function dateInputToServer(val) {
+    if (!val || !String(val).trim()) return false;
+    return String(val).trim();
+  }
+
+  function datetimeLocalToServer(val) {
+    if (!val || !String(val).trim()) return false;
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return false;
+    return d.toISOString().replace(/\.\d{3}Z$/, '').replace('T', ' ');
+  }
+
+  function confirmModal(opts) {
+    if (window.UIComponents && window.UIComponents.ConfirmDialog && typeof window.UIComponents.ConfirmDialog.confirm === 'function') {
+      return window.UIComponents.ConfirmDialog.confirm(opts || {});
+    }
+    const o = opts || {};
+    return Promise.resolve(window.confirm((o.title ? o.title + '\n\n' : '') + (o.message || o.body || 'Are you sure?')));
   }
 
   function isBinaryField(model, fname) {
@@ -2567,14 +2628,22 @@
     const fname = typeof f === 'object' ? f.name : f;
     const label = getFieldLabel(model, fname);
     const widget = typeof f === 'object' ? f.widget : '';
+    if (window.FieldWidgets && window.FieldWidgets.render && widget) {
+      const fieldNode = typeof f === 'object' ? f : { name: fname, widget: widget };
+      const custom = window.FieldWidgets.render(model, fieldNode, { getFieldLabel: getFieldLabel, getFieldMeta: getFieldMeta });
+      if (custom) {
+        if (typeof f === 'object' && (f.invisible || f.readonly || f.required_cond)) {
+          const ad = (f.invisible ? ' data-invisible="' + String(f.invisible).replace(/"/g, '&quot;') + '"' : '') + (f.readonly ? ' data-readonly="' + String(f.readonly).replace(/"/g, '&quot;') + '"' : '') + (f.required_cond ? ' data-required-cond="' + String(f.required_cond).replace(/"/g, '&quot;') + '"' : '');
+          return '<div class="attr-field" data-fname="' + fname + '"' + ad + '>' + custom + '</div>';
+        }
+        return '<div class="attr-field" data-fname="' + fname + '">' + custom + '</div>';
+      }
+    }
     if (widget === 'priority') {
       const selectionOpts = getSelectionOptions(model, fname) || [['0', 'Low'], ['1', 'Normal'], ['2', 'High'], ['3', 'Urgent']];
       let opts = '';
       selectionOpts.forEach(function (o) { opts += '<option value="' + (o[0] || '') + '">' + (o[1] || o[0]) + '</option>'; });
       return '<p><label>' + label + '</label><div class="priority-widget" data-fname="' + fname + '" style="margin-top:0.25rem;display:flex;gap:0.25rem;align-items:center"><span class="priority-stars" style="font-size:1.2rem;color:#f0ad4e">&#9733;&#9733;&#9733;&#9733;</span><select name="' + fname + '" style="width:auto;padding:0.25rem">' + opts + '</select></div></p>';
-    }
-    if (widget === 'progressbar') {
-      return '<p><label>' + label + '</label><div class="progressbar-widget" style="margin-top:0.25rem;display:flex;align-items:center;gap:0.5rem"><div style="flex:1;height:8px;background:#eee;border-radius:4px;overflow:hidden"><div class="progressbar-fill" style="height:100%;background:var(--color-primary,#1a1a2e);width:0%;transition:width 0.2s"></div></div><input type="number" name="' + fname + '" min="0" max="100" step="0.1" style="width:60px;padding:0.25rem"></div></p>';
     }
     if (widget === 'phone' || ((fname === 'phone' || fname === 'mobile') && !widget)) {
       return '<p><label>' + label + '</label><div style="margin-top:0.25rem"><input type="text" name="' + fname + '" style="width:100%;padding:0.5rem"><a class="phone-link" href="#" style="font-size:0.9rem;margin-left:0.25rem;display:inline-block;margin-top:0.25rem" target="_blank">Call</a></div></p>';
@@ -2615,6 +2684,14 @@
     const isHtml = isHtmlField(model, fname);
     const isTextarea = isTextField(model, fname) && !isHtml;
     const isMonetary = isMonetaryField(model, fname);
+    if (meta && meta.type === 'date') {
+      const fro = typeof f === 'object' && f.readonly ? ' readonly' : '';
+      return '<p><label>' + label + (required ? ' *' : '') + '<br><input type="date" name="' + fname + '" ' + (required ? 'required ' : '') + fro + ' style="width:100%;max-width:16rem;padding:0.5rem;margin-top:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)"></label></p>';
+    }
+    if (meta && meta.type === 'datetime') {
+      const fro = typeof f === 'object' && f.readonly ? ' readonly' : '';
+      return '<p><label>' + label + (required ? ' *' : '') + '<br><input type="datetime-local" name="' + fname + '" ' + (required ? 'required ' : '') + fro + ' style="width:100%;max-width:22rem;padding:0.5rem;margin-top:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)"></label></p>';
+    }
     const inputType = isImg ? 'image' : (isBin ? 'binary' : (isHtml ? 'html' : (isBool ? 'boolean' : (isMonetary ? 'monetary' : (fname === 'email' ? 'email' : isTextarea ? 'textarea' : selectionOpts ? 'selection' : (comodel ? 'many2one' : 'text'))))));
     if (inputType === 'boolean') return '<p><label style="display:flex;align-items:center;gap:0.5rem"><input type="checkbox" name="' + fname + '"> ' + label + '</label></p>';
     if (inputType === 'html') return '<p><label>' + label + (required ? ' *' : '') + '</label><div id="html-' + fname + '" class="html-widget" data-fname="' + fname + '" contenteditable="true" style="width:100%;padding:0.5rem;margin-top:0.25rem;min-height:6em;border:1px solid var(--border-color,#ddd);border-radius:4px;background:#fff"></div><input type="hidden" name="' + fname + '" id="hidden-html-' + fname + '"></p>';
@@ -3288,7 +3365,13 @@
             const el = form.querySelector('[name="' + n + '"]');
             if (el) {
               if (el.type === 'checkbox') el.checked = !!defaults[n];
-              else el.value = defaults[n] != null ? String(defaults[n]) : '';
+              else {
+                const metaD = getFieldMeta(model, n);
+                const dv = defaults[n];
+                if (metaD && metaD.type === 'date') el.value = serverValueToDateInput(dv);
+                else if (metaD && metaD.type === 'datetime') el.value = serverValueToDatetimeLocal(dv);
+                else el.value = dv != null ? String(dv) : '';
+              }
             }
           }
         });
@@ -3327,7 +3410,14 @@
             setupDependsOnHandlers();
             setupOnchangeHandlers();
             applyAttrsToForm(form, model);
-            const set = (n, v) => { const el = form.querySelector('[name="' + n + '"]'); if (el) el.value = v != null ? v : ''; };
+            const set = (n, v) => {
+              const el = form.querySelector('[name="' + n + '"]');
+              if (!el) return;
+              const metaEl = getFieldMeta(model, n);
+              if (metaEl && metaEl.type === 'date') { el.value = serverValueToDateInput(v); return; }
+              if (metaEl && metaEl.type === 'datetime') { el.value = serverValueToDatetimeLocal(v); return; }
+              el.value = v != null ? String(v) : '';
+            };
             fields.forEach(f => {
             const n = typeof f === 'object' ? f.name : f;
             const o2m = getOne2manyInfo(model, n);
@@ -3420,7 +3510,12 @@
           })
           .catch(function (err) { showToast(err.message || 'Failed to duplicate', 'error'); });
       };
-      if (btnDel) btnDel.onclick = function (e) { e.preventDefault(); if (confirm('Delete this record?')) deleteRecord(model, route, id); };
+      if (btnDel) btnDel.onclick = function (e) {
+        e.preventDefault();
+        confirmModal({ title: 'Delete record', message: 'Delete this record?', confirmLabel: 'Delete', cancelLabel: 'Cancel' }).then(function (ok) {
+          if (ok) deleteRecord(model, route, id);
+        });
+      };
       var suggestionsEl = document.getElementById('ai-suggestions-list');
       if (suggestionsEl) {
         fetch('/ai/chat', {
@@ -3486,6 +3581,7 @@
           .finally(function () { btnAiFill.disabled = false; btnAiFill.textContent = 'AI Fill'; });
       };
     }
+    setupSignatureWidgets(form);
     attachBreadcrumbHandlers();
   }
 
@@ -3551,6 +3647,15 @@
         vals[n] = byName(n);
         return;
       }
+      const metaFr = getFieldMeta(model, n);
+      if (metaFr && metaFr.type === 'date') {
+        vals[n] = dateInputToServer(byName(n));
+        return;
+      }
+      if (metaFr && metaFr.type === 'datetime') {
+        vals[n] = datetimeLocalToServer(byName(n));
+        return;
+      }
       let v = byName(n).trim();
       const comodel = getMany2oneComodel(model, n);
       const selectionOpts = getSelectionOptions(model, n);
@@ -3611,6 +3716,58 @@
     form.querySelectorAll('input:not([type="hidden"]), select, textarea').forEach(function (el) {
       el.addEventListener('change', markDirty);
       el.addEventListener('input', markDirty);
+    });
+  }
+
+  function setupSignatureWidgets(form) {
+    if (!form) return;
+    form.querySelectorAll('.o-signature-canvas').forEach(function (canvas) {
+      var wrap = canvas.closest('.o-signature-widget');
+      if (!wrap) return;
+      var hidden = wrap.querySelector('.o-signature-data');
+      if (!hidden) return;
+      var ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.strokeStyle = typeof getComputedStyle !== 'undefined' ? (getComputedStyle(document.documentElement).getPropertyValue('--color-text') || '#333').trim() || '#333' : '#333';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+      }
+      var drawing = false;
+      function pos(e) {
+        var r = canvas.getBoundingClientRect();
+        var cx = e.touches ? e.touches[0].clientX : e.clientX;
+        var cy = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: cx - r.left, y: cy - r.top };
+      }
+      function start(e) {
+        drawing = true;
+        var p = pos(e);
+        if (ctx) { ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+        if (e.cancelable) e.preventDefault();
+      }
+      function move(e) {
+        if (!drawing || !ctx) return;
+        var p = pos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        hidden.value = canvas.toDataURL('image/png');
+        if (e.cancelable) e.preventDefault();
+      }
+      function end() { drawing = false; }
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      canvas.addEventListener('mouseup', end);
+      canvas.addEventListener('mouseleave', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+      var clearBtn = wrap.querySelector('.o-signature-clear');
+      if (clearBtn) {
+        clearBtn.onclick = function () {
+          if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+          hidden.value = '';
+        };
+      }
     });
   }
 
@@ -3810,7 +3967,7 @@
         const totalCount = results[0] != null ? results[0] : (results[1].length + offset);
         const records = results[1];
         currentListState.totalCount = totalCount;
-        if (viewType === 'kanban' && (model === 'crm.lead' || model === 'helpdesk.ticket') && window.ViewRenderers && window.ViewRenderers.kanban) {
+        if (viewType === 'kanban' && window.ViewRenderers && window.ViewRenderers.kanban) {
           renderKanban(model, route, records, searchTerm);
         } else if (viewType === 'calendar' && model === 'crm.lead') {
           renderCalendar(model, route, records, searchTerm);
@@ -4568,6 +4725,17 @@
         rpc.callKw(model, 'write', [[parseInt(recordId, 10)], writeVal])
           .then(function () { return loadRecords(model, route, currentListState.searchTerm); })
           .catch(function (err) { showToast(err.message || 'Failed to update', 'error'); });
+      },
+      onQuickCreate: function (stageId, name, done) {
+        const vals = { name: name };
+        vals[groupBy] = stageId || false;
+        rpc.callKw(model, 'create', [[vals]], {})
+          .then(function () {
+            showToast('Created', 'success');
+            if (typeof done === 'function') done();
+            return loadRecords(model, route, currentListState.searchTerm);
+          })
+          .catch(function (err) { showToast(err.message || 'Failed to create', 'error'); });
       }
     };
     if (comodel && uniq.length) {
@@ -4583,12 +4751,17 @@
       baseOpts.stageNames = nameMap;
       renderKanbanWithOptions(baseOpts);
     } else {
-      renderKanbanWithOptions({ default_group_by: groupBy, stageNames: {}, onCardClick: baseOpts.onCardClick });
+      renderKanbanWithOptions({
+        default_group_by: groupBy,
+        stageNames: {},
+        onCardClick: baseOpts.onCardClick,
+        onQuickCreate: baseOpts.onQuickCreate,
+      });
     }
   }
 
   function isFormRoute(hash) {
-    const dataRoutes = 'contacts|pipeline|crm\\/activities|leads|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings\\/users|settings\\/approval_rules|settings\\/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing\\/mailing_lists|marketing\\/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
+    const dataRoutes = 'contacts|pipeline|crm\\/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings\\/users|settings\\/approval_rules|settings\\/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing\\/mailing_lists|marketing\\/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
     return new RegExp('^(' + dataRoutes + ')\\/edit\\/\\d+$').test(hash) || new RegExp('^(' + dataRoutes + ')\\/new$').test(hash);
   }
 
@@ -4734,19 +4907,10 @@
     loadReport();
   }
 
-  function route() {
-    const hash = (window.location.hash || '#home').slice(1);
-    const base = hash.split('?')[0];
-    renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
-    if (formDirty && isFormRoute(lastHash) && hash !== lastHash) {
-      if (!confirm('Leave without saving?')) {
-        window.location.hash = lastHash;
-        return;
-      }
-      formDirty = false;
-    }
-    lastHash = hash;
-    const dataRoutes = 'contacts|pipeline|crm/activities|leads|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
+  function routeApply(hash, base) {
+    var decoded = window.ActionManager && typeof window.ActionManager.decodeStackFromHash === 'function' ? window.ActionManager.decodeStackFromHash(hash) : null;
+    if (decoded && decoded.length) actionStack = decoded;
+    const dataRoutes = 'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
     const editMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/edit\\/(\\d+)$'));
     const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
@@ -4802,13 +4966,33 @@
     }
   }
 
+  function route() {
+    const hash = (window.location.hash || '#home').slice(1);
+    const base = hash.split('?')[0];
+    renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
+    if (formDirty && isFormRoute(lastHash) && hash !== lastHash) {
+      confirmModal({ title: 'Unsaved changes', message: 'Leave without saving?', confirmLabel: 'Leave', cancelLabel: 'Stay' }).then(function (ok) {
+        if (!ok) {
+          window.location.hash = lastHash;
+          return;
+        }
+        formDirty = false;
+        lastHash = hash;
+        routeApply(hash, base);
+      });
+      return;
+    }
+    lastHash = hash;
+    routeApply(hash, base);
+  }
+
   window.addEventListener('hashchange', route);
 
   document.addEventListener('keydown', function (e) {
     if (!e.altKey) return;
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
-    const dataRoutes = 'contacts|pipeline|crm/activities|leads|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
+    const dataRoutes = 'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
     const formMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/(edit\\/\\d+|new)$'));
     if (e.key === 'n' && listMatch) {
@@ -4847,6 +5031,18 @@
       }
     }
   });
+
+  window.__erpForm = {
+    renderFieldHtml: renderFieldHtml,
+    renderFormTreeToHtml: renderFormTreeToHtml,
+  };
+  if (window.AppCore) {
+    if (AppCore.GraphView && typeof AppCore.GraphView.setImpl === "function") AppCore.GraphView.setImpl(renderGraph);
+    if (AppCore.PivotView && typeof AppCore.PivotView.setImpl === "function") AppCore.PivotView.setImpl(renderPivot);
+    if (AppCore.CalendarView && typeof AppCore.CalendarView.setImpl === "function") AppCore.CalendarView.setImpl(renderCalendar);
+    if (AppCore.GanttView && typeof AppCore.GanttView.setImpl === "function") AppCore.GanttView.setImpl(renderGanttView);
+    if (AppCore.ActivityView && typeof AppCore.ActivityView.setImpl === "function") AppCore.ActivityView.setImpl(renderActivityMatrix);
+  }
 
   (function init() {
     // Apply theme immediately to avoid flash (localStorage or prefers-color-scheme)

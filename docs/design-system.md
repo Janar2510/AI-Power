@@ -6,6 +6,14 @@
 
 ## Components
 - Button, Card, Badge, Avatar, Modal, Toast
+- **Dashboard / home:** `KpiCard`, `ActivityFeed`, `ShortcutsBar`, `RecentItems` (`addons/web/static/src/components/`); orchestration in `addons/web/static/src/core/dashboard.js`.
+
+## Dashboard spec
+- Authoritative UI contract: [`design-system/specs/dashboard-home.md`](../design-system/specs/dashboard-home.md) (grid, `--card-gap`, gradient KPI cards, drawer, a11y).
+
+## App shell & navigation
+- **Layout:** `#webclient.o-app-shell` = flex row: `#app-sidebar` (categorized menus) + `.o-app-main-column` (`#navbar` + `#main`).
+- **Tokens:** sidebar width via `--sidebar-width` / `--sidebar-width-collapsed`; content padding `#main` uses `--space-lg` / `--space-xl` and `--card-gap` in the navbar.
 
 ## Implemented in Phases 366-373
 - Components are now DOM-based factories (no HTML string stubs).

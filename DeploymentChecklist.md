@@ -1,5 +1,46 @@
 # Deployment Checklist
 
+## Collapsible sidebar navigation (2026-03-20)
+
+### Pre-Deployment
+- [ ] Template includes `#app-sidebar`, `.o-app-main-column`, `o-sidebar-backdrop`.
+- [ ] After deploy: verify desktop collapse toggle and mobile drawer + Escape to close.
+
+### Release
+- [ ] `core/release.py`: `1.178.1`
+
+---
+
+## Dashboard & home UI redesign (2026-03-20)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase378_389 tests.test_phase366_377 tests.test_phase354_365 -v`
+- [ ] Hard-refresh browser after deploy (new JS bundle order).
+
+### Deliverables
+- Spec: `design-system/specs/dashboard-home.md`; `design-system/MASTER.md` dashboard section.
+- Components: `kpi_card.js`, `activity_feed.js`, `shortcuts_bar.js`, `recent_items.js`; `core/dashboard.js` renderer.
+- Assets: `web.assets_web` includes new scripts before `main.js`; `webclient_templates.xml` aligned for standalone HTML.
+- Styles: `webclient.css` dashboard grid, trends, timeline, AI skeleton, drawer, badge variants.
+
+### Config / release
+- [ ] `core/release.py`: `1.178.0`
+
+---
+
+## Runtime Stability Fixpack (2026-03-20)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase378_389 -v`
+- [ ] Restart app server after deploy to load JS bundle and backend dashboard fix.
+
+### Included fixes
+- Dashboard widget API (`ir.dashboard.widget/get_data`) handles both tuple and dict cursor rows (prevents repeated 500s).
+- Hash-route action resolution now traverses nested menus before fallback route rendering.
+- Bus service defaults to longpolling in local dev to prevent repeated WebSocket handshake errors in browser console.
+
+---
+
 ## Phases 378-389 - Modularization + Backend Enrichment + l10n Wave 5 (2026-03-19)
 
 ### Pre-Deployment Steps

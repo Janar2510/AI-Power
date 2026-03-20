@@ -81,7 +81,12 @@ _SECURITY_HEADERS = [
     ("X-Content-Type-Options", "nosniff"),
     ("X-Frame-Options", "DENY"),
     ("Referrer-Policy", "strict-origin-when-cross-origin"),
-    ("Content-Security-Policy-Report-Only", "default-src 'self'"),
+    (
+        "Content-Security-Policy-Report-Only",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob:; "
+        "font-src 'self' https://cdn.jsdelivr.net;",
+    ),
     ("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob:; font-src 'self' https://cdn.jsdelivr.net;"),
 ]
 

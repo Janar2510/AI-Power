@@ -2,11 +2,18 @@
 
 Verification checklist for AI assistant module deployment and feature additions.
 
+## Web client / dashboard (1.178)
+
+- [ ] Home dashboard loads via `AppCore.Dashboard.render` + `design-system/specs/dashboard-home.md` tokens (no inline dashboard HTML in `main.js`)
+- [ ] `web.assets_web` includes `kpi_card`, `activity_feed`, `shortcuts_bar`, `recent_items`, `core/dashboard.js` before `main.js`
+
 ## Deployment
 
 - [ ] `ai_assistant` in `DEFAULT_SERVER_WIDE_MODULES` (core/tools/config.py)
 - [ ] `./erp-bin db init -d <db>` creates `ai_audit_log`, `ai_tool_definition`, `ai_prompt_template` tables
 - [ ] Routes: `GET /ai/tools`, `POST /ai/chat`, `GET /ai/config`, `POST /ai/nl_search`, `POST /ai/extract_fields` registered (core/http/application.py)
+- [ ] Runtime sanity after deploy: no 500s from `/web/dataset/call_kw` while dashboard/AI panel are open
+- [ ] Runtime sanity after deploy: `/ai/chat` and bus polling remain healthy after browser hard refresh
 
 ## Security
 

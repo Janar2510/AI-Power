@@ -9,13 +9,17 @@
     <link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
   </head>
   <body>
-    <div id="webclient">
+    <div id="webclient" class="o-app-shell">
+      <div id="o-sidebar-backdrop" class="o-sidebar-backdrop" hidden aria-hidden="true"></div>
+      <aside id="app-sidebar" class="o-app-sidebar" aria-label="Application menu"></aside>
+      <div class="o-app-main-column">
       <header id="navbar">
         <span class="logo">ERP Platform</span>
       </header>
       <main id="main">
         <div id="action-manager"></div>
       </main>
+      </div><!-- /.o-app-main-column -->
       <div id="toast-container"></div>
       <aside id="chat-panel" class="chat-panel-hidden" aria-label="AI Assistant">
         <div class="chat-panel-header">
@@ -46,7 +50,17 @@
       <button type="button" id="chat-toggle" class="chat-toggle-btn" aria-label="Open AI Assistant">AI</button>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js" crossorigin="anonymous"></script>
-    <script src="/web/static/src/session.js"></script>
+    <script src="/web/static/src/services/rpc.js"></script>
+    <script src="/web/static/src/services/session.js"></script>
+    <script src="/web/static/src/components/card.js"></script>
+    <script src="/web/static/src/components/button.js"></script>
+    <script src="/web/static/src/components/badge.js"></script>
+    <script src="/web/static/src/components/avatar.js"></script>
+    <script src="/web/static/src/components/kpi_card.js"></script>
+    <script src="/web/static/src/components/activity_feed.js"></script>
+    <script src="/web/static/src/components/shortcuts_bar.js"></script>
+    <script src="/web/static/src/components/recent_items.js"></script>
+    <script src="/web/static/src/core/dashboard.js"></script>
     <script src="/web/static/src/main.js"></script>
   </body>
 </html>

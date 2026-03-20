@@ -6,7 +6,7 @@
   let _channels = [];
   let _pollTimer = null;
   let _pollInterval = 30000;
-  let _useWebSocket = true;
+  let _useWebSocket = false;
   let _wsReconnectDelay = 1000;
   let _ws = null;
 
@@ -32,6 +32,18 @@
       credentials: 'include',
       body: JSON.stringify({ channels: _channels, last: _lastId })
     }).then(function (r) {
+      if (r.status === 403 && window.Services && window.Services.session && window.Services.session.refreshCsrfToken) {
+        return window.Services.session.refreshCsrfToken().then(function (token) {
+          if (!token) return r;
+          var retryHdrs = { 'Content-Type': 'application/json', 'X-CSRF-Token': token };
+          return fetch('/longpolling/poll', {
+            method: 'POST',
+            headers: retryHdrs,
+            credentials: 'include',
+            body: JSON.stringify({ channels: _channels, last: _lastId }),
+          });
+        });
+      }
       if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'Poll failed'); });
       return r.json();
     }).then(function (data) {
@@ -69,11 +81,10 @@
       };
       ws.onclose = function () {
         _ws = null;
-        _pollTimer = setTimeout(function () {
-          _useWebSocket = true;
-          tryWebSocket();
-        }, _wsReconnectDelay);
-        _wsReconnectDelay = Math.min(_wsReconnectDelay * 2, 30000);
+        // In local Werkzeug dev mode websocket upgrades return 426; stay on longpolling.
+        _useWebSocket = false;
+        if (_pollTimer) clearTimeout(_pollTimer);
+        poll();
       };
     } catch (e) {
       _useWebSocket = false;

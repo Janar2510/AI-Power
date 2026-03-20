@@ -42,7 +42,52 @@ class IrDashboardWidget(Model):
         env = getattr(self, "env", None)
         if not env:
             return []
-        recs_data = self.read(["id", "name", "model", "domain", "measure_field", "aggregate"])
+        cr = getattr(env, "cr", None)
+        if not cr:
+            return []
+        ids = list(getattr(self, "_ids", []) or [])
+        if ids:
+            cr.execute(
+                """
+                SELECT id, name, model, domain, measure_field, aggregate
+                FROM ir_dashboard_widget
+                WHERE id = ANY(%s)
+                ORDER BY sequence, id
+                """,
+                (ids,),
+            )
+        else:
+            cr.execute(
+                """
+                SELECT id, name, model, domain, measure_field, aggregate
+                FROM ir_dashboard_widget
+                ORDER BY sequence, id
+                """
+            )
+        recs_data = []
+        for row in cr.fetchall():
+            if isinstance(row, dict):
+                recs_data.append(
+                    {
+                        "id": row.get("id"),
+                        "name": row.get("name"),
+                        "model": row.get("model"),
+                        "domain": row.get("domain"),
+                        "measure_field": row.get("measure_field"),
+                        "aggregate": row.get("aggregate"),
+                    }
+                )
+            else:
+                recs_data.append(
+                    {
+                        "id": row[0],
+                        "name": row[1],
+                        "model": row[2],
+                        "domain": row[3],
+                        "measure_field": row[4],
+                        "aggregate": row[5],
+                    }
+                )
         result = []
         for r in recs_data:
             model_name = r.get("model")

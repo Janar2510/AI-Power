@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.178.1 - Collapsible sidebar navigation + app shell layout (2026-03-20)
+
+### Added
+- `webclient_templates.xml`: `o-app-shell`, `#app-sidebar`, `#o-sidebar-backdrop`, `o-app-main-column` wrapping header + main.
+
+### Changed
+- `main.js`: menus render as **categorized collapsible sections** in the sidebar (top-level = category, children = links); compact **top bar** (logo + user tools); desktop **collapse rail** (`erp_sidebar_collapsed` in `localStorage`); mobile **off-canvas** drawer + backdrop.
+- `webclient.css`: sidebar tokens, main content padding via `--space-*` / `--card-gap`, navbar density.
+- **`core/http/routes.py` `_webclient_html()`**: real app shell now includes `#app-sidebar` and `o-app-shell` (was hardcoded old layout; XML template alone was not served on `/`).
+
+---
+
+## 1.178.0 - Dashboard & home UI redesign (design spec + composable components) (2026-03-20)
+
+### Added
+- `design-system/specs/dashboard-home.md` — layout, KPI, activity, AI insights, shortcuts, recent, drawer spec.
+- `addons/web/static/src/components/kpi_card.js`, `activity_feed.js`, `shortcuts_bar.js`, `recent_items.js`.
+- Dashboard CSS: `.o-dashboard-grid`, KPI trends, activity timeline, AI skeleton/callout, drawer/backdrop, badge variants (`--color-warning-surface`, `--color-backdrop`).
+
+### Changed
+- `addons/web/static/src/core/dashboard.js`: full composable home renderer (RPC, layout persistence, components).
+- `addons/web/static/src/main.js`: `renderDashboard()` delegates to `AppCore.Dashboard.render`.
+- `design-system/MASTER.md`: Dashboard widget zones + spec link.
+- `.cursor/rules/agents/ui-designer.mdc`, `frontend-builder.mdc`: spec-first workflow, triggers, globs.
+- `addons/web/__manifest__.py` `web.assets_web`: component + dashboard scripts before `main.js`.
+- `addons/web/views/webclient_templates.xml`: load `rpc`, `session`, dashboard components, `core/dashboard.js` before `main.js`.
+
+---
+
+## 1.177.1 - Runtime stability fixpack: dashboard data + nested menu routing + bus transport fallback (2026-03-20)
+
+### Fixed
+- `addons/base/models/ir_dashboard.py`: hardened `get_data()` row mapping to support dict-style DB rows and avoid `KeyError: 0` 500s on `/web/dataset/call_kw`.
+- `addons/web/static/src/main.js`: made `getActionForRoute()` traverse nested menus so menu actions resolve to their intended route/model instead of falling back to dashboard.
+- `addons/bus/static/src/bus_service.js`: defaulted dev transport to longpolling to avoid repeated browser WebSocket bad-response noise under Werkzeug.
+
+---
+
 ## 1.177.0 - Phases 378-389: modularization + backend enrichment + l10n wave 5 (2026-03-19)
 
 ### Added

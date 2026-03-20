@@ -4,6 +4,8 @@
 (function () {
   const main = document.getElementById('action-manager');
   const navbar = document.getElementById('navbar');
+  const appShell = document.getElementById('webclient');
+  const appSidebar = document.getElementById('app-sidebar');
   if (!main) return;
 
   function showToast(message, type) {
@@ -140,9 +142,16 @@
   function getActionForRoute(route) {
     if (!viewsSvc) return null;
     const menus = viewsSvc.getMenus() || [];
-    for (let i = 0; i < menus.length; i++) {
-      const action = menus[i].action ? viewsSvc.getAction(menus[i].action) : null;
+    const stack = [].concat(menus);
+    while (stack.length) {
+      const menu = stack.shift();
+      if (!menu) continue;
+      const action = menu.action ? viewsSvc.getAction(menu.action) : null;
       if (action && actionToRoute(action) === route) return action;
+      const children = menu.children || menu.child_id || [];
+      if (Array.isArray(children) && children.length) {
+        for (let i = 0; i < children.length; i++) stack.push(children[i]);
+      }
     }
     return null;
   }
@@ -443,41 +452,188 @@
     return roots;
   }
 
+  function escNavHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  }
+
+  function sidebarAbbrev(name) {
+    var n = String(name || '').trim();
+    return n ? n.charAt(0).toUpperCase() : '\u2022';
+  }
+
+  function buildSidebarNavHtml(tree, staleInnerHtml) {
+    var html = '<div class="o-sidebar-inner"><div class="o-sidebar-scroll">';
+    if (staleInnerHtml) {
+      html += '<div class="o-sidebar-stale">' + staleInnerHtml + '</div>';
+    }
+    html += '<nav class="o-sidebar-nav" role="navigation">';
+    if (!tree || !tree.length) {
+      html += '<p class="o-sidebar-empty">No menu items.</p>';
+    } else {
+      tree.forEach(function (node) {
+        var m = node.menu;
+        var action = m.action && viewsSvc ? viewsSvc.getAction(m.action) : null;
+        var route = action ? actionToRoute(action) : menuToRoute(m);
+        var href = route ? '#' + route : '#';
+        var hasKids = node.children && node.children.length > 0;
+        var abbrev = escNavHtml(sidebarAbbrev(m.name));
+        if (hasKids) {
+          html += '<section class="o-sidebar-category" data-expanded="true">';
+          html += '<button type="button" class="o-sidebar-category-head" aria-expanded="true">';
+          html += '<span class="o-sidebar-chevron" aria-hidden="true">\u25bc</span>';
+          html += '<span class="o-sidebar-abbrev">' + abbrev + '</span>';
+          html += '<span class="o-sidebar-category-name">' + escNavHtml(m.name) + '</span>';
+          html += '</button>';
+          html += '<div class="o-sidebar-category-body">';
+          node.children.forEach(function (ch) {
+            var cm = ch.menu;
+            var caction = cm.action && viewsSvc ? viewsSvc.getAction(cm.action) : null;
+            var croute = caction ? actionToRoute(caction) : menuToRoute(cm);
+            var chref = croute ? '#' + croute : '#';
+            var ccls = croute ? 'o-sidebar-link' : 'o-sidebar-link o-sidebar-link-disabled';
+            html += '<a href="' + escNavHtml(chref) + '" class="' + ccls + '" data-menu-id="' + escNavHtml(cm.id || '') + '"><span class="o-sidebar-link-text">' + escNavHtml(cm.name) + '</span></a>';
+          });
+          html += '</div></section>';
+        } else {
+          var leafCls = route ? 'o-sidebar-link' : 'o-sidebar-link o-sidebar-link-disabled';
+          html += '<section class="o-sidebar-category o-sidebar-category--flat">';
+          html += '<a href="' + escNavHtml(href) + '" class="' + leafCls + '" data-menu-id="' + escNavHtml(m.id || '') + '">';
+          html += '<span class="o-sidebar-abbrev">' + abbrev + '</span>';
+          html += '<span class="o-sidebar-link-text">' + escNavHtml(m.name) + '</span></a></section>';
+        }
+      });
+    }
+    html += '</nav></div></div>';
+    return html;
+  }
+
+  function closeMobileSidebar() {
+    if (!appShell) return;
+    appShell.classList.remove('o-app-shell--sidebar-mobile-open');
+    var bd = document.getElementById('o-sidebar-backdrop');
+    if (bd) {
+      bd.hidden = true;
+      bd.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function wireSidebarAfterRender() {
+    if (!appSidebar || !appShell) return;
+    var sidebar = appSidebar;
+    var shell = appShell;
+    sidebar.querySelectorAll('.o-sidebar-category-head').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var sec = btn.closest('.o-sidebar-category');
+        if (!sec || sec.classList.contains('o-sidebar-category--flat')) return;
+        sec.classList.toggle('o-sidebar-category--folded');
+        var folded = sec.classList.contains('o-sidebar-category--folded');
+        btn.setAttribute('aria-expanded', folded ? 'false' : 'true');
+      });
+    });
+    sidebar.querySelectorAll('a.o-sidebar-link').forEach(function (a) {
+      a.addEventListener('click', function () {
+        if (window.innerWidth <= 1023) closeMobileSidebar();
+      });
+    });
+    var bd = document.getElementById('o-sidebar-backdrop');
+    if (bd) {
+      bd.addEventListener('click', closeMobileSidebar);
+    }
+    var deskToggle = navbar.querySelector('.nav-sidebar-toggle');
+    if (deskToggle) {
+      var collapsed = typeof localStorage !== 'undefined' && localStorage.getItem('erp_sidebar_collapsed') === '1';
+      if (collapsed) {
+        shell.classList.add('o-app-shell--sidebar-collapsed');
+        deskToggle.setAttribute('aria-expanded', 'false');
+        deskToggle.innerHTML = '&#9654;';
+        deskToggle.setAttribute('title', 'Expand menu');
+      }
+      deskToggle.addEventListener('click', function () {
+        shell.classList.toggle('o-app-shell--sidebar-collapsed');
+        var c = shell.classList.contains('o-app-shell--sidebar-collapsed');
+        if (typeof localStorage !== 'undefined') localStorage.setItem('erp_sidebar_collapsed', c ? '1' : '0');
+        deskToggle.setAttribute('aria-expanded', c ? 'false' : 'true');
+        deskToggle.innerHTML = c ? '&#9654;' : '&#9664;';
+        deskToggle.setAttribute('title', c ? 'Expand menu' : 'Collapse menu');
+      });
+    }
+    var ham = navbar.querySelector('.nav-hamburger');
+    if (ham) {
+      ham.addEventListener('click', function () {
+        if (window.innerWidth <= 1023) {
+          var open = !shell.classList.contains('o-app-shell--sidebar-mobile-open');
+          shell.classList.toggle('o-app-shell--sidebar-mobile-open', open);
+          if (bd) {
+            bd.hidden = !open;
+            bd.setAttribute('aria-hidden', open ? 'false' : 'true');
+          }
+        }
+      });
+    }
+    window.addEventListener('hashchange', function () {
+      if (window.innerWidth <= 1023) closeMobileSidebar();
+    });
+    if (!window._erpNavEscapeBound) {
+      window._erpNavEscapeBound = true;
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (appShell && appShell.classList.contains('o-app-shell--sidebar-mobile-open')) closeMobileSidebar();
+      });
+    }
+  }
+
   function renderNavbar(userCompanies, userLangs, currentLang) {
     if (!navbar) return;
     userLangs = userLangs || [];
     currentLang = currentLang || 'en_US';
-    let html = '<button type="button" class="nav-hamburger" aria-label="Toggle menu" style="display:none">&#9776;</button><span class="logo">ERP Platform</span><nav role="navigation" class="nav-menu" aria-label="Main navigation" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
     var menus = (viewsSvc && viewsSvc.getMenus()) ? viewsSvc.getMenus() : [];
+    var tree = menus.length ? buildMenuTree(menus) : [];
+    var useSidebar = !!appSidebar;
+    var staleBannerHtml = '';
     if (menus.length === 0) {
-      html += '<span class="nav-menu-stale-banner" style="padding:0.25rem 0.5rem;background:var(--color-warning, #f59e0b);color:#000;font-size:0.85rem;border-radius:4px">Navigation menus missing. Run: <code style="background:rgba(0,0,0,0.2);padding:0.1rem 0.3rem;border-radius:2px">erp-bin db upgrade -d ' + (window.Session && window.Session.db ? String(window.Session.db).replace(/</g, '&lt;') : 'erp') + '</code></span>';
+      staleBannerHtml = 'Navigation menus missing. Run: <code style="padding:var(--space-xs) var(--space-sm);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--color-text) 12%,transparent)">erp-bin db upgrade -d ' +
+        escNavHtml(window.Session && window.Session.db ? String(window.Session.db) : 'erp') + '</code>';
     }
-    if (menus.length) {
-      const tree = buildMenuTree(menus);
-      tree.forEach(function (node) {
-        const m = node.menu;
-        const action = m.action ? viewsSvc.getAction(m.action) : null;
-        const route = action ? actionToRoute(action) : menuToRoute(m);
-        const href = route ? '#' + route : '#';
-        const cls = 'nav-link' + (route ? '' : ' nav-link-disabled');
-        if (node.children.length) {
-          html += '<span class="nav-dropdown" style="position:relative;display:inline-block">';
-          html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
-          html += '<span class="nav-dropdown-content" style="display:none;position:absolute;top:100%;left:0;background:#1a1a2e;min-width:140px;padding:0.5rem 0;border-radius:4px;z-index:100">';
-          node.children.forEach(function (ch) {
-            const cm = ch.menu;
-            const caction = cm.action ? viewsSvc.getAction(cm.action) : null;
-            const croute = caction ? actionToRoute(caction) : menuToRoute(cm);
-            const chref = croute ? '#' + croute : '#';
-            html += '<a href="' + chref + '" class="nav-link" style="display:block;padding:0.5rem 1rem;white-space:nowrap" data-menu-id="' + (cm.id || '').replace(/"/g, '&quot;') + '">' + (cm.name || '').replace(/</g, '&lt;') + '</a>';
-          });
-          html += '</span></span>';
-        } else {
-          html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
-        }
-      });
+    var html = '';
+    if (useSidebar) {
+      html += '<button type="button" class="nav-hamburger" aria-label="Open menu">&#9776;</button>';
+      html += '<button type="button" class="nav-sidebar-toggle" aria-label="Collapse sidebar" title="Collapse menu" aria-expanded="true">&#9664;</button>';
+    } else {
+      html += '<button type="button" class="nav-hamburger" aria-label="Toggle menu" style="display:none">&#9776;</button>';
     }
-    html += '</nav><span class="nav-user" style="margin-left:auto;display:flex;align-items:center;gap:0.75rem">';
+    html += '<span class="nav-toolbar-left"><span class="logo">ERP Platform</span>';
+    if (!useSidebar) {
+      html += '<nav role="navigation" class="nav-menu" aria-label="Main navigation" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
+      if (staleBannerHtml) {
+        html += '<span class="nav-menu-stale-banner" style="padding:0.25rem 0.5rem;background:var(--color-warning);color:var(--color-text);font-size:0.85rem;border-radius:var(--radius-sm)">' + staleBannerHtml + '</span>';
+      }
+      if (menus.length) {
+        tree.forEach(function (node) {
+          const m = node.menu;
+          const action = m.action ? viewsSvc.getAction(m.action) : null;
+          const route = action ? actionToRoute(action) : menuToRoute(m);
+          const href = route ? '#' + route : '#';
+          const cls = 'nav-link' + (route ? '' : ' nav-link-disabled');
+          if (node.children.length) {
+            html += '<span class="nav-dropdown" style="position:relative;display:inline-block">';
+            html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
+            html += '<span class="nav-dropdown-content" style="display:none;position:absolute;top:100%;left:0;background:#1a1a2e;min-width:140px;padding:0.5rem 0;border-radius:4px;z-index:100">';
+            node.children.forEach(function (ch) {
+              const cm = ch.menu;
+              const caction = cm.action ? viewsSvc.getAction(cm.action) : null;
+              const croute = caction ? actionToRoute(caction) : menuToRoute(cm);
+              const chref = croute ? '#' + croute : '#';
+              html += '<a href="' + chref + '" class="nav-link" style="display:block;padding:0.5rem 1rem;white-space:nowrap" data-menu-id="' + (cm.id || '').replace(/"/g, '&quot;') + '">' + (cm.name || '').replace(/</g, '&lt;') + '</a>';
+            });
+            html += '</span></span>';
+          } else {
+            html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
+          }
+        });
+      }
+      html += '</nav>';
+    }
+    html += '</span><span class="nav-user" style="margin-left:auto;display:flex;align-items:center;gap:0.75rem">';
     if (userCompanies && userCompanies.allowed_companies && userCompanies.allowed_companies.length > 1) {
       const cur = userCompanies.current_company;
       html += '<span class="nav-dropdown company-switcher" style="position:relative;display:inline-block">';
@@ -516,9 +672,13 @@
     html += '<a href="/web/logout" class="nav-link">Logout</a>';
     html += '</span>';
     navbar.innerHTML = html;
+    if (appSidebar) {
+      appSidebar.innerHTML = buildSidebarNavHtml(tree, staleBannerHtml);
+      wireSidebarAfterRender();
+    }
     var hamburger = navbar.querySelector('.nav-hamburger');
     var navMenu = navbar.querySelector('.nav-menu');
-    if (hamburger && navMenu) {
+    if (hamburger && navMenu && !appSidebar) {
       function updateHamburgerVisibility() {
         hamburger.style.display = (window.innerWidth <= 768) ? 'flex' : 'none';
         if (window.innerWidth > 768) navMenu.classList.remove('nav-menu-open');
@@ -528,6 +688,13 @@
         navMenu.classList.toggle('nav-menu-open');
       };
       window.addEventListener('resize', updateHamburgerVisibility);
+    }
+    if (appSidebar && hamburger) {
+      function syncMobileHamburgerVisibility() {
+        hamburger.style.display = (window.innerWidth <= 1023) ? 'inline-flex' : 'none';
+      }
+      syncMobileHamburgerVisibility();
+      window.addEventListener('resize', syncMobileHamburgerVisibility);
     }
     navbar.querySelectorAll('.theme-toggle').forEach(function (btn) {
       btn.onclick = function () {
@@ -965,161 +1132,13 @@
     renderDashboard();
   }
 
-  var DEFAULT_DASHBOARD_LAYOUT = { widgets: ['kpis', 'activity', 'ai-insights', 'shortcuts', 'recent'] };
-
   function renderDashboard() {
     actionStack = [];
-    main.innerHTML = '<h2>Dashboard</h2><button type="button" id="dashboard-customize-btn" style="margin-left:var(--space-md);padding:var(--space-xs) var(--space-sm);font-size:0.85rem;background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer">Customize</button><div id="dashboard-customize-drawer" style="display:none;position:fixed;top:0;right:0;width:280px;height:100%;background:var(--bg-color, #fff);border-left:1px solid var(--border-color);z-index:1000;padding:var(--space-lg);box-shadow:-4px 0 12px rgba(0,0,0,0.1)"><h3 style="margin:0 0 var(--space-md)">Customize Dashboard</h3><div id="dashboard-widget-toggles"></div><button type="button" id="dashboard-reset-btn" style="margin-top:var(--space-md);padding:var(--space-sm);background:transparent;border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer">Reset to Default</button><button type="button" id="dashboard-customize-close" style="margin-left:var(--space-sm);padding:var(--space-sm);cursor:pointer">Close</button></div><div id="dashboard-kpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--space-md);margin:var(--space-lg) 0" data-widget="kpis"></div><div id="dashboard-activity" style="margin-top:var(--space-lg)" data-widget="activity"></div><div id="dashboard-ai-insights" style="margin-top:var(--space-lg)" data-widget="ai-insights"></div><div id="dashboard-shortcuts" style="margin-top:var(--space-lg)" data-widget="shortcuts"></div><div id="dashboard-recent" style="margin-top:var(--space-lg)" data-widget="recent"></div>';
-    rpc.callKw('ir.dashboard.widget', 'search_read', [[]], { fields: ['id', 'name', 'model', 'domain'], order: 'sequence' })
-      .then(function (widgets) {
-        if (!widgets || !widgets.length) return;
-        const ids = widgets.map(function (w) { return w.id; });
-        return rpc.callKw('ir.dashboard.widget', 'get_data', [ids], {}).then(function (data) {
-          const container = document.getElementById('dashboard-kpis');
-          if (!container) return;
-          let html = '';
-          const modelToRoute = { 'crm.lead': 'leads', 'res.partner': 'contacts', 'sale.order': 'orders', 'account.move': 'invoices', 'product.product': 'products', 'project.task': 'tasks' };
-          (data || []).forEach(function (d, i) {
-            const w = widgets[i];
-            const route = modelToRoute[w.model] || null;
-            const hasDomain = d.domain && Array.isArray(d.domain) && d.domain.length;
-            const href = route ? '#' + route + (hasDomain ? '?domain=' + encodeURIComponent(JSON.stringify(d.domain)) : '') : '#';
-            const val = typeof d.value === 'number' ? (d.value % 1 === 0 ? d.value : d.value.toFixed(1)) : d.value;
-            html += '<a href="' + href + '" class="o-card o-card-gradient" style="display:block;padding:var(--space-lg);border-radius:var(--radius-md);text-decoration:none;color:inherit;border:1px solid var(--border-color)">';
-            html += '<div style="font-size:1.75rem;font-weight:700">' + (val || '0') + '</div>';
-            html += '<div style="font-size:0.9rem;color:var(--text-muted)">' + (d.name || '').replace(/</g, '&lt;') + '</div></a>';
-          });
-          container.innerHTML = html;
-        });
-      })
-      .catch(function () {});
-    (function loadActivities() {
-      var uidPromise = (window.Services && window.Services.session) ? window.Services.session.getSessionInfo() : Promise.resolve({ uid: 1 });
-      uidPromise.then(function (info) {
-        var u = (info && info.uid) || 1;
-        return rpc.callKw('mail.activity', 'search_read', [[['user_id', '=', u]]], { fields: ['res_model', 'res_id', 'summary', 'date_deadline', 'state'], limit: 10 });
-      }).then(function (activities) {
-        const container = document.getElementById('dashboard-activity');
-        if (!container) return;
-        container.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">Upcoming Activities</h3>';
-        if (!activities || !activities.length) {
-          container.innerHTML += '<p style="color:var(--text-muted)">No upcoming activities.</p>';
-          return;
-        }
-        activities.forEach(function (a) {
-          container.innerHTML += '<div style="padding:var(--space-sm);border-bottom:1px solid var(--border-color)">' + (a.summary || 'Activity').replace(/</g, '&lt;') + ' &middot; ' + (a.date_deadline || '').replace(/</g, '&lt;') + '</div>';
-        });
-      }).catch(function () {
-        const c = document.getElementById('dashboard-activity');
-        if (c) c.innerHTML = '<h3>Upcoming Activities</h3><p style="color:var(--text-muted)">Could not load.</p>';
-      });
-    })();
-    (function loadAiInsights() {
-      var insightsEl = document.getElementById('dashboard-ai-insights');
-      if (!insightsEl) return;
-      insightsEl.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3><p style="color:var(--text-muted)">Loading...</p>';
-      var aiHdrs = { 'Content-Type': 'application/json' };
-      if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(aiHdrs, window.Services.session.getAuthHeaders());
-      Promise.all([
-        fetch('/ai/chat', { method: 'POST', credentials: 'include', headers: aiHdrs, body: JSON.stringify({ tool: 'analyze_data', kwargs: { model: 'crm.lead', measure: 'expected_revenue', groupby: 'stage_id', use_llm: true } }) }).then(function (r) { return r.json(); }),
-        fetch('/ai/chat', { method: 'POST', credentials: 'include', headers: aiHdrs, body: JSON.stringify({ tool: 'analyze_kpi', kwargs: { model: 'crm.lead', measure: 'expected_revenue', groupby: 'stage_id' } }) }).then(function (r) { return r.json(); }),
-        fetch('/ai/chat', { method: 'POST', credentials: 'include', headers: aiHdrs, body: JSON.stringify({ tool: 'forecast_metric', kwargs: { model: 'sale.order', measure: 'amount_total', periods_ahead: 4 } }) }).then(function (r) { return r.json(); })
-      ]).then(function (results) {
-        var analyzeRes = results[0];
-        var kpiRes = results[1];
-        var forecastRes = results[2];
-        var html = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3>';
-        if (!analyzeRes.error && analyzeRes.result) html += '<p style="margin:0 0 var(--space-sm);line-height:1.5">' + (analyzeRes.result || '').replace(/</g, '&lt;') + '</p>';
-        if (!kpiRes.error && kpiRes.result && kpiRes.result.anomalies && kpiRes.result.anomalies.length) {
-          html += '<div style="margin:var(--space-sm) 0;padding:var(--space-sm);background:rgba(255,200,0,0.15);border-radius:var(--radius-sm)"><strong>Anomaly alerts</strong>: ' + kpiRes.result.anomalies.length + ' metric(s) deviate from trend.</div>';
-        }
-        if (!forecastRes.error && forecastRes.result && forecastRes.result.forecast && forecastRes.result.forecast.length) {
-          html += '<div style="margin:var(--space-sm) 0;font-size:0.9em">Forecast (next 4 periods): ' + (forecastRes.result.forecast || []).slice(0, 4).join(', ') + '</div>';
-        }
-        if (!html.match(/<p |<div /)) html += '<p style="color:var(--text-muted)">No insights available.</p>';
-        insightsEl.innerHTML = html;
-      }).catch(function () { var el = document.getElementById('dashboard-ai-insights'); if (el) el.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">AI Insights</h3><p style="color:var(--text-muted)">Could not load.</p>'; });
-    })();
-    const shortcuts = document.getElementById('dashboard-shortcuts');
-    if (shortcuts) {
-      shortcuts.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">Quick Actions</h3><div style="display:flex;gap:var(--space-md);flex-wrap:wrap">';
-      shortcuts.innerHTML += '<a href="#leads/new" style="padding:var(--space-sm) var(--space-md);background:var(--color-primary);color:white;border-radius:var(--radius-sm);text-decoration:none">New Lead</a>';
-      shortcuts.innerHTML += '<a href="#contacts/new" style="padding:var(--space-sm) var(--space-md);background:var(--color-primary);color:white;border-radius:var(--radius-sm);text-decoration:none">New Contact</a>';
-      shortcuts.innerHTML += '</div>';
+    if (DashboardCore && typeof DashboardCore.render === 'function') {
+      DashboardCore.render(main, { rpc: rpc });
+      return;
     }
-    try {
-      const recent = JSON.parse(sessionStorage.getItem('erp_recent_items') || '[]');
-      const recentEl = document.getElementById('dashboard-recent');
-      if (recentEl && recent.length) {
-        recentEl.innerHTML = '<h3 style="margin:0 0 var(--space-sm)">Recent Items</h3><ul style="list-style:none;padding:0;margin:0">';
-        recent.slice(0, 5).forEach(function (r) {
-          const href = (r.route || '') + '/edit/' + (r.id || '');
-          recentEl.innerHTML += '<li style="padding:var(--space-xs) 0"><a href="#' + href + '" style="text-decoration:none;color:inherit">' + (r.name || 'Item').replace(/</g, '&lt;') + '</a></li>';
-        });
-        recentEl.innerHTML += '</ul>';
-      }
-    } catch (e) {}
-    (function setupDashboardCustomize() {
-      var uidPromise = (window.Services && window.Services.session) ? window.Services.session.getSessionInfo() : Promise.resolve({ uid: 1 });
-      uidPromise.then(function (info) {
-        var uid = (info && info.uid) || 1;
-        return rpc.callKw('ir.dashboard.layout', 'search_read', [[['user_id', '=', uid]]], { fields: ['id', 'layout_json'], limit: 1 }).then(function (rows) {
-          var layout = DEFAULT_DASHBOARD_LAYOUT;
-          if (rows && rows[0] && rows[0].layout_json) {
-            try { layout = JSON.parse(rows[0].layout_json); } catch (e) {}
-          }
-          var widgets = layout.widgets || DEFAULT_DASHBOARD_LAYOUT.widgets;
-          ['kpis', 'activity', 'ai-insights', 'shortcuts', 'recent'].forEach(function (w) {
-            var el = document.querySelector('[data-widget="' + w + '"]');
-            if (el) el.style.display = widgets.indexOf(w) >= 0 ? '' : 'none';
-          });
-          var drawer = document.getElementById('dashboard-customize-drawer');
-          var togglesEl = document.getElementById('dashboard-widget-toggles');
-          if (togglesEl) {
-            togglesEl.innerHTML = '';
-            ['kpis', 'activity', 'ai-insights', 'shortcuts', 'recent'].forEach(function (w) {
-              var label = w === 'kpis' ? 'KPIs' : w === 'ai-insights' ? 'AI Insights' : w.charAt(0).toUpperCase() + w.slice(1);
-              var checked = widgets.indexOf(w) >= 0;
-              togglesEl.innerHTML += '<label style="display:block;margin:var(--space-sm) 0"><input type="checkbox" data-widget="' + w + '" ' + (checked ? 'checked' : '') + ' /> ' + label + '</label>';
-            });
-          }
-          var customizeBtn = document.getElementById('dashboard-customize-btn');
-        var closeBtn = document.getElementById('dashboard-customize-close');
-        var resetBtn = document.getElementById('dashboard-reset-btn');
-        if (customizeBtn && drawer) customizeBtn.onclick = function () { drawer.style.display = 'block'; };
-        if (closeBtn && drawer) closeBtn.onclick = function () { drawer.style.display = 'none'; };
-        if (resetBtn) resetBtn.onclick = function () {
-          var layoutJson = JSON.stringify(DEFAULT_DASHBOARD_LAYOUT);
-          rpc.callKw('ir.dashboard.layout', 'search_read', [[['user_id', '=', uid]]], { fields: ['id'], limit: 1 }).then(function (rows) {
-            if (rows && rows[0]) {
-              return rpc.callKw('ir.dashboard.layout', 'write', [[rows[0].id], { layout_json: layoutJson }], {});
-            }
-            return rpc.callKw('ir.dashboard.layout', 'create', [{ user_id: uid, layout_json: layoutJson }], {});
-          }).then(function () { renderDashboard(); }).catch(function () {});
-        };
-        if (togglesEl) {
-          togglesEl.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
-            cb.onchange = function () {
-              var w = cb.getAttribute('data-widget');
-              var wlist = (layout.widgets || []).slice();
-              if (cb.checked) { if (wlist.indexOf(w) < 0) wlist.push(w); }
-              else { wlist = wlist.filter(function (x) { return x !== w; }); }
-              var layoutJson = JSON.stringify({ widgets: wlist });
-              rpc.callKw('ir.dashboard.layout', 'search_read', [[['user_id', '=', uid]]], { fields: ['id'], limit: 1 }).then(function (rows) {
-                if (rows && rows[0]) {
-                  return rpc.callKw('ir.dashboard.layout', 'write', [[rows[0].id], { layout_json: layoutJson }], {});
-                }
-                return rpc.callKw('ir.dashboard.layout', 'create', [{ user_id: uid, layout_json: layoutJson }], {});
-              }).then(function () {
-                var el = document.querySelector('[data-widget="' + w + '"]');
-                if (el) el.style.display = cb.checked ? '' : 'none';
-              }).catch(function () {});
-            };
-          });
-        }
-        });
-      }).catch(function () {});
-    })();
+    main.innerHTML = '<p class="o-dashboard-fallback">Dashboard module not loaded.</p>';
   }
 
   function renderSettings() {

@@ -4,10 +4,7 @@
 (function () {
   const rpc = {
     url: '/web/dataset/call_kw',
-    rpc(params) {
-      const headers = { 'Content-Type': 'application/json' };
-      const csrf = window.Services && window.Services.session && window.Services.session.getCsrfToken && window.Services.session.getCsrfToken();
-      if (csrf) headers['X-CSRF-Token'] = csrf;
+    _post(params, headers) {
       return fetch(this.url, {
         method: 'POST',
         headers: headers,
@@ -18,8 +15,26 @@
           params: params,
           id: Math.floor(Math.random() * 1e9)
         })
+      });
+    },
+    rpc(params) {
+      const headers = { 'Content-Type': 'application/json' };
+      const csrf = window.Services && window.Services.session && window.Services.session.getCsrfToken && window.Services.session.getCsrfToken();
+      if (csrf) headers['X-CSRF-Token'] = csrf;
+      return this._post(params, headers).then(r => {
+        if (r.status === 403 && window.Services && window.Services.session && window.Services.session.refreshCsrfToken) {
+          return window.Services.session.refreshCsrfToken().then(function (newToken) {
+            if (newToken) {
+              const retryHeaders = { 'Content-Type': 'application/json', 'X-CSRF-Token': newToken };
+              return rpc._post(params, retryHeaders);
+            }
+            return r;
+          });
+        }
+        return r;
       }).then(r => {
         if (r.status === 401) throw new Error('Session expired. Please log in again.');
+        if (r.status === 403) throw new Error('CSRF/session invalid. Please refresh login session.');
         return r.json();
       }).then(data => {
         if (data.error) throw new Error(data.error.message || 'RPC error');

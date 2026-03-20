@@ -4,8 +4,8 @@
 (function () {
   let _cached = null;
   const session = {
-    getSessionInfo() {
-      if (_cached) return Promise.resolve(_cached);
+    getSessionInfo(force) {
+      if (!force && _cached) return Promise.resolve(_cached);
       return fetch('/web/session/get_session_info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -18,6 +18,9 @@
         _cached = data;
         return data;
       });
+    },
+    refreshCsrfToken() {
+      return this.getSessionInfo(true).then(info => (info && info.csrf_token) ? info.csrf_token : null);
     },
     getCsrfToken() {
       return _cached && _cached.csrf_token ? _cached.csrf_token : null;

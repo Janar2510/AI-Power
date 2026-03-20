@@ -955,33 +955,56 @@ def _webclient_html(debug_assets: bool = False) -> str:
         css_tags = '<link rel="stylesheet" href="/web/assets/web.assets_web.css"/>'
         js_tags = '<script src="/web/assets/web.assets_web.js"></script>'
 
+    # Shell DOM must match addons/web/views/webclient_templates.xml (sidebar + main column).
+    # Login still redirects here; main.js fills #app-sidebar and replaces #navbar contents.
     return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>ERP Platform</title>
 {css_tags}
 <style>
-  body {{ margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }}
-  #webclient {{ min-height: 100vh; display: flex; flex-direction: column; }}
-  #navbar {{ background: #1a1a2e; color: white; padding: 0.75rem 1.5rem; display: flex; align-items: center; gap: 1rem; }}
-  #navbar a {{ color: white; margin-left: auto; }}
-  #main {{ flex: 1; padding: 1rem; }}
+  body {{ margin: 0; min-height: 100vh; }}
 </style>
 </head>
 <body>
-<div id="webclient">
-  <header id="navbar">
-    <span class="logo">ERP Platform</span>
-    <nav style="display:flex;gap:1rem;">
-      <a href="#home" data-view="home">Home</a>
-      <a href="#contacts" data-view="contacts">Contacts</a>
-    </nav>
-    <a href="/web/logout" style="margin-left:auto;">Logout</a>
-  </header>
-  <main id="main"><div id="action-manager">Loading...</div></main>
-  <div id="toast-container" style="position:fixed;top:1rem;right:1rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;pointer-events:none"></div>
+<div id="webclient" class="o-app-shell">
+  <div id="o-sidebar-backdrop" class="o-sidebar-backdrop" hidden aria-hidden="true"></div>
+  <aside id="app-sidebar" class="o-app-sidebar" aria-label="Application menu"></aside>
+  <div class="o-app-main-column">
+    <header id="navbar"><span class="logo">ERP Platform</span></header>
+    <main id="main"><div id="action-manager">Loading...</div></main>
+  </div>
+  <div id="toast-container"></div>
+  <aside id="chat-panel" class="chat-panel-hidden" aria-label="AI Assistant">
+    <div class="chat-panel-header">
+      <h3>AI Assistant</h3>
+      <button type="button" id="chat-new-conv" class="chat-new-conv-btn" title="New conversation">New</button>
+      <button type="button" id="chat-panel-close" class="chat-panel-close" aria-label="Close">&times;</button>
+    </div>
+    <div id="chat-messages" class="chat-messages"></div>
+    <div class="chat-input-area">
+      <div class="chat-tool-row">
+        <select id="chat-tool" class="chat-tool-select">
+          <option value="search_records">Search records</option>
+          <option value="summarise_recordset">Summarise records</option>
+          <option value="draft_message">Draft message</option>
+          <option value="create_activity">Create activity</option>
+          <option value="propose_workflow_step">Propose workflow step</option>
+        </select>
+        <select id="chat-model" class="chat-model-select">
+          <option value="res.partner">Contacts</option>
+          <option value="crm.lead">Leads</option>
+        </select>
+      </div>
+      <label id="chat-agent-row" class="chat-agent-row-hidden"><input type="checkbox" id="chat-agent-mode" /> Agent mode (multi-step)</label>
+      <input type="text" id="chat-query" class="chat-query-input" placeholder="Search term (optional) or record IDs for summarise" />
+      <button type="button" id="chat-send" class="chat-send-btn">Send</button>
+    </div>
+  </aside>
+  <button type="button" id="chat-toggle" class="chat-toggle-btn" aria-label="Open AI Assistant">AI</button>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js" crossorigin="anonymous"></script>
 {js_tags}
 </body>
 </html>"""

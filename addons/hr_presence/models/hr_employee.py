@@ -1,5 +1,7 @@
 """Presence tracking fields (Odoo hr_presence parity)."""
 
+from datetime import datetime, timedelta
+
 from core.orm import Model, fields
 
 
@@ -30,4 +32,18 @@ class HrEmployee(Model):
     )
 
     def _check_presence(self):
-        pass
+        now = datetime.utcnow()
+        last_seen = getattr(self, "write_date", None) or getattr(self, "create_date", None)
+        if last_seen and isinstance(last_seen, datetime):
+            delta = now - last_seen
+            if delta <= timedelta(hours=8):
+                self.hr_presence_state = "present"
+                self.hr_presence_state_display = "present"
+                return "present"
+        if getattr(self, "manually_set_present", False) or getattr(self, "manually_set_presence", False):
+            self.hr_presence_state = "present"
+            self.hr_presence_state_display = "present"
+            return "present"
+        self.hr_presence_state = "absent"
+        self.hr_presence_state_display = "absent"
+        return "absent"

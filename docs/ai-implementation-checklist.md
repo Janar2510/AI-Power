@@ -118,3 +118,26 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] **347-349** in `DEFAULT_SERVER_WIDE_MODULES`: `spreadsheet`, `spreadsheet_dashboard`, `spreadsheet_account`, `spreadsheet_dashboard_account`, `spreadsheet_crm`, `spreadsheet_dashboard_crm`, `cloud_storage`, `iot`
 - [ ] **350-353** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_generic_coa`, `l10n_us`, `l10n_uk`, `l10n_de`, `l10n_fr`
 - [x] Run: `python3.11 -m unittest tests.test_phase342_353 -v`
+
+## Phases 354-365 Rollout
+
+- [ ] **354-356** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_es`, `l10n_it`, `l10n_nl`, `l10n_be`, `l10n_ch`, `l10n_at`, `l10n_in`, `l10n_br`, `l10n_mx`, `l10n_au`, `l10n_ca`, `l10n_pl`, `l10n_se`, `l10n_no`, `l10n_dk`
+- [ ] **357-359** in `DEFAULT_SERVER_WIDE_MODULES`: `theme_default`, `theme_starter_1`, `theme_starter_2`, `theme_starter_3`, `theme_starter_4`
+- [ ] **360-365** frontend artifacts present: design system docs, components, layout, renderers, widgets, UI/UX agent rules
+- [ ] UI UX Pro Max workflow documented in `docs/QUICK_START_AGENTS.md`
+- [x] Run: `python3.11 -m unittest tests.test_phase354_365 -v`
+
+## Phases 366-377 Rollout
+
+- [ ] **366-368** widgets implemented in `addons/web/static/src/widgets`: `many2one_widget`, `many2many_widget`, `date_widget`, `monetary_widget`, `binary_widget`, `html_widget`
+- [ ] **369-370** components implemented in `addons/web/static/src/components`: `button`, `card`, `badge`, `avatar`, `modal`, `toast`
+- [ ] **371-373** layout/renderers implemented in `addons/web/static/src/layout` and `addons/web/static/src/views`: `navbar`, `sidebar`, `action_layout`, `calendar_renderer`, `gantt_renderer`
+- [ ] **374-377** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_ar`, `l10n_cl`, `l10n_co`, `l10n_pe`, `l10n_ec`, `l10n_ae`, `l10n_sa`, `l10n_eg`, `l10n_za`, `l10n_ke`, `l10n_cn`, `l10n_kr`, `l10n_tw`, `l10n_sg_full`, `l10n_th`, `l10n_cz`, `l10n_hu`, `l10n_ro`, `l10n_bg`, `l10n_pt`
+- [x] Run: `python3.11 -m unittest tests.test_phase366_377 -v`
+
+## Phases 378-389 Rollout
+
+- [ ] **378-381** extracted frontend core modules in `addons/web/static/src/core`: `router`, `view_manager`, `dashboard`, `settings`, `chatter`, `field_utils`
+- [ ] **382-385** backend stub methods enriched in `hr_presence`, `hr_holidays_homeworking`, `hr_work_entry_holidays`, `mail_template`, `res_lang`, `ir_model`, `mrp_product_expiry`, `base_geolocalize`
+- [ ] **386-389** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_bo`, `l10n_cr`, `l10n_uy`, `l10n_ve`, `l10n_ph`, `l10n_id`, `l10n_vn`, `l10n_pk`, `l10n_ng`, `l10n_ma`, `l10n_il`, `l10n_hr`, `l10n_rs`, `l10n_si`, `l10n_lu`, `l10n_lt`, `l10n_lv`, `l10n_ua`, `l10n_fi`, `l10n_gr`
+- [x] Run: `python3.11 -m unittest tests.test_phase378_389 -v`

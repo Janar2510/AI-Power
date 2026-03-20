@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.177.0 - Phases 378-389: modularization + backend enrichment + l10n wave 5 (2026-03-19)
+
+### Added
+- **p378-p381**: new frontend core modules under `addons/web/static/src/core/` (`router.js`, `view_manager.js`, `dashboard.js`, `settings.js`, `chatter.js`, `field_utils.js`)
+- **p386**: `l10n_bo`, `l10n_cr`, `l10n_uy`, `l10n_ve`, `l10n_ph`
+- **p387**: `l10n_id`, `l10n_vn`, `l10n_pk`, `l10n_ng`, `l10n_ma`
+- **p388**: `l10n_il`, `l10n_hr`, `l10n_rs`, `l10n_si`, `l10n_lu`
+- **p389**: `l10n_lt`, `l10n_lv`, `l10n_ua`, `l10n_fi`, `l10n_gr`
+- `tests/test_phase378_389.py`
+
+### Changed
+- **p382**: implemented HR presence/holidays logic in `hr_presence`, `hr_holidays_homeworking`, `hr_work_entry_holidays`.
+- **p383**: implemented Many2one recipient resolution in `addons/mail/models/mail_template.py`.
+- **p384**: enriched `res.lang` and `ir.model` metadata fields.
+- **p385**: implemented expiry sync/check helpers in `mrp_product_expiry` and deterministic geolocalization in `base_geolocalize`.
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all phase `386-389` modules.
+- **core/release.py**: `version_info = (1, 177, 0, ...)`.
+
+---
+
+## 1.165.0 - Phases 366-377: frontend implementation + l10n wave 4 (2026-03-19)
+
+### Added
+- **p374**: `l10n_ar`, `l10n_cl`, `l10n_co`, `l10n_pe`, `l10n_ec`
+- **p375**: `l10n_ae`, `l10n_sa`, `l10n_eg`, `l10n_za`, `l10n_ke`
+- **p376**: `l10n_cn`, `l10n_kr`, `l10n_tw`, `l10n_sg_full`, `l10n_th`
+- **p377**: `l10n_cz`, `l10n_hu`, `l10n_ro`, `l10n_bg`, `l10n_pt`
+- `tests/test_phase366_377.py`
+
+### Changed
+- **p366-p368**: widget implementations in `addons/web/static/src/widgets/` (`many2one`, `many2many`, `date`, `monetary`, `binary`, `html`)
+- **p369-p370**: DOM-based component implementations in `addons/web/static/src/components/` (`button`, `card`, `badge`, `avatar`, `modal`, `toast`)
+- **p371**: layout implementations in `addons/web/static/src/layout/` (`navbar`, `sidebar`, `action_layout`)
+- **p372-p373**: functional `calendar_renderer.js` and `gantt_renderer.js`
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all phase `374-377` modules.
+- **core/release.py**: `version_info = (1, 165, 0, ...)`.
+
+---
+
+## 1.153.0 - Phases 354-365: deferred wave 3 + UI/UX agent track (l10n expansion, themes, frontend modernization) (2026-03-19)
+
+### Added
+- **p354**: `l10n_es`, `l10n_it`, `l10n_nl`, `l10n_be`, `l10n_ch`
+- **p355**: `l10n_at`, `l10n_in`, `l10n_br`, `l10n_mx`, `l10n_au`
+- **p356**: `l10n_ca`, `l10n_pl`, `l10n_se`, `l10n_no`, `l10n_dk`
+- **p357**: `theme_default` (`website.theme` + `website.theme_id`)
+- **p358-p359**: `theme_starter_1`, `theme_starter_2`, `theme_starter_3`, `theme_starter_4`
+- **p360**: `design-system/MASTER.md`, `docs/design-system.md`
+- **p361**: component stubs in `addons/web/static/src/components/`
+- **p362**: layout stubs in `addons/web/static/src/layout/`
+- **p363**: `calendar_renderer.js`, `gantt_renderer.js`
+- **p364**: widget stubs in `addons/web/static/src/widgets/`
+- **p365**: dashboard/portal style tokens in `webclient.css`
+- UI/UX agent rules: `.cursor/rules/agents/ui-designer.mdc`, `.cursor/rules/agents/frontend-builder.mdc`
+- `tests/test_phase354_365.py`
+
+### Changed
+- **core/tools/config.py**: `DEFAULT_SERVER_WIDE_MODULES` extended with all phase `354-359` modules.
+- **core/release.py**: `version_info = (1, 153, 0, ...)`.
+- **docs/QUICK_START_AGENTS.md**: added UI UX Pro Max skill integration workflow.
+
+---
+
 ## 1.142.0 - Phases 342-353: deferred wave 2 (payments, POS payment bridges, Google/MS, spreadsheet, cloud/iot, starter l10n) (2026-03-19)
 
 ### Added

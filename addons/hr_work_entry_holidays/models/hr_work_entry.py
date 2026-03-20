@@ -13,7 +13,11 @@ class HrWorkEntry(Model):
         return super().write(vals)
 
     def _reset_conflicting_state(self):
-        pass
+        state = getattr(self, "leave_state", None)
+        if state not in {"validate", "validate1", "approved"}:
+            return False
+        self.state = "cancelled"
+        return True
 
     def action_approve_leave(self):
         return True

@@ -25,6 +25,12 @@
 
   const rpc = window.Services && window.Services.rpc ? window.Services.rpc : (window.Session || { callKw: () => Promise.reject(new Error('RPC not loaded')) });
   const viewsSvc = window.Services && window.Services.views ? window.Services.views : null;
+  const RouterCore = window.AppCore && window.AppCore.Router ? window.AppCore.Router : null;
+  const ViewManagerCore = window.AppCore && window.AppCore.ViewManager ? window.AppCore.ViewManager : null;
+  const DashboardCore = window.AppCore && window.AppCore.Dashboard ? window.AppCore.Dashboard : null;
+  const SettingsCore = window.AppCore && window.AppCore.Settings ? window.AppCore.Settings : null;
+  const ChatterCore = window.AppCore && window.AppCore.Chatter ? window.AppCore.Chatter : null;
+  const FieldUtilsCore = window.AppCore && window.AppCore.FieldUtils ? window.AppCore.FieldUtils : null;
 
   var actionStack = [];
   var formDirty = false;

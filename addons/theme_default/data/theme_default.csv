@@ -1,0 +1,2 @@
+id,name,description,primary_color,active
+theme_default_record,Default Theme,Default ERP web theme,var(--color-primary),1

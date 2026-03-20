@@ -61,8 +61,18 @@ class MailTemplate(Model):
         if self.email_to:
             field_val = record_dict.get(self.email_to)
             if isinstance(field_val, (list, tuple)) and len(field_val) >= 2:
-                # Many2one - need to fetch email from related
-                pass
+                rel_id = field_val[0]
+                rel_name = str(field_val[1] or "")
+                if rel_id:
+                    if self.email_to == "partner_id":
+                        Partner = env.get("res.partner")
+                        if Partner:
+                            pr = Partner.browse([rel_id]).read(["email", "email_formatted"])
+                            if pr:
+                                email_to = str(pr[0].get("email") or pr[0].get("email_formatted") or "").strip()
+                    elif "." in self.email_to:
+                        # Support partner_id.email style notation when value was flattened.
+                        email_to = rel_name.strip()
             elif field_val:
                 email_to = str(field_val).strip()
             if not email_to and self.email_to and "partner_id" in record_dict:

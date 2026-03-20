@@ -1,5 +1,83 @@
 # Deployment Checklist
 
+## Phases 378-389 - Modularization + Backend Enrichment + l10n Wave 5 (2026-03-19)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase378_389 -v`
+- [ ] Run schema init/upgrade on target DB for new localization modules.
+
+### Frontend modularization (378-381)
+- New extraction modules in `addons/web/static/src/core/`: `router.js`, `view_manager.js`, `dashboard.js`, `settings.js`, `chatter.js`, `field_utils.js`.
+- `main.js` wired to core module availability for incremental extraction.
+
+### Backend enrichment (382-385)
+- HR presence/holidays stub methods implemented.
+- Mail template Many2one recipient resolution implemented.
+- `res.lang` i18n metadata fields and `ir.model` metadata relation fields added.
+- MRP expiry helpers and base geolocalization logic implemented.
+
+### New modules (386-389)
+- `l10n_bo`, `l10n_cr`, `l10n_uy`, `l10n_ve`, `l10n_ph`
+- `l10n_id`, `l10n_vn`, `l10n_pk`, `l10n_ng`, `l10n_ma`
+- `l10n_il`, `l10n_hr`, `l10n_rs`, `l10n_si`, `l10n_lu`
+- `l10n_lt`, `l10n_lv`, `l10n_ua`, `l10n_fi`, `l10n_gr`
+
+### Config / release
+- [ ] `core/tools/config.py`: phase `386-389` entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.177.0`
+
+---
+
+## Phases 366-377 - Frontend Implementation + l10n Wave 4 (2026-03-19)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase366_377 -v`
+- [ ] Run schema init/upgrade on target DB for new l10n models.
+
+### Frontend implementation (366-373)
+- `addons/web/static/src/widgets/`: many2one, many2many, date, monetary, binary, html widgets implemented.
+- `addons/web/static/src/components/`: button, card, badge, avatar, modal, toast implemented as DOM components.
+- `addons/web/static/src/layout/`: navbar, sidebar, action layout implemented.
+- `addons/web/static/src/views/calendar_renderer.js`, `gantt_renderer.js` implemented with mode/scale support.
+
+### New modules (374-377)
+- `l10n_ar`, `l10n_cl`, `l10n_co`, `l10n_pe`, `l10n_ec`
+- `l10n_ae`, `l10n_sa`, `l10n_eg`, `l10n_za`, `l10n_ke`
+- `l10n_cn`, `l10n_kr`, `l10n_tw`, `l10n_sg_full`, `l10n_th`
+- `l10n_cz`, `l10n_hu`, `l10n_ro`, `l10n_bg`, `l10n_pt`
+
+### Config / release
+- [ ] `core/tools/config.py`: phase `374-377` entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.165.0`
+
+---
+
+## Phases 354-365 - Deferred Wave 3 + UI/UX Agent Track (2026-03-19)
+
+### Pre-Deployment Steps
+- [x] Run tests: `python3.11 -m unittest tests.test_phase354_365 -v`
+- [ ] Run schema init/upgrade on target DB for new l10n/theme models.
+
+### New modules (354-359)
+- `l10n_es`, `l10n_it`, `l10n_nl`, `l10n_be`, `l10n_ch`
+- `l10n_at`, `l10n_in`, `l10n_br`, `l10n_mx`, `l10n_au`
+- `l10n_ca`, `l10n_pl`, `l10n_se`, `l10n_no`, `l10n_dk`
+- `theme_default`, `theme_starter_1`, `theme_starter_2`, `theme_starter_3`, `theme_starter_4`
+
+### UI/UX track artifacts (360-365)
+- `design-system/MASTER.md`, `docs/design-system.md`
+- `addons/web/static/src/components/` (button/card/badge/avatar/modal/toast)
+- `addons/web/static/src/layout/` (navbar/sidebar/action layout)
+- `addons/web/static/src/views/calendar_renderer.js`, `gantt_renderer.js`
+- `addons/web/static/src/widgets/` widget stubs
+- `.cursor/rules/agents/ui-designer.mdc`, `.cursor/rules/agents/frontend-builder.mdc`
+
+### Config / release
+- [ ] `core/tools/config.py`: phase `354-359` entries present in `DEFAULT_SERVER_WIDE_MODULES`
+- [ ] `core/release.py`: `1.153.0`
+
+---
+
 ## Phases 342-353 - Deferred Categories Wave 2 (payments, POS payment bridges, Google/MS, spreadsheet, cloud/iot, starter l10n) (2026-03-19)
 
 ### Pre-Deployment Steps

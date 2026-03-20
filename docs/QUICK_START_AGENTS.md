@@ -13,6 +13,26 @@ This ERP Platform uses a structured multi-agent AI workflow. Each AI agent has a
 | **Security Reviewer** | `agents/security-reviewer.mdc` | "Review the new auth module", "Check access rules" |
 | **Context Specialist** | `agents/context-specialist.mdc` | "Where is model X defined?", "How does field Y work?" |
 | **Docs Writer** | `agents/docs-writer.mdc` | "Update changelog", "Document Phase 246" |
+| **UI/UX Designer** | `agents/ui-designer.mdc` | "Design system for ERP dashboard", "Create component spec" |
+| **Frontend Builder** | `agents/frontend-builder.mdc` | "Implement UI component", "Build responsive layout" |
+
+## UI UX Pro Max Skill Integration
+
+The UI/UX Designer and Frontend Builder personas use the external skill:
+- `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill`
+
+### Install
+
+```bash
+npm install -g uipro-cli
+uipro init --ai cursor
+```
+
+### Usage in Team Flow
+
+1. UI/UX Designer runs the design system generator and updates `design-system/MASTER.md`.
+2. Frontend Builder implements UI from that spec using CSS custom properties and component patterns.
+3. Both agents follow accessibility and responsive checks from UI UX Pro Max guidance.
 
 ## Standard Development Loop
 
@@ -56,9 +76,9 @@ These files are always read by agents before acting:
 | `docs/architecture.md` | System design |
 | `docs/ai-rules.md` | Coding rules |
 | `docs/parity_matrix.md` | Odoo 19 parity status |
-| `changelog.md` | All changes (Phase 1–245) |
+| `changelog.md` | All changes (Phase 1–389) |
 | `DeploymentChecklist.md` | Deployment notes |
-| `core/release.py` | Current version (v1.89.0) |
+| `core/release.py` | Current version (v1.177.0) |
 
 ## Quality Gates
 
@@ -72,10 +92,10 @@ Every feature must pass before merge:
 
 ## Current Status
 
-- **Version**: v1.89.0
-- **Completed Phases**: 1–245
-- **Next Focus**: Phase 246+ (see docs/parity_matrix.md for gaps)
-- **Modules**: 51 addons, 94+ test files
+- **Version**: v1.177.0
+- **Completed Phases**: 1–389
+- **Next Focus**: Wave 6+ deferred items (payment providers, theme editor UI, JSON-2 API, mobile layer)
+- **Modules**: 391 addons, 100+ test files
 
 ## File Structure Reference
 
@@ -90,10 +110,10 @@ erp-platform/
 │           ├── security-reviewer.mdc
 │           ├── context-specialist.mdc
 │           └── docs-writer.mdc
-├── addons/          ← 51 business modules
+├── addons/          ← 391 business modules
 ├── core/            ← ORM, DB, tools
 ├── docs/            ← Architecture, rules, parity
-├── tests/           ← 103+ test files
+├── tests/           ← 100+ test files
 ├── changelog.md
 └── DeploymentChecklist.md
 ```

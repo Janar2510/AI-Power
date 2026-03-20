@@ -7,6 +7,7 @@
   --color-primary: #1a1a2e;
   --color-success: #2e7d32;
   --color-danger: #c62828;
+  --color-on-danger: #ffffff;
   --color-warning: #f9a825;
   --text-muted: #666;
   --border-color: #ddd;
@@ -47,6 +48,7 @@
   --color-primary: #4a9eff;
   --color-success: #4caf50;
   --color-danger: #f44336;
+  --color-on-danger: #ffffff;
   --color-warning: #ff9800;
   --text-muted: #9e9e9e;
   --border-color: #333;
@@ -1457,6 +1459,282 @@ body {
     background: var(--color-bg);
     z-index: 1;
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* —— Settings (design tokens only) —— */
+.o-settings-shell {
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.o-settings-intro {
+  margin: 0 0 var(--space-md);
+  color: var(--text-muted);
+}
+
+.o-settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.o-settings-card.o-card {
+  margin: 0;
+}
+
+.o-settings-nav-link {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  text-decoration: none;
+  margin: 0;
+}
+
+.o-settings-subpage {
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.o-settings-subpage--wide {
+  max-width: 45rem;
+}
+
+.o-settings-subpage--wide .o-settings-table-wrap--wide {
+  max-width: none;
+}
+
+.o-settings-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: var(--space-sm);
+}
+
+.o-settings-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.o-settings-table th {
+  text-align: left;
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.o-settings-table td {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: middle;
+}
+
+.o-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.o-settings-field--toggle {
+  margin-bottom: var(--space-md);
+}
+
+.o-settings-field-label {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.o-settings-input,
+.o-settings-select {
+  width: 100%;
+  max-width: 20rem;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.o-settings-input:focus-visible,
+.o-settings-select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.o-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.o-settings-toggle-label {
+  font-size: 0.95rem;
+}
+
+.o-settings-password {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-sm);
+  max-width: 22rem;
+}
+
+.o-settings-password .o-settings-input {
+  flex: 1 1 12rem;
+  max-width: none;
+}
+
+.o-settings-password-toggle {
+  min-height: auto;
+  padding: var(--space-sm) var(--space-md);
+  flex-shrink: 0;
+}
+
+.o-settings-mail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
+
+.o-settings-mail-row {
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+
+.o-settings-mail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.o-settings-mail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.o-settings-actions-top {
+  margin-top: var(--space-sm);
+}
+
+.o-settings-add-dashed {
+  margin-top: var(--space-lg);
+  border-style: dashed;
+  color: var(--text-muted);
+  background: var(--bg-card);
+}
+
+.o-settings-btn-inline {
+  min-height: auto;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: 0.85rem;
+  margin-right: var(--space-xs);
+}
+
+.o-settings-desc {
+  margin: 0 0 var(--space-md);
+  color: var(--text-muted);
+}
+
+.o-settings-loading {
+  color: var(--text-muted);
+}
+
+.o-settings-muted {
+  color: var(--text-muted);
+}
+
+.o-settings-error {
+  color: var(--color-danger);
+}
+
+.o-settings-success-msg {
+  color: var(--color-success);
+  margin-bottom: var(--space-md);
+}
+
+.o-settings-hint {
+  margin-top: var(--space-md);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.o-settings-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.o-settings-inline-actions .o-settings-input {
+  min-width: 11rem;
+  max-width: 18rem;
+}
+
+.o-settings-link-danger {
+  font-size: 0.9rem;
+  color: var(--color-danger);
+}
+
+.o-settings-totp-box {
+  padding: var(--space-lg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  max-width: 25rem;
+}
+
+.o-settings-totp-setup {
+  margin-top: var(--space-lg);
+}
+
+.o-settings-totp-manual {
+  margin-top: var(--space-md);
+}
+
+.o-settings-input-totp {
+  max-width: 7rem;
+}
+
+.o-settings-fallback {
+  color: var(--text-muted);
+}
+
+.o-btn-danger-outline {
+  background: transparent;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.o-btn-danger-outline:hover {
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface-2));
+}
+
+.o-btn-danger-solid {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+  border-color: var(--color-danger);
+}
+
+.o-btn-danger-solid:hover {
+  filter: brightness(1.05);
+}
+
+@media (max-width: 768px) {
+  .o-settings-mail-grid {
+    grid-template-columns: 1fr;
   }
 }
 

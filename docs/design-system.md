@@ -7,6 +7,10 @@
 ## Components
 - Button, Card, Badge, Avatar, Modal, Toast
 - **Dashboard / home:** `KpiCard`, `ActivityFeed`, `ShortcutsBar`, `RecentItems` (`addons/web/static/src/components/`); orchestration in `addons/web/static/src/core/dashboard.js`.
+- **Settings:** `SettingsField`, `SettingsTable`, `SettingsSection` (`addons/web/static/src/components/`); orchestration in `addons/web/static/src/core/settings.js` (`AppCore.Settings`).
+
+## Settings spec
+- Authoritative UI contract: [`design-system/specs/settings.md`](../design-system/specs/settings.md) (shell, gradient section cards, `.o-settings-table`, toggles, password field, sub-pages + breadcrumbs).
 
 ## Dashboard spec
 - Authoritative UI contract: [`design-system/specs/dashboard-home.md`](../design-system/specs/dashboard-home.md) (grid, `--card-gap`, gradient KPI cards, drawer, a11y).

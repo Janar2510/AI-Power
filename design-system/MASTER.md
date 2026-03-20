@@ -15,6 +15,21 @@ Generated with UI UX Pro Max guidance for enterprise ERP frontend consistency.
 - Use spacing system (`--space-*`) and `--card-gap`
 - Keep gradient border animation on primary cards
 
+## Settings
+
+Full layout, fields, tables, and sub-pages: [specs/settings.md](specs/settings.md).
+
+### Surfaces → tokens / classes
+
+| Surface | Classes / components |
+|---------|----------------------|
+| Index shell | `.o-settings-shell`, `.o-settings-stack`, `gap: var(--card-gap)` |
+| Section blocks | `UIComponents.SettingsSection` → `.o-settings-card`, `.o-card-gradient` |
+| Nav to sub-pages | `.o-settings-nav-link` + `.o-btn-secondary` |
+| Sub-page body | `.o-settings-subpage`, breadcrumbs `.o-settings-breadcrumbs` |
+| Fields | `.o-settings-field`, `.o-settings-input`, `.o-settings-toggle`, `.o-settings-password` |
+| Tables | `.o-settings-table` via `UIComponents.SettingsTable` |
+
 ## Dashboard (home)
 
 Full layout and component contracts: [specs/dashboard-home.md](specs/dashboard-home.md).

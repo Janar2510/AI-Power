@@ -1143,413 +1143,62 @@
 
   function renderSettings() {
     actionStack = [{ label: 'Settings', hash: 'settings' }];
-    main.innerHTML = '<h2>Settings</h2><p style="margin-bottom:var(--space-lg)">Manage your account and preferences.</p>';
-    main.innerHTML += '<div style="display:flex;flex-direction:column;gap:var(--space-md);max-width:480px">';
-    main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">General</h3><div id="settings-company"></div></div>';
-    main.innerHTML += '<a href="#settings/users" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Users</a>';
-    main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">System Parameters</h3><div id="settings-params"></div></div>';
-    main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">AI Configuration</h3><div id="settings-ai"></div></div>';
-    main.innerHTML += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm)"><h3 style="margin:0 0 var(--space-sm)">Outgoing Mail Servers</h3><div id="settings-mail-servers"></div></div>';
-    main.innerHTML += '<a href="#settings/dashboard-widgets" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Dashboard Widgets</a>';
-    main.innerHTML += '<a href="#settings/apikeys" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">API Keys</a>';
-    main.innerHTML += '<a href="#settings/approval_rules" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Approval Rules</a>';
-    main.innerHTML += '<a href="#settings/approval_requests" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Approval Requests</a>';
-    main.innerHTML += '<a href="#settings/totp" style="display:block;padding:var(--space-md) var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);text-decoration:none;color:inherit">Two-Factor Authentication</a>';
-    main.innerHTML += '</div>';
-    rpc.callKw('res.company', 'search_read', [[]], { fields: ['id', 'name'], limit: 1 })
-      .then(function (rows) {
-        const company = rows && rows[0];
-        const container = document.getElementById('settings-company');
-        if (!container) return;
-        if (!company) {
-          container.innerHTML = '<p style="color:var(--text-muted)">No company record.</p>';
-          return;
-        }
-        container.innerHTML = '<label style="display:block;margin-bottom:var(--space-xs)">Company name</label>';
-        container.innerHTML += '<input type="text" id="settings-company-name" value="' + (company.name || '').replace(/"/g, '&quot;') + '" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);width:100%;max-width:280px">';
-        container.innerHTML += '<button type="button" id="btn-save-company" style="margin-top:var(--space-sm);padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Save</button>';
-        const btn = document.getElementById('btn-save-company');
-        const inp = document.getElementById('settings-company-name');
-        if (btn && inp) {
-          btn.onclick = function () {
-            btn.disabled = true;
-            rpc.callKw('res.company', 'write', [[company.id], { name: inp.value.trim() }], {})
-              .then(function () { btn.disabled = false; showToast('Company saved', 'success'); })
-              .catch(function (err) { btn.disabled = false; showToast(err.message || 'Failed to save', 'error'); });
-          };
-        }
-      })
-      .catch(function () {
-        const c = document.getElementById('settings-company');
-        if (c) c.innerHTML = '<p style="color:var(--text-muted)">Could not load company.</p>';
+    if (SettingsCore && typeof SettingsCore.renderIndex === 'function') {
+      SettingsCore.renderIndex(main, {
+        rpc: rpc,
+        showToast: showToast,
+        reloadIndex: function () { renderSettings(); },
       });
-    rpc.callKw('ir.config_parameter', 'search_read', [[]], { fields: ['id', 'key', 'value'], limit: 50 })
-      .then(function (params) {
-        const container = document.getElementById('settings-params');
-        if (!container) return;
-        if (!params || !params.length) {
-          container.innerHTML = '<p style="color:var(--text-muted)">No parameters.</p>';
-          return;
-        }
-        let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Key</th><th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Value</th></tr></thead><tbody>';
-        params.forEach(function (p) {
-          tbl += '<tr data-id="' + (p.id || '') + '"><td style="padding:var(--space-sm);border-bottom:1px solid #eee">' + (p.key || '').replace(/</g, '&lt;') + '</td>';
-          tbl += '<td style="padding:var(--space-sm);border-bottom:1px solid #eee"><input type="text" class="param-value" data-key="' + (p.key || '').replace(/"/g, '&quot;') + '" value="' + (p.value || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"></td></tr>';
-        });
-        tbl += '</tbody></table>';
-        container.innerHTML = tbl;
-        container.querySelectorAll('.param-value').forEach(function (inp) {
-          inp.onblur = function () {
-            const key = inp.getAttribute('data-key');
-            if (!key) return;
-            rpc.callKw('ir.config_parameter', 'set_param', [key, inp.value], {})
-              .then(function () { showToast('Parameter saved', 'success'); })
-              .catch(function (err) { showToast(err.message || 'Failed to save', 'error'); });
-          };
-        });
-      })
-      .catch(function () {
-        const c = document.getElementById('settings-params');
-        if (c) c.innerHTML = '<p style="color:var(--text-muted)">Could not load parameters.</p>';
-      });
-    rpc.callKw('ir.config_parameter', 'search_read', [[['key', 'in', ['ai.openai_api_key', 'ai.llm_enabled', 'ai.llm_model']]]], { fields: ['key', 'value'] })
-      .then(function (params) {
-        const container = document.getElementById('settings-ai');
-        if (!container) return;
-        const byKey = {};
-        (params || []).forEach(function (p) { byKey[p.key] = (p.value || '').trim(); });
-        const apiKey = byKey['ai.openai_api_key'] || '';
-        const llmEnabled = (byKey['ai.llm_enabled'] || '0') === '1';
-        const llmModel = byKey['ai.llm_model'] || 'gpt-4o-mini';
-        let html = '<label style="display:block;margin-bottom:var(--space-xs)">OpenAI API Key</label>';
-        html += '<input type="password" id="ai-api-key" placeholder="sk-..." value="' + apiKey.replace(/"/g, '&quot;') + '" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);width:100%;max-width:320px;margin-bottom:var(--space-md)">';
-        html += '<label style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-md);cursor:pointer">';
-        html += '<input type="checkbox" id="ai-llm-enabled" ' + (llmEnabled ? 'checked' : '') + '> Enable LLM (conversational AI)';
-        html += '</label>';
-        html += '<label style="display:block;margin-bottom:var(--space-xs)">Model</label>';
-        html += '<select id="ai-llm-model" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);margin-bottom:var(--space-md)">';
-        html += '<option value="gpt-4o-mini"' + (llmModel === 'gpt-4o-mini' ? ' selected' : '') + '>gpt-4o-mini</option>';
-        html += '<option value="gpt-4o"' + (llmModel === 'gpt-4o' ? ' selected' : '') + '>gpt-4o</option>';
-        html += '<option value="gpt-4-turbo"' + (llmModel === 'gpt-4-turbo' ? ' selected' : '') + '>gpt-4-turbo</option>';
-        html += '</select>';
-        html += '<button type="button" id="btn-save-ai" style="padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Save</button>';
-        container.innerHTML = html;
-        const btn = document.getElementById('btn-save-ai');
-        if (btn) {
-          btn.onclick = function () {
-            const keyInp = document.getElementById('ai-api-key');
-            const enabledInp = document.getElementById('ai-llm-enabled');
-            const modelInp = document.getElementById('ai-llm-model');
-            if (!keyInp || !enabledInp || !modelInp) return;
-            btn.disabled = true;
-            Promise.all([
-              rpc.callKw('ir.config_parameter', 'set_param', ['ai.openai_api_key', keyInp.value], {}),
-              rpc.callKw('ir.config_parameter', 'set_param', ['ai.llm_enabled', enabledInp.checked ? '1' : '0'], {}),
-              rpc.callKw('ir.config_parameter', 'set_param', ['ai.llm_model', modelInp.value], {})
-            ]).then(function () { btn.disabled = false; showToast('AI configuration saved', 'success'); })
-              .catch(function (err) { btn.disabled = false; showToast(err.message || 'Failed to save', 'error'); });
-          };
-        }
-      })
-      .catch(function () {
-        const c = document.getElementById('settings-ai');
-        if (c) c.innerHTML = '<p style="color:var(--text-muted)">Could not load AI configuration.</p>';
-      });
-    rpc.callKw('ir.mail_server', 'search_read', [[]], { fields: ['id', 'name', 'smtp_host', 'smtp_port', 'smtp_user', 'smtp_encryption'], order: 'sequence' })
-      .then(function (servers) {
-        const container = document.getElementById('settings-mail-servers');
-        if (!container) return;
-        let html = '<div style="display:flex;flex-direction:column;gap:var(--space-md)">';
-        (servers || []).forEach(function (s) {
-          html += '<div class="mail-server-row" data-id="' + (s.id || '') + '" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-card)">';
-          html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-sm);margin-bottom:var(--space-sm)">';
-          html += '<div><label style="font-size:0.85rem;color:var(--text-muted)">Host</label><input type="text" class="mail-host" value="' + (s.smtp_host || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"></div>';
-          html += '<div><label style="font-size:0.85rem;color:var(--text-muted)">Port</label><input type="number" class="mail-port" value="' + (s.smtp_port || 25) + '" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"></div>';
-          html += '<div><label style="font-size:0.85rem;color:var(--text-muted)">User</label><input type="text" class="mail-user" value="' + (s.smtp_user || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"></div>';
-          html += '<div><label style="font-size:0.85rem;color:var(--text-muted)">Encryption</label><select class="mail-enc" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"><option value="none"' + ((s.smtp_encryption || 'none') === 'none' ? ' selected' : '') + '>None</option><option value="starttls"' + ((s.smtp_encryption || '') === 'starttls' ? ' selected' : '') + '>TLS (STARTTLS)</option><option value="ssl"' + ((s.smtp_encryption || '') === 'ssl' ? ' selected' : '') + '>SSL/TLS</option></select></div>';
-          html += '</div>';
-          html += '<div style="display:flex;gap:var(--space-sm)">';
-          html += '<button type="button" class="btn-mail-save" style="padding:0.25rem 0.75rem;background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.9rem">Save</button>';
-          html += '<button type="button" class="btn-mail-test" style="padding:0.25rem 0.75rem;background:var(--bg-card);color:var(--text);border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer;font-size:0.9rem">Test Connection</button>';
-          html += '</div></div>';
-        });
-        html += '<button type="button" id="btn-add-mail-server" style="padding:var(--space-sm) var(--space-md);background:var(--bg-card);border:1px dashed var(--border-color);border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted)">+ Add Mail Server</button>';
-        html += '</div>';
-        container.innerHTML = html;
-        container.querySelectorAll('.mail-server-row').forEach(function (row) {
-          const id = parseInt(row.getAttribute('data-id'), 10);
-          const saveBtn = row.querySelector('.btn-mail-save');
-          const testBtn = row.querySelector('.btn-mail-test');
-          if (saveBtn) {
-            saveBtn.onclick = function () {
-              const host = row.querySelector('.mail-host').value.trim();
-              const port = parseInt(row.querySelector('.mail-port').value, 10) || 25;
-              const user = row.querySelector('.mail-user').value.trim();
-              const enc = row.querySelector('.mail-enc').value;
-              rpc.callKw('ir.mail_server', 'write', [[id], { smtp_host: host, smtp_port: port, smtp_user: user || false, smtp_encryption: enc }], {})
-                .then(function () { showToast('Mail server saved', 'success'); })
-                .catch(function (err) { showToast(err.message || 'Failed', 'error'); });
-            };
-          }
-          if (testBtn) {
-            testBtn.onclick = function () {
-              testBtn.disabled = true;
-              rpc.callKw('ir.mail_server', 'test_smtp_connection', [[id]], {})
-                .then(function (res) {
-                  testBtn.disabled = false;
-                  showToast(res.success ? res.message : res.message, res.success ? 'success' : 'error');
-                })
-                .catch(function (err) { testBtn.disabled = false; showToast(err.message || 'Test failed', 'error'); });
-            };
-          }
-        });
-        const addBtn = document.getElementById('btn-add-mail-server');
-        if (addBtn) {
-          addBtn.onclick = function () {
-            rpc.callKw('ir.mail_server', 'create', [{ name: 'New SMTP Server', smtp_host: 'smtp.example.com', smtp_port: 587 }], {})
-              .then(function () { renderSettings(); })
-              .catch(function (err) { showToast(err.message || 'Failed to create', 'error'); });
-          };
-        }
-      })
-      .catch(function () {
-        const c = document.getElementById('settings-mail-servers');
-        if (c) c.innerHTML = '<p style="color:var(--text-muted)">Could not load mail servers.</p>';
-      });
+      return;
+    }
+    main.innerHTML = '<p class="o-settings-fallback">Settings module not loaded.</p>';
   }
 
   function renderDashboardWidgets() {
     actionStack = [{ label: 'Settings', hash: 'settings' }, { label: 'Dashboard Widgets', hash: 'settings/dashboard-widgets' }];
-    main.innerHTML = renderBreadcrumbs() + '<h2>Dashboard Widgets</h2><p>Loading...</p>';
-    rpc.callKw('ir.dashboard.widget', 'search_read', [[]], { fields: ['id', 'name', 'model', 'domain', 'measure_field', 'aggregate', 'sequence'], order: 'sequence' })
-      .then(function (widgets) {
-        let html = '<h2>Dashboard Widgets</h2><p style="margin-bottom:var(--space-lg)">Configure KPI cards shown on the home dashboard.</p>';
-        html += '<table style="width:100%;border-collapse:collapse;max-width:720px"><thead><tr>';
-        html += '<th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Name</th>';
-        html += '<th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Model</th>';
-        html += '<th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Domain</th>';
-        html += '<th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Sequence</th>';
-        html += '<th style="text-align:left;padding:var(--space-sm);border-bottom:1px solid var(--border-color)">Actions</th></tr></thead><tbody>';
-        (widgets || []).forEach(function (w) {
-          html += '<tr data-id="' + (w.id || '') + '">';
-          html += '<td style="padding:var(--space-sm);border-bottom:1px solid var(--border-color)"><input type="text" class="widget-name" value="' + (w.name || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"></td>';
-          html += '<td style="padding:var(--space-sm);border-bottom:1px solid var(--border-color)"><input type="text" class="widget-model" value="' + (w.model || '').replace(/"/g, '&quot;') + '" style="width:100%;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)" placeholder="crm.lead"></td>';
-          html += '<td style="padding:var(--space-sm);border-bottom:1px solid var(--border-color)"><input type="text" class="widget-domain" value="' + (w.domain || '').replace(/"/g, '&quot;') + '" style="width:100%;min-width:120px;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)" placeholder="[]"></td>';
-          html += '<td style="padding:var(--space-sm);border-bottom:1px solid var(--border-color)"><input type="number" class="widget-sequence" value="' + (w.sequence || 10) + '" style="width:60px;padding:0.25rem;border:1px solid var(--border-color);border-radius:var(--radius-sm)"></td>';
-          html += '<td style="padding:var(--space-sm);border-bottom:1px solid var(--border-color)"><button type="button" class="btn-widget-save" style="padding:0.25rem 0.5rem;font-size:0.85rem;background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;margin-right:0.25rem">Save</button><button type="button" class="btn-widget-delete" style="padding:0.25rem 0.5rem;font-size:0.85rem;background:transparent;color:#c00;border:1px solid #c00;border-radius:var(--radius-sm);cursor:pointer">Delete</button></td>';
-          html += '</tr>';
-        });
-        html += '</tbody></table>';
-        html += '<button type="button" id="btn-add-widget" style="margin-top:var(--space-lg);padding:var(--space-sm) var(--space-md);background:var(--bg-card);border:1px dashed var(--border-color);border-radius:var(--radius-sm);cursor:pointer;color:var(--text-muted)">+ Add Widget</button>';
-        main.innerHTML = html;
-        main.querySelectorAll('.btn-widget-save').forEach(function (btn) {
-          const row = btn.closest('tr');
-          if (!row) return;
-          const id = parseInt(row.getAttribute('data-id'), 10);
-          btn.onclick = function () {
-            const name = row.querySelector('.widget-name').value.trim();
-            const model = row.querySelector('.widget-model').value.trim();
-            const domain = row.querySelector('.widget-domain').value.trim();
-            const seq = parseInt(row.querySelector('.widget-sequence').value, 10) || 10;
-            btn.disabled = true;
-            rpc.callKw('ir.dashboard.widget', 'write', [[id], { name: name || 'Widget', model: model || 'crm.lead', domain: domain || '[]', sequence: seq }], {})
-              .then(function () { btn.disabled = false; showToast('Widget saved', 'success'); })
-              .catch(function (err) { btn.disabled = false; showToast(err.message || 'Failed', 'error'); });
-          };
-        });
-        main.querySelectorAll('.btn-widget-delete').forEach(function (btn) {
-          const row = btn.closest('tr');
-          if (!row) return;
-          const id = parseInt(row.getAttribute('data-id'), 10);
-          btn.onclick = function () {
-            if (!confirm('Delete this widget?')) return;
-            rpc.callKw('ir.dashboard.widget', 'unlink', [[id]], {})
-              .then(function () { renderDashboardWidgets(); showToast('Widget deleted', 'success'); })
-              .catch(function (err) { showToast(err.message || 'Failed', 'error'); });
-          };
-        });
-        const addBtn = document.getElementById('btn-add-widget');
-        if (addBtn) {
-          addBtn.onclick = function () {
-            rpc.callKw('ir.dashboard.widget', 'create', [{ name: 'New Widget', model: 'crm.lead', domain: '[]', sequence: 99 }], {})
-              .then(function () { renderDashboardWidgets(); showToast('Widget created', 'success'); })
-              .catch(function (err) { showToast(err.message || 'Failed to create', 'error'); });
-          };
-        }
-      })
-      .catch(function (err) {
-        const msg = (err && err.message) ? String(err.message) : 'Unknown error';
-        const dbHint = 'erp';
-        main.innerHTML = '<h2>Dashboard Widgets</h2><p class="error" style="color:#c00">Could not load widgets: ' + msg.replace(/</g, '&lt;') + '</p><p style="margin-top:var(--space-md);font-size:0.9rem;color:#666">If the table does not exist, run: <code>./erp-bin db init -d ' + dbHint + '</code></p><button type="button" id="btn-retry-widgets" style="margin-top:var(--space-md);padding:0.5rem 1rem;background:var(--color-primary,#1a1a2e);color:white;border:none;border-radius:4px;cursor:pointer">Retry</button>';
-        const retryBtn = document.getElementById('btn-retry-widgets');
-        if (retryBtn) retryBtn.onclick = function () { renderDashboardWidgets(); };
+    if (SettingsCore && typeof SettingsCore.renderDashboardWidgets === 'function') {
+      SettingsCore.renderDashboardWidgets(main, {
+        rpc: rpc,
+        showToast: showToast,
+        breadcrumbsHtml: renderBreadcrumbs(),
+        reloadDashboardWidgets: function () { renderDashboardWidgets(); },
       });
+      attachBreadcrumbHandlers();
+      return;
+    }
+    main.innerHTML = renderBreadcrumbs() + '<p class="o-settings-fallback">Settings module not loaded.</p>';
+    attachBreadcrumbHandlers();
   }
 
   function renderApiKeysSettings() {
     actionStack = [{ label: 'Settings', hash: 'settings' }, { label: 'API Keys', hash: 'settings/apikeys' }];
-    main.innerHTML = renderBreadcrumbs() + '<h2>API Keys</h2><p>Loading...</p>';
-    const sessionSvc = window.Services && window.Services.session;
-    if (!sessionSvc) {
-      main.innerHTML = '<h2>API Keys</h2><p class="error">Session not available.</p>';
+    if (SettingsCore && typeof SettingsCore.renderApiKeys === 'function') {
+      SettingsCore.renderApiKeys(main, {
+        rpc: rpc,
+        showToast: showToast,
+        breadcrumbsHtml: renderBreadcrumbs(),
+        reloadApiKeys: function () { renderApiKeysSettings(); },
+      });
+      attachBreadcrumbHandlers();
       return;
     }
-    sessionSvc.getSessionInfo().then(function (info) {
-      if (!info || !info.uid) {
-        main.innerHTML = '<h2>API Keys</h2><p class="error">Not logged in.</p>';
-        return;
-      }
-      rpc.callKw('res.users.apikeys', 'search_read', [[['user_id', '=', info.uid]]], { fields: ['id', 'name'] })
-        .then(function (keys) {
-          let html = '<h2>API Keys</h2>';
-          html += '<p style="margin-bottom:1rem">Use API keys to authenticate with the JSON-2 API. Use <code>Authorization: Bearer &lt;key&gt;</code>.</p>';
-          html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">';
-          html += '<input type="text" id="apikey-name" placeholder="Key name (e.g. My App)" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:180px">';
-          html += '<button type="button" id="btn-generate" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Generate</button>';
-          html += '</p>';
-          if (!keys || !keys.length) {
-            html += '<p>No API keys yet. Generate one above.</p>';
-          } else {
-            html += '<table style="width:100%;border-collapse:collapse"><thead><tr>';
-            html += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd">Name</th>';
-            html += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd">Actions</th></tr></thead><tbody>';
-            keys.forEach(function (k) {
-              html += '<tr data-id="' + (k.id || '') + '"><td style="padding:0.5rem;border-bottom:1px solid #eee">' + (k.name || 'API Key').replace(/</g, '&lt;') + '</td>';
-              html += '<td style="padding:0.5rem;border-bottom:1px solid #eee"><a href="#" class="btn-revoke" data-id="' + (k.id || '') + '" style="font-size:0.9rem;color:#c00">Revoke</a></td></tr>';
-            });
-            html += '</tbody></table>';
-          }
-          main.innerHTML = html;
-          const btn = document.getElementById('btn-generate');
-          const nameInput = document.getElementById('apikey-name');
-          if (btn && nameInput) {
-            btn.onclick = function () {
-              const name = (nameInput.value || 'API Key').trim();
-              btn.disabled = true;
-              rpc.callKw('res.users.apikeys', 'generate', [info.uid, name])
-                .then(function (rawKey) {
-                  btn.disabled = false;
-                  if (typeof navigator.clipboard !== 'undefined' && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(rawKey).then(function () {
-                      showToast('API key generated and copied to clipboard.', 'success');
-                    }).catch(function () { showToast('API key generated. Copy it now - it will not be shown again.', 'warning'); });
-                  } else {
-                    showToast('API key generated. Copy it now - it will not be shown again.', 'warning');
-                  }
-                  renderApiKeysSettings();
-                })
-                .catch(function (err) {
-                  btn.disabled = false;
-                  showToast(err.message || 'Failed to generate key', 'error');
-                });
-            };
-          }
-          main.querySelectorAll('.btn-revoke').forEach(function (el) {
-            el.onclick = function (e) {
-              e.preventDefault();
-              var id = parseInt(el.getAttribute('data-id'), 10);
-              if (!confirm('Revoke this API key? It will stop working immediately.')) return;
-              rpc.callKw('res.users.apikeys', 'revoke', [[id]])
-                .then(function () { renderApiKeysSettings(); })
-                .catch(function (err) { showToast(err.message || 'Failed to revoke', 'error'); });
-            };
-          });
-        })
-        .catch(function (err) {
-          main.innerHTML = '<h2>API Keys</h2><p class="error">' + (err.message || 'Failed to load keys') + '</p>';
-        });
-    });
+    main.innerHTML = renderBreadcrumbs() + '<p class="o-settings-fallback">Settings module not loaded.</p>';
+    attachBreadcrumbHandlers();
   }
 
   function renderTotpSettings() {
     actionStack = [{ label: 'Settings', hash: 'settings' }, { label: 'Two-Factor Authentication', hash: 'settings/totp' }];
-    main.innerHTML = renderBreadcrumbs() + '<h2>Two-Factor Authentication</h2><p>Loading...</p>';
-    fetch('/web/totp/status', { credentials: 'include' })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        const enabled = data && data.enabled;
-        let html = '<h2>Two-Factor Authentication</h2><p style="margin-bottom:var(--space-lg)">Add an extra layer of security with TOTP (authenticator app).</p>';
-        html += '<div class="settings-section" style="padding:var(--space-lg);border:1px solid var(--border-color);border-radius:var(--radius-sm);max-width:400px">';
-        if (enabled) {
-          html += '<p style="color:var(--color-success,#080);margin-bottom:var(--space-md)">2FA is enabled.</p>';
-          html += '<button type="button" id="btn-totp-disable" style="padding:var(--space-sm) var(--space-lg);background:#c00;color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Disable 2FA</button>';
-        } else {
-          html += '<p style="margin-bottom:var(--space-md)">2FA is not enabled.</p>';
-          html += '<button type="button" id="btn-totp-begin" style="padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Enable 2FA</button>';
-          html += '<div id="totp-setup-area" style="display:none;margin-top:var(--space-lg)">';
-          html += '<p>Scan the QR code with your authenticator app.</p>';
-          html += '<div id="totp-qr"></div>';
-          html += '<p style="margin-top:var(--space-md)">Or enter this secret manually: <code id="totp-secret"></code></p>';
-          html += '<label style="display:block;margin-top:var(--space-md)">Enter the 6-digit code to confirm:</label>';
-          html += '<input type="text" id="totp-code" placeholder="000000" maxlength="6" pattern="[0-9]{6}" style="padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);width:100px;margin-top:var(--space-xs)">';
-          html += '<button type="button" id="btn-totp-confirm" style="display:block;margin-top:var(--space-sm);padding:var(--space-sm) var(--space-lg);background:var(--color-primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer">Confirm</button>';
-          html += '</div>';
-        }
-        html += '</div>';
-        main.innerHTML = renderBreadcrumbs() + html;
-        const btnBegin = document.getElementById('btn-totp-begin');
-        const btnDisable = document.getElementById('btn-totp-disable');
-        const btnConfirm = document.getElementById('btn-totp-confirm');
-        if (btnBegin) {
-          btnBegin.onclick = function () {
-            btnBegin.disabled = true;
-            var totpHdrs = { 'Content-Type': 'application/json' };
-            if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(totpHdrs, window.Services.session.getAuthHeaders());
-            fetch('/web/totp/begin_setup', { method: 'POST', credentials: 'include', headers: totpHdrs, body: '{}' })
-              .then(function (r) { return r.json(); })
-              .then(function (d) {
-                btnBegin.disabled = false;
-                if (d.error) { showToast(d.error, 'error'); return; }
-                document.getElementById('totp-setup-area').style.display = 'block';
-                document.getElementById('totp-secret').textContent = d.secret || '';
-                const qrDiv = document.getElementById('totp-qr');
-                if (d.provision_uri && typeof QRCode !== 'undefined') {
-                  qrDiv.innerHTML = '';
-                  new QRCode(qrDiv, { text: d.provision_uri, width: 180, height: 180 });
-                } else if (d.provision_uri) {
-                  qrDiv.innerHTML = '<a href="' + d.provision_uri.replace(/"/g, '&quot;') + '" target="_blank">Open in authenticator</a>';
-                }
-              })
-              .catch(function (err) { btnBegin.disabled = false; showToast(err.message || 'Failed', 'error'); });
-          };
-        }
-        if (btnConfirm) {
-          btnConfirm.onclick = function () {
-            const code = (document.getElementById('totp-code').value || '').trim();
-            if (!code || code.length !== 6) { showToast('Enter 6-digit code', 'error'); return; }
-            btnConfirm.disabled = true;
-            var totpConfirmHdrs = { 'Content-Type': 'application/json' };
-            if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(totpConfirmHdrs, window.Services.session.getAuthHeaders());
-            fetch('/web/totp/confirm_setup', { method: 'POST', credentials: 'include', headers: totpConfirmHdrs, body: JSON.stringify({ code: code }) })
-              .then(function (r) { return r.json(); })
-              .then(function (d) {
-                btnConfirm.disabled = false;
-                if (d.error) { showToast(d.error, 'error'); return; }
-                showToast('2FA enabled', 'success');
-                renderTotpSettings();
-              })
-              .catch(function (err) { btnConfirm.disabled = false; showToast(err.message || 'Failed', 'error'); });
-          };
-        }
-        if (btnDisable) {
-          btnDisable.onclick = function () {
-            if (!confirm('Disable two-factor authentication? Your account will be less secure.')) return;
-            var totpDisableHdrs = { 'Content-Type': 'application/json' };
-            if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(totpDisableHdrs, window.Services.session.getAuthHeaders());
-            fetch('/web/totp/disable', { method: 'POST', credentials: 'include', headers: totpDisableHdrs, body: '{}' })
-              .then(function (r) { return r.json(); })
-              .then(function (d) {
-                if (d.error) { showToast(d.error, 'error'); return; }
-                showToast('2FA disabled', 'success');
-                renderTotpSettings();
-              })
-              .catch(function (err) { showToast(err.message || 'Failed', 'error'); });
-          };
-        }
-      })
-      .catch(function () {
-        main.innerHTML = renderBreadcrumbs() + '<h2>Two-Factor Authentication</h2><p class="error">Failed to load status.</p>';
+    if (SettingsCore && typeof SettingsCore.renderTotp === 'function') {
+      SettingsCore.renderTotp(main, {
+        showToast: showToast,
+        breadcrumbsHtml: renderBreadcrumbs(),
+        reloadTotp: function () { renderTotpSettings(); },
       });
+      attachBreadcrumbHandlers();
+      return;
+    }
+    main.innerHTML = renderBreadcrumbs() + '<p class="o-settings-fallback">Settings module not loaded.</p>';
+    attachBreadcrumbHandlers();
   }
 
   function getDisplayNames(model, colName, records) {

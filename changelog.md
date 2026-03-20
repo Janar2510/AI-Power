@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.179.0 - Settings page componentization (2026-03-20)
+
+### Added
+- `design-system/specs/settings.md` — settings index, sub-pages, fields, tables, responsive/a11y.
+- `addons/web/static/src/components/settings_field.js`, `settings_table.js`, `settings_section.js` — composable settings UI primitives (`UIComponents.SettingsField`, `SettingsTable`, `SettingsSection`).
+- `addons/web/static/src/core/settings.js` — `renderIndex`, `renderDashboardWidgets`, `renderApiKeys`, `renderTotp` (DOM + design tokens; same RPC/TOTP behaviour as before).
+- Settings CSS block in `webclient.css`: `.o-settings-shell`, `.o-settings-card`, `.o-settings-field`, `.o-settings-table`, `.o-settings-toggle`, `.o-settings-password`, `.o-btn-danger-outline`, `.o-btn-danger-solid`, `--color-on-danger`.
+
+### Changed
+- `addons/web/static/src/main.js`: `renderSettings`, `renderDashboardWidgets`, `renderApiKeysSettings`, `renderTotpSettings` delegate to `AppCore.Settings` with `showToast` / reload / breadcrumbs callbacks.
+- `design-system/MASTER.md`: Settings section + spec link.
+- `addons/web/__manifest__.py` & `webclient_templates.xml`: load settings components and `core/settings.js` before `dashboard.js` / `main.js`.
+
+---
+
 ## 1.178.1 - Collapsible sidebar navigation + app shell layout (2026-03-20)
 
 ### Added

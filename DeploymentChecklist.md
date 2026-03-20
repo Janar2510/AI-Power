@@ -1,5 +1,16 @@
 # Deployment Checklist
 
+## Settings page componentization (2026-03-20)
+
+### Pre-Deployment
+- [ ] Hard-refresh browser after deploy (`settings_field.js`, `settings_table.js`, `settings_section.js`, `core/settings.js` before `main.js`).
+- [ ] Smoke: Settings index (company, params, AI, mail), Dashboard Widgets CRUD, API Keys generate/revoke, TOTP enable/disable (QR script already on layout).
+
+### Release
+- [ ] `core/release.py`: `1.179.0`
+
+---
+
 ## Collapsible sidebar navigation (2026-03-20)
 
 ### Pre-Deployment

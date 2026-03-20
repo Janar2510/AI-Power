@@ -60,6 +60,10 @@
     <script src="/web/static/src/components/activity_feed.js"></script>
     <script src="/web/static/src/components/shortcuts_bar.js"></script>
     <script src="/web/static/src/components/recent_items.js"></script>
+    <script src="/web/static/src/components/settings_field.js"></script>
+    <script src="/web/static/src/components/settings_table.js"></script>
+    <script src="/web/static/src/components/settings_section.js"></script>
+    <script src="/web/static/src/core/settings.js"></script>
     <script src="/web/static/src/core/dashboard.js"></script>
     <script src="/web/static/src/main.js"></script>
   </body>

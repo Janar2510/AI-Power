@@ -2,6 +2,7 @@
 
 **Surface:** `#home` / default route (`renderHome` → dashboard).  
 **Implements:** B2B ERP home; executive, data-dense (per [MASTER.md](../MASTER.md)).
+**Inherits:** [foundations.md](./foundations.md) and [app-shell.md](./app-shell.md).
 
 ---
 
@@ -23,6 +24,7 @@
 - **Component:** `UIComponents.KpiCard(options)`.
 - **Structure:** Outer `a.o-kpi-card-link` (navigation) wrapping `UIComponents.Card({ gradient: true, content: … })`.
 - **Typography:** Value `.o-kpi-card-value` — large, semibold; label `.o-kpi-card-label` — `color: var(--text-muted)`; font sizes via relative `rem` in CSS only.
+- **Material cue:** KPI cards are one of the few surfaces allowed to use stronger raised depth and signature edge treatment.
 - **Trend:** Optional. If `trend > 0` → `.o-kpi-trend-up` + arrow/text "up"; if `trend < 0` → `.o-kpi-trend-down`; else `.o-kpi-trend-neutral` (muted).
 - **Interaction:** `:focus-visible` on link; hover elevates shadow via `.o-card:hover` on inner card.
 - **A11y:** `aria-label` on link including metric name and value.
@@ -88,6 +90,7 @@ Align with [webclient.css](../../addons/web/static/src/scss/webclient.css): **10
 ## Dark mode
 
 All new surfaces use existing `:root` / `[data-theme="dark"]` tokens only.
+Dashboard panels should feel like illuminated instruments on top of the darker work plane, not flat cards on a generic dark background.
 
 ---
 

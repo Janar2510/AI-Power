@@ -4,6 +4,14 @@
 
 The web client is a metadata-driven framework that renders UI from declarative view definitions. It targets Odoo-like parity for action-first navigation, view architecture, and control panel behaviour.
 
+The active product direction is defined by the Foundry One brand system and the design system specs. Frontend work must preserve parity-oriented architecture while following the shell-first, light/dark-safe, class-and-token-based UI model documented in:
+
+- `docs/brand-system.md`
+- `docs/frontend-design-rules.md`
+- `design-system/MASTER.md`
+- `design-system/specs/foundations.md`
+- `design-system/specs/app-shell.md`
+
 ## UI/UX Rules
 
 ### Action-First Navigation
@@ -21,6 +29,12 @@ The web client is a metadata-driven framework that renders UI from declarative v
 
 - Centralise search, filters, grouping, favourites, context actions
 - Consistent surface across list/form/kanban views
+
+### Shell-First Design
+
+- Sidebar, navbar, breadcrumbs, search, notifications, systray, and AI entry points are part of one app-shell contract
+- View specs inherit from the foundations and app-shell specs rather than styling each surface in isolation
+- Light and dark mode parity is required from the token layer upward
 
 ## Component Model
 
@@ -40,6 +54,13 @@ The web client is a metadata-driven framework that renders UI from declarative v
 - **Theming**: SCSS variables; bundle inheritance (before/after/replace/remove)
 - **Responsive**: Breakpoints; table collapse, form stack, kanban scale
 
+## Styling Guardrails
+
+- New visual styling should be class-based and token-driven
+- Do not add new inline visual `style=` assignments when a shared class or surface recipe can own the styling
+- New UI work must support both light and dark mode before it is considered complete
+- Shared elements should use the minimum element inventory from `design-system/specs/foundations.md`
+
 ## Testing
 
 - **JS unit tests**: Mock server, deterministic RPC fixtures
@@ -51,6 +72,17 @@ The web client is a metadata-driven framework that renders UI from declarative v
 - Asset bundling semantics
 - Service injection pattern
 - View renderer contracts
+
+## Asset delivery (Phase 527)
+
+- **Default (Odoo-like):** `core/modules/assets.py` **concatenates** manifest-listed files into `web.assets_web.js`. Files in that bundle must be **classic scripts** — no top-level `export` / ESM (browsers load one concatenated file).
+- **Guard:** `npm run check:assets-concat` scans `addons/web/__manifest__.py` `web.assets_web` entries and fails on `export` at line start. Run in CI and locally before merging UI changes.
+- **Optional esbuild path:** `npm run build:web` emits `addons/web/static/dist/web.bundle.js` (IIFE) from `main.js` for experiments or Docker multi-stage pre-COPY builds; it does **not** replace concat unless you wire templates to serve the bundle (document any switch in `DeploymentChecklist.md`).
+
+## Production deployment default (Phase 534)
+
+- **Shipped behaviour:** The live web client continues to load **concatenated** `web.assets_web.js` from manifests. This is the supported production default until a project explicitly switches templates to a single bundled entry and regression-tests the shell.
+- **esbuild** remains optional (CI builds it to catch breakage; Docker comment describes multi-stage). Choosing esbuild-primary for production requires an ADR-style note in `DeploymentChecklist.md` and template wiring — not implied by `npm run build:web` alone.
 
 ## Non-Goals
 

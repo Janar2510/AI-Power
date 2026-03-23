@@ -12,13 +12,16 @@ from . import res_company
 from . import res_groups
 from . import res_users_apikeys
 from . import ir_cron
+from . import ir_async
 from . import ir_sequence
 from . import ir_attachment
 from . import ir_model
 from . import ir_model_fields
 from . import ir_model_data
+from . import ir_property
 from . import ir_config_parameter
 from . import ir_actions
+from . import report_paperformat
 from . import ir_actions_server
 from . import ir_webhook
 from . import ir_rule

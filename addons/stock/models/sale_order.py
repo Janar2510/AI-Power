@@ -8,7 +8,14 @@ class SaleOrder(Model):
 
     def action_confirm(self):
         """Confirm order and create delivery picking when stock module is installed."""
-        self.write({"state": "sale"})
+        if hasattr(self, "_action_confirm_sale_core"):
+            self._action_confirm_sale_core()
+        else:
+            self.write({"state": "sale"})
+        self._action_confirm_stock_core()
+
+    def _action_confirm_stock_core(self):
+        """Create delivery orders for confirmed sale orders."""
         self._create_delivery_picking()
 
     def _create_delivery_picking(self):
@@ -88,3 +95,62 @@ class SaleOrder(Model):
                     "state": "draft",
                 })
         return True
+
+    def _cancel_open_outgoing_pickings(self):
+        """Cancel draft/assigned outgoing pickings tied to these sale orders (Phase 477)."""
+        Picking = self.env.get("stock.picking")
+        Move = self.env.get("stock.move")
+        PickingType = self.env.get("stock.picking.type")
+        if not Picking:
+            return True
+        open_states = ["draft", "assigned"]
+        out_type_id = None
+        if PickingType:
+            out_type = PickingType.search([("code", "=", "outgoing")], limit=1)
+            if out_type.ids:
+                out_type_id = out_type.ids[0]
+        for order in self:
+            if not order.ids:
+                continue
+            order_name = order.read(["name"])[0].get("name", "") if order.ids else ""
+            state_leaf = ("state", "in", open_states)
+            if out_type_id:
+                type_leaf = ("picking_type_id", "=", out_type_id)
+                if order_name:
+                    link_domain = [
+                        "|",
+                        ("sale_id", "=", order.ids[0]),
+                        ("origin", "=", order_name),
+                    ]
+                    domain = ["&", ["&", type_leaf, link_domain], state_leaf]
+                else:
+                    domain = ["&", ["&", type_leaf, ("sale_id", "=", order.ids[0])], state_leaf]
+            elif order_name:
+                link_domain = [
+                    "|",
+                    ("sale_id", "=", order.ids[0]),
+                    ("origin", "=", order_name),
+                ]
+                domain = ["&", link_domain, state_leaf]
+            else:
+                domain = ["&", ("sale_id", "=", order.ids[0]), state_leaf]
+            pickings = Picking.search(domain)
+            for picking in pickings:
+                picking.write({"state": "cancel"})
+                if Move and picking.ids:
+                    moves = Move.search(
+                        [
+                            ("picking_id", "=", picking.ids[0]),
+                            ("state", "not in", ["done", "cancel"]),
+                        ]
+                    )
+                    if moves.ids:
+                        moves.write({"state": "cancel"})
+        return True
+
+    def action_cancel(self):
+        """Cancel the order and open outgoing deliveries."""
+        SO = self.env.get("sale.order") if getattr(self, "env", None) else None
+        if SO is not None:
+            SO._cancel_open_outgoing_pickings(self)
+        self.write({"state": "cancel"})

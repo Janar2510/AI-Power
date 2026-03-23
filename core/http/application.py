@@ -11,6 +11,7 @@ from werkzeug.routing import Map, Rule
 from werkzeug.exceptions import NotFound
 
 from core.tools import config
+from core.tools.json_log import format_json_log
 
 from core.modules.assets import get_bundle_content
 
@@ -216,6 +217,8 @@ class Application:
         _load_routes()
 
     def __call__(self, environ: dict, start_response: Callable):
+        if config.get_config().get("json_access_log"):
+            start_response = _wrap_start_response_json_access(environ, start_response)
         if config.get_config().get("debug_profiling"):
             try:
                 from core.profiling import init_request_profiling

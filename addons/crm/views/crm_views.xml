@@ -115,6 +115,87 @@
         </pivot>
       </field>
     </record>
+    <record model="ir.ui.view" id="crm_stage_list">
+      <field name="name">crm.stage list</field>
+      <field name="model">crm.stage</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="sequence"/>
+          <field name="name"/>
+          <field name="fold"/>
+          <field name="is_won"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="crm_stage_form">
+      <field name="name">crm.stage form</field>
+      <field name="model">crm.stage</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+            <field name="sequence"/>
+            <field name="fold"/>
+            <field name="is_won"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="crm_tag_list">
+      <field name="name">crm.tag list</field>
+      <field name="model">crm.tag</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="crm_tag_form">
+      <field name="name">crm.tag form</field>
+      <field name="model">crm.tag</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="crm_lost_reason_list">
+      <field name="name">crm.lost.reason list</field>
+      <field name="model">crm.lost.reason</field>
+      <field name="arch" type="xml">
+        <list>
+          <field name="name"/>
+        </list>
+      </field>
+    </record>
+    <record model="ir.ui.view" id="crm_lost_reason_form">
+      <field name="name">crm.lost.reason form</field>
+      <field name="model">crm.lost.reason</field>
+      <field name="arch" type="xml">
+        <form>
+          <sheet>
+            <field name="name"/>
+          </sheet>
+        </form>
+      </field>
+    </record>
+    <record model="ir.actions.act_window" id="action_crm_stage">
+      <field name="name">Stages</field>
+      <field name="res_model">crm.stage</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_crm_tag">
+      <field name="name">Tags</field>
+      <field name="res_model">crm.tag</field>
+      <field name="view_mode">list,form</field>
+    </record>
+    <record model="ir.actions.act_window" id="action_crm_lost_reason">
+      <field name="name">Lost Reasons</field>
+      <field name="res_model">crm.lost.reason</field>
+      <field name="view_mode">list,form</field>
+    </record>
     <record model="ir.actions.act_window" id="action_crm_lead">
       <field name="name">Leads</field>
       <field name="res_model">crm.lead</field>
@@ -145,8 +226,8 @@
     <menuitem name="Activities" id="crm_menu_report_activities" parent="crm_menu_report" action="action_crm_activity_leads" sequence="2"/>
 
     <menuitem name="Configuration" id="crm_menu_config" parent="crm_menu_root" sequence="25"/>
-    <menuitem name="Stages" id="menu_crm_stage_config" parent="crm_menu_config" sequence="1"/>
-    <menuitem name="Tags" id="menu_crm_tag_config" parent="crm_menu_config" sequence="2"/>
-    <menuitem name="Lost Reasons" id="menu_crm_lost_reason_config" parent="crm_menu_config" sequence="3"/>
+    <menuitem name="Stages" id="menu_crm_stage_config" parent="crm_menu_config" action="action_crm_stage" sequence="1"/>
+    <menuitem name="Tags" id="menu_crm_tag_config" parent="crm_menu_config" action="action_crm_tag" sequence="2"/>
+    <menuitem name="Lost Reasons" id="menu_crm_lost_reason_config" parent="crm_menu_config" action="action_crm_lost_reason" sequence="3"/>
   </data>
 </odoo>

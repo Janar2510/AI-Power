@@ -40,6 +40,9 @@ def _column_def(field: fields.Field) -> str:
     if col_type == "double precision":
         return "DOUBLE PRECISION"
     if col_type == "boolean":
+        default = getattr(field, "default", False)
+        if default is True:
+            return "BOOLEAN DEFAULT TRUE"
         return "BOOLEAN DEFAULT FALSE"
     if col_type == "date":
         return "DATE"
@@ -90,14 +93,15 @@ def create_table(cursor: Any, model_class: Type[ModelBase]) -> None:
         return
     columns = ["id SERIAL PRIMARY KEY"]
     if getattr(model_class, "_log_access", True):
-        columns.extend(
-            [
-                '"create_uid" INTEGER',
-                '"create_date" TIMESTAMP',
-                '"write_uid" INTEGER',
-                '"write_date" TIMESTAMP',
-            ]
-        )
+        audit_columns = {
+            "create_uid": '"create_uid" INTEGER',
+            "create_date": '"create_date" TIMESTAMP',
+            "write_uid": '"write_uid" INTEGER',
+            "write_date": '"write_date" TIMESTAMP',
+        }
+        for audit_name, audit_sql in audit_columns.items():
+            if audit_name not in field_defs:
+                columns.append(audit_sql)
     for name, field in field_defs.items():
         if getattr(field, "column_type", None) is None:
             continue  # virtual fields (One2many, Many2many)

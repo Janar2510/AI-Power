@@ -61,6 +61,7 @@ def create_session(uid: int, db: str, company_id: Optional[int] = None, lang: Op
         "uid": uid,
         "db": db,
         "company_id": company_id,
+        "allowed_company_ids": [company_id] if company_id else [],
         "lang": lang or "en_US",
         "csrf_token": _generate_csrf_token(),
     }
@@ -113,6 +114,10 @@ def set_session_company_id(sid: str, company_id: int) -> None:
             sess = get_session(sid)
             if sess:
                 sess["company_id"] = company_id
+                allowed = sess.get("allowed_company_ids") or []
+                if company_id not in allowed:
+                    allowed = [company_id] + [x for x in allowed if x != company_id]
+                sess["allowed_company_ids"] = allowed
                 from core.sql_db import get_cursor
                 with get_cursor(session_db) as cur:
                     cur.execute(
@@ -123,6 +128,51 @@ def set_session_company_id(sid: str, company_id: int) -> None:
             pass
     elif sid in _sessions:
         _sessions[sid]["company_id"] = company_id
+        allowed = _sessions[sid].get("allowed_company_ids") or []
+        if company_id not in allowed:
+            allowed = [company_id] + [x for x in allowed if x != company_id]
+        _sessions[sid]["allowed_company_ids"] = allowed
+
+
+def get_session_allowed_company_ids(sid: str) -> list[int]:
+    """Get allowed company ids from session."""
+    sess = get_session(sid)
+    allowed = (sess or {}).get("allowed_company_ids") if sess else []
+    if isinstance(allowed, list):
+        out = []
+        for item in allowed:
+            try:
+                out.append(int(item))
+            except Exception:
+                continue
+        return out
+    return []
+
+
+def set_session_allowed_company_ids(sid: str, company_ids: list[int]) -> None:
+    """Set allowed companies in session."""
+    clean = []
+    for cid in company_ids or []:
+        try:
+            clean.append(int(cid))
+        except Exception:
+            continue
+    if _get_store() == "db":
+        try:
+            session_db = _get_session_db()
+            sess = get_session(sid)
+            if sess is not None:
+                sess["allowed_company_ids"] = clean
+                from core.sql_db import get_cursor
+                with get_cursor(session_db) as cur:
+                    cur.execute(
+                        "UPDATE http_session SET data = %s WHERE sid = %s",
+                        (json.dumps(sess), sid),
+                    )
+        except Exception:
+            pass
+    elif sid in _sessions:
+        _sessions[sid]["allowed_company_ids"] = clean
 
 
 def get_session_lang(sid: str) -> Optional[str]:

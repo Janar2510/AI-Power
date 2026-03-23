@@ -27,7 +27,9 @@ from .session import (
     create_session,
     get_session,
     get_session_company_id,
+    get_session_allowed_company_ids,
     set_session_company_id,
+    set_session_allowed_company_ids,
     get_session_lang,
     set_session_lang,
 )
@@ -209,14 +211,25 @@ def authenticate(login: str, password: str, db: str) -> Optional[int]:
     with get_cursor(db) as cr:
         env = Environment(registry, cr=cr, uid=0)
         registry.set_env(env)
-        User = env["res.users"]
-        users = User.search([("login", "=", login)])
-        if not users:
-            return None
-        uid = users.ids[0]
+        User = env.get("res.users")
+        uid = None
+        if User is not None:
+            users = User.search([("login", "=", login)])
+            if not users:
+                return None
+            uid = users.ids[0]
+        else:
+            # Fallback for partially initialized registries: use SQL lookup.
+            cr.execute("SELECT id FROM res_users WHERE login = %s ORDER BY id LIMIT 1", (login,))
+            row_uid = cr.fetchone()
+            if not row_uid:
+                return None
+            uid = row_uid.get("id") if hasattr(row_uid, "get") else row_uid[0]
+            if not uid:
+                return None
         # Simple password check - direct SQL to avoid ORM read cursor issues
         cr.execute(
-            'SELECT password FROM res_users WHERE id = %s',
+            "SELECT password FROM res_users WHERE id = %s",
             (uid,),
         )
         row = cr.fetchone()
@@ -253,6 +266,14 @@ def get_session_company_id_from_request(request: Request) -> Optional[int]:
     if not sid:
         return None
     return get_session_company_id(sid)
+
+
+def get_session_allowed_company_ids_from_request(request: Request) -> list[int]:
+    """Get allowed company ids from session."""
+    sid = request.cookies.get("erp_session")
+    if not sid:
+        return []
+    return get_session_allowed_company_ids(sid)
 
 
 def get_session_lang_from_request(request: Request) -> str:

@@ -73,4 +73,7 @@ def _run_due_jobs(dbname: str) -> None:
         registry.set_env(env)
         IrCron = env.get("ir.cron")
         if IrCron:
-            IrCron.run_due(env)
+            IrCron.run_due()
+        IrAsync = env.get("ir.async")
+        if IrAsync:
+            IrAsync.run_pending(limit=10)

@@ -25,7 +25,8 @@ class AiRagReindex(Model):
             _logger.warning("index_record_for_rag not available")
             return 0
         count = 0
-        for model in ("res.partner", "crm.lead"):
+        # Extendable set — keep small per cron run (Phase 532).
+        for model in ("res.partner", "crm.lead", "knowledge.article"):
             M = env.get(model)
             if not M:
                 continue

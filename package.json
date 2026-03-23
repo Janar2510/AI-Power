@@ -1,0 +1,15 @@
+{
+  "name": "erp-platform",
+  "private": true,
+  "description": "Web client bundler (Phase 481) — optional production bundle of main.js",
+  "scripts": {
+    "build:web": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.js --sourcemap",
+    "build:web:min": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.min.js --minify --sourcemap",
+    "check:assets-concat": "python3 scripts/check_concat_bundle.py",
+    "test:account-smoke": "bash scripts/run_account_wave_f_smoke.sh",
+    "test:account-broad": "bash scripts/run_account_wave_f_broad.sh"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

@@ -22,6 +22,7 @@ CSRF_EXEMPT_PATHS: Set[str] = {
     "/payment/status",
     "/payment/callback",
     "/health",
+    "/readiness",
 }
 
 

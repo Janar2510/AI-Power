@@ -1,5 +1,176 @@
 # Deployment Checklist
 
+## Phases 535–538 (account posting / tax / bank reconcile / reports note) (Unreleased)
+
+### Pre-Deployment
+- [ ] No schema change. Behaviour: posting rejects non-draft moves and lines without `account_id`.
+- [ ] Sale/purchase flows that post invoices: confirm draft-only posting still matches expectations.
+
+### Verification
+- [ ] **Fast smoke (no DB, fewer module loads):** use `.venv/bin/python` if available; each listed **module** runs `load_module_graph()` once in `setUpClass`, so keep lists short for quick feedback:
+  - Minimal (~3 graph loads): `tests.test_account_post_phase467`, `tests.test_account_post_phase535`, `tests.test_account_tax_compute_phase536`
+  - Or run: `./scripts/run_account_wave_f_smoke.sh` or `npm run test:account-smoke` (same three modules)
+- [ ] **Broader (no DB, 5 graph loads):** `./scripts/run_account_wave_f_broad.sh` or `npm run test:account-broad` (adds `tests.test_sale_invoice_phase466`, `tests.test_purchase_bill_phase471`).
+- [ ] **Full + DB** (slowest; needs DB `_test_rpc_read`): `tests.test_bank_statement_phase193`, `tests.test_reconcile_wizard_phase195`, `tests.test_bank_statement_action_reconcile_phase537`, and optionally `tests.test_stock_partial_reserve_phase530`.
+
+---
+
+## Phases 530–534 (partial stock, MRP draft move, RAG breadth, planning rule) (Unreleased)
+
+### Pre-Deployment
+- [ ] `db upgrade` for new columns: `stock_move.quantity_reserved`, `mrp_production.cost_draft_move_id`.
+- [ ] Agents/planners: read `docs/ai-rules.md` **Reference analysis** and keep `odoo-19.0` on disk + in workspace when comparing behaviour.
+- [ ] Optional: smoke MO done with `account` + journal present — check draft `account.move` with `invoice_origin` `MFG:<MO name>` when `cost_estimate` > 0.
+
+### Verification
+- [ ] Optional DB: `tests.test_stock_partial_reserve_phase530`, `tests.test_ai_retrieve_chunks_phase532`
+
+---
+
+## Phases 525–529 (stock/MRP depth, concat guard, RAG embed, access logs) (Unreleased)
+
+### Pre-Deployment
+- [ ] `db upgrade` if upgrading from before Phase 526: `mrp.bom.operation` table and related columns.
+- [ ] Before deploying web UI changes: `npm install && npm run check:assets-concat` (concat bundle must not contain ESM `export`).
+- [ ] Optional: `npm run build:web` for `addons/web/static/dist/web.bundle.js` (Dockerfile notes multi-stage pattern).
+- [ ] Structured access logs (optional): set `ERP_JSON_ACCESS_LOG=1` or start server with `--json-access-log`; ship `erp.http.access` lines to your log aggregator. Trace id: send `X-Request-Id` or `X-Trace-Id` header.
+- [ ] RAG: ensure `OPENAI_API_KEY` (or your `_get_api_key` source) when using `index_record_for_rag` / chunk embedding refresh; run `CREATE EXTENSION vector` on PG when using pgvector (see `addons/ai_assistant/embeddings/pipeline.py`).
+
+### Verification
+- [ ] `GET /health?db=<name>` — liveness (always 200 JSON; `db` flag informational).
+- [ ] `GET /readiness?db=<name>` — 200 when DB exists, **503** when missing (use for k8s readiness).
+- [ ] Optional DB: `./.venv/bin/python -m unittest tests.test_mrp_bom_operations_phase526 tests.test_ai_chunk_embed_phase528 tests.test_stock_picking_phase525`
+
+---
+
+## Next phases 490+ (MRP, HR, web bundle, readiness) (Unreleased)
+
+### Pre-Deployment
+- [ ] After pull: run `python3 erp-bin db upgrade -d <db>` so new columns (`mrp.workorder`, `product.template.manufacture_on_order`, HR lifecycle fields, etc.) exist.
+- [ ] Optional web bundle: `npm install && npm run build:web` (see root `package.json`); artefacts go to `addons/web/static/dist/` (gitignored except `.gitkeep`).
+- [ ] Configure load balancers: `GET /health` **liveness**, `GET /readiness` **readiness** (503 if DB missing).
+
+### Verification
+- [ ] Smoke: confirm SO with **Manufacture on Order** + BOM creates MO; MO confirm → work order + reserved moves when quants exist; MO done adjusts quants; cancel clears moves + work orders.
+- [ ] Smoke HR: onboarding → contract start → attendance check-in; approved leave shows `work_entry_note`; payslip `compute_sheet` includes attendance allowance when rules exist.
+- [ ] Hit `/readiness?db=<name>` returns 200 when DB initialized.
+
+---
+
+## Sale confirmation helper chain + schema bootstrap (Unreleased)
+
+### Pre-Deployment
+- [ ] Run `python3 erp-bin db upgrade -d <db>` before deploying if the target database was initialized before the schema audit-column fix.
+- [ ] Smoke sale confirmation on an environment with `sale`, `stock`, `account`, and `sale_purchase` loaded: confirm one sale order and verify no `super(type, obj)` crash occurs.
+- [ ] Verify sale confirmation still applies pricelists, creates a draft delivery picking, queues the confirmation email, and updates invoice/delivery status fields.
+- [ ] Smoke **Contacts:** create a partner; `contact_rank` should still increment (uses `res.partner._create_res_partner_record` under the hood).
+
+### Verification
+- [ ] Run focused regressions: `./.venv/bin/python -m unittest tests.test_schema_audit_columns tests.test_sale_confirm_phase465`
+- [ ] Run sale-invoice regressions (empty invoice, draft duplicate skip, second draft when no draft dup): `./.venv/bin/python -m unittest tests.test_sale_invoice_phase466`
+- [ ] Run posting-safety regression: `./.venv/bin/python -m unittest tests.test_account_post_phase467`
+- [ ] Run payment-application regression: `./.venv/bin/python -m unittest tests.test_account_payment_phase468`
+- [ ] Run payment-stats fallback regression: `./.venv/bin/python -m unittest tests.test_account_payment_stats_phase469`
+- [ ] Run durable payment-record regression: `./.venv/bin/python -m unittest tests.test_account_payment_record_phase470`
+- [ ] Run vendor-bill regressions (empty bills, draft duplicate skip, partial second bill): `./.venv/bin/python -m unittest tests.test_purchase_bill_phase471`
+- [ ] Run purchase receipt-domain regression (received qty + `receipt_count`): `./.venv/bin/python -m unittest tests.test_purchase_receipt_domain_phase473`
+- [ ] Run PO cancel / receipt cleanup regression: `./.venv/bin/python -m unittest tests.test_purchase_cancel_pickings_phase476`
+- [ ] Run SO cancel / delivery cleanup regression (stock loaded): `./.venv/bin/python -m unittest tests.test_sale_cancel_pickings_phase477`
+- [ ] Optional DB: draft-only confirm after cancel (PO + SO) — `./.venv/bin/python -m unittest tests.test_confirm_draft_guard_phase478` (skips if `_test_rpc_read` missing; PO test uses no lines to avoid One2many recompute quirks in harness)
+- [ ] Optional DB: MRP cancel clears production moves — `./.venv/bin/python -m unittest tests.test_mrp_phase153.TestMrpPhase153.test_mrp_cancel_cancels_open_moves` (skips if DB missing)
+
+---
+
+## Missing sidebar apps / active=False (Unreleased)
+
+### Pre-Deployment
+- [ ] Run `db upgrade` or `db init` to re-seed menus with `active=True`: `python3 erp-bin db upgrade -d <db>`.
+- [ ] Verify all 34 app root menus appear on the home page app grid.
+- [ ] Verify `SELECT COUNT(*) FROM ir_ui_menu WHERE active = false` returns 0.
+
+---
+
+## Sidebar navigation / greyed-out menus (Unreleased)
+
+### Pre-Deployment
+- [ ] Run DB upgrade after CRM model `crm.lost.reason` and menu/action XML changes: `python3 erp-bin db upgrade -d <db>`.
+- [ ] Hard-refresh web client (`main.js`); verify CRM **Configuration → Stages / Tags / Lost Reasons** open list views and are not greyed out.
+- [ ] Verify **Expenses** app has no empty Configuration leaf; **Attendance → Kiosk** navigates to attendances list.
+- [ ] Optional: `window.__ERP_DEBUG_SIDEBAR_MENU = true` in console, reload, confirm no unexpected `[sidebar] menu without route` warnings.
+
+### Verification
+- [ ] Hash routes `#crm_stages`, `#crm_tags`, `#crm_lost_reasons` load the corresponding models.
+
+---
+
+## Frontend Pro Max phases 451-464 (1.205.0)
+
+### Pre-Deployment
+- [ ] Hard-refresh web assets after deploy (`webclient.css`, `main.js`, `core/helpers.js`, `core/list_view.js`, `core/discuss.js`, new components/services).
+- [ ] Confirm `web.assets_web` includes newly wired assets (`systray_registry`, `empty_state`, `onboarding_panel`, `pdf_viewer`, `attachment_viewer`, previously missing core/components files).
+- [ ] Smoke systray async badge (`/web/async/call_notify`) and shortcut help modal.
+- [ ] Verify onboarding panel render/fold persistence on `#home`.
+- [ ] Verify report preview opens inline PDF modal from list/form and falls back to new tab when needed.
+- [ ] Verify list drag reorder works on views using `widget="handle"` and persists sequence with RPC writes.
+- [ ] Verify attachment image preview opens viewer overlay and closes with `Esc`.
+
+### Verification
+- [ ] JS unit suite passes at `/web/static/tests/test_runner.html` including:
+  - [ ] `test_helpers_skeleton.js`
+  - [ ] `test_systray_registry.js`
+  - [ ] `test_onboarding_panel.js`
+  - [ ] `test_attachment_viewer.js`
+
+### Release
+- [x] `core/release.py`: `1.205.0`
+
+## Phases 437–450 (1.204.0)
+
+### Pre-Deployment
+- [ ] Run DB upgrade: `python3.11 erp-bin db upgrade -d <db>` (server-action route/runtime path changes, session context changes).
+- [ ] Hard-refresh web assets (`core/helpers.js`, `core/search_model.js`, `core/list_view.js`, `core/field_registry.js`, `views/kanban_renderer.js`, `components/confirm_dialog.js`, `core/action_manager.js`, `main.js`).
+- [ ] Validate `web.assets_web` includes `widgets/*.js` files (date/many2one/many2many/monetary/html/binary) after bundle rebuild.
+- [ ] Smoke server-action execution from form header buttons (`type="object"` and `type="action"`).
+- [ ] Verify wizard modal path for `ir.actions.act_window` with `target: "new"` opens modal and closes without route breakage.
+- [ ] Verify company switch sets both current company and `allowed_company_ids` (`/web/session/set_current_company`) and list/form record rules still apply.
+- [ ] Check async badge route `/web/async/call_notify` returns queue counters for logged-in users.
+
+### Verification
+- [ ] Browser JS unit suite passes at `/web/static/tests/test_runner.html` with new suites:
+  - [ ] `test_search_model.js`
+  - [ ] `test_field_registry.js`
+  - [ ] `test_router.js`
+  - [ ] `test_form_view.js`
+  - [ ] `test_kanban_renderer.js`
+  - [ ] `test_import.js`
+
+### Release
+- [x] `core/release.py`: `1.204.0`
+
+---
+
+## Phases 423–436 (1.203.0)
+
+### Pre-Deployment
+- [ ] Run DB upgrade: `python3.11 erp-bin db upgrade -d <db>` (new models: `ir.async`, `ir.property`, `report.paperformat`, `inter.company.rule`, scaffold bridge fields).
+- [ ] Hard-refresh web assets (`core/router.js`, `core/navbar.js`, `core/sidebar.js`, `core/form_view.js`, `main.js`, `webclient.css`).
+- [ ] Confirm cron worker can execute `ir.async.run_pending` and `ir.async.gc_done`.
+- [ ] Validate report routes:
+  - [ ] `/report/pdf/<report>/<ids>` still renders for existing reports
+  - [ ] `/report/pdf_async/<report>/<ids>` returns queued job id
+- [ ] If attachment caching for reports is enabled (`attachment_use`), verify `ir.attachment` rows are created/updated for report PDFs.
+- [ ] Multi-company smoke: ensure session context includes `allowed_company_ids` and list/form visibility respects company scoping.
+- [ ] Optional: install/enable `inter_company_rules` and configure at least one source/target company rule before testing SO->PO mirroring.
+
+### Verification
+- [x] Python syntax checks pass for modified backend modules (`py_compile` run).
+- [x] Added phase 436 tests execute (`python3.11 -m unittest tests.test_e2e_business_flows_phase436 tests.e2e.test_smoke`) with environment-dependent skips.
+
+### Release
+- [x] `core/release.py`: `1.203.0`
+
+---
+
 ## Phases 409–422 (1.202.0)
 
 ### Pre-Deployment

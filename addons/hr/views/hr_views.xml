@@ -60,8 +60,12 @@
       <field name="model">hr.employee</field>
       <field name="arch" type="xml">
         <form>
+          <header>
+            <button name="action_start_onboarding" string="Start Onboarding" type="object" invisible="lifecycle_status not in ('new', 'onboarding')"/>
+          </header>
           <sheet>
             <field name="name"/>
+            <field name="lifecycle_status"/>
             <field name="department_id" comodel="hr.department"/>
             <field name="job_id" comodel="hr.job"/>
             <field name="work_email"/>
@@ -145,6 +149,7 @@
             <field name="date_from"/>
             <field name="date_to"/>
             <field name="number_of_days"/>
+            <field name="work_entry_note"/>
           </sheet>
         </form>
       </field>

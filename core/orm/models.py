@@ -1,9 +1,11 @@
 """Model base class and recordset."""
 
 import base64
+import logging
 from typing import Any, Dict, List, Optional, Type, TypeVar, Iterator, Union, Tuple
 
 T = TypeVar("T", bound="ModelBase")
+_logger = logging.getLogger("erp.orm.models")
 
 
 def _trigger_dependant_recompute(
@@ -92,8 +94,15 @@ def _trigger_dependant_recompute(
                         if to_write:
                             sets = ", ".join(f'"{k}" = %s' for k in to_write)
                             cr.execute(f'UPDATE "{table}" SET {sets} WHERE id = %s', list(to_write.values()) + [rid])
-                except Exception:
-                    pass
+                except Exception as e:
+                    _logger.warning(
+                        "Dependant recompute failed model=%s field=%s written_model=%s ids=%s: %s",
+                        other_name,
+                        fname,
+                        written_model,
+                        written_ids,
+                        e,
+                    )
 
 
 def _domain_to_sql(
@@ -105,6 +114,16 @@ def _domain_to_sql(
     """Convert Odoo domain to (WHERE clause, params). Supports | (OR), & (AND), and leaf terms."""
     if not domain:
         return "1=1", []
+
+    # NOT prefix: ["!", <domain_or_leaf>]
+    if (
+        isinstance(domain, (list, tuple))
+        and len(domain) == 2
+        and domain[0] == "!"
+        and isinstance(domain[1], (list, tuple))
+    ):
+        w, p = _domain_to_sql(domain[1], table, cr, model_cls)
+        return f"NOT ({w})", p
 
     # Polish notation: ['|', term1, term2] or ['&', term1, term2]
     if len(domain) >= 3 and domain[0] in ("|", "&") and isinstance(domain[1], (list, tuple)) and isinstance(domain[2], (list, tuple)):
@@ -129,12 +148,30 @@ def _domain_to_sql(
             vals = list(val) if isinstance(val, (list, tuple)) else [val]
             if not vals:
                 return "1=0", []
+            if len(vals) > 1000:
+                chunks = [vals[i:i + 1000] for i in range(0, len(vals), 1000)]
+                parts: List[str] = []
+                params: List[Any] = []
+                for chunk in chunks:
+                    ph = ", ".join("%s" for _ in chunk)
+                    parts.append(f'"{fld}" IN ({ph})')
+                    params.extend(chunk)
+                return "(" + " OR ".join(parts) + ")", params
             ph = ", ".join("%s" for _ in vals)
             return f'"{fld}" IN ({ph})', vals
         if op == "not in":
             vals = list(val) if isinstance(val, (list, tuple)) else [val]
             if not vals:
                 return "1=1", []
+            if len(vals) > 1000:
+                chunks = [vals[i:i + 1000] for i in range(0, len(vals), 1000)]
+                parts: List[str] = []
+                params: List[Any] = []
+                for chunk in chunks:
+                    ph = ", ".join("%s" for _ in chunk)
+                    parts.append(f'"{fld}" NOT IN ({ph})')
+                    params.extend(chunk)
+                return f'("{fld}" IS NULL OR (' + " AND ".join(parts) + "))", params
             ph = ", ".join("%s" for _ in vals)
             return f'("{fld}" IS NULL OR "{fld}" NOT IN ({ph}))', vals
         if op == "ilike":
@@ -893,6 +930,16 @@ class ModelBase(metaclass=Model):
         from core.orm.api import ValidationError
         if not vals or not self._ids:
             return True
+        # Phase 428: basic field access guard for unknown/private writes.
+        try:
+            allowed_fields = set((self._model.fields_get() or {}).keys())
+            bad = [k for k in vals.keys() if k.startswith("_") or (allowed_fields and k not in allowed_fields)]
+            if bad:
+                raise PermissionError(f"Write access denied for fields on {self._model._name}: {bad}")
+        except PermissionError:
+            raise
+        except Exception:
+            pass
         env = getattr(self, "env", None)
         if env and getattr(env, "uid", None):
             allowed = self._model.search([("id", "in", self._ids)], operation="write")
@@ -974,10 +1021,18 @@ class ModelBase(metaclass=Model):
             table = self._model._table
             sets = ", ".join(f'"{k}" = %s' for k in vals_stored)
             try:
-                cr.execute(
-                    f'UPDATE "{table}" SET {sets} WHERE id = %s',
-                    list(vals_stored.values()) + [self._ids[0]],
-                )
+                ids = list(dict.fromkeys(self._ids))
+                if len(ids) > 1:
+                    placeholders = ", ".join("%s" for _ in ids)
+                    cr.execute(
+                        f'UPDATE "{table}" SET {sets} WHERE id IN ({placeholders})',
+                        list(vals_stored.values()) + ids,
+                    )
+                else:
+                    cr.execute(
+                        f'UPDATE "{table}" SET {sets} WHERE id = %s',
+                        list(vals_stored.values()) + [ids[0]],
+                    )
             except Exception as e:
                 msg = self._model._sql_constraint_message(str(e))
                 if msg:
@@ -1006,37 +1061,37 @@ class ModelBase(metaclass=Model):
                 Comodel = env.get(comodel) if env else None
                 if not Comodel:
                     continue
-                parent_id = self._ids[0]
-                current_ids = []
-                domain = [(inv_name, "=", parent_id)]
-                extra = getattr(field, "domain", None)
-                if extra:
-                    d = extra(self._model) if callable(extra) else (extra or [])
-                    domain = d + domain
-                try:
-                    recs = Comodel.search(domain)
-                    current_ids = recs.ids if hasattr(recs, "ids") else [r for r in recs]
-                except Exception:
-                    pass
-                submitted_ids = []
-                inv_extra = getattr(field, "inverse_extra", None)
-                for line in lines:
-                    if not isinstance(line, dict):
-                        continue
-                    lid = line.get("id")
-                    line_vals = {k: v for k, v in line.items() if k != "id"}
-                    if lid and lid in current_ids:
-                        Comodel.browse(lid).write(line_vals)
-                        submitted_ids.append(lid)
-                    else:
-                        line_vals[inv_name] = parent_id
-                        if inv_extra and callable(inv_extra):
-                            line_vals.update(inv_extra(self._model))
-                        new_rec = Comodel.create(line_vals)
-                        submitted_ids.append(new_rec.id if hasattr(new_rec, "id") else new_rec.ids[0])
-                to_unlink = [i for i in current_ids if i not in submitted_ids]
-                if to_unlink:
-                    Comodel.browse(to_unlink).unlink()
+                for parent_id in self._ids:
+                    current_ids = []
+                    domain = [(inv_name, "=", parent_id)]
+                    extra = getattr(field, "domain", None)
+                    if extra:
+                        d = extra(self._model) if callable(extra) else (extra or [])
+                        domain = d + domain
+                    try:
+                        recs = Comodel.search(domain)
+                        current_ids = recs.ids if hasattr(recs, "ids") else [r for r in recs]
+                    except Exception:
+                        pass
+                    submitted_ids = []
+                    inv_extra = getattr(field, "inverse_extra", None)
+                    for line in lines:
+                        if not isinstance(line, dict):
+                            continue
+                        lid = line.get("id")
+                        line_vals = {k: v for k, v in line.items() if k != "id"}
+                        if lid and lid in current_ids:
+                            Comodel.browse(lid).write(line_vals)
+                            submitted_ids.append(lid)
+                        else:
+                            line_vals[inv_name] = parent_id
+                            if inv_extra and callable(inv_extra):
+                                line_vals.update(inv_extra(self._model))
+                            new_rec = Comodel.create(line_vals)
+                            submitted_ids.append(new_rec.id if hasattr(new_rec, "id") else new_rec.ids[0])
+                    to_unlink = [i for i in current_ids if i not in submitted_ids]
+                    if to_unlink:
+                        Comodel.browse(to_unlink).unlink()
                 continue
             if not isinstance(field, fmod.Many2many):
                 continue
@@ -1455,6 +1510,17 @@ class ModelBase(metaclass=Model):
             if k not in vals and v is not None:
                 vals[k] = v
         env = env or (getattr(cls._registry, "_env", None) if cls._registry else None)
+        # Phase 431: default company from allowed_company_ids / current company context.
+        try:
+            if "company_id" in cls._get_stored_field_names() and not vals.get("company_id") and env:
+                ctx = getattr(env, "context", {}) or {}
+                allowed = ctx.get("allowed_company_ids")
+                if isinstance(allowed, (list, tuple)) and allowed:
+                    vals["company_id"] = int(allowed[0])
+                elif ctx.get("company_id"):
+                    vals["company_id"] = int(ctx.get("company_id"))
+        except Exception:
+            pass
         cr = env.cr if env and hasattr(env, "cr") else None
         if not cr:
             return cls.browse(1)

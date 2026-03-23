@@ -1,5 +1,7 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_mrp_bom_user,mrp.bom user,model_mrp_bom,,1,1,1,1
 access_mrp_bom_line_user,mrp.bom.line user,model_mrp_bom_line,,1,1,1,1
+access_mrp_bom_operation_user,mrp.bom.operation user,model_mrp_bom_operation,,1,1,1,1
 access_mrp_production_user,mrp.production user,model_mrp_production,,1,1,1,1
 access_mrp_workcenter_user,mrp.workcenter user,model_mrp_workcenter,,1,1,1,1
+access_mrp_workorder_user,mrp.workorder user,model_mrp_workorder,,1,1,1,1

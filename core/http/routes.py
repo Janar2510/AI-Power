@@ -20,8 +20,10 @@ from core.http.auth import (
     get_session_uid,
     get_session_db,
     get_session_company_id_from_request,
+    get_session_allowed_company_ids_from_request,
     get_session_lang_from_request,
     set_session_company_id,
+    set_session_allowed_company_ids,
     set_session_lang,
     get_session,
     login_response_with_html,
@@ -108,7 +110,11 @@ TOTP_HTML = """<!DOCTYPE html>
 
 @route("/health", auth="public", methods=["GET"])
 def health(request):
-    """Health check endpoint for load balancers and monitoring (Phase 99, 225)."""
+    """Liveness: process is up; `db` in JSON reflects whether the named database exists (Phase 99, 225, 529).
+
+    Use for load-balancer **liveness** — does not fail when DB is missing. For **readiness**
+    (traffic routing), use ``GET /readiness`` which returns 503 when the database is unavailable.
+    """
     import json
     try:
         from core import release
@@ -122,6 +128,24 @@ def health(request):
     except Exception:
         body = '{"status":"ok","db":false,"version":"1.0"}'
     return Response(body, content_type="application/json")
+
+
+@route("/readiness", auth="public", methods=["GET"])
+def readiness(request):
+    """Readiness: returns 200 only when the database exists (Phase 517, 529).
+
+    Kubernetes/load balancers should use this for **ready** probes; pair with ``GET /health``
+    for liveness. Query param ``db`` overrides default database name (same as config ``PGDATABASE``).
+    """
+    import json
+    db = request.args.get("db", config.get_config().get("db_name", "erp"))
+    ok = db_exists(db)
+    try:
+        body = json.dumps({"ready": bool(ok), "db": db})
+    except Exception:
+        body = '{"ready":false,"db":""}'
+    status = 200 if ok else 503
+    return Response(body, content_type="application/json", status=status)
 
 
 @route("/metrics", auth="public", methods=["GET"])
@@ -840,8 +864,13 @@ def get_session_info(request):
                 "current_company": next((a for a in allowed if a["id"] == current_id), allowed[0] if allowed else None),
                 "allowed_companies": allowed,
             }
+            allowed_ids = get_session_allowed_company_ids_from_request(request)
+            if not allowed_ids:
+                allowed_ids = [c["id"] for c in allowed]
+            result["allowed_company_ids"] = allowed_ids
     except Exception:
         result["user_companies"] = {"current_company": None, "allowed_companies": []}
+        result["allowed_company_ids"] = []
     try:
         registry_obj = _get_registry(db)
         with get_cursor(db) as cr:
@@ -866,6 +895,57 @@ def get_session_info(request):
         json.dumps(result),
         content_type="application/json",
     )
+
+
+@route("/web/action/run_server_action", auth="user", methods=["POST"])
+def run_server_action(request):
+    """Execute ir.actions.server for action buttons/wizards."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response('{"error":"unauthorized"}', status=401, content_type="application/json")
+    import json
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        action_id = data.get("action_id")
+        model = data.get("model")
+        res_id = data.get("res_id")
+        if not action_id:
+            return Response('{"error":"action_id required"}', status=400, content_type="application/json")
+        registry_obj = _get_registry(db)
+        with get_cursor(db) as cr:
+            from core.orm import Environment
+            env = Environment(registry_obj, cr=cr, uid=uid)
+            registry_obj.set_env(env)
+            Action = env.get("ir.actions.server")
+            if not Action:
+                return Response('{"error":"ir.actions.server unavailable"}', status=404, content_type="application/json")
+            result = Action.run_server_action(action_id, model=model, res_id=res_id, context=data.get("context") or {})
+            return Response(json.dumps(result or {"ok": True}), content_type="application/json")
+    except Exception as e:
+        return Response(json.dumps({"error": str(e)}), status=500, content_type="application/json")
+
+
+@route("/web/async/call_notify", auth="user", methods=["GET"])
+def async_call_notify(request):
+    """Return async queue badge counters."""
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response('{"error":"unauthorized"}', status=401, content_type="application/json")
+    import json
+    try:
+        registry_obj = _get_registry(db)
+        with get_cursor(db) as cr:
+            from core.orm import Environment
+            env = Environment(registry_obj, cr=cr, uid=uid)
+            registry_obj.set_env(env)
+            Async = env.get("ir.async")
+            if not Async:
+                return Response('{"pending":0,"running":0,"failed":0}', content_type="application/json")
+            return Response(json.dumps(Async.call_notify()), content_type="application/json")
+    except Exception:
+        return Response('{"pending":0,"running":0,"failed":0}', content_type="application/json")
 
 
 @route("/web/translations", auth="user", methods=["GET"])
@@ -923,6 +1003,7 @@ def set_current_company(request):
     try:
         data = request.get_json(force=True, silent=True) or {}
         company_id = data.get("company_id")
+        allowed_company_ids = data.get("allowed_company_ids")
         if company_id is None:
             return Response('{"error": "company_id required"}', status=400, content_type="application/json")
         company_id = int(company_id)
@@ -939,7 +1020,21 @@ def set_current_company(request):
             allowed = rows[0].get("company_ids") or [] if rows else []
             if company_id not in allowed:
                 return Response('{"error": "company not allowed"}', status=403, content_type="application/json")
+            next_allowed = []
+            if isinstance(allowed_company_ids, list):
+                for cid in allowed_company_ids:
+                    try:
+                        cid_i = int(cid)
+                    except Exception:
+                        continue
+                    if cid_i in allowed:
+                        next_allowed.append(cid_i)
+            if not next_allowed:
+                next_allowed = [company_id]
+            elif company_id not in next_allowed:
+                next_allowed = [company_id] + [x for x in next_allowed if x != company_id]
         set_session_company_id(sid, company_id)
+        set_session_allowed_company_ids(sid, next_allowed)
         return Response('{"ok": true}', content_type="application/json")
     except (ValueError, TypeError):
         return Response('{"error": "invalid company_id"}', status=400, content_type="application/json")

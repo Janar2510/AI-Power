@@ -10,8 +10,14 @@
 
   function showToast(message, type) {
     type = type || 'info';
+    if (window.UIComponents && typeof window.UIComponents.Toast === "function") {
+      window.UIComponents.Toast({ message: message || "", type: type });
+      return;
+    }
     const container = document.getElementById('toast-container');
     if (!container) return;
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'true');
     const el = document.createElement('div');
     el.className = 'toast toast-' + type;
     el.innerHTML = '<span>' + (message || '').replace(/</g, '&lt;') + '</span><button type="button" class="toast-close" aria-label="Close">&times;</button>';
@@ -25,6 +31,13 @@
     setTimeout(dismiss, 4000);
   }
 
+  function skeletonHtml(lines, shortLast) {
+    if (HelpersCore && typeof HelpersCore.renderSkeletonHtml === "function") {
+      return HelpersCore.renderSkeletonHtml(lines, shortLast);
+    }
+    return '<p style="color:var(--text-muted)">Loading...</p>';
+  }
+
   const rpc = window.Services && window.Services.rpc ? window.Services.rpc : (window.Session || { callKw: () => Promise.reject(new Error('RPC not loaded')) });
   const viewsSvc = window.Services && window.Services.views ? window.Services.views : null;
   const RouterCore = window.AppCore && window.AppCore.Router ? window.AppCore.Router : null;
@@ -34,6 +47,7 @@
   const ListViewCore = window.AppCore && window.AppCore.ListView ? window.AppCore.ListView : null;
   const FormViewCore = window.AppCore && window.AppCore.FormView ? window.AppCore.FormView : null;
   const NavbarCore = window.AppCore && window.AppCore.Navbar ? window.AppCore.Navbar : null;
+  const SidebarCore = window.AppCore && window.AppCore.Sidebar ? window.AppCore.Sidebar : null;
   const DiscussViewCore = window.AppCore && window.AppCore.DiscussView ? window.AppCore.DiscussView : null;
   const GraphViewCore = window.AppCore && window.AppCore.GraphView ? window.AppCore.GraphView : null;
   const PivotViewCore = window.AppCore && window.AppCore.PivotView ? window.AppCore.PivotView : null;
@@ -43,6 +57,8 @@
   const ImportCore = window.AppCore && window.AppCore.Import ? window.AppCore.Import : null;
   const ChatterCore = window.AppCore && window.AppCore.Chatter ? window.AppCore.Chatter : null;
   const FieldUtilsCore = window.AppCore && window.AppCore.FieldUtils ? window.AppCore.FieldUtils : null;
+  const HelpersCore = window.AppCore && window.AppCore.Helpers ? window.AppCore.Helpers : null;
+  const SystraySvc = window.Services && window.Services.systray ? window.Services.systray : null;
 
   var actionStack = [];
   var formDirty = false;
@@ -105,9 +121,44 @@
     });
   }
 
+  /**
+   * Slugs used for list/new/edit routing (sidebar hash targets).
+   * Keep in sync with routeApplyInternal, isFormRoute, and keyboard shortcuts below.
+   */
+  var DATA_ROUTES_SLUGS =
+    'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans|subscriptions|meetings|timesheets|applicants|contracts|account_reconcile_wizard|recruitment_stages|crm_stages|crm_tags|crm_lost_reasons';
+
+  /** Opt-in: set window.__ERP_DEBUG_SIDEBAR_MENU = true to log menus with no resolvable route. */
+  function _warnSidebarMenuDisabled(menu, actionRef, hasResolvedAction, route) {
+    if (!route && window.__ERP_DEBUG_SIDEBAR_MENU) {
+      try {
+        console.warn('[sidebar] menu without route', {
+          id: menu && menu.id,
+          name: menu && menu.name,
+          action: actionRef || '',
+          resolvedAction: !!hasResolvedAction,
+        });
+      } catch (e) { /* noop */ }
+    }
+  }
+
   /** Map act_window res_model to hash route (convention: res.partner -> contacts) */
   function actionToRoute(action) {
-    if (!action || action.type !== 'ir.actions.act_window') return null;
+    if (!action) return null;
+    if (action.type === 'ir.actions.act_url') {
+      var rawUrl = String(action.url || '').trim();
+      if (!rawUrl) return null;
+      // Support hash-only routes ("#reports/trial-balance") and full URLs containing hash.
+      var hashIdx = rawUrl.indexOf('#');
+      if (hashIdx >= 0) {
+        var frag = rawUrl.slice(hashIdx + 1).split('?')[0].trim();
+        return frag || null;
+      }
+      // Fallback: allow direct route-like URLs without '#'.
+      if (/^[a-z0-9_\-/]+$/i.test(rawUrl)) return rawUrl;
+      return null;
+    }
+    if (action.type !== 'ir.actions.act_window') return null;
     const m = (action.res_model || '').replace(/\./g, '_');
     if (m === 'res_partner') return 'contacts';
     if (m === 'crm_lead') {
@@ -171,6 +222,9 @@
     if (m === 'audit_log') return 'audit_log';
     if (m === 'mailing_list') return 'marketing/mailing_lists';
     if (m === 'mailing_mailing') return 'marketing/mailings';
+    if (m === 'crm_stage') return 'crm_stages';
+    if (m === 'crm_tag') return 'crm_tags';
+    if (m === 'crm_lost_reason') return 'crm_lost_reasons';
     return m || null;
   }
 
@@ -209,9 +263,23 @@
     if (name === 'data recycle') return 'recycle_models';
     if (name === 'skills') return 'skills';
     if (name === 'elearning') return 'elearning';
+    if (name === 'analytic plans' || name === 'analytic plan') return 'analytic_plans';
+    if (name === 'subscriptions' || name === 'subscription') return 'subscriptions';
+    if (name === 'meetings' || name === 'meeting') return 'meetings';
+    if (name === 'applicants' || name === 'applicant') return 'applicants';
+    if (name === 'recruitment stages') return 'recruitment_stages';
+    if (name === 'valuation' || name === 'valuations' || name === 'stock valuation report') return 'reports/stock-valuation';
     if (name === 'website') return 'website';
     if (name === 'ecommerce') return 'ecommerce';
     if (name === 'reports') return 'reports/trial-balance';
+    if (name === 'stages') return 'crm_stages';
+    if (name === 'tags') return 'crm_tags';
+    if (name === 'lost reasons') return 'crm_lost_reasons';
+    var slug = (m.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (slug && slug.length >= 2 && /^[a-z][a-z0-9_]*$/.test(slug)) {
+      var sectionOnly = { configuration: 1, reporting: 1, operations: 1, sales: 1, technical: 1 };
+      if (!sectionOnly[slug]) return slug;
+    }
     return null;
   }
 
@@ -280,6 +348,7 @@
     if (route === 'attendances') return 'hr.attendance';
     if (route === 'applicants') return 'hr.applicant';
     if (route === 'recruitment') return 'hr.applicant';
+    if (route === 'recruitment_stages') return 'hr.recruitment.stage';
     if (route === 'contracts') return 'hr.contract';
     if (route === 'time_off') return 'hr.leave';
     if (route === 'expenses') return 'hr.expense';
@@ -300,6 +369,9 @@
     if (route === 'reordering_rules') return 'stock.warehouse.orderpoint';
     if (route === 'meetings') return 'calendar.event';
     if (route === 'tickets') return 'helpdesk.ticket';
+    if (route === 'crm_stages') return 'crm.stage';
+    if (route === 'crm_tags') return 'crm.tag';
+    if (route === 'crm_lost_reasons') return 'crm.lost.reason';
     return null;
   }
 
@@ -676,6 +748,7 @@
         html += _renderSidebarChildren(ch.children, currentHash, depth + 1);
         html += '</div></div>';
       } else {
+        if (!croute) _warnSidebarMenuDisabled(cm, cm.action, !!caction, croute);
         var ccls = croute ? 'o-sidebar-link' : 'o-sidebar-link o-sidebar-link-disabled';
         if (isActive) ccls += ' o-sidebar-link--active';
         if (depth > 0) ccls += ' o-sidebar-link--nested';
@@ -717,6 +790,7 @@
           html += _renderSidebarChildren(node.children, currentHash, 0);
           html += '</div></section>';
         } else {
+          if (!route) _warnSidebarMenuDisabled(m, m.action, !!action, route);
           var isActive = route && currentHash === route;
           var leafCls = route ? 'o-sidebar-link' : 'o-sidebar-link o-sidebar-link-disabled';
           if (isActive) leafCls += ' o-sidebar-link--active';
@@ -748,6 +822,8 @@
       var linkHash = (a.getAttribute('href') || '').replace(/^#/, '');
       var isActive = linkHash && linkHash !== '' && linkHash === currentHash;
       a.classList.toggle('o-sidebar-link--active', isActive);
+      if (isActive) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
       if (isActive) {
         var category = a.closest('.o-sidebar-category');
         if (category && category.classList.contains('o-sidebar-category--folded')) {
@@ -857,6 +933,68 @@
       });
     }
     _updateSidebarActiveLink();
+  }
+
+  function renderSystrayMount() {
+    if (!navbar) return;
+    var host = navbar.querySelector(".o-systray-registry");
+    if (!host || !SystraySvc) return;
+    if (!SystraySvc.getItems().length) {
+      SystraySvc.add("async_jobs", {
+        sequence: 10,
+        render: function () {
+          return '<button type="button" class="nav-link o-systray-item" id="systray-async" title="Async jobs">Jobs <span class="o-systray-count" id="systray-async-count">0</span></button>';
+        },
+      });
+      SystraySvc.add("shortcuts", {
+        sequence: 20,
+        render: function () {
+          return '<button type="button" class="nav-link o-systray-item" id="systray-shortcuts" title="Keyboard shortcuts">?</button>';
+        },
+      });
+    }
+    host.innerHTML = SystraySvc.renderAll({});
+    var asyncBtn = host.querySelector("#systray-async");
+    if (asyncBtn) {
+      asyncBtn.onclick = function () { window.location.hash = "settings"; };
+      fetch("/web/async/call_notify", { credentials: "include" })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var c = host.querySelector("#systray-async-count");
+          if (!c) return;
+          var total = Number((data && data.pending) || 0) + Number((data && data.running) || 0) + Number((data && data.failed) || 0);
+          c.textContent = String(total);
+          c.style.display = total ? "inline-flex" : "none";
+        })
+        .catch(function () {});
+    }
+    var kbBtn = host.querySelector("#systray-shortcuts");
+    if (kbBtn) {
+      kbBtn.onclick = function () {
+        showShortcutHelp();
+      };
+    }
+  }
+
+  function showShortcutHelp() {
+    if (window.UIComponents && window.UIComponents.ConfirmDialog && typeof window.UIComponents.ConfirmDialog.openModal === "function") {
+      window.UIComponents.ConfirmDialog.openModal({
+        title: "Keyboard shortcuts",
+        content:
+          '<div class="o-shortcut-sheet">' +
+          '<p><kbd>Mod+K</kbd> Command palette</p>' +
+          '<p><kbd>Alt+N</kbd> New record</p>' +
+          '<p><kbd>Alt+S</kbd> Save form</p>' +
+          '<p><kbd>Alt+E</kbd> Toggle edit mode</p>' +
+          '<p><kbd>Alt+L</kbd> List view</p>' +
+          '<p><kbd>Alt+K</kbd> Kanban view</p>' +
+          '<p><kbd>Alt+P</kbd> Print / preview</p>' +
+          "<p><kbd>Esc</kbd> Close modal</p>" +
+          "</div>",
+      });
+      return;
+    }
+    window.alert("Shortcuts: Mod+K, Alt+N, Alt+S, Alt+E, Alt+L, Alt+K, Alt+P, Esc");
   }
 
   function renderNavbar(userCompanies, userLangs, currentLang) {
@@ -974,9 +1112,11 @@
     html += '<div id="notification-list" style="max-height:320px;overflow-y:auto"></div>';
     html += '</span></span>';
     html += '<a href="#discuss" class="nav-link" title="Discuss">Discuss</a>';
+    html += '<span class="o-systray-registry"></span>';
     html += '<a href="/web/logout" class="nav-link">Logout</a>';
     html += '</span>';
     navbar.innerHTML = html;
+    renderSystrayMount();
     if (appSidebar) {
       var sidebarTree = tree;
       if (appRoots.length && selectedAppId) {
@@ -986,8 +1126,21 @@
             : [selectedRoot];
         }
       }
-      appSidebar.innerHTML = buildSidebarNavHtml(sidebarTree, staleBannerHtml);
-      wireSidebarAfterRender();
+      if (SidebarCore && typeof SidebarCore.render === "function") {
+        appSidebar.innerHTML = SidebarCore.render({
+          tree: sidebarTree,
+          staleBannerHtml: staleBannerHtml,
+          buildSidebarNavHtml: buildSidebarNavHtml,
+        }) || buildSidebarNavHtml(sidebarTree, staleBannerHtml);
+        if (typeof SidebarCore.wire === "function") {
+          SidebarCore.wire({ wireSidebarAfterRender: wireSidebarAfterRender });
+        } else {
+          wireSidebarAfterRender();
+        }
+      } else {
+        appSidebar.innerHTML = buildSidebarNavHtml(sidebarTree, staleBannerHtml);
+        wireSidebarAfterRender();
+      }
     }
     var appsHomeBtn = navbar.querySelector('#nav-apps-home');
     if (appsHomeBtn) {
@@ -1484,6 +1637,25 @@
     header.className = 'o-home-apps-header';
     header.innerHTML = '<h2 class="o-home-apps-title">Apps</h2><p class="o-home-apps-subtitle">Choose a module to start working.</p>';
     root.appendChild(header);
+    if (window.UIComponents && window.UIComponents.OnboardingPanel && typeof window.UIComponents.OnboardingPanel.renderHTML === "function") {
+      var onboardingWrap = document.createElement("div");
+      onboardingWrap.innerHTML = window.UIComponents.OnboardingPanel.renderHTML({
+        storageKey: "home",
+        steps: [
+          { title: "Configure company", description: "Set company profile and defaults.", actionLabel: "Open settings", done: false },
+          { title: "Import data", description: "Load customers and products.", actionLabel: "Open import", done: false },
+          { title: "Create first record", description: "Start with a lead, task, or invoice.", actionLabel: "Open CRM", done: false },
+        ],
+      });
+      root.appendChild(onboardingWrap);
+      window.UIComponents.OnboardingPanel.wire(onboardingWrap, {
+        onStepAction: function (idx) {
+          if (idx === 0) window.location.hash = "settings";
+          if (idx === 1) window.location.hash = "contacts";
+          if (idx === 2) window.location.hash = "pipeline";
+        },
+      });
+    }
 
     var grid = document.createElement('div');
     grid.className = 'o-app-grid';
@@ -1652,6 +1824,13 @@
 
   function renderList(model, route, records, searchTerm, totalCount, offset, limit, savedFiltersList) {
     savedFiltersList = savedFiltersList || [];
+    if (!currentListState.__searchModel || currentListState.__searchModel.model !== model) {
+      if (window.AppCore && window.AppCore.SearchModel) {
+        currentListState.__searchModel = new window.AppCore.SearchModel(model, viewsSvc, currentListState);
+      } else {
+        currentListState.__searchModel = null;
+      }
+    }
     if (ListViewCore && typeof ListViewCore.render === 'function') {
       actionStack = [{ label: getTitle(route), hash: route }];
       ListViewCore.render(main, {
@@ -1665,6 +1844,7 @@
         totalCount: totalCount,
         offset: offset,
         limit: limit,
+        searchModel: currentListState.__searchModel,
         savedFiltersList: savedFiltersList,
         currentListState: currentListState,
         helpers: {
@@ -1692,6 +1872,8 @@
           confirmModal: confirmModal,
           getFieldMeta: getFieldMeta,
           getSelectionOptions: getSelectionOptions,
+          saveListState: window.ActionManager && window.ActionManager.saveListState ? window.ActionManager.saveListState : null,
+          restoreListState: window.ActionManager && window.ActionManager.restoreListState ? window.ActionManager.restoreListState : null,
         }
       });
       return;
@@ -2728,8 +2910,9 @@
         html += '<div class="o-button-box">' + renderFormTreeToHtml(model, c.children || [], opts) + '</div>';
       } else if (c.type === 'button') {
         var btnName = c.name || '';
+        var btnType = c.button_type || c.action_type || (c.attrs && c.attrs.type) || 'object';
         var btnStr = (c.string || btnName).replace(/</g, '&lt;');
-        html += '<button type="button" class="btn-action-object' + (c.class ? ' ' + c.class : '') + '" data-action="' + btnName + '" style="padding:0.35rem 0.75rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff;font-size:0.9rem">' + btnStr + '</button>';
+        html += '<button type="button" class="btn-action-' + btnType + (c.class ? ' ' + c.class : '') + '" data-action="' + btnName + '" data-btn-type="' + btnType + '" style="padding:0.35rem 0.75rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:var(--color-surface-1);font-size:0.9rem">' + btnStr + '</button>';
       } else if (c.type === 'field') {
         var fieldHtml = renderFieldHtml(model, c);
         var fname = c.name || '';
@@ -2761,8 +2944,8 @@
     return html;
   }
 
-  function renderForm(model, route, id) {
-    if (FormViewCore && typeof FormViewCore.render === "function") {
+  function renderForm(model, route, id, _skipCore) {
+    if (!_skipCore && FormViewCore && typeof FormViewCore.render === "function") {
       var coreHandled = FormViewCore.render(main, {
         model: model,
         route: route,
@@ -2795,27 +2978,47 @@
         html += '<div class="attr-field" data-fname="' + (fname || '') + '">' + renderFieldHtml(model, f) + '</div>';
       });
     }
-    html += '<p><button type="submit" id="btn-save" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Save</button> ';
+    html += '<p><button type="submit" id="btn-save" class="o-btn o-btn-primary o-shortcut-target" data-shortcut="Alt+S">Save</button> ';
     html += '<a href="#' + route + '" id="form-cancel" style="margin-left:0.5rem">Cancel</a>';
     if (isNew && (model === 'crm.lead' || model === 'res.partner')) {
       html += ' <button type="button" id="btn-ai-fill" title="Extract fields from pasted text" style="margin-left:0.5rem;padding:0.5rem 1rem;background:var(--color-accent,#6366f1);color:white;border:none;border-radius:4px;cursor:pointer">AI Fill</button>';
     }
     if (!isNew) {
-      html += ' <button type="button" id="btn-duplicate" style="margin-left:0.5rem;padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Duplicate</button>';
+      html += ' <button type="button" id="btn-duplicate" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Duplicate</button>';
       const reportName = getReportName(model);
-      if (reportName) html += ' <a href="/report/html/' + reportName + '/' + id + '" target="_blank" rel="noopener" id="btn-print-form" style="margin-left:0.5rem;padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff;text-decoration:none;color:inherit">Print</a>';
+      if (reportName) {
+        html += ' <a href="/report/html/' + reportName + '/' + id + '" target="_blank" rel="noopener" id="btn-print-form" class="o-btn o-btn-secondary o-shortcut-target" data-shortcut="Alt+P" style="margin-left:0.5rem;text-decoration:none">Print</a>';
+        html += ' <button type="button" id="btn-preview-form" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Preview</button>';
+      }
       html += ' <a href="#" id="btn-delete-form" style="margin-left:0.5rem;font-size:0.9rem;color:#c00">Delete</a>';
     }
     html += '</p></form>';
     if (!isNew && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
       html += '<aside id="form-ai-sidebar" class="form-ai-sidebar" style="min-width:240px;max-width:280px;padding:var(--space-lg);background:var(--color-bg);border:1px solid var(--border-color);border-radius:var(--radius-md)">';
       html += '<h3 style="margin:0 0 var(--space-md);font-size:1rem">AI Suggestions</h3>';
-      html += '<div id="ai-suggestions-list" style="font-size:0.9rem;color:var(--text-muted)">Loading...</div>';
+      html += '<div id="ai-suggestions-list" style="font-size:0.9rem;color:var(--text-muted)">' + skeletonHtml(3, true) + '</div>';
       html += '</aside>';
     }
     html += '</div>';
     main.innerHTML = html;
     const form = document.getElementById('record-form');
+    main.querySelectorAll(".o-shortcut-target[data-shortcut]").forEach(function (el) {
+      var k = el.getAttribute("data-shortcut");
+      if (k) el.title = (el.title ? el.title + " " : "") + "(" + k + ")";
+    });
+    var previewBtn = document.getElementById("btn-preview-form");
+    if (previewBtn) {
+      previewBtn.onclick = function () {
+        var reportName = getReportName(model);
+        if (!reportName || !id) return;
+        var url = "/report/pdf/" + reportName + "/" + id;
+        if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === "function") {
+          window.UIComponents.PdfViewer.open(url, "Record Preview");
+        } else {
+          window.open(url, "_blank", "noopener");
+        }
+      };
+    }
     fields.forEach(f => {
       const fn = typeof f === 'object' ? f.name : f;
       if (isHtmlField(model, fn)) {
@@ -2850,17 +3053,59 @@
             r.readAsDataURL(file);
           };
         }
+        if (imgPreview) {
+          imgPreview.onclick = function () {
+            if (!imgPreview.src) return;
+            if (window.UIComponents && window.UIComponents.AttachmentViewer && typeof window.UIComponents.AttachmentViewer.open === "function") {
+              window.UIComponents.AttachmentViewer.open([
+                { name: fn, url: imgPreview.src, mimetype: "image/*" },
+              ], 0);
+            } else {
+              window.open(imgPreview.src, "_blank", "noopener");
+            }
+          };
+          imgPreview.style.cursor = "zoom-in";
+        }
       }
     });
-    main.querySelectorAll('.btn-action-object').forEach(function (btn) {
+    main.querySelectorAll('[data-btn-type]').forEach(function (btn) {
       var actionName = btn.getAttribute('data-action');
+      var buttonType = btn.getAttribute('data-btn-type') || 'object';
       if (!actionName || isNew) return;
       btn.onclick = function () {
         btn.disabled = true;
-        rpc.callKw(model, actionName, [[parseInt(id, 10)]], {})
+        var runner = (window.ActionManager && typeof window.ActionManager.doActionButton === 'function')
+          ? window.ActionManager.doActionButton({
+              rpc: rpc,
+              buttonType: buttonType,
+              actionId: actionName,
+              model: model,
+              method: actionName,
+              resId: parseInt(id, 10),
+              context: { active_model: model, active_id: parseInt(id, 10), active_ids: [parseInt(id, 10)] },
+            })
+          : rpc.callKw(model, actionName, [[parseInt(id, 10)]], {});
+        runner
           .then(function (result) {
             btn.disabled = false;
             if (result && typeof result === 'object' && result.type === 'ir.actions.act_window' && result.res_model) {
+              if (result.target === 'new' && window.UIComponents && window.UIComponents.ConfirmDialog && typeof window.UIComponents.ConfirmDialog.openModal === 'function') {
+                var wizardTrail = ['Wizard'];
+                var current = result;
+                var modal = window.UIComponents.ConfirmDialog.openModal({
+                  title: result.name || 'Wizard',
+                  breadcrumbs: wizardTrail,
+                  bodyHtml: '<p style="margin:0 0 var(--space-sm)">Wizard action returned <code>' + String(result.res_model || '').replace(/</g, '&lt;') + '</code>.</p><p style="color:var(--text-muted);margin:0">Complete the wizard and close to refresh parent view.</p>',
+                  onClose: function () { renderForm(model, route, id); },
+                });
+                // Simple multi-step chain support: if action payload carries `next_action`
+                while (current && current.next_action) {
+                  current = current.next_action;
+                  wizardTrail.push(current.name || 'Step');
+                }
+                if (modal && modal.setBreadcrumbs) modal.setBreadcrumbs(wizardTrail);
+                return;
+              }
               var actRoute = (result.res_model || '').replace(/\./g, '_');
               var resId = result.res_id;
               if (actRoute && resId) {
@@ -3917,7 +4162,7 @@
     const prevCal = (viewType === 'calendar' && currentListState.route === route) ? { calendarYear: currentListState.calendarYear, calendarMonth: currentListState.calendarMonth } : {};
     const prevFilters = (currentListState.route === route) ? { activeSearchFilters: currentListState.activeSearchFilters || [], groupBy: currentListState.groupBy } : {};
     currentListState = Object.assign({ model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: viewType, savedFilterId: savedFilterId || null, offset: offset, limit: limit, order: order, totalCount: 0, activeSearchFilters: [], groupBy: null }, prevCal, prevFilters);
-    main.innerHTML = '<h2>' + title + '</h2><p>Loading...</p>';
+    main.innerHTML = '<h2>' + title + '</h2>' + skeletonHtml(6, true);
     const sessionSvc = window.Services && window.Services.session;
     const uidPromise = sessionSvc && sessionSvc.getSessionInfo ? sessionSvc.getSessionInfo().then(function (info) { return info && info.uid ? info.uid : 1; }).catch(function () { return 1; }) : Promise.resolve(1);
     uidPromise.then(function (uid) {
@@ -4761,8 +5006,10 @@
   }
 
   function isFormRoute(hash) {
-    const dataRoutes = 'contacts|pipeline|crm\\/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings\\/users|settings\\/approval_rules|settings\\/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing\\/mailing_lists|marketing\\/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
-    return new RegExp('^(' + dataRoutes + ')\\/edit\\/\\d+$').test(hash) || new RegExp('^(' + dataRoutes + ')\\/new$').test(hash);
+    const dataRoutes = DATA_ROUTES_SLUGS.replace(/\//g, '\\/');
+    if (new RegExp('^(' + dataRoutes + ')\\/edit\\/\\d+$').test(hash) || new RegExp('^(' + dataRoutes + ')\\/new$').test(hash)) return true;
+    var m = hash.match(/^([a-z0-9_/-]+)\/edit\/\d+$/i) || hash.match(/^([a-z0-9_/-]+)\/new$/i);
+    return !!(m && getModelForRoute(m[1]));
   }
 
   function renderAccountingReport(reportType, title) {
@@ -4778,7 +5025,7 @@
       '<label>To <input type="date" id="report-date-to" value="' + today + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
       '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
       '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
-      '</p><div id="report-table" style="overflow-x:auto"><p style="color:var(--text-muted)">Loading...</p></div>';
+      '</p><div id="report-table" style="overflow-x:auto">' + skeletonHtml(8, true) + '</div>';
     function loadReport() {
       const df = document.getElementById('report-date-from').value || yearStart;
       const dt = document.getElementById('report-date-to').value || today;
@@ -4824,7 +5071,7 @@
     main.innerHTML = '<h2>Stock Valuation</h2><p style="margin-bottom:1rem">' +
       '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Refresh</button>' +
       '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
-      '</p><div id="report-table" style="overflow-x:auto"><p style="color:var(--text-muted)">Loading...</p></div>';
+      '</p><div id="report-table" style="overflow-x:auto">' + skeletonHtml(8, true) + '</div>';
     function loadReport() {
       rpc.callKw('product.product', 'get_stock_valuation_report', [], {})
         .then(function (rows) {
@@ -4871,7 +5118,7 @@
       '<label>Group by <select id="report-group-by" style="padding:0.35rem;margin:0 0.5rem"><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option><option value="product">Product</option></select></label>' +
       '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
       '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
-      '</p><div id="report-table" style="overflow-x:auto"><p style="color:var(--text-muted)">Loading...</p></div>';
+      '</p><div id="report-table" style="overflow-x:auto">' + skeletonHtml(8, true) + '</div>';
     function loadReport() {
       const df = document.getElementById('report-date-from').value || yearStart;
       const dt = document.getElementById('report-date-to').value || today;
@@ -4907,10 +5154,18 @@
     loadReport();
   }
 
-  function routeApply(hash, base) {
+  function routeApplyInternal(hash, base) {
+    if (main) {
+      main.classList.remove("o-view-enter");
+      main.classList.add("o-view-exit");
+      window.requestAnimationFrame(function () {
+        main.classList.remove("o-view-exit");
+        main.classList.add("o-view-enter");
+      });
+    }
     var decoded = window.ActionManager && typeof window.ActionManager.decodeStackFromHash === 'function' ? window.ActionManager.decodeStackFromHash(hash) : null;
     if (decoded && decoded.length) actionStack = decoded;
-    const dataRoutes = 'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
+    const dataRoutes = DATA_ROUTES_SLUGS;
     const editMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/edit\\/(\\d+)$'));
     const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
@@ -4925,6 +5180,9 @@
     const reportsBSMatch = hash.match(/^reports\/balance-sheet$/);
     const reportsStockValMatch = hash.match(/^reports\/stock-valuation$/);
     const reportsSalesRevMatch = hash.match(/^reports\/sales-revenue$/);
+    const genericEditMatch = hash.match(/^([a-z0-9_/-]+)\/edit\/(\d+)$/i);
+    const genericNewMatch = hash.match(/^([a-z0-9_/-]+)\/new$/i);
+    const genericListMatch = base.match(/^([a-z0-9_/-]+)$/i);
 
     if (reportsTrialMatch) {
       renderAccountingReport('trial-balance', 'Trial Balance');
@@ -4961,12 +5219,27 @@
       const model = getModelForRoute(route);
       if (model) renderForm(model, route, id);
       else renderHome();
+    } else if (genericListMatch) {
+      const route = genericListMatch[1];
+      const model = getModelForRoute(route);
+      if (model) loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+      else renderHome();
+    } else if (genericNewMatch) {
+      const route = genericNewMatch[1];
+      const model = getModelForRoute(route);
+      if (model) renderForm(model, route);
+      else renderHome();
+    } else if (genericEditMatch) {
+      const route = genericEditMatch[1], id = genericEditMatch[2];
+      const model = getModelForRoute(route);
+      if (model) renderForm(model, route, id);
+      else renderHome();
     } else {
       renderHome();
     }
   }
 
-  function route() {
+  function routeInternal() {
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
     renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
@@ -4983,16 +5256,59 @@
       return;
     }
     lastHash = hash;
-    routeApply(hash, base);
+    routeApplyInternal(hash, base);
+  }
+
+  function routeApply(hash, base) {
+    if (RouterCore && typeof RouterCore.routeApply === "function") {
+      return RouterCore.routeApply(hash, base);
+    }
+    return routeApplyInternal(hash, base);
+  }
+
+  function route() {
+    if (RouterCore && typeof RouterCore.route === "function") {
+      return RouterCore.route();
+    }
+    return routeInternal();
+  }
+
+  if (RouterCore && typeof RouterCore.setHandlers === "function") {
+    RouterCore.setHandlers({
+      renderNavbar: function () {
+        renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
+      },
+      applyRoute: routeApplyInternal,
+      isFormRoute: isFormRoute,
+      confirmLeave: function () {
+        return confirmModal({
+          title: "Unsaved changes",
+          message: "Leave without saving?",
+          confirmLabel: "Leave",
+          cancelLabel: "Stay",
+        });
+      },
+    });
+    if (typeof RouterCore.setState === "function") {
+      RouterCore.setState({ dirty: formDirty, lastHash: lastHash });
+    }
   }
 
   window.addEventListener('hashchange', route);
 
   document.addEventListener('keydown', function (e) {
+    if (e.key === "Escape") {
+      var closeBtn = document.querySelector(".o-report-preview-close, .o-attachment-close");
+      if (closeBtn) {
+        e.preventDefault();
+        closeBtn.click();
+        return;
+      }
+    }
     if (!e.altKey) return;
     const hash = (window.location.hash || '#home').slice(1);
     const base = hash.split('?')[0];
-    const dataRoutes = 'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans';
+    const dataRoutes = DATA_ROUTES_SLUGS;
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
     const formMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/(edit\\/\\d+|new)$'));
     if (e.key === 'n' && listMatch) {
@@ -5002,6 +5318,30 @@
       if (formMatch) {
         const btn = document.getElementById('btn-save');
         if (btn && !btn.disabled) { e.preventDefault(); btn.click(); }
+      }
+    } else if (e.key === 'e' || e.key === 'E') {
+      const editBtn = document.querySelector('.btn-edit, #btn-edit');
+      if (editBtn) {
+        e.preventDefault();
+        editBtn.click();
+      }
+    } else if (e.key === 'l' || e.key === 'L') {
+      if (formMatch) {
+        e.preventDefault();
+        window.location.hash = formMatch[1];
+      }
+    } else if (e.key === 'k' || e.key === 'K') {
+      if (listMatch) {
+        e.preventDefault();
+        currentListState.viewType = "kanban";
+        const model = getModelForRoute(listMatch[1]);
+        if (model) loadRecords(model, listMatch[1], currentListState.searchTerm || "");
+      }
+    } else if (e.key === 'p' || e.key === 'P') {
+      const previewBtn = document.getElementById("btn-preview-pdf") || document.getElementById("btn-print-form");
+      if (previewBtn) {
+        e.preventDefault();
+        previewBtn.click();
       }
     }
   });
@@ -5037,6 +5377,38 @@
     renderFormTreeToHtml: renderFormTreeToHtml,
   };
   if (window.AppCore) {
+    if (AppCore.FormView && typeof AppCore.FormView.setImpl === "function") {
+      AppCore.FormView.setImpl({
+        renderFieldHtml: renderFieldHtml,
+        renderFormTreeToHtml: renderFormTreeToHtml,
+        render: function (_container, opts) {
+          renderForm(opts.model, opts.route, opts.id, true);
+          return true;
+        },
+      });
+    }
+    if (AppCore.Navbar && typeof AppCore.Navbar.setImpl === "function") {
+      AppCore.Navbar.setImpl(function (opts) {
+        // Keep runtime behavior in main.js while exposing extraction boundary.
+        return false;
+      });
+    }
+    if (AppCore.Sidebar && typeof AppCore.Sidebar.setImpl === "function") {
+      AppCore.Sidebar.setImpl({
+        render: function (opts) {
+          return opts && opts.buildSidebarNavHtml
+            ? opts.buildSidebarNavHtml(opts.tree || [], opts.staleBannerHtml || "")
+            : "";
+        },
+        wire: function (opts) {
+          if (opts && typeof opts.wireSidebarAfterRender === "function") {
+            opts.wireSidebarAfterRender();
+            return true;
+          }
+          return false;
+        },
+      });
+    }
     if (AppCore.GraphView && typeof AppCore.GraphView.setImpl === "function") AppCore.GraphView.setImpl(renderGraph);
     if (AppCore.PivotView && typeof AppCore.PivotView.setImpl === "function") AppCore.PivotView.setImpl(renderPivot);
     if (AppCore.CalendarView && typeof AppCore.CalendarView.setImpl === "function") AppCore.CalendarView.setImpl(renderCalendar);

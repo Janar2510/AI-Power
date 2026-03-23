@@ -431,6 +431,7 @@ def _parse_config(args: list[str]) -> dict:
         "api_key": os.environ.get("API_KEY", ""),
         "backup_dir": os.environ.get("ERP_BACKUP_DIR", ""),
         "load_demo": os.environ.get("ERP_LOAD_DEMO", "").lower() in ("1", "true", "yes"),
+        "json_access_log": os.environ.get("ERP_JSON_ACCESS_LOG", "").lower() in ("1", "true", "yes"),
     }
 
     for arg in args:
@@ -478,6 +479,10 @@ def _parse_config(args: list[str]) -> dict:
             result["backup_dir"] = arg.split("=", 1)[1].strip()
         elif arg == "--demo":
             result["load_demo"] = True
+        elif arg == "--json-access-log":
+            result["json_access_log"] = True
+        elif arg == "--no-json-access-log":
+            result["json_access_log"] = False
 
     return result
 

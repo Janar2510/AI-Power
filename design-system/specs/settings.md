@@ -1,5 +1,7 @@
 # Settings — UI specification
 
+Inherits [foundations.md](./foundations.md) and [app-shell.md](./app-shell.md).
+
 Enterprise settings area: index (card grid + nav) and sub-pages (breadcrumbs + focused forms/tables). All surfaces use CSS custom properties only; spacing uses `--space-*` and `--card-gap`.
 
 ## Settings index
@@ -46,6 +48,7 @@ Helper: `UIComponents.SettingsTable.create(parent, columnLabels)` → `{ table, 
 ## Dark mode
 
 - All colors from `var(--*)` tokens inherited from `webclient.css`. No `#rgb` / `#rrggbb` in new settings CSS except where tokens are defined at `:root` / `[data-theme="dark"]`.
+- Settings should read as a high-trust administration surface with stronger sheet clarity than the dashboard but shared shell materials.
 
 ## Accessibility
 

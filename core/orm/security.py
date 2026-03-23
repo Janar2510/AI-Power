@@ -128,6 +128,13 @@ def _get_company_ids(env: Any, uid: int) -> List:
     if not env or not uid:
         return []
     try:
+        ctx = getattr(env, "context", {}) or {}
+        allowed_ctx = ctx.get("allowed_company_ids")
+        if isinstance(allowed_ctx, (list, tuple)) and allowed_ctx:
+            return [int(x) for x in allowed_ctx if str(x).isdigit()]
+    except Exception:
+        pass
+    try:
         User = env.get("res.users")
         if not User:
             return []
@@ -244,6 +251,16 @@ def get_record_rules(model_name: str, uid: int, env: Any = None, operation: str 
         domain = _parse_domain_force(str(spec.get("domain_force") or ""), uid, company_ids, env=env)
         if domain:
             out.append(domain)
+    # Phase 431: default multi-company guard when model has company_id.
+    try:
+        if env and company_ids:
+            M = env.get(model_name)
+            if M and hasattr(M, "fields_get"):
+                fmeta = M.fields_get()
+                if isinstance(fmeta, dict) and "company_id" in fmeta:
+                    out.append([["company_id", "in", company_ids]])
+    except Exception:
+        pass
     # Phase 101: portal users see only crm.lead where partner_id = their partner
     if model_name == "crm.lead" and env and uid:
         try:

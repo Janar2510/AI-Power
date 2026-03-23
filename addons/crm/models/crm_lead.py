@@ -61,6 +61,26 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
             return [None] * len(self)
         names = {r["id"]: r.get("name") for r in Partner.browse(partner_ids).read(["id", "name"])}
         return [names.get(r.get("partner_id")) if r.get("partner_id") else None for r in rows]
+
+    @api.depends("expected_revenue", "priority", "ai_score", "type")
+    def _compute_ai_win_probability(self):
+        """Heuristic win probability for pipeline forecasting (Phase 497 predictive track)."""
+        if not self:
+            return []
+        rows = self.read(["expected_revenue", "priority", "ai_score", "type"])
+        out = []
+        for r in rows:
+            base = float(r.get("ai_score") or 40.0)
+            rev = float(r.get("expected_revenue") or 0.0)
+            base += min(35.0, rev / 1000.0)
+            pr = r.get("priority") or "1"
+            if pr == "3":
+                base += 10.0
+            if r.get("type") == "opportunity":
+                base += 5.0
+            out.append(min(99.0, max(1.0, base)))
+        return out
+
     stage_id = fields.Many2one("crm.stage", string="Stage", tracking=True)
     user_id = fields.Many2one("res.users", string="Salesperson")  # Phase 220: for assign_lead
     ai_score = fields.Float(string="AI Score", readonly=True)  # Phase 220: 0-100
@@ -69,6 +89,11 @@ class CrmLead(MailActivityMixin, MailThreadMixin, Model):
         string="AI Score",
         readonly=True,
     )  # Phase 220
+    ai_win_probability = fields.Float(
+        string="AI Win probability %",
+        compute="_compute_ai_win_probability",
+        store=False,
+    )
     priority = fields.Selection(
         selection=[("0", "Low"), ("1", "Normal"), ("2", "High"), ("3", "Urgent")],
         string="Priority",

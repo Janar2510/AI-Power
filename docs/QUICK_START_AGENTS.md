@@ -31,8 +31,9 @@ uipro init --ai cursor
 ### Usage in Team Flow
 
 1. UI/UX Designer runs the design system generator and updates `design-system/MASTER.md`.
-2. Frontend Builder implements UI from that spec using CSS custom properties and component patterns.
-3. Both agents follow accessibility and responsive checks from UI UX Pro Max guidance.
+2. UI/UX Designer aligns specs with `docs/brand-system.md`, `docs/frontend-design-rules.md`, and the app-shell/foundations specs.
+3. Frontend Builder implements UI from that spec using CSS custom properties, shell-first patterns, and class-based styling.
+4. Both agents follow accessibility, responsive, and light/dark-mode checks from the project design rules.
 
 ## Standard Development Loop
 
@@ -75,10 +76,12 @@ These files are always read by agents before acting:
 |------|---------|
 | `docs/architecture.md` | System design |
 | `docs/ai-rules.md` | Coding rules |
+| `docs/brand-system.md` | Product brand and naming |
+| `docs/frontend-design-rules.md` | Frontend design constraints |
 | `docs/parity_matrix.md` | Odoo 19 parity status |
 | `changelog.md` | All changes (Phase 1–389) |
 | `DeploymentChecklist.md` | Deployment notes |
-| `core/release.py` | Current version (v1.177.0) |
+| `core/release.py` | Current version |
 
 ## Quality Gates
 
@@ -92,10 +95,10 @@ Every feature must pass before merge:
 
 ## Current Status
 
-- **Version**: v1.177.0
-- **Completed Phases**: 1–389
-- **Next Focus**: Wave 6+ deferred items (payment providers, theme editor UI, JSON-2 API, mobile layer)
-- **Modules**: 391 addons, 100+ test files
+- **Version**: see `core/release.py`
+- **Completed Phases**: see `docs/parity_matrix.md`
+- **Next Focus**: parity-safe implementation and shell/design-system modernization
+- **Modules**: see `addons/` and parity docs for current counts
 
 ## File Structure Reference
 

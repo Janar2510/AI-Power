@@ -1,5 +1,6 @@
 """Report rendering - Jinja2 HTML templates, optional PDF via weasyprint."""
 
+import base64
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -24,14 +25,18 @@ _REPORT_REGISTRY: Dict[str, tuple] = {
 
 
 def _get_report_from_db(report_name: str, db: str, registry: Any) -> Optional[tuple]:
-    """Look up report metadata from ir.actions.report (Phase 110). Returns (model, template_path, fields) or None."""
+    """Look up report metadata from ir.actions.report (Phase 110/429)."""
     try:
         with get_cursor(db) as cr:
             env = Environment(registry, cr=cr, uid=1)
             Report = env.get("ir.actions.report")
             if not Report:
                 return None
-            rows = Report.search_read([("report_name", "=", report_name)], ["model", "report_file", "fields_csv"], limit=1)
+            rows = Report.search_read(
+                [("report_name", "=", report_name)],
+                ["model", "report_file", "fields_csv", "attachment_use", "attachment", "paperformat_id"],
+                limit=1,
+            )
             if not rows:
                 return None
             r = rows[0]
@@ -41,7 +46,16 @@ def _get_report_from_db(report_name: str, db: str, registry: Any) -> Optional[tu
                 return None
             fields_csv = (r.get("fields_csv") or "").strip()
             fields = [f.strip() for f in fields_csv.split(",") if f.strip()] if fields_csv else ["id", "name"]
-            return (model_name, report_file, fields)
+            return (
+                model_name,
+                report_file,
+                fields,
+                {
+                    "attachment_use": bool(r.get("attachment_use")),
+                    "attachment": r.get("attachment") or "",
+                    "paperformat_id": r.get("paperformat_id"),
+                },
+            )
     except Exception:
         return None
 
@@ -58,6 +72,30 @@ def _load_template(module: str, rel_path: str) -> Optional[str]:
         return path.read_text(encoding="utf-8")
     except OSError:
         return None
+
+
+def _qwebish_to_jinja(content: str) -> str:
+    """Very small QWeb-ish directive mapping for report templates."""
+    s = content or ""
+    # <t t-foreach="records" t-as="r">...</t>
+    s = re.sub(
+        r'<t\s+[^>]*t-foreach="([^"]+)"\s+[^>]*t-as="([^"]+)"[^>]*>',
+        r"{% for \2 in \1 %}",
+        s,
+    )
+    # <t t-if="cond">...</t>
+    s = re.sub(r'<t\s+[^>]*t-if="([^"]+)"[^>]*>', r"{% if \1 %}", s)
+    # <t t-esc="expr"/> or with closing tag
+    s = re.sub(r'<t\s+[^>]*t-esc="([^"]+)"\s*/>', r"{{ \1 | e }}", s)
+    s = re.sub(r'<t\s+[^>]*t-esc="([^"]+)"[^>]*>\s*</t>', r"{{ \1 | e }}", s)
+    # <t t-raw="expr"/>
+    s = re.sub(r'<t\s+[^>]*t-raw="([^"]+)"\s*/>', r"{{ \1 | safe }}", s)
+    s = re.sub(r'<t\s+[^>]*t-raw="([^"]+)"[^>]*>\s*</t>', r"{{ \1 | safe }}", s)
+    # Generic </t>
+    s = s.replace("</t>", "{% endfor %}")
+    # Balance accidental endfor for if blocks: convert `endfor` near preceding if to endif when obvious.
+    s = re.sub(r"(\{% if [^%]+%\})((?:.|\n)*?)\{% endfor %\}", r"\1\2{% endif %}", s)
+    return s
 
 
 def _render_report_html(report_name: str, ids: List[int], request: Request) -> Optional[Response]:
@@ -124,7 +162,7 @@ def _render_report_html(report_name: str, ids: List[int], request: Request) -> O
         if template_engine != "jinja2":
             template_engine = "jinja2"
         from jinja2 import Template
-        template = Template(content)
+        template = Template(_qwebish_to_jinja(content))
         html = template.render(records=records, report_name=report_name)
         return Response(html, mimetype="text/html; charset=utf-8")
     except Exception as e:
@@ -136,12 +174,62 @@ def _render_report_pdf(report_name: str, ids: List[int], request: Request) -> Op
     html_resp = _render_report_html(report_name, ids, request)
     if not html_resp or html_resp.status_code != 200:
         return html_resp
+    uid = get_session_uid(request)
+    db = get_session_db(request)
+    if uid is None:
+        return Response("Unauthorized", status=401)
+    registry = _get_registry(db)
+    # Optional attachment cache by report_name/model/id.
+    try:
+        reg = _get_report_from_db(report_name, db, registry)
+        if reg and len(reg) > 3 and reg[3].get("attachment_use") and len(ids) == 1:
+            model_name = reg[0]
+            aid_name = f"{report_name}-{ids[0]}.pdf"
+            with get_cursor(db) as cr:
+                env = Environment(registry, cr=cr, uid=uid)
+                Att = env.get("ir.attachment")
+                if Att:
+                    existing = Att.search_read(
+                        [("res_model", "=", model_name), ("res_id", "=", ids[0]), ("name", "=", aid_name)],
+                        ["id", "datas"],
+                        limit=1,
+                    )
+                    if existing and existing[0].get("datas"):
+                        return Response(base64.b64decode(existing[0]["datas"]), mimetype="application/pdf")
+    except Exception:
+        pass
     try:
         pdf_engine = (config.get_config().get("report_pdf_engine", "weasyprint") or "weasyprint").lower()
         if pdf_engine != "weasyprint":
             pdf_engine = "weasyprint"
         from weasyprint import HTML
         pdf_bytes = HTML(string=html_resp.get_data(as_text=True)).write_pdf()
+        # Save cache attachment when configured.
+        try:
+            reg = _get_report_from_db(report_name, db, registry)
+            if reg and len(reg) > 3 and reg[3].get("attachment_use") and len(ids) == 1:
+                model_name = reg[0]
+                aid_name = f"{report_name}-{ids[0]}.pdf"
+                with get_cursor(db) as cr:
+                    env = Environment(registry, cr=cr, uid=uid)
+                    Att = env.get("ir.attachment")
+                    if Att:
+                        encoded = base64.b64encode(pdf_bytes).decode()
+                        old = Att.search([("res_model", "=", model_name), ("res_id", "=", ids[0]), ("name", "=", aid_name)], limit=1)
+                        if old and old.ids:
+                            Att.browse(old.ids).write({"datas": encoded, "mimetype": "application/pdf"})
+                        else:
+                            Att.create(
+                                {
+                                    "name": aid_name,
+                                    "res_model": model_name,
+                                    "res_id": ids[0],
+                                    "datas": encoded,
+                                    "mimetype": "application/pdf",
+                                }
+                            )
+        except Exception:
+            pass
         return Response(pdf_bytes, mimetype="application/pdf")
     except ImportError:
         return html_resp
@@ -150,10 +238,36 @@ def _render_report_pdf(report_name: str, ids: List[int], request: Request) -> Op
 
 
 REPORT_PATH_RE = re.compile(r"^/report/(html|pdf)/([a-zA-Z0-9_.]+)/([\d,]+)$")
+REPORT_ASYNC_RE = re.compile(r"^/report/pdf_async/([a-zA-Z0-9_.]+)/([\d,]+)$")
 
 
 def handle_report(request: Request) -> Optional[Response]:
     """Handle /report/html/<name>/<ids> or /report/pdf/<name>/<ids>. Returns None if path doesn't match."""
+    ma = REPORT_ASYNC_RE.match(request.path)
+    if ma:
+        report_name, ids_str = ma.group(1), ma.group(2)
+        ids = [int(x.strip()) for x in ids_str.split(",") if x.strip()]
+        uid = get_session_uid(request)
+        db = get_session_db(request)
+        if uid is None:
+            return Response("Unauthorized", status=401)
+        registry = _get_registry(db)
+        with get_cursor(db) as cr:
+            env = Environment(registry, cr=cr, uid=uid)
+            Async = env.get("ir.async")
+            if not Async:
+                return Response('{"error":"ir.async not available"}', status=400, mimetype="application/json")
+            job = Async.call(
+                "ir.actions.report",
+                "generate_pdf_job",
+                [report_name, ids],
+                {},
+                name=f"PDF {report_name}",
+            )
+            return Response(
+                '{"queued": true, "job_id": %s}' % (job.id if hasattr(job, "id") else "null"),
+                mimetype="application/json",
+            )
     m = REPORT_PATH_RE.match(request.path)
     if not m:
         return None

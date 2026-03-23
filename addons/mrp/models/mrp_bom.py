@@ -20,6 +20,7 @@ class MrpBom(Model):
     product_id = fields.Many2one("product.product", string="Product", required=True)
     product_qty = fields.Float(string="Quantity", default=1.0)
     bom_line_ids = fields.One2many("mrp.bom.line", "bom_id", string="Components")
+    operation_ids = fields.One2many("mrp.bom.operation", "bom_id", string="Operations")
     type = fields.Selection(
         selection=[
             ("normal", "Manufacture this product"),

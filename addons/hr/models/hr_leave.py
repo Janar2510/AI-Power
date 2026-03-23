@@ -52,13 +52,23 @@ class HrLeave(Model):
         default="draft",
         tracking=True,
     )
+    work_entry_note = fields.Text(
+        string="Work Entry Adjustment",
+        readonly=True,
+        help="Filled when leave is approved (Phase 491 HR lifecycle).",
+    )
 
     @classmethod
-    def create(cls, vals):
+    def _create_hr_leave_record(cls, vals):
+        """Default `number_of_days` from dates + ORM insert (Phase 487: merge-safe for `_inherit` create)."""
         if "date_from" in vals or "date_to" in vals:
             vals = dict(vals)
             vals["number_of_days"] = _weekday_count(vals.get("date_from"), vals.get("date_to"))
         return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_hr_leave_record(vals)
 
     def write(self, vals):
         vals = dict(vals)
@@ -74,8 +84,13 @@ class HrLeave(Model):
         self.write({"state": "confirm"})
 
     def action_validate(self):
-        """Manager approves."""
-        self.write({"state": "validate"})
+        """Manager approves; record work-entry adjustment note for payroll visibility."""
+        for rec in self:
+            row = rec.read(["number_of_days"])[0]
+            days = float(row.get("number_of_days") or 0)
+            note = f"Leave approved: {days:g} working day(s) marked for work entry adjustment."
+            rec.write({"state": "validate", "work_entry_note": note})
+        return True
 
     def action_refuse(self):
         """Manager refuses."""

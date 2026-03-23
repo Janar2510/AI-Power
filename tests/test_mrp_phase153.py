@@ -130,3 +130,55 @@ class TestMrpPhase153(unittest.TestCase):
             for mid in move_ids:
                 m = Move.browse(mid).read(["state"])[0]
                 self.assertEqual(m["state"], "done")
+
+    def test_mrp_cancel_cancels_open_moves(self):
+        """After confirm, cancel MO should set linked moves to cancel (Phase 489)."""
+        if not self._has_db:
+            self.skipTest("DB _test_rpc_read not found; run: ./erp-bin db init -d _test_rpc_read")
+        parse_config(["--addons-path=" + self._addons_path])
+        registry = Registry(self.db)
+        from core.orm.models import ModelBase
+        ModelBase._registry = registry
+        clear_loaded_addon_modules()
+        load_module_graph()
+        with get_cursor(self.db) as cr:
+            init_schema(cr, registry)
+            env = Environment(registry, cr=cr, uid=1)
+            registry.set_env(env)
+            load_default_data(env)
+            Production = env.get("mrp.production")
+            Bom = env.get("mrp.bom")
+            Product = env.get("product.product")
+            Move = env.get("stock.move")
+            BomLine = env.get("mrp.bom.line")
+            if not all([Production, Bom, Product, Move, BomLine]):
+                self.skipTest("Required models not loaded")
+            products = Product.search_read([], ["id"], limit=2)
+            if len(products) < 2:
+                Product.create({"name": "Raw C", "list_price": 1.0})
+                Product.create({"name": "Fin C", "list_price": 5.0})
+                products = Product.search_read([], ["id"], limit=2)
+            raw_id = products[0]["id"]
+            finished_id = products[1]["id"]
+            bom = Bom.create({
+                "name": "BOM Cancel Test",
+                "product_id": finished_id,
+                "product_qty": 1.0,
+            })
+            BomLine.create({"bom_id": bom.id, "product_id": raw_id, "product_qty": 1.0})
+            mo = Production.create({
+                "product_id": finished_id,
+                "bom_id": bom.id,
+                "product_qty": 1.0,
+                "state": "draft",
+            })
+            mo.action_confirm()
+            self.assertEqual(mo.read(["state"])[0]["state"], "confirmed")
+            moves = mo.read(["move_ids"])[0].get("move_ids") or []
+            move_ids = [x[0] if isinstance(x, (list, tuple)) else x for x in moves if x]
+            self.assertGreater(len(move_ids), 0)
+            mo.action_cancel()
+            self.assertEqual(mo.read(["state"])[0]["state"], "cancel")
+            for mid in move_ids:
+                st = Move.browse(mid).read(["state"])[0].get("state")
+                self.assertEqual(st, "cancel", f"move {mid} should be cancelled")

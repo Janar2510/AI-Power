@@ -45,13 +45,18 @@ class MailActivity(Model):
     state = fields.Char(string="Status")  # overdue, today, planned - set on create/write
 
     @classmethod
-    def create(cls: Type[T], vals: Dict[str, Any]) -> T:
+    def _create_mail_activity_record(cls: Type[T], vals: Dict[str, Any]) -> T:
+        """ORM insert after defaulting `state` from deadline (Phase 485: merge-safe for `_inherit` create)."""
         vals = dict(vals)
         if "state" not in vals and "date_deadline" in vals:
             vals["state"] = _state_from_deadline(vals["date_deadline"])
         elif "state" not in vals:
             vals["state"] = "planned"
         return super().create(vals)
+
+    @classmethod
+    def create(cls: Type[T], vals: Dict[str, Any]) -> T:
+        return cls._create_mail_activity_record(vals)
 
     def write(self, vals: Dict[str, Any]) -> bool:
         vals = dict(vals)

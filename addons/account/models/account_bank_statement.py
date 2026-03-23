@@ -10,13 +10,18 @@ class AccountBankStatement(Model):
     name = fields.Char(string="Reference", required=True, default="New")
 
     @classmethod
-    def create(cls, vals):
+    def _create_account_bank_statement_record(cls, vals):
+        """Name from sequence + ORM insert (Phase 487: merge-safe for `_inherit` create)."""
         if vals.get("name") == "New" or not vals.get("name"):
             env = getattr(cls._registry, "_env", None) if cls._registry else None
             IrSequence = env.get("ir.sequence") if env else None
             next_val = IrSequence.next_by_code("account.bank.statement") if IrSequence else None
             vals = dict(vals, name=f"BSTAT/{next_val:05d}" if next_val is not None else "New")
         return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_account_bank_statement_record(vals)
     journal_id = fields.Many2one("account.journal", string="Journal", required=True)
     currency_id = fields.Many2one("res.currency", string="Currency")  # Phase 200: statement currency
     date = fields.Date(string="Date", required=True)

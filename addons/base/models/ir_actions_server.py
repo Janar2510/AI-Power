@@ -1,6 +1,7 @@
 """ir.actions.server - Server actions (Phase 119)."""
 
 from core.orm import Model, fields
+from core.tools.safe_eval import safe_exec
 
 
 class IrActionsServer(Model):
@@ -46,7 +47,7 @@ class IrActionsServer(Model):
         if not code:
             return
         rec = next(iter(records), None) if records and records.ids else None
-        safe_builtins = {
+        safe_context = {
             "env": env,
             "record": rec,
             "records": records,
@@ -56,10 +57,8 @@ class IrActionsServer(Model):
             import logging
             logging.getLogger("erp.actions").warning("Server action: records empty, skipping")
             return
-        import builtins
-        exec_globals = {"__builtins__": builtins.__dict__, **safe_builtins}
         try:
-            exec(code, exec_globals, exec_globals)
+            safe_exec(code, safe_context)
         except Exception as e:
             import logging
             logging.getLogger("erp.actions").warning("Server action code failed: %s", e)
@@ -70,3 +69,21 @@ class IrActionsServer(Model):
         code = (data[0].get("code") or "").strip() if data else ""
         if code:
             self._run_code(action, records, code)
+
+    @classmethod
+    def run_server_action(cls, action_id, model=None, res_id=None, context=None):
+        """Run server action and return optional follow-up action payload."""
+        env = getattr(cls, "env", None)
+        if not env:
+            return {"ok": False, "error": "env missing"}
+        action = cls.browse([int(action_id)])
+        if not action or not action.ids:
+            return {"ok": False, "error": "action not found"}
+        records = None
+        if model and res_id:
+            try:
+                records = env.get(model).browse([int(res_id)])
+            except Exception:
+                records = None
+        action.run(records=records)
+        return {"ok": True}

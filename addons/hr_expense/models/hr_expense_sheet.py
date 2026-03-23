@@ -44,13 +44,18 @@ class HrExpenseSheet(Model):
         return result
 
     @classmethod
-    def create(cls, vals):
+    def _create_hr_expense_sheet_record(cls, vals):
+        """Name from sequence + ORM insert (Phase 488: merge-safe for `_inherit` create)."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         if vals.get("name") == "New" or not vals.get("name"):
             IrSeq = env.get("ir.sequence") if env else None
             next_val = IrSeq.next_by_code("hr.expense.sheet") if IrSeq else None
             vals = dict(vals, name=f"EXP/{next_val:05d}" if next_val else "New")
         return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_hr_expense_sheet_record(vals)
 
     def action_submit(self):
         self.write({"state": "submit"})

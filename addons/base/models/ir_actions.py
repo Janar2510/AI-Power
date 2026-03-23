@@ -36,3 +36,12 @@ class IrActionsReport(Model):
     report_file = fields.Char(required=True, string="Template Path")
     report_type = fields.Char(string="Report Type", default="qweb-html")
     fields_csv = fields.Text(string="Fields CSV")
+    paperformat_id = fields.Many2one("report.paperformat", string="Paperformat")
+    attachment = fields.Char(string="Attachment Name")
+    attachment_use = fields.Boolean(string="Reload from Attachment", default=False)
+
+    @classmethod
+    def generate_pdf_job(cls, report_name, ids, env=None):
+        """Background placeholder for Phase 430 async report generation."""
+        # Rendering still happens through /report/pdf; this job is used as queue/audit marker.
+        return {"report_name": report_name, "ids": ids or [], "status": "queued"}

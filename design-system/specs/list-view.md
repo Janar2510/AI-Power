@@ -1,5 +1,7 @@
 # List View + Control Panel Specification
 
+Inherits [foundations.md](./foundations.md) and [app-shell.md](./app-shell.md).
+
 List pages use a reusable control panel and table renderer while preserving current list behaviors (search, filters, grouping, bulk actions, export/import, paging).
 
 ## List page shell
@@ -87,3 +89,4 @@ List pages use a reusable control panel and table renderer while preserving curr
 - All new colors must come from CSS custom properties
 - No hardcoded hex colors for new list/control-panel styles
 - Preserve existing design language used by dashboard/settings
+- Dense table surfaces should keep a clear work-plane hierarchy with subtle row depth, strong selection cues, and restrained shell chrome.

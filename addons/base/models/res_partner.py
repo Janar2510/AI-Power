@@ -36,6 +36,11 @@ class ResPartner(Model):
         return [r.get("name") or "" for r in rows]
 
     @classmethod
+    def _create_res_partner_record(cls, vals):
+        """Insert partner row (Phase 480: `_inherit` create overrides call this, not `super().create`)."""
+        return super().create(vals)
+
+    @classmethod
     def _onchange_country_id(cls, vals):
         """Clear state_id when country changes."""
         return {"state_id": None}

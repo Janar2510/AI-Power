@@ -32,13 +32,25 @@ class AccountMovePayment(Model):
     @api.depends("transaction_ids")
     def _compute_transaction_count(self):
         for move in self:
-            move.transaction_count = len(move.transaction_ids) if move.transaction_ids else 0
+            txs = AccountMovePayment._get_linked_transactions(self, move)
+            move.transaction_count = len(txs.ids) if getattr(txs, "ids", None) else 0
 
     @api.depends("transaction_ids")
     def _compute_amount_paid(self):
         for move in self:
-            if not move.transaction_ids:
+            txs = AccountMovePayment._get_linked_transactions(self, move)
+            if not getattr(txs, "ids", None):
                 move.amount_paid = 0.0
                 continue
-            rows = move.transaction_ids.read(["amount", "state"])
+            rows = txs.read(["amount", "state"])
             move.amount_paid = sum(r.get("amount") or 0.0 for r in rows if r.get("state") == "done")
+
+    def _get_linked_transactions(self, move):
+        """Prefer explicit relation rows, but fall back to direct account_move_id links."""
+        if getattr(move, "transaction_ids", None):
+            return move.transaction_ids
+        env = getattr(self, "env", None)
+        Transaction = env.get("payment.transaction") if env else None
+        if not Transaction or not getattr(move, "ids", None):
+            return []
+        return Transaction.search([("account_move_id", "=", move.ids[0])])

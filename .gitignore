@@ -7,6 +7,7 @@ __pycache__/
 .coverage
 htmlcov/
 venv/
+.venv/
 .env
 
 # IDE
@@ -19,3 +20,9 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Node (web bundler Phase 481)
+node_modules/
+addons/web/static/dist/*.js
+addons/web/static/dist/*.map
+!addons/web/static/dist/.gitkeep

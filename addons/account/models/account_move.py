@@ -12,13 +12,18 @@ class AccountMove(Model):
     date = fields.Date(string="Date")
 
     @classmethod
-    def create(cls, vals):
+    def _create_account_move_record(cls, vals):
+        """Insert move row after default name from sequence (Phase 481: merge-safe for `_inherit` create)."""
         if vals.get("name") == "New" or not vals.get("name"):
             env = getattr(cls._registry, "_env", None) if cls._registry else None
             IrSequence = env.get("ir.sequence") if env else None
             next_val = IrSequence.next_by_code("account.move") if IrSequence else None
             vals = dict(vals, name=f"INV/{next_val:05d}" if next_val is not None else "New")
         return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_account_move_record(vals)
     journal_id = fields.Many2one("account.journal", string="Journal", required=True)
     partner_id = fields.Many2one("res.partner", string="Partner")
     currency_id = fields.Many2one("res.currency", string="Currency")
@@ -92,51 +97,82 @@ class AccountMove(Model):
         """Residual amount in invoice currency (Phase 200). 0 when paid."""
         if not self:
             return []
+        return [AccountMove._compute_amount_residual_for_move(self, move) for move in self]
+
+    def _compute_amount_residual_for_move(self, move):
+        """Compute residual amount for a single invoice, net of completed transactions."""
         env = getattr(self, "env", None)
         MoveLine = env.get("account.move.line") if env else None
         Account = env.get("account.account") if env else None
         if not MoveLine or not Account:
-            return [0.0] * len(self.ids)
+            return 0.0
         recv = Account.search([("account_type", "=", "asset_receivable")], limit=1)
         pay = Account.search([("account_type", "=", "liability_payable")], limit=1)
         recv_ids = recv.ids if recv else []
         pay_ids = pay.ids if pay else []
-        result = []
+        if move.read(["state"])[0].get("state") == "paid":
+            return 0.0
+        move_row = move.read(["move_type", "currency_id"])[0]
+        move_type = move_row.get("move_type", "")
+        currency_id = move_row.get("currency_id")
+        currency_id = currency_id[0] if isinstance(currency_id, (list, tuple)) and currency_id else currency_id
+        lines = MoveLine.search([("move_id", "=", move.ids[0])])
+        line_rows = lines.read(["account_id", "debit", "credit", "amount_currency", "currency_id"]) if getattr(lines, "ids", []) else []
+        total = 0.0
+        if move_type == "out_invoice" and recv_ids:
+            for r in line_rows:
+                aid = r.get("account_id")
+                aid = aid[0] if isinstance(aid, (list, tuple)) and aid else aid
+                if aid in recv_ids:
+                    line_cur = r.get("currency_id")
+                    line_cur = line_cur[0] if isinstance(line_cur, (list, tuple)) and line_cur else line_cur
+                    if currency_id and line_cur == currency_id and (r.get("amount_currency") or 0) != 0:
+                        total += float(r.get("amount_currency") or 0)
+                    else:
+                        total += float(r.get("debit") or 0) - float(r.get("credit") or 0)
+        elif move_type == "in_invoice" and pay_ids:
+            for r in line_rows:
+                aid = r.get("account_id")
+                aid = aid[0] if isinstance(aid, (list, tuple)) and aid else aid
+                if aid in pay_ids:
+                    line_cur = r.get("currency_id")
+                    line_cur = line_cur[0] if isinstance(line_cur, (list, tuple)) and line_cur else line_cur
+                    if currency_id and line_cur == currency_id and (r.get("amount_currency") or 0) != 0:
+                        total += abs(float(r.get("amount_currency") or 0))
+                    else:
+                        total += float(r.get("credit") or 0) - float(r.get("debit") or 0)
+        total -= AccountMove._get_done_transaction_amount_for_move(self, move)
+        return max(abs(total), 0.0) if total < 0 else max(total, 0.0)
+
+    def _get_done_transaction_amount_for_move(self, move):
+        """Sum completed payment.transaction amounts linked to a single invoice."""
+        env = getattr(self, "env", None)
+        Transaction = env.get("payment.transaction") if env else None
+        if not Transaction:
+            return 0.0
+        total = 0.0
+        if not move.ids:
+            return 0.0
+        txs = Transaction.search([("account_move_id", "=", move.ids[0]), ("state", "=", "done")])
+        if not getattr(txs, "ids", []):
+            return 0.0
+        rows = txs.read(["amount", "state"])
+        total += sum(float(row.get("amount") or 0.0) for row in rows if row.get("state") == "done")
+        return total
+
+    def _sync_payment_state_from_transactions(self):
+        """Mark invoices paid when done transactions fully cover the residual."""
         for move in self:
-            if move.read(["state"])[0].get("state") == "paid":
-                result.append(0.0)
+            if not move.ids:
                 continue
-            move_type = move.read(["move_type", "currency_id"])[0].get("move_type", "")
-            currency_id = move.read(["currency_id"])[0].get("currency_id")
-            currency_id = currency_id[0] if isinstance(currency_id, (list, tuple)) and currency_id else currency_id
-            lines = MoveLine.search([("move_id", "=", move.ids[0])])
-            total = 0.0
-            if move_type == "out_invoice" and recv_ids:
-                for ln in lines:
-                    r = ln.read(["account_id", "debit", "credit", "amount_currency", "currency_id"])[0]
-                    aid = r.get("account_id")
-                    aid = aid[0] if isinstance(aid, (list, tuple)) and aid else aid
-                    if aid in recv_ids:
-                        line_cur = r.get("currency_id")
-                        line_cur = line_cur[0] if isinstance(line_cur, (list, tuple)) and line_cur else line_cur
-                        if currency_id and line_cur == currency_id and (r.get("amount_currency") or 0) != 0:
-                            total += float(r.get("amount_currency") or 0)
-                        else:
-                            total += float(r.get("debit") or 0) - float(r.get("credit") or 0)
-            elif move_type == "in_invoice" and pay_ids:
-                for ln in lines:
-                    r = ln.read(["account_id", "debit", "credit", "amount_currency", "currency_id"])[0]
-                    aid = r.get("account_id")
-                    aid = aid[0] if isinstance(aid, (list, tuple)) and aid else aid
-                    if aid in pay_ids:
-                        line_cur = r.get("currency_id")
-                        line_cur = line_cur[0] if isinstance(line_cur, (list, tuple)) and line_cur else line_cur
-                        if currency_id and line_cur == currency_id and (r.get("amount_currency") or 0) != 0:
-                            total += abs(float(r.get("amount_currency") or 0))
-                        else:
-                            total += float(r.get("credit") or 0) - float(r.get("debit") or 0)
-            result.append(abs(total))
-        return result
+            state = move.read(["state"])[0].get("state")
+            if state not in ("posted", "paid"):
+                continue
+            residual = float(AccountMove._compute_amount_residual_for_move(self, move))
+            if residual <= 0.0001 and state != "paid":
+                move.write({"state": "paid"})
+            elif residual > 0.0001 and state == "paid":
+                move.write({"state": "posted"})
 
     line_ids = fields.One2many(
         "account.move.line",
@@ -144,8 +180,36 @@ class AccountMove(Model):
         string="Journal Items",
     )
 
+    def _validate_balanced_before_post(self):
+        """Ensure the move has journal lines and is balanced before posting."""
+        MoveLine = self.env.get("account.move.line") if getattr(self, "env", None) else None
+        if not MoveLine:
+            return
+        move_rows = self.read(["state"])
+        for mrow in move_rows:
+            rid = mrow.get("id")
+            if not rid:
+                continue
+            st = mrow.get("state") or "draft"
+            if st != "draft":
+                raise ValueError("Cannot post move unless it is in draft state")
+            lines = MoveLine.search([("move_id", "=", rid)])
+            if not getattr(lines, "ids", []):
+                raise ValueError("Cannot post move without journal lines")
+            rows = lines.read(["debit", "credit", "account_id"])
+            for row in rows:
+                aid = row.get("account_id")
+                aid = aid[0] if isinstance(aid, (list, tuple)) and aid else aid
+                if not aid:
+                    raise ValueError("Cannot post move with journal items missing an account")
+            total_debit = sum(float(row.get("debit") or 0) for row in rows)
+            total_credit = sum(float(row.get("credit") or 0) for row in rows)
+            if abs(total_debit - total_credit) > 0.0001:
+                raise ValueError("Cannot post move unless journal items are balanced")
+
     def action_post(self):
         """Post the move: draft -> posted."""
+        self._validate_balanced_before_post()
         self.write({"state": "posted"})
 
     def action_cancel(self):

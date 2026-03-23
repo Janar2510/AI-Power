@@ -14,7 +14,13 @@ from core.orm.security import build_access_map, check_access, get_user_groups
 from core.tools import config
 
 from .request import Request
-from .auth import get_session_uid, get_session_db, _get_registry
+from .auth import (
+    get_session_uid,
+    get_session_db,
+    get_session_company_id_from_request,
+    get_session_allowed_company_ids_from_request,
+    _get_registry,
+)
 
 _logger = logging.getLogger("erp.rpc")
 
@@ -76,6 +82,7 @@ _CLASS_METHODS = frozenset({
     "write_ids",
     "fields_get", "default_get", "onchange", "name_get", "name_search", "write", "copy",
     "process_email_queue",  # Phase 166: mail.mail class method
+    "call", "call_notify", "run_pending", "gc_done",  # Phase 427: ir.async
 })
 
 
@@ -103,14 +110,14 @@ def _merge_args_kwargs(fn: Any, args: List, kwargs: Dict) -> tuple:
         return args, kwargs
 
 
-def _call_kw(uid: int, db: str, model: str, method: str, args: List, kwargs: Dict) -> Any:
+def _call_kw(uid: int, db: str, model: str, method: str, args: List, kwargs: Dict, env_context: Optional[Dict] = None) -> Any:
     """Execute model method with user context."""
     if model is None or not str(model).strip():
         raise ValueError("Model name is required")
     registry = _get_registry(db)
     try:
         with get_cursor(db) as cr:
-            env = Environment(registry, cr=cr, uid=uid)
+            env = Environment(registry, cr=cr, uid=uid, context=env_context or {})
             registry.set_env(env)
             Model = env.get(model)
             if Model is None:
@@ -182,6 +189,14 @@ def dispatch_jsonrpc(request: Request) -> Response:
 
             uid = get_session_uid(request)
             db = get_session_db(request)
+            company_id = get_session_company_id_from_request(request)
+            allowed_company_ids = get_session_allowed_company_ids_from_request(request)
+            env_context = dict(method_kwargs.pop("context", {}) or {})
+            if company_id and "company_id" not in env_context:
+                env_context["company_id"] = company_id
+            if allowed_company_ids and "allowed_company_ids" not in env_context:
+                env_context["allowed_company_ids"] = allowed_company_ids
+
             if uid is None:
                 _logger.warning("RPC 401: no session (cookie missing or invalid)")
                 return _rpc_unauthorized(req_id)
@@ -224,7 +239,7 @@ def dispatch_jsonrpc(request: Request) -> Response:
                     method_args = [records[0]]  # single record: pass dict to our create
 
             try:
-                result = _call_kw(uid, db, model_name, method_name, method_args, method_kwargs)
+                result = _call_kw(uid, db, model_name, method_name, method_args, method_kwargs, env_context=env_context)
                 from core.orm.models import Recordset
                 if isinstance(result, Recordset):
                     result = result.ids
@@ -327,7 +342,14 @@ def dispatch_jsonrpc(request: Request) -> Response:
                     method_kwargs = {}
 
                 try:
-                    result = _call_kw(uid, db, model_name, method_name, method_args, method_kwargs)
+                    company_id = get_session_company_id_from_request(request)
+                    allowed_company_ids = get_session_allowed_company_ids_from_request(request)
+                    env_context = dict(method_kwargs.pop("context", {}) or {})
+                    if company_id and "company_id" not in env_context:
+                        env_context["company_id"] = company_id
+                    if allowed_company_ids and "allowed_company_ids" not in env_context:
+                        env_context["allowed_company_ids"] = allowed_company_ids
+                    result = _call_kw(uid, db, model_name, method_name, method_args, method_kwargs, env_context=env_context)
                     # Serialize for JSON: Recordset/Model -> ids, keep list/dict/bool as-is
                     from core.orm.models import Recordset
                     if isinstance(result, Recordset):

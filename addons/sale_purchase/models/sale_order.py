@@ -36,10 +36,15 @@ class SaleOrderPurchase(Model):
             order.purchase_order_count = len(po_ids)
 
     def action_confirm(self):
-        result = super().action_confirm()
+        if hasattr(self, "_action_confirm_sale_core"):
+            self._action_confirm_sale_core()
+        if hasattr(self, "_action_confirm_stock_core"):
+            self._action_confirm_stock_core()
+        if hasattr(self, "_action_confirm_account_core"):
+            self._action_confirm_account_core()
         if self.order_line:
             self.order_line._purchase_service_generation()
-        return result
+        return True
 
     def action_view_purchase_orders(self):
         """Return action to view purchase orders generated from this sale order."""

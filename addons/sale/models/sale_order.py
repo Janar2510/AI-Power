@@ -1,6 +1,6 @@
 """Sale order (Phase 112)."""
 
-from core.orm import Model, api, fields
+from core.orm import Model, Recordset, api, fields
 
 
 class SaleOrder(Model):
@@ -11,7 +11,8 @@ class SaleOrder(Model):
     name = fields.Char(string="Order Reference", required=True, default="New")
 
     @classmethod
-    def create(cls, vals):
+    def _create_sale_order_record(cls, vals):
+        """Insert sale order row after name/currency defaults (Phase 478: chain from _inherit without broken super())."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
@@ -34,6 +35,10 @@ class SaleOrder(Model):
                     if cid:
                         vals = dict(vals, currency_id=cid)
         return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_sale_order_record(vals)
     partner_id = fields.Many2one("res.partner", string="Customer", required=True, tracking=True)
     date_order = fields.Datetime(string="Order Date", default=lambda: __import__("datetime").datetime.utcnow().isoformat())
     state = fields.Selection(
@@ -99,9 +104,25 @@ class SaleOrder(Model):
 
     def action_confirm(self):
         """Confirm the order (draft -> sale). Applies pricelist (Phase 187), sends confirmation email (Phase 143)."""
-        self._apply_pricelist()
-        self.write({"state": "sale"})
-        self._send_order_confirmation_email()
+        self._action_confirm_sale_core()
+
+    def _action_confirm_sale_core(self):
+        """Core sale confirmation side effects shared by downstream extensions."""
+        if not self:
+            return True
+        draft_ids = []
+        for rec in self:
+            rows = rec.read(["state"])
+            if rows and rows[0].get("state") == "draft":
+                draft_ids.append(rec.ids[0])
+        if not draft_ids:
+            return True
+        _env = getattr(self, "env", None) or getattr(self, "_env", None)
+        todo = Recordset(self._model, draft_ids, _env=_env)
+        todo._apply_pricelist()
+        todo.write({"state": "sale"})
+        todo._send_order_confirmation_email()
+        return True
 
     def _apply_pricelist(self):
         """Apply pricelist to order lines (Phase 187)."""

@@ -20,6 +20,9 @@
       <field name="model">hr.contract</field>
       <field name="arch" type="xml">
         <form>
+          <header>
+            <button name="action_open_contract" string="Start Contract" type="object" invisible="state != 'draft'"/>
+          </header>
           <sheet>
             <field name="name"/>
             <field name="employee_id" comodel="hr.employee"/>
@@ -37,5 +40,14 @@
       <field name="view_mode">list,form</field>
     </record>
     <menuitem name="Contracts" id="menu_hr_contract" action="action_hr_contract" parent="hr.menu_hr_root" sequence="35"/>
+    <record model="ir.ui.view" id="hr_employee_form_contract" inherit_id="hr.hr_employee_form">
+      <field name="name">hr.employee form (contract)</field>
+      <field name="model">hr.employee</field>
+      <field name="arch" type="xml">
+        <xpath expr="//field[@name='lifecycle_status']" position="after">
+          <field name="contract_id" comodel="hr.contract" readonly="1"/>
+        </xpath>
+      </field>
+    </record>
   </data>
 </odoo>

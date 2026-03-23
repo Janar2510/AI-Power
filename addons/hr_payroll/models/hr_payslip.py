@@ -1,5 +1,7 @@
 """Payslip model - compute sheet from salary rules (Phase 186)."""
 
+from datetime import datetime
+
 from core.orm import Model, fields
 
 
@@ -26,13 +28,53 @@ class HrPayslip(Model):
     )
 
     @classmethod
-    def create(cls, vals):
+    def _create_hr_payslip_record(cls, vals):
+        """Name from sequence + ORM insert (Phase 488: merge-safe for `_inherit` create)."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         if vals.get("name") == "New" or not vals.get("name"):
             IrSeq = env.get("ir.sequence") if env else None
             next_val = IrSeq.next_by_code("hr.payslip") if IrSeq else None
             vals = dict(vals, name=f"PAY/{next_val:05d}" if next_val else "New")
         return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_hr_payslip_record(vals)
+
+    def _payslip_total_attendance_hours(self, env, slip):
+        """Sum worked hours from hr.attendance in payslip date range (Phase 491)."""
+        Att = env.get("hr.attendance")
+        if not Att:
+            return 0.0
+        row = slip.read(["employee_id", "date_from", "date_to"])[0]
+        eid = row.get("employee_id")
+        if isinstance(eid, (list, tuple)) and eid:
+            eid = eid[0]
+        if not eid:
+            return 0.0
+        df = row.get("date_from")
+        dt = row.get("date_to")
+        df_s = (str(df)[:10] if df else "") or "0000-00-00"
+        dt_s = (str(dt)[:10] if dt else "") or "9999-12-31"
+        atts = Att.search([("employee_id", "=", eid)])
+        total = 0.0
+        for a in atts:
+            ar = a.read(["check_in", "check_out"])[0]
+            ci, co = ar.get("check_in"), ar.get("check_out")
+            if not ci or not co:
+                continue
+            ci_s = str(ci)[:10]
+            if ci_s < df_s or ci_s > dt_s:
+                continue
+            try:
+                if isinstance(ci, str):
+                    ci = datetime.fromisoformat(ci.replace("Z", "+00:00"))
+                if isinstance(co, str):
+                    co = datetime.fromisoformat(co.replace("Z", "+00:00"))
+                total += max(0.0, (co - ci).total_seconds() / 3600.0)
+            except Exception:
+                continue
+        return total
 
     def compute_sheet(self, env=None):
         """Apply salary rules and create payslip lines."""
@@ -70,5 +112,13 @@ class HrPayslip(Model):
                 amt_pct = float(rule_row.get("amount_percentage") or 0)
                 amount = amt_fix + (base * amt_pct / 100.0)
                 Line.create({"slip_id": slip.id, "rule_id": rule_id, "amount": amount})
+            att_hrs = self._payslip_total_attendance_hours(env, slip)
+            if att_hrs > 0 and rules.ids:
+                hourly_addon = 1.0
+                Line.create({
+                    "slip_id": slip.id,
+                    "rule_id": rules.ids[0],
+                    "amount": att_hrs * hourly_addon,
+                })
         Recordset(self._model, draft_ids, _env=getattr(self, "_env", None)).write({"state": "done"})
         return True

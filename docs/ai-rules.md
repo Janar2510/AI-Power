@@ -31,6 +31,9 @@ This document codifies rules from the AI-Powered ERP Build Plan and [deep-resear
 - **Service container**: rpc, action, session, i18n, user injected into components.
 - **Component model**: Declarative; registries for view types, field widgets, services.
 - **State rules**: Separate server-state (authoritative) from UI-state (ephemeral, serialisable).
+- **Design system**: Follow `docs/brand-system.md`, `docs/frontend-design-rules.md`, `design-system/MASTER.md`, and the relevant `design-system/specs/*.md` files before changing frontend surfaces.
+- **Theming**: New UI work must support both light and dark mode at the token level.
+- **Styling discipline**: Prefer classes and CSS custom properties; do not add new inline visual `style=` assignments when shared CSS can own the surface.
 
 ## AI Module Rules
 
@@ -38,11 +41,21 @@ This document codifies rules from the AI-Powered ERP Build Plan and [deep-resear
 - **Audit log**: Every retrieval and tool invocation logged to `ai.audit.log` (prompt hash, doc IDs, tool calls, user, timestamps).
 - **User confirmation**: Require confirmation for state-changing actions unless workflow explicitly delegates.
 
+## Reference analysis (required for planning) {#reference-analysis}
+
+Before proposing or implementing a change, compare the **local Odoo 19 CE reference** with **this repo** for the same domain (read-only upstream; **clean-room** implementation here per **Clean-room reimplementation** above).
+
+- **Backend / business logic:** For edits under `erp-platform/addons/*` or `erp-platform/core/*`, inspect the corresponding area under `odoo-19.0/addons/<module>/` and `odoo-19.0/odoo/` (sibling tree: see [docs/odoo19_reference_map.md](odoo19_reference_map.md)). Note triggers, state machines, and method responsibilities. Map ERP files using [docs/parity_matrix.md](parity_matrix.md) and the reference map.
+- **Frontend / web client:** For edits under `erp-platform/addons/web/static/` or asset manifests, compare with `odoo-19.0/addons/web/` (manifest + how assets are loaded). The ERP `web.assets_web` bundle is **concatenated** classic script: no top-level ESM `export`. After touching listed JS, run `python3 scripts/check_concat_bundle.py` or `npm run check:assets-concat` (see [docs/frontend.md](frontend.md)).
+- **If `odoo-19.0` is missing locally:** Do not guess upstream behaviour. State that the reference tree is unavailable, rely on parity matrix + existing tests, or clone Odoo 19 CE into `AI Power/odoo-19.0` and add it to the IDE workspace alongside `erp-platform`.
+- **Output of planning:** A short gap table is recommended: trigger → Odoo file/method (path only) → ERP file → test scenario. Use upstream for behaviour notes, not verbatim code.
+
 ## Workflow Rules
 
 - **One feature or fix per response**; avoid large refactors without approval.
 - **Prefer minimal, surgical diffs**; never break public APIs without explicit instruction.
 - **Do not invent** data models or endpoints; follow existing architecture.
+- **Before coding**, complete **Reference analysis** above for the scope you will change (at minimum: the modules/files you will edit).
 - **Read** docs/architecture.md and docs/api-contracts.md before coding.
 - **Update** changelog.md and DeploymentChecklist.md when adding or changing important deployment-relevant code.
 

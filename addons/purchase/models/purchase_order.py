@@ -1,6 +1,6 @@
 """Purchase order (Phase 117, 154)."""
 
-from core.orm import Model, api, fields
+from core.orm import Model, Recordset, api, fields
 
 
 class PurchaseOrder(Model):
@@ -74,14 +74,27 @@ class PurchaseOrder(Model):
                 order.write({"bill_status": "no"})
 
     def _get_received_qty_by_product(self):
-        """Return {product_id: received_qty} from done moves in pickings (Phase 197)."""
+        """Return {product_id: received_qty} from done moves in pickings (Phase 197).
+
+        Pickings are matched by ``purchase_id`` or by ``origin`` equal to the PO reference so
+        receipts still count when the link field was not set (imports / edge flows).
+        """
         if not self or not self.ids:
             return {}
         Picking = self.env.get("stock.picking")
         Move = self.env.get("stock.move")
         if not Picking or not Move:
             return {}
-        pickings = Picking.search([("purchase_id", "=", self.ids[0])])
+        order_name = self.read(["name"])[0].get("name", "") if self.ids else ""
+        if order_name:
+            picking_domain = [
+                "|",
+                ("purchase_id", "=", self.ids[0]),
+                ("origin", "=", order_name),
+            ]
+        else:
+            picking_domain = [("purchase_id", "=", self.ids[0])]
+        pickings = Picking.search(picking_domain)
         result = {}
         for p in pickings:
             moves = Move.search([("picking_id", "=", p.ids[0]), ("state", "=", "done")])
@@ -131,6 +144,16 @@ class PurchaseOrder(Model):
             if not expense_account.ids or not payable_account.ids:
                 continue
             order_name = order.read(["name"])[0].get("name", "") if order.ids else ""
+            existing = Move.search(
+                [
+                    ("invoice_origin", "=", order_name),
+                    ("move_type", "=", "in_invoice"),
+                    ("state", "=", "draft"),
+                ],
+                limit=1,
+            )
+            if existing.ids:
+                continue
             IrSequence = self.env.get("ir.sequence")
             next_val = IrSequence.next_by_code("account.move") if IrSequence else None
             move_name = f"BILL/{next_val:05d}" if next_val is not None else "New"
@@ -154,21 +177,6 @@ class PurchaseOrder(Model):
             pt_id = order_data.get("payment_term_id")
             if isinstance(pt_id, (list, tuple)) and pt_id:
                 pt_id = pt_id[0]
-            move_vals = {
-                "name": move_name,
-                "journal_id": purch_journal.ids[0],
-                "partner_id": partner_id,
-                "currency_id": move_currency_id,
-                "move_type": "in_invoice",
-                "invoice_origin": order_name,
-                "state": "draft",
-                "date": None,
-            }
-            if pt_id:
-                move_vals["payment_term_id"] = pt_id
-            move = Move.create(move_vals)
-            if not move.ids:
-                continue
             PoLine = self.env.get("purchase.order.line")
             if not PoLine or not order.id:
                 continue
@@ -176,6 +184,7 @@ class PurchaseOrder(Model):
             total = 0.0
             total_fc = 0.0
             Currency = self.env.get("res.currency")
+            prepared_line_vals = []
             for line in lines:
                 line_data = line.read(["product_id", "product_qty", "price_unit", "name"])
                 if not line_data:
@@ -196,7 +205,6 @@ class PurchaseOrder(Model):
                 total += amount_cc
                 total_fc += amount_fc
                 line_vals = {
-                    "move_id": move.ids[0],
                     "account_id": expense_account.ids[0],
                     "name": row.get("name") or "Purchases",
                     "debit": amount_cc,
@@ -206,7 +214,26 @@ class PurchaseOrder(Model):
                 if order_currency_id and order_currency_id != company_currency_id:
                     line_vals["amount_currency"] = amount_fc
                     line_vals["currency_id"] = order_currency_id
-                MoveLine.create(line_vals)
+                prepared_line_vals.append(line_vals)
+            if not prepared_line_vals:
+                continue
+            move_vals = {
+                "name": move_name,
+                "journal_id": purch_journal.ids[0],
+                "partner_id": partner_id,
+                "currency_id": move_currency_id,
+                "move_type": "in_invoice",
+                "invoice_origin": order_name,
+                "state": "draft",
+                "date": None,
+            }
+            if pt_id:
+                move_vals["payment_term_id"] = pt_id
+            move = Move.create(move_vals)
+            if not move.ids:
+                continue
+            for line_vals in prepared_line_vals:
+                MoveLine.create(dict(line_vals, move_id=move.ids[0]))
             if total > 0:
                 pay_vals = {
                     "move_id": move.ids[0],
@@ -250,7 +277,8 @@ class PurchaseOrder(Model):
         return result
 
     @classmethod
-    def create(cls, vals):
+    def _create_purchase_order_record(cls, vals):
+        """Insert PO row after name/currency defaults (Phase 479: same merge-safe pattern as sale.order)."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
@@ -269,14 +297,85 @@ class PurchaseOrder(Model):
                         vals = dict(vals, currency_id=cid)
         return super().create(vals)
 
+    @classmethod
+    def create(cls, vals):
+        return cls._create_purchase_order_record(vals)
+
     def button_confirm(self):
         """Confirm order and create incoming stock.picking (Phase 197)."""
-        self.write({"state": "purchase"})
-        self._create_incoming_picking()
-        self._update_bill_status()
+        if not self:
+            return True
+        draft_ids = []
+        for rec in self:
+            rows = rec.read(["state"])
+            if rows and rows[0].get("state") == "draft":
+                draft_ids.append(rec.ids[0])
+        if not draft_ids:
+            return True
+        _env = getattr(self, "env", None) or getattr(self, "_env", None)
+        todo = Recordset(self._model, draft_ids, _env=_env)
+        todo.write({"state": "purchase"})
+        todo._create_incoming_picking()
+        todo._update_bill_status()
+        return True
+
+    def _cancel_open_incoming_pickings(self):
+        """Cancel draft/assigned incoming pickings tied to these POs (Phase 476)."""
+        Picking = self.env.get("stock.picking")
+        Move = self.env.get("stock.move")
+        PickingType = self.env.get("stock.picking.type")
+        if not Picking:
+            return True
+        open_states = ["draft", "assigned"]
+        in_type_id = None
+        if PickingType:
+            in_type = PickingType.search([("code", "=", "incoming")], limit=1)
+            if in_type.ids:
+                in_type_id = in_type.ids[0]
+        for order in self:
+            if not order.ids:
+                continue
+            order_name = order.read(["name"])[0].get("name", "") if order.ids else ""
+            state_leaf = ("state", "in", open_states)
+            if in_type_id:
+                type_leaf = ("picking_type_id", "=", in_type_id)
+                if order_name:
+                    link_domain = [
+                        "|",
+                        ("purchase_id", "=", order.ids[0]),
+                        ("origin", "=", order_name),
+                    ]
+                    domain = ["&", ["&", type_leaf, link_domain], state_leaf]
+                else:
+                    domain = ["&", ["&", type_leaf, ("purchase_id", "=", order.ids[0])], state_leaf]
+            elif order_name:
+                link_domain = [
+                    "|",
+                    ("purchase_id", "=", order.ids[0]),
+                    ("origin", "=", order_name),
+                ]
+                domain = ["&", link_domain, state_leaf]
+            else:
+                domain = ["&", ("purchase_id", "=", order.ids[0]), state_leaf]
+            pickings = Picking.search(domain)
+            for picking in pickings:
+                picking.write({"state": "cancel"})
+                if Move and picking.ids:
+                    moves = Move.search(
+                        [
+                            ("picking_id", "=", picking.ids[0]),
+                            ("state", "not in", ["done", "cancel"]),
+                        ]
+                    )
+                    if moves.ids:
+                        moves.write({"state": "cancel"})
+        return True
 
     def action_cancel(self):
-        """Cancel the order."""
+        """Cancel the order and open incoming receipts."""
+        PO = self.env.get("purchase.order") if getattr(self, "env", None) else None
+        if PO is not None:
+            PO._cancel_open_incoming_pickings(self)
         self.write({"state": "cancel"})
 
     def _create_incoming_picking(self):

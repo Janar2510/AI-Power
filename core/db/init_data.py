@@ -218,6 +218,28 @@ def load_default_data(env, *, update_mode: bool = False) -> None:
                 "active": True,
             })
             _logger.info("Created cron: base.automation on_time")
+        if IrCron and env.get("ir.async") and not IrCron.search([("model", "=", "ir.async"), ("method", "=", "run_pending")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Async jobs: process queue",
+                "model": "ir.async",
+                "method": "run_pending",
+                "interval_minutes": 1,
+                "next_run": (datetime.utcnow() + timedelta(minutes=1)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: ir.async run_pending")
+        if IrCron and env.get("ir.async") and not IrCron.search([("model", "=", "ir.async"), ("method", "=", "gc_done")]):
+            from datetime import datetime, timedelta
+            IrCron.create({
+                "name": "Async jobs: garbage collect done/failed",
+                "model": "ir.async",
+                "method": "gc_done",
+                "interval_minutes": 1440,
+                "next_run": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+                "active": True,
+            })
+            _logger.info("Created cron: ir.async gc_done")
     except Exception as e:
         _logger.warning("Could not create transient vacuum cron: %s", e)
 
@@ -234,7 +256,9 @@ def load_default_data(env, *, update_mode: bool = False) -> None:
     except Exception as e:
         _logger.warning("Generic/demo XML data load: %s", e)
     try:
-        IrModel = env.get("ir.model")
+        # Use raw registry class, not env.get() proxy: proxy injects kwargs["env"] for
+        # callables whose signature names "env", which breaks @classmethod sync_registry(env).
+        IrModel = env.registry.get("ir.model") if getattr(env, "registry", None) else None
         if IrModel and hasattr(IrModel, "sync_registry"):
             IrModel.sync_registry(env)
             _logger.info("Synced ir.model / ir.model.fields from registry")
@@ -295,11 +319,18 @@ def _load_ir_actions_menus(env) -> None:
                 "action_ref": m.get("action", ""),
                 "parent_ref": m.get("parent", ""),
                 "sequence": m.get("sequence", 10),
+                "active": True,
             }
             if existing:
                 Menu.browse(existing.ids[0]).write(vals)
             else:
                 Menu.create(vals)
+        cr = getattr(env, "cr", None)
+        if cr:
+            try:
+                cr.execute("UPDATE ir_ui_menu SET active = true WHERE active = false")
+            except Exception:
+                pass
         _logger.info("Loaded ir.actions.act_window and ir.ui.menu from XML")
     except Exception as e:
         _logger.warning("Could not load ir.actions/menus: %s", e)

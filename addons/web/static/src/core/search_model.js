@@ -6,6 +6,7 @@
     this.model = model;
     this.viewsSvc = viewsSvc || null;
     this.state = listStateRef || {};
+    if (!Array.isArray(this.state.facets)) this.state.facets = [];
   }
 
   SearchModel.prototype.getSearchView = function () {
@@ -28,6 +29,105 @@
   SearchModel.prototype.setSearchTerm = function (term) {
     this.state.searchTerm = term || "";
     this._emit("change");
+  };
+
+  SearchModel.prototype._facetKey = function (facet) {
+    if (!facet) return "";
+    return [facet.type || "custom", facet.name || "", facet.value || "", facet.operator || "", facet.label || ""].join("::");
+  };
+
+  SearchModel.prototype.addFacet = function (facet) {
+    if (!facet || !facet.label) return;
+    var next = {
+      type: facet.type || "custom",
+      name: facet.name || "",
+      operator: facet.operator || "ilike",
+      value: facet.value,
+      label: facet.label,
+      removable: facet.removable !== false,
+      domain: Array.isArray(facet.domain) ? facet.domain.slice() : null,
+    };
+    var key = this._facetKey(next);
+    var exists = (this.state.facets || []).some(function (f) { return this._facetKey(f) === key; }, this);
+    if (!exists) this.state.facets = (this.state.facets || []).concat(next);
+    this._emit("change");
+  };
+
+  SearchModel.prototype.removeFacet = function (facetOrIdx) {
+    var arr = this.state.facets || [];
+    if (!arr.length) return;
+    if (typeof facetOrIdx === "number") {
+      this.state.facets = arr.filter(function (_, i) { return i !== facetOrIdx; });
+    } else {
+      var key = this._facetKey(facetOrIdx);
+      this.state.facets = arr.filter(function (f) { return this._facetKey(f) !== key; }, this);
+    }
+    this._emit("change");
+  };
+
+  SearchModel.prototype.getFacets = function () {
+    return (this.state.facets || []).slice();
+  };
+
+  SearchModel.prototype.renderFacets = function () {
+    var facets = this.getFacets();
+    if (!facets.length) return "";
+    var esc = function (s) {
+      return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    };
+    var html = '<div class="o-facet-bar" role="list" aria-label="Active filters">';
+    facets.forEach(function (f, idx) {
+      html += '<span class="o-filter-chip facet-chip" role="listitem" data-facet-idx="' + idx + '">';
+      html += esc(f.label);
+      if (f.removable !== false) {
+        html += ' <button type="button" class="o-filter-chip-remove facet-remove" data-facet-remove="' + idx + '" aria-label="Remove">&times;</button>';
+      }
+      html += "</span>";
+    });
+    html += "</div>";
+    return html;
+  };
+
+  SearchModel.prototype.applyDefaultsFromContext = function (ctx) {
+    var c = ctx || {};
+    Object.keys(c).forEach(function (k) {
+      if (k.indexOf("search_default_") !== 0) return;
+      var field = k.slice("search_default_".length);
+      var val = c[k];
+      if (val == null || val === false || val === "") return;
+      this.addFacet({
+        type: "field",
+        name: field,
+        operator: typeof val === "number" ? "=" : "ilike",
+        value: val,
+        label: field + ": " + val,
+        domain: [[field, typeof val === "number" ? "=" : "ilike", val]],
+      });
+    }, this);
+  };
+
+  SearchModel.prototype.getAutocompleteSuggestions = function (term) {
+    var q = String(term || "").trim().toLowerCase();
+    if (!q) return [];
+    var sv = this.getSearchView();
+    var fields = (sv && sv.fields) || [];
+    var out = [];
+    fields.forEach(function (f) {
+      var name = f.name || "";
+      var label = f.string || name;
+      if (!name) return;
+      if (label.toLowerCase().indexOf(q) >= 0 || name.toLowerCase().indexOf(q) >= 0 || q.length >= 2) {
+        out.push({
+          type: "field",
+          name: name,
+          operator: "ilike",
+          value: term,
+          label: label + ": " + term,
+          domain: [[name, "ilike", term]],
+        });
+      }
+    });
+    return out.slice(0, 8);
   };
 
   SearchModel.prototype._listeners = null;
@@ -74,6 +174,11 @@
       if (f && f.domain && ctx.parseFilterDomain) {
         var fd = ctx.parseFilterDomain(f.domain, uid);
         if (fd && fd.length) domain = domain.concat(fd);
+      }
+    });
+    (this.state.facets || []).forEach(function (f) {
+      if (f && Array.isArray(f.domain) && f.domain.length) {
+        domain = domain.concat(f.domain);
       }
     });
     return domain;

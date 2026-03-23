@@ -25,10 +25,15 @@ class PosSession(Model):
     order_ids = fields.One2many("pos.order", "session_id", string="Orders")
 
     @classmethod
-    def create(cls, vals):
+    def _create_pos_session_record(cls, vals):
+        """Name from sequence + ORM insert (Phase 486: merge-safe for `_inherit` create)."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
             next_val = IrSequence.next_by_code("pos.session") if IrSequence else None
             vals = dict(vals, name=f"POS/{next_val:05d}" if next_val is not None else "New")
         return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_pos_session_record(vals)

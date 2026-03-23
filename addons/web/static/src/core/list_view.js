@@ -1,6 +1,11 @@
 (function () {
   window.AppCore = window.AppCore || {};
   var UI = window.UIComponents || {};
+  var _impl = null;
+
+  function setImpl(fn) {
+    _impl = typeof fn === "function" ? fn : null;
+  }
 
   function escHtml(v) {
     return String(v == null ? "" : v)
@@ -22,6 +27,7 @@
   }
 
   function render(container, options) {
+    if (_impl) return !!_impl(container, options || {});
     var opts = options || {};
     var model = opts.model;
     var route = opts.route;
@@ -36,23 +42,38 @@
     var currentListState = opts.currentListState || {};
     var showToast = opts.showToast || function () {};
     var h = opts.helpers || {};
+    var searchModel = opts.searchModel || null;
 
     if (typeof window !== "undefined") {
       window.chatContext = { model: model, active_id: null };
     }
 
     var cols = h.getListColumns ? h.getListColumns(model) : [];
+    var handleCol = cols.find(function (c) { return c && typeof c === "object" && c.widget === "handle"; }) || null;
+    var sequenceField = handleCol ? handleCol.name : null;
     var title = h.getTitle ? h.getTitle(route) : route;
     var addLabel = route === "contacts" ? "Add contact" : route === "leads" ? "Add lead" : route === "orders" ? "Add order" : route === "products" ? "Add product" : route === "settings/users" ? "Add user" : "Add";
     var stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     var currentView = (currentListState.route === route && currentListState.viewType) || "list";
     var order = (currentListState.route === route && currentListState.order) || null;
+    if (h.restoreListState && !currentListState._restoredForRoute) {
+      var restored = h.restoreListState(route);
+      if (restored && typeof restored === "object") {
+        Object.keys(restored).forEach(function (k) { currentListState[k] = restored[k]; });
+      }
+      currentListState._restoredForRoute = route;
+    }
 
     var searchView = viewsSvc && viewsSvc.getView ? viewsSvc.getView(model, "search") : null;
     var searchFilters = (searchView && searchView.filters) || [];
     var searchGroupBys = (searchView && searchView.group_bys) || [];
     var activeFilters = currentListState.activeSearchFilters || [];
     var currentGroupBy = currentListState.groupBy || null;
+    var action = h.getActionForRoute ? h.getActionForRoute(route) : null;
+    if (searchModel && !currentListState._facetsDefaultsApplied) {
+      searchModel.applyDefaultsFromContext((action && action.context) || {});
+      currentListState._facetsDefaultsApplied = true;
+    }
 
     var listViewDef = viewsSvc && viewsSvc.getView ? viewsSvc.getView(model, "list") : null;
     var listEditable = !!(listViewDef && (listViewDef.editable === "bottom" || listViewDef.editable === "top"));
@@ -128,6 +149,7 @@
     actionsHtml += '<button type="button" id="btn-export-excel" class="o-btn o-btn-secondary">Export Excel</button>';
     actionsHtml += '<button type="button" id="btn-import" class="o-btn o-btn-secondary">Import</button>';
     if (reportName) actionsHtml += '<button type="button" id="btn-print" class="o-btn o-btn-secondary">Print</button>';
+    if (reportName) actionsHtml += '<button type="button" id="btn-preview-pdf" class="o-btn o-btn-secondary">Preview</button>';
     actionsHtml += '<button type="button" id="btn-add" class="o-btn o-btn-primary">' + escHtml(addLabel) + "</button>";
 
     var html = '<div class="o-list-shell"><h2>' + escHtml(title) + "</h2>";
@@ -139,7 +161,8 @@
       actionsHtml: actionsHtml,
     }) : "");
 
-    var hasFacets = activeFilters.length > 0 || currentGroupBy;
+    var dynamicFacetHtml = searchModel && searchModel.renderFacets ? searchModel.renderFacets() : "";
+    var hasFacets = activeFilters.length > 0 || currentGroupBy || !!dynamicFacetHtml;
     if (hasFacets) {
       html += '<p class="o-filter-chips">';
       activeFilters.forEach(function (fname) {
@@ -151,26 +174,135 @@
         html += '<span class="o-filter-chip facet-chip" data-type="groupby" data-name="' + String(currentGroupBy || "").replace(/"/g, "&quot;") + '">Group: ' + escHtml(g ? (g.string || currentGroupBy) : currentGroupBy) + ' <button type="button" class="o-filter-chip-remove facet-remove" aria-label="Remove">&times;</button></span>';
       }
       html += "</p>";
+      if (dynamicFacetHtml) html += dynamicFacetHtml;
     }
 
     function attachCommonHandlers() {
       var btn = container.querySelector("#btn-add");
       if (btn) btn.onclick = function () { window.location.hash = route + "/new"; };
+      function saveCurrentState() {
+        if (typeof h.saveListState !== "function") return;
+        var listEl = container.querySelector(".o-list-shell");
+        h.saveListState(route, {
+          route: route,
+          searchTerm: (container.querySelector("#list-search") || { value: "" }).value || "",
+          stageFilter: (container.querySelector("#list-stage-filter") || { value: "" }).value || null,
+          savedFilterId: currentListState.savedFilterId || null,
+          activeSearchFilters: (currentListState.activeSearchFilters || []).slice(),
+          groupBy: currentListState.groupBy || null,
+          offset: offset || 0,
+          scrollTop: listEl ? listEl.scrollTop : 0,
+        });
+      }
+
+      container.querySelectorAll(".o-list-edit-link").forEach(function (lnk) {
+        lnk.addEventListener("click", saveCurrentState);
+      });
+
 
       var btnImport = container.querySelector("#btn-import");
       if (btnImport && h.showImportModal) btnImport.onclick = function () { h.showImportModal(model, route); };
 
       var btnSearch = container.querySelector("#btn-search");
       var searchInput = container.querySelector("#list-search");
+      function buildDomainOverride(term, stageVal) {
+        if (!searchModel || !searchModel.buildDomain) return undefined;
+        var base = h.parseActionDomain ? h.parseActionDomain(action && action.domain ? action.domain : "") : [];
+        return searchModel.buildDomain({
+          actionDomain: base,
+          model: model,
+          searchTerm: term,
+          stageFilter: stageVal,
+          buildSearchDomain: h.buildSearchDomain,
+          parseFilterDomain: h.parseFilterDomain,
+          uid: 1,
+          skipSearchDomain: false,
+        });
+      }
+
       if (btnSearch && searchInput) {
         var doSearch = function () {
           var sf = container.querySelector("#list-saved-filter");
           var stageEl = container.querySelector("#list-stage-filter");
           var stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
-          h.loadRecords(model, route, searchInput.value.trim(), stageVal, null, sf && sf.value ? sf.value : null, 0, null);
+          if (searchModel && searchModel.setSearchTerm) searchModel.setSearchTerm(searchInput.value.trim());
+          h.loadRecords(model, route, searchInput.value.trim(), stageVal, null, sf && sf.value ? sf.value : null, 0, null, buildDomainOverride(searchInput.value.trim(), stageVal));
         };
         btnSearch.onclick = doSearch;
         searchInput.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); doSearch(); } };
+
+        var acBox = document.createElement("div");
+        acBox.className = "o-search-autocomplete";
+        acBox.style.position = "absolute";
+        acBox.style.zIndex = "15";
+        acBox.style.display = "none";
+        acBox.style.minWidth = "260px";
+        acBox.style.background = "var(--color-surface-1)";
+        acBox.style.border = "1px solid var(--border-color)";
+        acBox.style.borderRadius = "var(--radius-sm)";
+        acBox.style.boxShadow = "0 6px 18px rgba(0,0,0,0.08)";
+        if (searchInput.parentElement) {
+          searchInput.parentElement.style.position = "relative";
+          searchInput.parentElement.appendChild(acBox);
+        }
+
+        function closeAutocomplete() {
+          acBox.style.display = "none";
+          acBox.innerHTML = "";
+        }
+        searchInput.addEventListener("input", function () {
+          if (!searchModel || !searchModel.getAutocompleteSuggestions) return;
+          var term = searchInput.value.trim();
+          if (!term) return closeAutocomplete();
+          var suggestions = searchModel.getAutocompleteSuggestions(term);
+          if (!suggestions.length) return closeAutocomplete();
+          var items = "";
+          suggestions.forEach(function (s, idx) {
+            items += '<button type="button" class="o-ac-item" data-ac-idx="' + idx + '" style="display:block;width:100%;text-align:left;border:0;background:transparent;padding:var(--space-xs) var(--space-sm);cursor:pointer">' + escHtml(s.label || "") + "</button>";
+          });
+          items += '<button type="button" class="o-ac-item o-ac-custom" data-ac-custom="1" style="display:block;width:100%;text-align:left;border:0;background:var(--color-surface-2);padding:var(--space-xs) var(--space-sm);cursor:pointer">Custom filter...</button>';
+          acBox.innerHTML = items;
+          acBox.style.display = "block";
+          acBox.querySelectorAll("[data-ac-idx]").forEach(function (btnS) {
+            btnS.onclick = function () {
+              var idx = parseInt(btnS.getAttribute("data-ac-idx"), 10) || 0;
+              var picked = suggestions[idx];
+              if (picked && searchModel.addFacet) {
+                searchModel.addFacet(picked);
+                searchInput.value = "";
+                closeAutocomplete();
+                var stageEl = container.querySelector("#list-stage-filter");
+                var stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
+                h.loadRecords(model, route, "", stageVal, null, currentListState.savedFilterId, 0, null, buildDomainOverride("", stageVal));
+              }
+            };
+          });
+          var customBtn = acBox.querySelector("[data-ac-custom]");
+          if (customBtn) {
+            customBtn.onclick = function () {
+              var field = window.prompt("Field name:");
+              if (!field || !field.trim()) return;
+              var op = window.prompt("Operator (=, !=, ilike, in):", "ilike") || "ilike";
+              var val = window.prompt("Value:");
+              if (val == null) return;
+              if (searchModel.addFacet) {
+                searchModel.addFacet({
+                  type: "custom",
+                  name: field.trim(),
+                  operator: op.trim(),
+                  value: val,
+                  label: field.trim() + " " + op.trim() + " " + val,
+                  domain: [[field.trim(), op.trim(), val]],
+                });
+              }
+              closeAutocomplete();
+              var stageEl = container.querySelector("#list-stage-filter");
+              var stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
+              h.loadRecords(model, route, "", stageVal, null, currentListState.savedFilterId, 0, null, buildDomainOverride("", stageVal));
+            };
+          }
+        });
+        searchInput.addEventListener("blur", function () { setTimeout(closeAutocomplete, 120); });
       }
 
       var btnAiSearch = container.querySelector("#btn-ai-search");
@@ -246,6 +378,16 @@
           else if (typ === "groupby") currentListState.groupBy = null;
           var si = container.querySelector("#list-search");
           h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, 0, null);
+        };
+      });
+      container.querySelectorAll("[data-facet-remove]").forEach(function (btnRm) {
+        btnRm.onclick = function (e) {
+          e.preventDefault();
+          var idx = parseInt(btnRm.getAttribute("data-facet-remove"), 10);
+          if (searchModel && searchModel.removeFacet) searchModel.removeFacet(idx);
+          var stageEl = container.querySelector("#list-stage-filter");
+          var stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
+          h.loadRecords(model, route, (container.querySelector("#list-search") || { value: "" }).value.trim(), stageVal, null, currentListState.savedFilterId, 0, null, buildDomainOverride((container.querySelector("#list-search") || { value: "" }).value.trim(), stageVal));
         };
       });
 
@@ -329,8 +471,22 @@
     }
 
     if (!records || !records.length) {
-      container.innerHTML = html + '<p class="o-list-empty">No records yet.</p></div>';
+      if (UI.EmptyState && typeof UI.EmptyState.renderHTML === "function") {
+        container.innerHTML = html + UI.EmptyState.renderHTML({
+          icon: "◌",
+          title: "No records yet",
+          subtitle: "Create your first record to start working.",
+          actionLabel: addLabel,
+        }) + "</div>";
+      } else {
+        container.innerHTML = html + '<p class="o-list-empty">No records yet.</p></div>';
+      }
       attachCommonHandlers();
+      if (UI.EmptyState && typeof UI.EmptyState.wire === "function") {
+        UI.EmptyState.wire(container, {
+          actionFn: function () { window.location.hash = route + "/new"; },
+        });
+      }
       return;
     }
 
@@ -392,6 +548,7 @@
           '<tr role="row" tabindex="0" data-id="' +
           (r.id || "") +
           '" class="o-list-data-row"' +
+          (sequenceField ? ' draggable="true"' : "") +
           (listEditable && !groups ? ' data-inline-edit="1"' : "") +
           ">";
         tbl += '<td role="gridcell"><input type="checkbox" class="list-row-select" data-id="' + (r.id || "") + '" aria-label="Select row"></td>';
@@ -429,6 +586,10 @@
           var meta = useInline ? h.getFieldMeta(model, f) : null;
           var t = meta && meta.type;
           if (useInline && t && t !== "many2one" && t !== "many2many" && t !== "one2many" && t !== "binary" && t !== "image" && t !== "html") {
+            if (typeof c === "object" && c.widget === "handle") {
+              tbl += '<td role="gridcell" class="o-list-handle" title="Drag to reorder">::</td>';
+              return;
+            }
             tbl +=
               '<td role="gridcell" class="o-list-editable-cell" data-field="' +
               escHtml(f) +
@@ -520,7 +681,52 @@
           if (idx < 0) return;
           if (e.key === "ArrowDown" && idx < rows.length - 1) { e.preventDefault(); rows[idx + 1].focus(); }
           else if (e.key === "ArrowUp" && idx > 0) { e.preventDefault(); rows[idx - 1].focus(); }
-          else if (e.key === "Enter") { var id = row.getAttribute("data-id"); if (id) { e.preventDefault(); window.location.hash = route + "/edit/" + id; } }
+          else if (e.key === "Enter") { var id = row.getAttribute("data-id"); if (id) { e.preventDefault(); saveCurrentState(); window.location.hash = route + "/edit/" + id; } }
+        });
+      })();
+
+      (function setupListRowReorder() {
+        if (!sequenceField || !listEditable || groups) return;
+        var tbody = container.querySelector(".o-list-table tbody");
+        if (!tbody) return;
+        var dragging = null;
+        tbody.querySelectorAll("tr.o-list-data-row").forEach(function (row) {
+          row.addEventListener("dragstart", function () {
+            dragging = row;
+            row.classList.add("o-list-row--dragging");
+          });
+          row.addEventListener("dragend", function () {
+            row.classList.remove("o-list-row--dragging");
+            dragging = null;
+            tbody.querySelectorAll(".o-list-row--drag-over").forEach(function (r) { r.classList.remove("o-list-row--drag-over"); });
+          });
+          row.addEventListener("dragover", function (e) {
+            if (!dragging || dragging === row) return;
+            e.preventDefault();
+            row.classList.add("o-list-row--drag-over");
+          });
+          row.addEventListener("dragleave", function () {
+            row.classList.remove("o-list-row--drag-over");
+          });
+          row.addEventListener("drop", function (e) {
+            if (!dragging || dragging === row) return;
+            e.preventDefault();
+            row.classList.remove("o-list-row--drag-over");
+            tbody.insertBefore(dragging, row.nextSibling);
+            var ids = Array.prototype.map.call(tbody.querySelectorAll("tr.o-list-data-row[data-id]"), function (tr) {
+              return parseInt(tr.getAttribute("data-id"), 10);
+            }).filter(function (x) { return !isNaN(x); });
+            var writes = ids.map(function (id, idx) {
+              var vals = {};
+              vals[sequenceField] = (idx + 1) * 10;
+              return rpc.callKw(model, "write", [[id], vals], {});
+            });
+            Promise.all(writes).then(function () {
+              showToast("Order updated", "success");
+            }).catch(function (err) {
+              showToast(err && err.message ? err.message : "Reorder failed", "error");
+            });
+          });
         });
       })();
 
@@ -815,6 +1021,16 @@
           if (ids.length) window.open("/report/html/" + reportName + "/" + ids.join(","), "_blank", "noopener");
         };
       }
+      var btnPreviewPdf = container.querySelector("#btn-preview-pdf");
+      if (btnPreviewPdf && reportName && records && records.length) {
+        btnPreviewPdf.onclick = function () {
+          var ids = records.map(function (r) { return r.id; }).filter(function (x) { return x; });
+          if (!ids.length) return;
+          var url = "/report/pdf/" + reportName + "/" + ids.join(",");
+          if (UI.PdfViewer && typeof UI.PdfViewer.open === "function") UI.PdfViewer.open(url, "Report Preview");
+          else window.open(url, "_blank", "noopener");
+        };
+      }
 
       container.querySelectorAll(".btn-delete").forEach(function (a) {
         a.onclick = function (e) {
@@ -923,6 +1139,7 @@
   }
 
   window.AppCore.ListView = {
+    setImpl: setImpl,
     render: render,
     renderViewSwitcher: function (route, currentView, helpers) {
       return renderViewSwitcher(route, currentView, helpers);

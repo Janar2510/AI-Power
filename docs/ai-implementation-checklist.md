@@ -2,6 +2,121 @@
 
 Verification checklist for AI assistant module deployment and feature additions.
 
+## Sale confirmation helper chain + schema bootstrap (Unreleased)
+
+- [ ] `core/db/schema.py` allows explicit `create_date` / `write_date` model fields without emitting duplicate access-log columns during `init_schema()`.
+- [ ] `sale.order.action_confirm()` works with the merged `sale` + `stock` + `account` + `sale_purchase` model stack and does not rely on `_inherit`-merged `super()` calls.
+- [ ] Confirming a sale order still preserves all expected side effects: pricelist application, delivery picking creation, invoice status refresh, delivery status refresh, and confirmation email queueing.
+- [ ] `sale.order._create_invoice_with_quantities()` skips empty invoices when there are no invoiceable lines or delivered quantities.
+- [ ] `sale.order._create_invoice_with_quantities()` skips creating a duplicate only when a **draft** `out_invoice` already exists for the same SO reference; posted invoices do not block a new draft.
+- [ ] `purchase.order._create_bill_with_quantities()` skips empty vendor bills when there are no billable PO lines or received quantities.
+- [ ] `purchase.order._create_bill_with_quantities()` does not create a duplicate **draft** vendor bill when a draft already exists for the same PO reference (`invoice_origin` + `in_invoice`); posted bills do not block a new draft (partial billing).
+- [ ] `purchase.order._get_received_qty_by_product()` includes pickings linked by `purchase_id` or by `origin` matching the PO name.
+- [ ] `purchase_stock` `purchase.order` `receipt_count` uses the same picking domain as received-qty (OR `purchase_id` / `origin`).
+- [ ] `purchase.order.action_cancel()` cancels open incoming pickings (draft/assigned) for the PO and related `stock.move` rows before setting state to `cancel` (restricts to `incoming` picking type when configured, same pattern as SO outgoing).
+- [ ] With `stock` installed, `sale.order.action_cancel()` cancels open **outgoing** pickings (draft/assigned) for the SO (`sale_id` or `origin`) and related moves before setting state to `cancel`.
+- [ ] `purchase.order.button_confirm()` and `sale.order._action_confirm_sale_core()` only confirm **draft** orders; cancelled orders are not returned to confirmed states.
+- [ ] `inter_company_rules` `sale.order.create` calls `sale.order._create_sale_order_record` instead of `super().create` (registry merge-safe).
+- [ ] New `purchase.order` `create` overrides should delegate to `cls._create_purchase_order_record(vals)` (merge-safe), same as sale.
+- [ ] New `res.partner` `create` overrides should delegate to `cls._create_res_partner_record(vals)` (merge-safe).
+- [ ] New `account.move` `create` overrides should delegate to `cls._create_account_move_record(vals)` (merge-safe).
+- [ ] New `payment.transaction` `create` overrides should delegate to `cls._create_payment_transaction_record(vals)` then run any post-create sync (merge-safe).
+- [ ] New `product.template` `create` overrides should delegate to `cls._create_product_template_record(vals)` then run `_create_variant_ids` when variants apply (merge-safe).
+- [ ] New `mrp.production` `create` overrides should delegate to `cls._create_mrp_production_record(vals)` (merge-safe).
+- [ ] New `mail.activity` `create` overrides should delegate to `cls._create_mail_activity_record(vals)` (merge-safe).
+- [ ] New `pos.order` / `pos.session` `create` overrides should delegate to `cls._create_pos_order_record(vals)` / `cls._create_pos_session_record(vals)` (merge-safe).
+- [ ] New `account.bank.statement` `create` overrides should delegate to `cls._create_account_bank_statement_record(vals)` (merge-safe).
+- [ ] New `hr.leave` `create` overrides should delegate to `cls._create_hr_leave_record(vals)` (merge-safe).
+- [ ] New `hr.expense.sheet` / `hr.payslip` `create` overrides should delegate to `cls._create_hr_expense_sheet_record(vals)` / `cls._create_hr_payslip_record(vals)` (merge-safe).
+- [ ] `mrp.production.action_cancel()` cancels open production-linked `stock.move` rows (draft/assigned) before setting the MO to `cancel`.
+- [ ] `account.move.action_post()` rejects non-draft moves, lines without `account_id`, moves without journal lines, and unbalanced debit/credit totals.
+- [ ] Completed `payment.transaction` rows linked by `account_move_id` reduce `account.move.amount_residual` and auto-sync invoice state to `paid` when fully covered.
+- [ ] `account.move.transaction_count` and `account.move.amount_paid` include direct `payment.transaction.account_move_id` links when `transaction_ids` is empty.
+- [ ] Completed invoice-linked `payment.transaction` rows create idempotent `account.payment` records with invoice link, payment reference, company, and journal defaults.
+- [ ] Focused regressions pass: `tests.test_schema_audit_columns`, `tests.test_sale_confirm_phase465`, `tests.test_sale_invoice_phase466`, `tests.test_account_post_phase467`, `tests.test_account_payment_phase468`, `tests.test_account_payment_stats_phase469`, `tests.test_account_payment_record_phase470`, `tests.test_purchase_bill_phase471`, `tests.test_purchase_receipt_domain_phase473`, `tests.test_purchase_cancel_pickings_phase476`, `tests.test_sale_cancel_pickings_phase477`, (optional DB) `tests.test_confirm_draft_guard_phase478`, and (optional DB) `tests.test_mrp_phase153`.
+
+## Phases 490–524 (business depth, frontend, AI, production)
+
+- [ ] MRP: `mrp.workorder`, reservation + quant completion on MO done; SO-driven MO when `product.template.manufacture_on_order` and `sale_mrp` loaded.
+- [ ] HR: employee lifecycle + contract start + attendance promotion; leave approval note; payroll + attendance lines.
+- [ ] Web: `npm run build:web` succeeds when Node is available; `tsconfig.json` + `framework/component_base.js` present.
+- [ ] AI: `ai_assistant.embeddings.pipeline` documents pgvector; `retrieve_chunks` still falls back to ILIKE without vectors.
+- [ ] Ops: `/readiness` for probes; `json_log.format_json_log` available; security checklist doc reviewed.
+
+## Phases 525–529 (reference roadmap: stock/MRP depth, assets, RAG, hardening)
+
+- [x] Stock picking behavioural lifecycle documented in `docs/parity_matrix.md` (Phase 525).
+- [x] MRP BOM operations + multi work orders + cost estimate heuristic (Phase 526); tests `test_mrp_bom_operations_phase526`.
+- [x] Web concat guard: `npm run check:assets-concat`; CI runs `build:web` when Node is installed (Phase 527).
+- [x] `ai.document.chunk` embedding refresh on text write; pipeline doc in `embeddings/pipeline.py` (Phase 528); test `test_ai_chunk_embed_phase528`.
+- [x] JSON access logging: `ERP_JSON_ACCESS_LOG` / `--json-access-log`; health vs readiness docstrings (Phase 529).
+
+## Phases 530–534 (stock partial reserve, MRP cost stub, RAG, sale picking count, rules)
+
+- [x] Planning gate: `docs/ai-rules.md` reference analysis (Odoo 19.0 + ERP); `.cursor/rules/dual-codebase-analysis.mdc`.
+- [x] Stock partial reservation: `quantity_reserved`, `partial` move state; tests `test_stock_partial_reserve_phase530`.
+- [x] MRP: `cost_draft_move_id` + draft `account.move` stub on MO done when `cost_estimate` > 0.
+- [x] `sale_stock.picking_count` uses `stock.picking` `sale_id` OR `origin`.
+- [x] `ai.rag.reindex` includes `knowledge.article`; `retrieve_chunks` ilike test `test_ai_retrieve_chunks_phase532`.
+- [x] Deferred large modules: `docs/deferred_product_backlog.md`.
+
+## Phases 535–538 (account depth wave F)
+
+- [x] Gap audit doc: `docs/account_odoo19_gap_audit.md` (clone `odoo-19.0` for upstream file inventory when missing).
+- [x] `account.move.action_post`: move must be **draft**; each line has **account_id**; still balanced (Phase 535).
+- [x] `account.tax.compute_all`: single **percent** + **price_include** extracts tax from included subtotal (Phase 536).
+- [x] Bank reconcile: `action_reconcile` + wizard flows tested (Phase 537); partial reconcile vs Odoo remains **deferred** (matrix 538 / audit).
+- [x] Full Odoo `account_reports` parity **deferred**; ERP SQL reports unchanged (Phase 538).
+- [x] Quick verify: `./scripts/run_account_wave_f_smoke.sh` or `npm run test:account-smoke` (3 modules, no DB); broader: `./scripts/run_account_wave_f_broad.sh` or `npm run test:account-broad` (+ sale/purchase invoice fakes). Full account+DB+stock chain is slower because **each** `tests.test_*` file runs `load_module_graph()` once—see `DeploymentChecklist.md` Phase 535–538.
+
+## Sidebar navigation (greyed-out submenus)
+
+- [ ] CRM Configuration submenus (Stages, Tags, Lost Reasons) resolve actions and routes; `crm.lost.reason` model installed after upgrade.
+- [ ] `DATA_ROUTES_SLUGS` in `main.js` stays aligned with `actionToRoute` / `getModelForRoute` for new list routes.
+- [ ] `window.__ERP_DEBUG_SIDEBAR_MENU` can be used to trace any remaining menus without routes.
+
+## Frontend Pro Max phases 451-464 (1.205)
+
+- [ ] Typography tokens (`--font-*`, `--text-*`, leading/tracking tokens) are present and used by shell/headings.
+- [ ] Glassmorphism tokens (`--color-glass`, `--glass-blur`, `--glass-border`) are applied to navbar/modal/dropdowns without breaking contrast.
+- [ ] View transition classes (`.o-view-enter/.o-view-exit`) are active and reduced-motion safe.
+- [ ] Skeleton helper (`AppCore.Helpers.renderSkeletonHtml`) is used for list/form/report loading states.
+- [ ] Empty state component (`UIComponents.EmptyState`) is wired in list no-record branch.
+- [ ] `services/systray_registry.js` is loaded and systray async badge updates from `/web/async/call_notify`.
+- [ ] `AppCore.DiscussView.setImpl` and `AppCore.ListView.setImpl` boundaries are available.
+- [ ] PDF preview component opens `/report/pdf/...` from both list and form actions.
+- [ ] Attachment viewer opens image previews and supports close/keyboard flow.
+- [ ] Expanded keyboard shortcuts (`Alt+N/S/E/L/K/P`, `Esc`) execute expected actions.
+- [ ] JS unit tests are wired for helpers/systray/onboarding/attachment viewer.
+
+## Phases 437–450 (1.204)
+
+- [ ] `core/helpers.js` is loaded before `form_view.js` / `list_view.js` and shared helpers are available at `window.AppCore.Helpers`.
+- [ ] `SearchModel` facet lifecycle works end-to-end (`addFacet/removeFacet/renderFacets`) and `search_default_*` context values become initial facets.
+- [ ] Search autocomplete suggestions appear from search-view fields and selected suggestion applies a domain facet.
+- [ ] Custom filter builder can add ad-hoc domain facets and reload list results.
+- [ ] Kanban supports fold persistence, multi-select bulk bar, progressive loading, and optional dynamic card template callback.
+- [ ] `field_registry.js` renders new widgets (`priority`, `state_selection`, `handle`, `email`, `url`, `phone`, `copy_clipboard`, `float_time`, `radio`, `many2many_checkboxes`).
+- [ ] `ActionManager.doActionButton()` handles both `type="object"` and `type="action"` form header buttons.
+- [ ] `ConfirmDialog.openModal()` is usable for wizard flows (`target: "new"`) including breadcrumb updates.
+- [ ] `/web/action/run_server_action` executes `ir.actions.server` with user context and returns JSON result payload.
+- [ ] `/web/async/call_notify` returns async queue counts for the current user session.
+- [ ] Session includes `allowed_company_ids` and RPC context receives `company_id` + `allowed_company_ids`.
+- [ ] JS unit tests are wired and visible in `test_runner.html` for search model, field registry, router, form view, kanban, import.
+
+## Phases 423–436 (1.203)
+
+- [ ] Router handlers are registered through `AppCore.Router.setHandlers` and route flow still handles unsaved form confirmation.
+- [ ] `AppCore.Sidebar` is loaded before `main.js` and sidebar render/wire delegation is active.
+- [ ] `AppCore.FormView.setImpl` is registered from `main.js` (no behavior regression for form create/edit/chatter paths).
+- [ ] `ir.async` model is available over RPC (`call`, `call_notify`, `run_pending`, `gc_done`) and scheduler runs pending jobs.
+- [ ] Report async endpoint `/report/pdf_async/<report>/<ids>` queues jobs successfully.
+- [ ] `core/http/report.py` qweb-ish directive mapping works for templates using `t-foreach`, `t-if`, `t-esc`, `t-raw`.
+- [ ] `ir.actions.report` supports `attachment_use` flow and PDF cache writes to `ir.attachment` when enabled.
+- [ ] Record-rule evaluation applies default company domain when model has `company_id` and context has `allowed_company_ids`.
+- [ ] Added scaffold bridges are importable: `sale_stock`, `purchase_stock`, `stock_account`, `contacts`, `mrp_account`, `website`, `website_sale`, `inter_company_rules`.
+- [x] Added phase 436 tests run in CI/local and handle schema-unavailable environments via skips.
+
 ## Phases 409–422 (1.202)
 
 - [ ] DB upgrade after pull: `ir.model.data`, `ir.model.fields`, generic XML loader paths.
@@ -79,7 +194,8 @@ Verification checklist for AI assistant module deployment and feature additions.
 ## Phase 136 (Vector embeddings)
 
 - [ ] pgvector extension; ai.document.chunk.embedding (vector 1536)
-- [ ] index_record_for_rag: embeds via OpenAI text-embedding-3-small on write
+- [x] index_record_for_rag: embeds via OpenAI text-embedding-3-small on write
+- [x] Chunk rows: `_inherit` refreshes embedding when `text` changes (Phase 528)
 - [ ] retrieve_chunks: cosine similarity when embeddings exist; ilike fallback
 
 ## LLM Integration (Phase 88)

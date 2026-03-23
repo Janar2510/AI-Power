@@ -34,3 +34,24 @@ class HrAttendance(Model):
             else:
                 result.append(0.0)
         return result
+
+    @classmethod
+    def create(cls, vals):
+        rec = super().create(vals)
+        env = getattr(rec, "env", None) or (
+            getattr(cls._registry, "_env", None) if getattr(cls, "_registry", None) else None
+        )
+        Employee = env.get("hr.employee") if env else None
+        if not Employee:
+            return rec
+        for r in rec:
+            row = r.read(["employee_id"])[0]
+            eid = row.get("employee_id")
+            if isinstance(eid, (list, tuple)) and eid:
+                eid = eid[0]
+            if not eid:
+                continue
+            er = Employee.browse(eid).read(["lifecycle_status"])[0]
+            if er.get("lifecycle_status") == "onboarding":
+                Employee.browse(eid).write({"lifecycle_status": "active"})
+        return rec

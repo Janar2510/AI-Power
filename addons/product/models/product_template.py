@@ -23,8 +23,13 @@ class ProductTemplate(Model):
     )
 
     @classmethod
+    def _create_product_template_record(cls, vals):
+        """ORM insert only (Phase 483: merge-safe hook for `_inherit` create overrides)."""
+        return super().create(vals)
+
+    @classmethod
     def create(cls, vals):
-        rec = super().create(vals)
+        rec = cls._create_product_template_record(vals)
         rec._create_variant_ids()
         return rec
 

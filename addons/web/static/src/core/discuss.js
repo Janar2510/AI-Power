@@ -2,11 +2,18 @@
  * Discuss app — channel list + thread + composer (Phase 413).
  */
 (function () {
+  var _impl = null;
+
+  function setImpl(fn) {
+    _impl = typeof fn === "function" ? fn : null;
+  }
+
   function esc(s) {
     return String(s || "").replace(/</g, "&lt;");
   }
 
   function render(container, opts) {
+    if (_impl) return !!_impl(container, opts || {});
     opts = opts || {};
     var rpc = window.Services && window.Services.rpc;
     if (!rpc || !container) return false;
@@ -130,5 +137,8 @@
   }
 
   window.AppCore = window.AppCore || {};
-  window.AppCore.DiscussView = { render: render };
+  window.AppCore.DiscussView = {
+    setImpl: setImpl,
+    render: render,
+  };
 })();

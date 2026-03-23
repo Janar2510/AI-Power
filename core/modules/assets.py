@@ -2,6 +2,11 @@
 
 Parses manifest 'assets' key, resolves include/remove/after directives,
 and returns ordered file paths for CSS and JS bundles.
+
+**Concat vs ESM (Phase 527):** Production `web.assets_web` JS is built by concatenating
+classic scripts. Run `npm run check:assets-concat` (or `python3 scripts/check_concat_bundle.py`)
+before shipping UI changes; optional `npm run build:web` produces an IIFE bundle under
+`addons/web/static/dist/` for alternate delivery (see docs/frontend.md).
 """
 
 import logging

@@ -98,6 +98,5 @@
     <menuitem name="Expenses" id="menu_hr_expense_root" sequence="24"/>
     <menuitem name="My Expenses" id="menu_hr_expense_my_expenses" action="action_hr_expense" parent="menu_hr_expense_root" sequence="1"/>
     <menuitem name="Reporting" id="menu_hr_expense_reports" action="action_hr_expense_sheet" parent="menu_hr_expense_root" sequence="2"/>
-    <menuitem name="Configuration" id="menu_hr_expense_configuration" parent="menu_hr_expense_root" sequence="3"/>
   </data>
 </odoo>

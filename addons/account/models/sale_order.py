@@ -59,9 +59,16 @@ class SaleOrder(Model):
 
     def action_confirm(self):
         """Confirm order; create delivery picking if stock; set invoice_status to_invoice (Phase 196)."""
-        self.write({"state": "sale"})
-        if hasattr(self, "_create_delivery_picking"):
-            self._create_delivery_picking()
+        if hasattr(self, "_action_confirm_sale_core"):
+            self._action_confirm_sale_core()
+        else:
+            self.write({"state": "sale"})
+        if hasattr(self, "_action_confirm_stock_core"):
+            self._action_confirm_stock_core()
+        self._action_confirm_account_core()
+
+    def _action_confirm_account_core(self):
+        """Accounting confirmation side effects layered onto sale confirmation."""
         self.write({"invoice_status": "to_invoice"})
         self._update_delivery_status()
 
@@ -123,10 +130,14 @@ class SaleOrder(Model):
             if not income_account.ids or not receivable_account.ids:
                 continue
             order_name = order.read(["name"])[0].get("name", "") if order.ids else ""
-            existing = Move.search([
-                ("invoice_origin", "=", order_name),
-                ("move_type", "=", "out_invoice"),
-            ], limit=1)
+            existing = Move.search(
+                [
+                    ("invoice_origin", "=", order_name),
+                    ("move_type", "=", "out_invoice"),
+                    ("state", "=", "draft"),
+                ],
+                limit=1,
+            )
             if existing.ids:
                 continue
             IrSequence = self.env.get("ir.sequence")
@@ -155,21 +166,6 @@ class SaleOrder(Model):
             pt_id = order_data.get("payment_term_id")
             if isinstance(pt_id, (list, tuple)) and pt_id:
                 pt_id = pt_id[0]
-            move_vals = {
-                "name": move_name,
-                "journal_id": sale_journal.ids[0],
-                "partner_id": partner_id,
-                "currency_id": move_currency_id,
-                "move_type": "out_invoice",
-                "invoice_origin": order_name,
-                "state": "draft",
-                "date": order_date or None,
-            }
-            if pt_id:
-                move_vals["payment_term_id"] = pt_id
-            move = Move.create(move_vals)
-            if not move.ids:
-                continue
             SaleLine = self.env.get("sale.order.line")
             if not SaleLine or not order.id:
                 continue
@@ -177,6 +173,7 @@ class SaleOrder(Model):
             total = 0.0
             total_fc = 0.0
             Currency = self.env.get("res.currency")
+            prepared_line_vals = []
             for line in lines:
                 line_data = line.read(["product_id", "product_uom_qty", "price_unit", "price_subtotal", "name"])
                 if not line_data:
@@ -197,7 +194,6 @@ class SaleOrder(Model):
                 total += amount_cc
                 total_fc += amount_fc
                 line_vals = {
-                    "move_id": move.ids[0],
                     "account_id": income_account.ids[0],
                     "name": row.get("name") or "Sales",
                     "debit": 0.0,
@@ -207,7 +203,26 @@ class SaleOrder(Model):
                 if order_currency_id and order_currency_id != company_currency_id:
                     line_vals["amount_currency"] = amount_fc
                     line_vals["currency_id"] = order_currency_id
-                MoveLine.create(line_vals)
+                prepared_line_vals.append(line_vals)
+            if not prepared_line_vals:
+                continue
+            move_vals = {
+                "name": move_name,
+                "journal_id": sale_journal.ids[0],
+                "partner_id": partner_id,
+                "currency_id": move_currency_id,
+                "move_type": "out_invoice",
+                "invoice_origin": order_name,
+                "state": "draft",
+                "date": order_date or None,
+            }
+            if pt_id:
+                move_vals["payment_term_id"] = pt_id
+            move = Move.create(move_vals)
+            if not move.ids:
+                continue
+            for line_vals in prepared_line_vals:
+                MoveLine.create(dict(line_vals, move_id=move.ids[0]))
             if total > 0:
                 recv_vals = {
                     "move_id": move.ids[0],

@@ -6,8 +6,34 @@
     return h || "home";
   }
 
+  const _state = {
+    dirty: false,
+    lastHash: "home",
+  };
+  const _handlers = {
+    renderNavbar: null,
+    applyRoute: null,
+    isFormRoute: null,
+    confirmLeave: null,
+  };
+
   const Router = {
     breadcrumbs: [],
+    setState(next) {
+      if (!next || typeof next !== "object") return;
+      if (Object.prototype.hasOwnProperty.call(next, "dirty")) _state.dirty = !!next.dirty;
+      if (Object.prototype.hasOwnProperty.call(next, "lastHash")) _state.lastHash = safeHash(next.lastHash);
+    },
+    getState() {
+      return { dirty: _state.dirty, lastHash: _state.lastHash };
+    },
+    setHandlers(handlers) {
+      handlers = handlers || {};
+      _handlers.renderNavbar = typeof handlers.renderNavbar === "function" ? handlers.renderNavbar : _handlers.renderNavbar;
+      _handlers.applyRoute = typeof handlers.applyRoute === "function" ? handlers.applyRoute : _handlers.applyRoute;
+      _handlers.isFormRoute = typeof handlers.isFormRoute === "function" ? handlers.isFormRoute : _handlers.isFormRoute;
+      _handlers.confirmLeave = typeof handlers.confirmLeave === "function" ? handlers.confirmLeave : _handlers.confirmLeave;
+    },
     pushBreadcrumb(label, hash) {
       this.breadcrumbs.push({ label: label || "", hash: safeHash(hash) });
     },
@@ -50,6 +76,33 @@
       const route = safeHash(hash);
       window.location.hash = "#" + route;
       return route;
+    },
+    routeApply(hash, base) {
+      if (typeof _handlers.applyRoute === "function") {
+        _handlers.applyRoute(hash, base);
+      }
+    },
+    route() {
+      const hash = (window.location.hash || "#home").slice(1);
+      const base = hash.split("?")[0];
+      if (typeof _handlers.renderNavbar === "function") {
+        _handlers.renderNavbar();
+      }
+      const isForm = typeof _handlers.isFormRoute === "function" ? _handlers.isFormRoute : function () { return false; };
+      if (_state.dirty && isForm(_state.lastHash) && hash !== _state.lastHash && typeof _handlers.confirmLeave === "function") {
+        _handlers.confirmLeave().then(function (ok) {
+          if (!ok) {
+            window.location.hash = _state.lastHash;
+            return;
+          }
+          _state.dirty = false;
+          _state.lastHash = hash;
+          Router.routeApply(hash, base);
+        });
+        return;
+      }
+      _state.lastHash = hash;
+      Router.routeApply(hash, base);
     },
   };
 

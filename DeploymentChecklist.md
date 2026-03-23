@@ -1,5 +1,19 @@
 # Deployment Checklist
 
+## Phases 539–544 (stock valuation subset, MRP cost lines, sale/purchase domains, web doc, RAG scope, account deferrals) (Unreleased)
+
+### Pre-Deployment
+- [ ] No new DB columns required for 539–544. **540:** MO cost draft moves may now include journal lines when chart has expense + current asset accounts.
+- [ ] Cron `ai.rag.reindex` indexes **sale.order** in addition to partner/lead/knowledge — review load if many SOs (500 cap per model per run unchanged).
+
+### Verification
+- [ ] **ORM / `ir.rule`:** `search`, `search_count`, and `_read_group` now AND record-rule domains with the caller domain using nested `&` (list concat previously broke top-level `|` domains). Smoke-test any custom `ir.rule` on list views if you use OR domains.
+- [ ] Optional DB (one run, not three): `./scripts/run_phases_539_541_db.sh` or `npm run test:phases-539-541-db` → `tests.test_phases_539_541_stock_mrp_sale_db`
+- [ ] No DB: `tests.test_ai_rag_scope_phase543`
+- [ ] Review `docs/frontend.md` Phase 542 and `docs/stock_odoo19_gap_audit.md` / `docs/account_odoo19_gap_audit.md` for planning alignment
+
+---
+
 ## Phases 535–538 (account posting / tax / bank reconcile / reports note) (Unreleased)
 
 ### Pre-Deployment
@@ -821,6 +835,8 @@ These are IDE-level Cursor rules and documentation. No DB migration, no `DEFAULT
 - [ ] PostgreSQL: If "role does not exist", run with `PGUSER=postgres` (e.g. `PGUSER=postgres ./erp-bin server`)
 - [ ] Verify addons path: `./erp-bin module list`
 - [ ] Initialize database: `./erp-bin db init -d <dbname>` (re-run when adding modules like crm, ai_assistant)
+- [ ] If Postgres error `relation "res_users" does not exist`: DB exists but schema not applied — run `db init` for that DB name, or restart server (auto-inits when `public.res_users` is missing)
+- [ ] **pgvector:** Optional; without it, `db init` uses JSONB for embedding columns (no aborted transaction). Install pgvector on the server when you want `<=>` / vector RAG
 - [ ] Optional: install module: `./erp-bin module install -d <db> -m <module>`
 - [ ] Check config: `./erp-bin help server`
 

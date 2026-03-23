@@ -64,11 +64,16 @@ class MrpProduction(Model):
         return True
 
     def _mrp_create_cost_draft_move(self):
-        """Create idempotent draft account.move(entry) from cost_estimate (no lines yet — stub)."""
+        """Create idempotent draft account.move(entry) from cost_estimate with balanced lines when accounts exist (Phase 540).
+
+        Debit expense, credit current asset — simplified manufacturing cost mirror; no Odoo layer copy.
+        """
         env = getattr(self, "env", None)
         if not env:
             return
         Move = env.get("account.move")
+        MoveLine = env.get("account.move.line")
+        Account = env.get("account.account")
         Journal = env.get("account.journal")
         if not Move or not Journal:
             return
@@ -103,6 +108,30 @@ class MrpProduction(Model):
             mid = mv.id if hasattr(mv, "id") else (mv.ids[0] if getattr(mv, "ids", None) else None)
             if mid:
                 rec.write({"cost_draft_move_id": mid})
+            if not mid or not MoveLine or not Account:
+                continue
+            exp = Account.search([("account_type", "=", "expense")], limit=1)
+            ast = Account.search([("account_type", "=", "asset_current")], limit=1)
+            if not exp.ids or not ast.ids:
+                continue
+            MoveLine.create(
+                {
+                    "move_id": mid,
+                    "account_id": exp.ids[0],
+                    "name": f"MO material cost {mo_name}",
+                    "debit": ce,
+                    "credit": 0.0,
+                }
+            )
+            MoveLine.create(
+                {
+                    "move_id": mid,
+                    "account_id": ast.ids[0],
+                    "name": f"MO material cost {mo_name}",
+                    "debit": 0.0,
+                    "credit": ce,
+                }
+            )
 
     def action_done(self):
         """Post manufacturing cost flag when production completes (Phase 490)."""

@@ -6,6 +6,14 @@ from core.orm import Model
 
 _logger = logging.getLogger("erp.ai_assistant")
 
+# Phase 543: explicit scope for cron (dual-analysis note — expand only with tests + matrix).
+RAG_REINDEX_MODELS = (
+    "res.partner",
+    "crm.lead",
+    "knowledge.article",
+    "sale.order",
+)
+
 
 class AiRagReindex(Model):
     """Cron hook for bulk RAG reindex. Indexes res.partner and crm.lead into ai.document.chunk."""
@@ -25,8 +33,8 @@ class AiRagReindex(Model):
             _logger.warning("index_record_for_rag not available")
             return 0
         count = 0
-        # Extendable set — keep small per cron run (Phase 532).
-        for model in ("res.partner", "crm.lead", "knowledge.article"):
+        # Extendable set — keep small per cron run (Phases 532, 543).
+        for model in RAG_REINDEX_MODELS:
             M = env.get(model)
             if not M:
                 continue

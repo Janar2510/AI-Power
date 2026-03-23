@@ -17,7 +17,7 @@ If `odoo-19.0` is missing locally, clone Odoo 19 CE into `AI Power/odoo-19.0` an
 | Domain | Odoo 19 path | ERP platform path |
 |--------|--------------|-------------------|
 | Stock core | `addons/stock/models/stock_picking.py`, `stock_move.py`, `stock_quant.py` | `addons/stock/models/` |
-| Stock valuation | `addons/stock_account/` | `addons/stock_account/` |
+| Stock valuation | `addons/stock_account/` | `addons/stock_account/`; gap notes [docs/stock_odoo19_gap_audit.md](stock_odoo19_gap_audit.md) |
 | MRP | `addons/mrp/models/mrp_production.py`, `mrp_workorder.py`, `mrp_bom.py` | `addons/mrp/models/` |
 | MRP costing | `addons/mrp_account/` | `addons/mrp_account/` |
 | Web assets | `addons/web/__manifest__.py`, static pipeline | `addons/web/`, `core/modules/assets.py` |

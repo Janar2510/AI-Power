@@ -69,6 +69,13 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] Full Odoo `account_reports` parity **deferred**; ERP SQL reports unchanged (Phase 538).
 - [x] Quick verify: `./scripts/run_account_wave_f_smoke.sh` or `npm run test:account-smoke` (3 modules, no DB); broader: `./scripts/run_account_wave_f_broad.sh` or `npm run test:account-broad` (+ sale/purchase invoice fakes). Full account+DB+stock chain is slower because **each** `tests.test_*` file runs `load_module_graph()` once—see `DeploymentChecklist.md` Phase 535–538.
 
+## Phases 539–544 (next waves G–L)
+
+- [x] Stock + `stock_account` gap audit: `docs/stock_odoo19_gap_audit.md`; Phases **539–541** in `tests/test_phases_539_541_stock_mrp_sale_db.py` (one `load_module_graph` + `load_default_data`); helper `./scripts/run_phases_539_541_db.sh`.
+- [x] Web dual-codebase asset strategy in `docs/frontend.md` Phase **542**; concat+guard remains default.
+- [x] `RAG_REINDEX_MODELS` includes `sale.order`; Phase **543**; `test_ai_rag_scope_phase543`.
+- [x] Account Wave L deferrals documented (Phase **544**): fiscal, multi-tax chain, partial reconcile, locks — `docs/account_odoo19_gap_audit.md`.
+
 ## Sidebar navigation (greyed-out submenus)
 
 - [ ] CRM Configuration submenus (Stages, Tags, Lost Reasons) resolve actions and routes; `crm.lost.reason` model installed after upgrade.
@@ -158,6 +165,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] ORM registry hooks are called (`_register_hook`, `_unregister_hook`) when env is attached/cleared.
 - [ ] `_log_access` writes `create_uid/create_date/write_uid/write_date` on create/write where available.
 - [ ] Schema manager creates audit columns for `_log_access` models and supports SQL views via `_table_query`.
+- [ ] `search` / `search_count` / `_read_group` combine caller domains with `ir.rule` via `_combine_domain_with_record_rules` (nested `&`), not list concatenation (which breaks top-level `|`).
 - [ ] Tooling helpers are available from `core.tools`: `safe_eval`, `date_utils`, `float_utils`, `image`, `misc`, `mail`.
 
 ## Web client / dashboard (1.178)

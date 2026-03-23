@@ -21,12 +21,52 @@ This ERP Platform uses a structured multi-agent AI workflow. Each AI agent has a
 The UI/UX Designer and Frontend Builder personas use the external skill:
 - `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill`
 
-### Install
+### Project Status
+
+- The skill is already vendored in this repo at `.cursor/skills/ui-ux-pro-max`.
+- Cursor is configured from the repo-local `.cursor` directory.
+- Codex uses `~/.codex/skills`, so it needs a separate local-machine link step.
+
+### Prerequisites
 
 ```bash
+npm --version
+python3 --version
 npm install -g uipro-cli
-uipro init --ai cursor
+uipro --version
 ```
+
+If `npm install -g uipro-cli` fails with a permissions error on `/usr/local`, use:
+
+```bash
+bash scripts/install_uipro_cli_local.sh
+uipro --version
+```
+
+If `python3` points to an older system Python on macOS, install a newer one:
+
+```bash
+brew install python3
+python3 --version
+```
+
+### Assistant Setup
+
+Cursor is already wired through the vendored `.cursor` directory.
+
+For Codex, run:
+
+```bash
+bash scripts/setup_ui_ux_pro_max_codex.sh
+```
+
+For a full health check:
+
+```bash
+bash scripts/check_ui_ux_pro_max_setup.sh
+```
+
+See [docs/assistant-skill-setup.md](assistant-skill-setup.md) for the full setup model.
 
 ### Usage in Team Flow
 
@@ -104,6 +144,7 @@ Every feature must pass before merge:
 
 ```
 erp-platform/
+├── .codex/          ← Codex project notes
 ├── .cursor/
 │   └── rules/
 │       ├── core-protocol.mdc          ← always active
@@ -113,9 +154,10 @@ erp-platform/
 │           ├── security-reviewer.mdc
 │           ├── context-specialist.mdc
 │           └── docs-writer.mdc
-├── addons/          ← 391 business modules
+├── addons/          ← Business modules
 ├── core/            ← ORM, DB, tools
 ├── docs/            ← Architecture, rules, parity
+├── scripts/         ← setup and verification helpers
 ├── tests/           ← 100+ test files
 ├── changelog.md
 └── DeploymentChecklist.md

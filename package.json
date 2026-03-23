@@ -6,8 +6,12 @@
     "build:web": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.js --sourcemap",
     "build:web:min": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.min.js --minify --sourcemap",
     "check:assets-concat": "python3 scripts/check_concat_bundle.py",
+    "check:uipro:setup": "bash scripts/check_ui_ux_pro_max_setup.sh",
+    "install:uipro:local": "bash scripts/install_uipro_cli_local.sh",
+    "setup:uipro:codex": "bash scripts/setup_ui_ux_pro_max_codex.sh",
     "test:account-smoke": "bash scripts/run_account_wave_f_smoke.sh",
-    "test:account-broad": "bash scripts/run_account_wave_f_broad.sh"
+    "test:account-broad": "bash scripts/run_account_wave_f_broad.sh",
+    "test:phases-539-541-db": "bash scripts/run_phases_539_541_db.sh"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

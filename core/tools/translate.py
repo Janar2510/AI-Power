@@ -3,7 +3,7 @@
 import logging
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 _logger = logging.getLogger("erp.translate")
 
@@ -30,6 +30,30 @@ def parse_po_file(path: Path) -> Dict[str, str]:
         if key:
             out[key] = val or key
     return out
+
+
+def discover_po_files(addons_path: Path) -> Iterator[Tuple[str, str, Path]]:
+    """Yield (module_name, lang_code, po_path) for each addons/<module>/i18n/<lang>.po file."""
+    root = Path(addons_path)
+    if not root.is_dir():
+        return
+    for mod_dir in sorted(root.iterdir()):
+        if not mod_dir.is_dir():
+            continue
+        i18n = mod_dir / "i18n"
+        if not i18n.is_dir():
+            continue
+        for po in sorted(i18n.glob("*.po")):
+            if po.is_file():
+                yield mod_dir.name, po.stem, po
+
+
+def load_po_file(
+    po_path: Path, module: str, lang: str
+) -> Iterator[Tuple[str, str, str, str]]:
+    """Yield (module, lang, msgid, msgstr) tuples for ir.translation seeding (Phase 94)."""
+    for src, val in parse_po_file(po_path).items():
+        yield module, lang, src, val
 
 
 def load_module_po_translations(env: Any, module_name: str, lang: str = "et_EE") -> int:

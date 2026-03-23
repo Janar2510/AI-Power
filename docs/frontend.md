@@ -84,6 +84,18 @@ The active product direction is defined by the Foundry One brand system and the 
 - **Shipped behaviour:** The live web client continues to load **concatenated** `web.assets_web.js` from manifests. This is the supported production default until a project explicitly switches templates to a single bundled entry and regression-tests the shell.
 - **esbuild** remains optional (CI builds it to catch breakage; Docker comment describes multi-stage). Choosing esbuild-primary for production requires an ADR-style note in `DeploymentChecklist.md` and template wiring — not implied by `npm run build:web` alone.
 
+## Dual-codebase asset strategy (Phase 542)
+
+When planning web changes, compare **read-only** `odoo-19.0/addons/web/__manifest__.py` `assets` (Odoo 19 uses a **bundled** pipeline with many named bundles and `t-call-assets` in templates) with ERP’s **[addons/web/__manifest__.py](addons/web/__manifest__.py)** and **[core/modules/assets.py](core/modules/assets.py)**.
+
+| Aspect | Odoo 19 CE (reference) | ERP (default) |
+|--------|-------------------------|---------------|
+| Primary delivery | Webpack-like asset graph per bundle | **Concatenation** of listed paths into one `web.assets_web.js` |
+| ESM | Supported inside upstream bundler | **Forbidden** top-level `export` in concat entries; use `npm run check:assets-concat` |
+| Optional bundle | N/A for ERP | `npm run build:web` → IIFE `dist/web.bundle.js`; production switch requires template wiring + checklist ADR |
+
+**Decision:** Keep **concat + guard** as the supported production default until product approves esbuild-primary and CI/regression covers the shell. Document any switch in `DeploymentChecklist.md`.
+
 ## Non-Goals
 
 - Exact Odoo Owl/legacy JS implementation

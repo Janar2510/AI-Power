@@ -26,14 +26,28 @@ _logger = logging.getLogger("erp.ai.embeddings")
 
 
 def ensure_pgvector_extension(cr: Any) -> bool:
-    """Run CREATE EXTENSION IF NOT EXISTS vector. Returns False on failure."""
+    """Run CREATE EXTENSION IF NOT EXISTS vector. Returns False on failure.
+
+    Uses a SAVEPOINT so a missing extension does not abort the outer transaction.
+    """
     if cr is None:
         return False
+    import time
+
+    from psycopg2 import sql
+
+    sp = f"erp_ai_pgvector_{int(time.time() * 1000000)}"
     try:
+        cr.execute(sql.SQL("SAVEPOINT {}").format(sql.Identifier(sp)))
         cr.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        cr.execute(sql.SQL("RELEASE SAVEPOINT {}").format(sql.Identifier(sp)))
         return True
     except Exception as e:
         _logger.info("pgvector extension not available: %s", e)
+        try:
+            cr.execute(sql.SQL("ROLLBACK TO SAVEPOINT {}").format(sql.Identifier(sp)))
+        except Exception:
+            pass
         return False
 
 

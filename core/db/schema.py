@@ -24,12 +24,15 @@ def _get_model_fields(model_class: Type[ModelBase]) -> Dict[str, fields.Field]:
     return result
 
 
-def _column_def(field: fields.Field) -> str:
+def _column_def(field: fields.Field, *, use_native_vector: bool = True) -> str:
     """Get SQL column definition for a field. Many2one uses INTEGER; FK constraints added separately."""
     col_type = getattr(field, "column_type", "varchar")
     if col_type == "vector":
-        dims = getattr(field, "dimensions", None) or getattr(field, "size", 1536)
-        return f"vector({dims})"
+        if use_native_vector:
+            dims = getattr(field, "dimensions", None) or getattr(field, "size", 1536)
+            return f"vector({dims})"
+        # No pgvector extension: store embeddings as JSONB (ORM wraps lists via Registry._pgvector_native)
+        return "JSONB"
     if col_type == "varchar":
         size = getattr(field, "size", None)
         if size:
@@ -71,7 +74,9 @@ def table_exists(cursor: Any, table_name: str) -> bool:
     return cursor.fetchone() is not None
 
 
-def create_table(cursor: Any, model_class: Type[ModelBase]) -> None:
+def create_table(
+    cursor: Any, model_class: Type[ModelBase], *, use_native_vector: bool = True
+) -> None:
     """Create table for model if it does not exist."""
     table = model_class._table
     if not table:
@@ -105,7 +110,7 @@ def create_table(cursor: Any, model_class: Type[ModelBase]) -> None:
     for name, field in field_defs.items():
         if getattr(field, "column_type", None) is None:
             continue  # virtual fields (One2many, Many2many)
-        col_def = _column_def(field)
+        col_def = _column_def(field, use_native_vector=use_native_vector)
         columns.append(f'"{name}" {col_def}')
     stmt = f'CREATE TABLE "{table}" ({", ".join(columns)})'
     cursor.execute(stmt)
@@ -124,7 +129,9 @@ def column_exists(cursor: Any, table_name: str, column_name: str) -> bool:
     return cursor.fetchone() is not None
 
 
-def add_missing_columns(cursor: Any, registry: Any) -> None:
+def add_missing_columns(
+    cursor: Any, registry: Any, *, use_native_vector: bool = True
+) -> None:
     """Add missing columns to existing tables (simple migration)."""
     for model_name, model_class in registry._models.items():
         table = getattr(model_class, "_table", None)
@@ -151,7 +158,7 @@ def add_missing_columns(cursor: Any, registry: Any) -> None:
             if getattr(field, "column_type", None) is None:
                 continue
             if not column_exists(cursor, table, col_name):
-                col_def = _column_def(field)
+                col_def = _column_def(field, use_native_vector=use_native_vector)
                 try:
                     cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{col_name}" {col_def}')
                     _logger.info("Added column %s.%s", table, col_name)
@@ -238,13 +245,28 @@ def _apply_sql_constraints(cursor: Any, model_class: Type[ModelBase]) -> None:
             _logger.warning("Could not add constraint %s on %s: %s", constraint_name, table, e)
 
 
-def _ensure_pgvector_extension(cursor: Any) -> None:
-    """Enable pgvector extension if available (Phase 136)."""
+def _ensure_pgvector_extension(cursor: Any) -> bool:
+    """Enable pgvector extension if available (Phase 136).
+
+    Uses a SAVEPOINT so a missing extension does not abort the whole transaction
+    (PostgreSQL marks the transaction failed after a plain CREATE EXTENSION error).
+    """
+    import time
+
+    sp = f"erp_pgvector_{int(time.time() * 1000000)}"
     try:
+        cursor.execute(sql.SQL("SAVEPOINT {}").format(sql.Identifier(sp)))
         cursor.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        cursor.execute(sql.SQL("RELEASE SAVEPOINT {}").format(sql.Identifier(sp)))
         _logger.info("pgvector extension enabled")
+        return True
     except Exception as e:
         _logger.warning("pgvector extension not available: %s", e)
+        try:
+            cursor.execute(sql.SQL("ROLLBACK TO SAVEPOINT {}").format(sql.Identifier(sp)))
+        except Exception as rb_e:
+            _logger.warning("Could not roll back to savepoint %s: %s", sp, rb_e)
+        return False
 
 
 def _create_performance_indexes(cursor: Any) -> None:
@@ -280,10 +302,11 @@ def _create_performance_indexes(cursor: Any) -> None:
 
 def init_schema(cursor: Any, registry: Any) -> None:
     """Create tables for all registered models; add missing columns; create Many2many tables."""
-    _ensure_pgvector_extension(cursor)
+    use_native_vector = _ensure_pgvector_extension(cursor)
+    setattr(registry, "_pgvector_native", use_native_vector)
     for model_name, model_class in registry._models.items():
         if hasattr(model_class, "_table") and model_class._table:
-            create_table(cursor, model_class)
+            create_table(cursor, model_class, use_native_vector=use_native_vector)
     for model_name, model_class in registry._models.items():
         table = getattr(model_class, "_table", None)
         if not table:
@@ -297,7 +320,7 @@ def init_schema(cursor: Any, registry: Any) -> None:
             comodel = getattr(field, "comodel", "")
             table2 = comodel.replace(".", "_") if comodel else "unknown"
             create_many2many_table(cursor, rel, col1, col2, table, table2)
-    add_missing_columns(cursor, registry)
+    add_missing_columns(cursor, registry, use_native_vector=use_native_vector)
     _apply_many2one_fk_constraints(cursor, registry)
     for model_name, model_class in registry._models.items():
         _apply_sql_constraints(cursor, model_class)

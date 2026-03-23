@@ -14,15 +14,14 @@ class PurchaseOrder(Model):
         for rec in recs:
             count = 0
             if Picking and rec.ids:
-                name = rec.name or ""
-                if name:
-                    domain = [
-                        "|",
-                        ("purchase_id", "=", rec.ids[0]),
-                        ("origin", "=", name),
-                    ]
-                else:
-                    domain = [("purchase_id", "=", rec.ids[0])]
-                count = Picking.search_count(domain)
-            out.append({"receipt_count": count})
+                row = rec.read(["name"])[0]
+                name = (row.get("name") or "") if row else ""
+                # Match pickings linked by purchase_id OR by origin (same as sale_stock picking_count).
+                domain = [
+                    "|",
+                    ("purchase_id", "=", rec.ids[0]),
+                    ("origin", "=", name),
+                ]
+                count = Picking.search_count(domain, env=env)
+            out.append(count)
         return out

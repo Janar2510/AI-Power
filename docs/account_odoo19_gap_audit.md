@@ -37,3 +37,14 @@ Odoo CE `account` typically spreads across many models: move/posting pipeline, f
 ## Parity matrix
 
 See **Phases 535–538** in `docs/parity_matrix.md`.
+
+## Phase 544 — explicit deferrals (Wave L / account+)
+
+No implementation in this wave; track for later clean-room work with `odoo-19.0/addons/account/` read-only analysis:
+
+- **Fiscal positions** — map `account.fiscal.position` style rules before adding fields.
+- **Multi-tax ordering / price_include chains** — `compute_all` today supports **single** included percent tax (Phase 536); multiple included taxes remain **deferred**.
+- **Partial reconcile** — ERP uses statement line ↔ move link + `reconciled_id` string; Odoo-style partials and FX matching **deferred**.
+- **Lock dates / sequence** on `action_post` — deferred vs Odoo strict checks.
+
+Update this doc when a subtrack ships; keep matrix row **544** in sync.

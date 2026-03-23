@@ -8,6 +8,27 @@ T = TypeVar("T", bound="ModelBase")
 _logger = logging.getLogger("erp.orm.models")
 
 
+def _combine_domain_with_record_rules(domain: Optional[List], rule_domains: List) -> List:
+    """AND the user domain with each ir.rule domain (Odoo-style).
+
+    Concatenating lists breaks Polish OR/AND at the top level and drops extra operands;
+    use nested ['&', left, right] instead.
+    """
+    combined: List = list(domain or [])
+    for rd in rule_domains:
+        if rd is None:
+            continue
+        if isinstance(rd, (list, tuple)) and len(rd) == 0:
+            continue
+        if not combined:
+            combined = list(rd) if isinstance(rd, list) else [rd]
+        else:
+            left = combined
+            right: Union[List, Tuple] = list(rd) if isinstance(rd, list) else rd
+            combined = ["&", left, right]
+    return combined
+
+
 def _trigger_dependant_recompute(
     registry: Any,
     written_model: str,
@@ -1484,6 +1505,11 @@ class ModelBase(metaclass=Model):
                 continue
             if getattr(field, "column_type", None) == "jsonb" and isinstance(val, (dict, list)):
                 out[fname] = PgJson(val)
+            # Vector columns fall back to JSONB when pgvector extension is missing (see init_schema).
+            if isinstance(field, fmod.Vector) and isinstance(val, (list, tuple)):
+                reg = getattr(cls, "_registry", None)
+                if reg is not None and getattr(reg, "_pgvector_native", True) is False:
+                    out[fname] = PgJson(list(val))
         return out
 
     @classmethod
@@ -1923,10 +1949,7 @@ class ModelBase(metaclass=Model):
         model_name = getattr(cls, "_name", "")
         uid = getattr(env, "uid", 1)
         rule_domains = get_record_rules(model_name, uid, env=env, operation=operation)
-        combined = list(domain or [])
-        for rd in rule_domains:
-            combined = combined + [rd]  # Each rule is one term (e.g. ['|', A, B])
-        domain = combined
+        domain = _combine_domain_with_record_rules(domain, rule_domains)
         table = cls._table
         where = "1=1"
         params: List[Any] = []
@@ -1975,10 +1998,7 @@ class ModelBase(metaclass=Model):
         model_name = getattr(cls, "_name", "")
         uid = getattr(env, "uid", 1)
         rule_domains = get_record_rules(model_name, uid, env=env, operation=operation)
-        combined = list(domain or [])
-        for rd in rule_domains:
-            combined = combined + [rd]  # Each rule is one term (e.g. ['|', A, B])
-        domain = combined
+        domain = _combine_domain_with_record_rules(domain, rule_domains)
         table = cls._table
         where = "1=1"
         params: List[Any] = []
@@ -2033,10 +2053,7 @@ class ModelBase(metaclass=Model):
         model_name = getattr(cls, "_name", "")
         uid = getattr(env, "uid", 1)
         rule_domains = get_record_rules(model_name, uid, env=env, operation="read")
-        combined = list(domain or [])
-        for rd in rule_domains:
-            combined = combined + [rd]
-        domain = combined
+        domain = _combine_domain_with_record_rules(domain, rule_domains)
         table = cls._table
         stored = cls._get_stored_field_names()
         where, params = _domain_to_sql(domain or [], table, cr, cls)

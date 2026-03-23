@@ -27,6 +27,10 @@ PGUSER=postgres ./erp-bin db init -d erp
 PGUSER=postgres ./erp-bin server
 ```
 
+**Empty database / missing tables:** If you see `relation "res_users" does not exist`, the DB exists but was never initialized. Run `./erp-bin db init -d <name>` (same name as `PGDATABASE` / `--db_name=`, default `erp`), or restart `./erp-bin server` after upgrading — the server auto-inits when `res_users` is missing.
+
+**pgvector (optional):** Semantic RAG embeddings use the Postgres `vector` type when the **pgvector** extension is installed. Without it, `db init` still completes: embeddings are stored as **JSONB** and retrieval falls back to text search. To enable vectors on Homebrew PostgreSQL, install/build pgvector for your server version and run `CREATE EXTENSION vector` (see [pgvector](https://github.com/pgvector/pgvector)). If a previous `db init` failed halfway, drop the database and re-run `db init`.
+
 ## Module Philosophy
 
 - **Metadata-driven**: Models, views, actions, menus declared as data
@@ -51,6 +55,26 @@ erp-platform/
 2. Implement models, views, security in module
 3. Run tests: `./erp-bin test` (when implemented)
 4. See [CONTRIBUTING.md](CONTRIBUTING.md) for workflow
+
+## Assistant Skill Setup
+
+This repo vendors the UI UX Pro Max skill at `.cursor/skills/ui-ux-pro-max`.
+
+- Cursor uses the vendored `.cursor` setup directly.
+- Codex uses `~/.codex/skills`, so this repo provides helper scripts for local-machine linking and verification.
+
+See [docs/assistant-skill-setup.md](docs/assistant-skill-setup.md).
+
+Common checks:
+
+```bash
+python3 --version
+npm install -g uipro-cli
+uipro --version
+bash scripts/install_uipro_cli_local.sh   # fallback if npm global install hits EACCES
+bash scripts/setup_ui_ux_pro_max_codex.sh
+bash scripts/check_ui_ux_pro_max_setup.sh
+```
 
 ## Parity Targets
 

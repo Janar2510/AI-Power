@@ -18,6 +18,7 @@ class SaleOrder(Model):
             if Picking and rid:
                 count = Picking.search_count(
                     ["|", ("sale_id", "=", rid), ("origin", "=", name)],
+                    env=env,
                 )
-            out.append({"picking_count": count})
+            out.append(count)
         return out

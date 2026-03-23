@@ -194,14 +194,31 @@ class Server(Command):
         )
 
     def _ensure_default_db(self) -> None:
-        """Create and init default database if it does not exist."""
+        """Create DB if missing; run schema + default data if core tables are absent.
+
+        A PostgreSQL database can exist but be empty (e.g. created manually). Previously we
+        only initialized when the database row was missing, which led to login errors like
+        ``relation "res_users" does not exist``.
+        """
         from core.sql_db import db_exists, create_database, get_cursor
         dbname = config.get_config().get("db_name", "erp")
         if db_exists(dbname):
-            return
+            try:
+                with get_cursor(dbname) as cr:
+                    cr.execute(
+                        "SELECT 1 FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = %s",
+                        ("res_users",),
+                    )
+                    if cr.fetchone():
+                        return
+            except Exception as e:
+                _logger.warning("Could not inspect database %s: %s", dbname, e)
+                return
         try:
-            create_database(dbname)
-            _logger.info("Created database %s", dbname)
+            if not db_exists(dbname):
+                create_database(dbname)
+                _logger.info("Created database %s", dbname)
             from core.db import init_schema
             from core.db.init_data import load_default_data, assign_admin_groups
             from core.orm import Registry, Environment

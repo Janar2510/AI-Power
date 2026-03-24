@@ -2,6 +2,8 @@
  * ERP Platform Web Client - Data-driven menus, actions, list/form views
  */
 (function () {
+  const frontendBootstrap = window.__erpFrontendBootstrap || {};
+  const modernShellOwner = frontendBootstrap.runtime === "modern";
   const main = document.getElementById('action-manager');
   const navbar = document.getElementById('navbar');
   const appShell = document.getElementById('webclient');
@@ -998,6 +1000,14 @@
   }
 
   function renderNavbar(userCompanies, userLangs, currentLang) {
+    if (modernShellOwner && window.__erpModernShellController) {
+      window.__erpModernShellController.applyNavContext({
+        userCompanies: userCompanies || null,
+        userLangs: userLangs || [],
+        currentLang: currentLang || "en_US",
+      });
+      return true;
+    }
     if (NavbarCore && typeof NavbarCore.render === "function") {
       var coreHandled = NavbarCore.render({
         navbar: navbar,
@@ -1116,6 +1126,9 @@
     html += '<a href="/web/logout" class="nav-link">Logout</a>';
     html += '</span>';
     navbar.innerHTML = html;
+    if (window.__erpNavbarContract && typeof window.__erpNavbarContract.markDelegated === 'function') {
+      window.__erpNavbarContract.markDelegated(navbar);
+    }
     renderSystrayMount();
     if (appSidebar) {
       var sidebarTree = tree;
@@ -2978,21 +2991,33 @@
         html += '<div class="attr-field" data-fname="' + (fname || '') + '">' + renderFieldHtml(model, f) + '</div>';
       });
     }
-    html += '<p><button type="submit" id="btn-save" class="o-btn o-btn-primary o-shortcut-target" data-shortcut="Alt+S">Save</button> ';
-    html += '<a href="#' + route + '" id="form-cancel" style="margin-left:0.5rem">Cancel</a>';
-    if (isNew && (model === 'crm.lead' || model === 'res.partner')) {
-      html += ' <button type="button" id="btn-ai-fill" title="Extract fields from pasted text" style="margin-left:0.5rem;padding:0.5rem 1rem;background:var(--color-accent,#6366f1);color:white;border:none;border-radius:4px;cursor:pointer">AI Fill</button>';
-    }
-    if (!isNew) {
-      html += ' <button type="button" id="btn-duplicate" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Duplicate</button>';
-      const reportName = getReportName(model);
-      if (reportName) {
-        html += ' <a href="/report/html/' + reportName + '/' + id + '" target="_blank" rel="noopener" id="btn-print-form" class="o-btn o-btn-secondary o-shortcut-target" data-shortcut="Alt+P" style="margin-left:0.5rem;text-decoration:none">Print</a>';
-        html += ' <button type="button" id="btn-preview-form" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Preview</button>';
+    var FFA = window.AppCore && window.AppCore.FormFooterActions;
+    if (FFA && typeof FFA.buildFormFooterActionsHtml === 'function') {
+      html += FFA.buildFormFooterActionsHtml({
+        route: route,
+        isNew: isNew,
+        model: model,
+        reportName: !isNew ? getReportName(model) : null,
+        recordId: id,
+      });
+    } else {
+      html += '<p><button type="submit" id="btn-save" class="o-btn o-btn-primary o-shortcut-target" data-shortcut="Alt+S">Save</button> ';
+      html += '<a href="#' + route + '" id="form-cancel" style="margin-left:0.5rem">Cancel</a>';
+      if (isNew && (model === 'crm.lead' || model === 'res.partner')) {
+        html += ' <button type="button" id="btn-ai-fill" title="Extract fields from pasted text" style="margin-left:0.5rem;padding:0.5rem 1rem;background:var(--color-accent,#6366f1);color:white;border:none;border-radius:4px;cursor:pointer">AI Fill</button>';
       }
-      html += ' <a href="#" id="btn-delete-form" style="margin-left:0.5rem;font-size:0.9rem;color:#c00">Delete</a>';
+      if (!isNew) {
+        html += ' <button type="button" id="btn-duplicate" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Duplicate</button>';
+        const reportName = getReportName(model);
+        if (reportName) {
+          html += ' <a href="/report/html/' + reportName + '/' + id + '" target="_blank" rel="noopener" id="btn-print-form" class="o-btn o-btn-secondary o-shortcut-target" data-shortcut="Alt+P" style="margin-left:0.5rem;text-decoration:none">Print</a>';
+          html += ' <button type="button" id="btn-preview-form" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Preview</button>';
+        }
+        html += ' <a href="#" id="btn-delete-form" style="margin-left:0.5rem;font-size:0.9rem;color:#c00">Delete</a>';
+      }
+      html += '</p>';
     }
-    html += '</p></form>';
+    html += '</form>';
     if (!isNew && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
       html += '<aside id="form-ai-sidebar" class="form-ai-sidebar" style="min-width:240px;max-width:280px;padding:var(--space-lg);background:var(--color-bg);border:1px solid var(--border-color);border-radius:var(--radius-md)">';
       html += '<h3 style="margin:0 0 var(--space-md);font-size:1rem">AI Suggestions</h3>';
@@ -5387,7 +5412,7 @@
         },
       });
     }
-    if (AppCore.Navbar && typeof AppCore.Navbar.setImpl === "function") {
+    if (!modernShellOwner && AppCore.Navbar && typeof AppCore.Navbar.setImpl === "function") {
       AppCore.Navbar.setImpl(function (opts) {
         // Keep runtime behavior in main.js while exposing extraction boundary.
         return false;
@@ -5416,7 +5441,13 @@
     if (AppCore.ActivityView && typeof AppCore.ActivityView.setImpl === "function") AppCore.ActivityView.setImpl(renderActivityMatrix);
   }
 
-  (function init() {
+  function bootLegacyWebClient() {
+    if (window.__erpLegacyRuntime && window.__erpLegacyRuntime.booted) {
+      return;
+    }
+    if (window.__erpLegacyRuntime) {
+      window.__erpLegacyRuntime.booted = true;
+    }
     // Apply theme immediately to avoid flash (localStorage or prefers-color-scheme)
     const savedTheme = typeof localStorage !== 'undefined' && localStorage.getItem('erp_theme');
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -5437,6 +5468,15 @@
       navContext.userCompanies = userCompanies;
       navContext.userLangs = userLangs;
       navContext.currentLang = currentLang;
+      if (modernShellOwner) {
+        window.dispatchEvent(new CustomEvent("erp:navigation-context", {
+          detail: {
+            userCompanies: userCompanies,
+            userLangs: userLangs,
+            currentLang: currentLang,
+          },
+        }));
+      }
       if (window.Services && window.Services.i18n) {
         window.Services.i18n.loadFromServer(currentLang).then(function () {
           renderNavbar(userCompanies, userLangs, currentLang);
@@ -5457,5 +5497,12 @@
         (err && err.message ? String(err.message).replace(/</g, '&lt;') : 'Network or server error') + '</p>' +
         '<p><a href="/web/login" style="color:var(--color-primary)">Go to login</a> &middot; <a href="javascript:location.reload()" style="color:var(--color-primary)">Retry</a></p>';
     });
-  })();
+  }
+
+  window.__erpLegacyRuntime = window.__erpLegacyRuntime || {};
+  window.__erpLegacyRuntime.start = bootLegacyWebClient;
+  window.__erpLegacyRuntime.booted = false;
+  if (frontendBootstrap.runtime !== 'modern') {
+    bootLegacyWebClient();
+  }
 })();

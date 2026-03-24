@@ -4,6 +4,8 @@
 (function () {
   var mounted = false;
   var allCommands = [];
+  var palettePreviousFocus = null;
+  var globalEscapeBound = false;
 
   function slug(s) {
     return String(s || "")
@@ -103,32 +105,52 @@
     wrap.id = "o-command-palette";
     wrap.className = "o-command-palette";
     wrap.hidden = true;
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-label", "Command palette");
     wrap.innerHTML =
       '<div class="o-command-palette-panel" style="background:var(--color-surface-1);border:1px solid var(--border-color);border-radius:var(--radius-md);padding:var(--space-md);max-width:28rem;width:100%;margin:auto">' +
       '<input id="o-command-input" type="search" placeholder="Search commands and menus…" style="width:100%;padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)">' +
       '<div id="o-command-results" style="margin-top:var(--space-sm);max-height:16rem;overflow-y:auto"></div>' +
       "<small style=\"display:block;margin-top:var(--space-sm);color:var(--text-muted)\">Enter to use first result · Esc to close</small></div>";
     document.body.appendChild(wrap);
+    if (!globalEscapeBound) {
+      globalEscapeBound = true;
+      document.addEventListener(
+        "keydown",
+        function (e) {
+          var el = document.getElementById("o-command-palette");
+          if (!el || el.hidden || e.key !== "Escape") return;
+          e.preventDefault();
+          close();
+        },
+        true
+      );
+    }
     wrap.addEventListener("click", function (e) {
       if (e.target === wrap) close();
     });
     var input = wrap.querySelector("#o-command-input");
-    input.addEventListener("input", function () {
-      renderResults(input, wrap);
-    });
-    input.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") return close();
-      if (e.key === "Enter") {
-        var first = wrap.querySelector(".o-command-item");
-        if (first && first.dataset.href) {
-          window.location.hash = first.dataset.href.replace(/^#/, "");
-          close();
+    if (input) {
+      input.setAttribute("aria-label", "Search commands and menus");
+      input.addEventListener("input", function () {
+        renderResults(input, wrap);
+      });
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") return close();
+        if (e.key === "Enter") {
+          var first = wrap.querySelector(".o-command-item");
+          if (first && first.dataset.href) {
+            window.location.hash = first.dataset.href.replace(/^#/, "");
+            close();
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   function open() {
+    palettePreviousFocus = document.activeElement;
     ensure();
     buildCommandsFromMenus();
     var el = document.getElementById("o-command-palette");
@@ -146,6 +168,12 @@
     var el = document.getElementById("o-command-palette");
     if (!el) return;
     el.hidden = true;
+    if (palettePreviousFocus && typeof palettePreviousFocus.focus === "function") {
+      try {
+        palettePreviousFocus.focus();
+      } catch (e) {}
+    }
+    palettePreviousFocus = null;
   }
 
   function initHotkey() {

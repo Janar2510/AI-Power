@@ -4,16 +4,20 @@
 
 The AI-Powered Modular ERP Platform is a client/server system with metadata-driven UI, modular server, and optional AI capabilities. It targets Odoo 19.0 parity for core behaviour while implementing a clean-room reimplementation.
 
+The frontend is now migrating toward a bundled modular runtime with explicit bootstrap, env, service startup, registries, and component-owned shell boundaries.
+
 ## System Boundary
 
 ```mermaid
 flowchart TB
   subgraph Browser
     UI[Web Client Shell]
+    Boot[Bootstrap Object + Modern Runtime]
   end
 
   subgraph Frontend
     Assets[Asset Bundles]
+    Env[Frontend Env + Registries]
     Services[Service Container]
     Views[View Renderers]
     PyEval[Python-like Expr Evaluator]
@@ -32,8 +36,10 @@ flowchart TB
     Index[(Retrieval Index)]
   end
 
-  UI --> Assets
-  UI --> Services
+  UI --> Boot
+  Boot --> Assets
+  Boot --> Env
+  Env --> Services
   Services --> HTTP
   HTTP --> Registry
   HTTP --> ORM
@@ -81,6 +87,7 @@ flowchart TB
 - Full Odoo addon ecosystem
 - Legacy XML-RPC/JSON-RPC external API (target JSON-2)
 - Exact Odoo UI pixel parity
+- Verbatim copy of Odoo frontend source
 
 ## Compatibility Notes (Odoo 19)
 

@@ -13,6 +13,16 @@ class StockValuationLayer(Model):
     quantity = fields.Float(string="Quantity", default=0.0)
     unit_cost = fields.Float(string="Unit Cost", default=0.0)
     value = fields.Float(string="Value", default=0.0)
+    remaining_qty = fields.Float(
+        string="Remaining Quantity",
+        default=0.0,
+        help="Phase 565 Tier A: FIFO consumption hook; initial copy of quantity.",
+    )
+    remaining_value = fields.Float(
+        string="Remaining Value",
+        default=0.0,
+        help="Phase 565 Tier A: initial copy of value for layer consumption tracking.",
+    )
     stock_move_id = fields.Many2one("stock.move", string="Stock Move", ondelete="set null")
     description = fields.Char(string="Description")
     create_date = fields.Datetime(string="Created", default=lambda: datetime.utcnow().isoformat())

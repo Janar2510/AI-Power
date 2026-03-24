@@ -14,17 +14,52 @@ class AccountMove(Model):
     @classmethod
     def _create_account_move_record(cls, vals):
         """Insert move row after default name from sequence (Phase 481: merge-safe for `_inherit` create)."""
+        vals = dict(vals)
+        if not vals.get("company_id") and vals.get("journal_id"):
+            env = getattr(cls._registry, "_env", None) if cls._registry else None
+            Journal = env.get("account.journal") if env else None
+            Company = env.get("res.company") if env else None
+            if Journal:
+                jrow = Journal.browse(vals["journal_id"]).read(["company_id"])[0]
+                jc = jrow.get("company_id")
+                jid = jc[0] if isinstance(jc, (list, tuple)) and jc else jc
+                if jid:
+                    vals["company_id"] = jid
+            if not vals.get("company_id") and Company:
+                fallback = Company.search([], limit=1)
+                if fallback.ids:
+                    vals["company_id"] = fallback.ids[0]
         if vals.get("name") == "New" or not vals.get("name"):
             env = getattr(cls._registry, "_env", None) if cls._registry else None
             IrSequence = env.get("ir.sequence") if env else None
-            next_val = IrSequence.next_by_code("account.move") if IrSequence else None
-            vals = dict(vals, name=f"INV/{next_val:05d}" if next_val is not None else "New")
+            cid = vals.get("company_id")
+            next_val = (
+                IrSequence.next_by_code(
+                    "account.move",
+                    company_id=cid,
+                    reference_date=vals.get("date"),
+                )
+                if IrSequence
+                else None
+            )
+            if next_val is None:
+                nm = "New"
+            elif isinstance(next_val, int):
+                nm = f"INV/{next_val:05d}"
+            else:
+                nm = str(next_val)
+            vals = dict(vals, name=nm)
         return super().create(vals)
 
     @classmethod
     def create(cls, vals):
         return cls._create_account_move_record(vals)
     journal_id = fields.Many2one("account.journal", string="Journal", required=True)
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        help="Phase 560: posting lock date is resolved from this company when set; else first company (legacy).",
+    )
     partner_id = fields.Many2one("res.partner", string="Partner")
     currency_id = fields.Many2one("res.currency", string="Currency")
     state = fields.Selection(
@@ -49,6 +84,11 @@ class AccountMove(Model):
     )
     invoice_origin = fields.Char(string="Source")
     payment_term_id = fields.Many2one("account.payment.term", string="Payment Terms")  # Phase 191
+    fiscal_position_id = fields.Many2one(
+        "account.fiscal.position",
+        string="Fiscal Position",
+        help="Phase 551: map draft line tax_ids via apply_fiscal_position_taxes().",
+    )
     invoice_date_due = fields.Computed(compute="_compute_invoice_date_due", store=True, string="Due Date")  # Phase 191
     amount_residual = fields.Computed(
         compute="_compute_amount_residual",
@@ -207,8 +247,80 @@ class AccountMove(Model):
             if abs(total_debit - total_credit) > 0.0001:
                 raise ValueError("Cannot post move unless journal items are balanced")
 
+    def apply_fiscal_position_taxes(self):
+        """Remap draft ``account.move.line`` ``tax_ids`` through ``account.fiscal.position.tax`` (Phase 551)."""
+        env = self.env
+        if not env:
+            return True
+        registry = getattr(env, "registry", None)
+        FiscalModel = registry.get("account.fiscal.position") if registry else None
+        MoveLine = env.get("account.move.line")
+        if not FiscalModel or not MoveLine:
+            return True
+        for move in self:
+            if not move.ids:
+                continue
+            mrow = move.read(["state", "fiscal_position_id"])[0]
+            if mrow.get("state") != "draft":
+                continue
+            fp = mrow.get("fiscal_position_id")
+            fp_id = fp[0] if isinstance(fp, (list, tuple)) and fp else fp
+            if not fp_id:
+                continue
+            lines = MoveLine.search([("move_id", "=", move.ids[0])])
+            for line in lines:
+                lr = line.read(["tax_ids"])[0]
+                raw = lr.get("tax_ids") or []
+                tids = []
+                for x in raw:
+                    if isinstance(x, int):
+                        tids.append(x)
+                    elif isinstance(x, (list, tuple)) and x:
+                        tids.append(int(x[0]))
+                if not tids:
+                    continue
+                mapped = FiscalModel.map_tax_ids(env, int(fp_id), tids)
+                if mapped != tids:
+                    line.write({"tax_ids": [(6, 0, mapped)]})
+        return True
+
+    def _check_account_lock_date_before_post(self):
+        """Reject post when move date is on/before company account_lock_date (Phase 557, company from move Phase 560)."""
+        env = self.env
+        if not env:
+            return
+        Company = env.get("res.company")
+        if not Company:
+            return
+        for move in self:
+            if not move.ids:
+                continue
+            m = move.read(["date", "company_id"])[0]
+            d = m.get("date")
+            if not d:
+                continue
+            move_str = str(d)[:10]
+            comp = m.get("company_id")
+            cid = comp[0] if isinstance(comp, (list, tuple)) and comp else comp
+            if cid:
+                companies = Company.browse(cid)
+            else:
+                companies = Company.search([], limit=1)
+            if not companies.ids:
+                continue
+            lock_row = companies.read(["account_lock_date"])[0]
+            lock_raw = lock_row.get("account_lock_date")
+            if not lock_raw:
+                continue
+            lock_str = str(lock_raw)[:10]
+            if move_str <= lock_str:
+                raise ValueError(
+                    f"Cannot post move on or before account lock date {lock_str} (move date {move_str})"
+                )
+
     def action_post(self):
         """Post the move: draft -> posted."""
+        self._check_account_lock_date_before_post()
         self._validate_balanced_before_post()
         self.write({"state": "posted"})
 

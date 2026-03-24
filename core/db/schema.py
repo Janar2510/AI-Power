@@ -276,6 +276,7 @@ def _create_performance_indexes(cursor: Any) -> None:
         ("sale_order", "sale_order_partner_state_idx", ["partner_id", "state"]),
         ("account_move", "account_move_partner_state_type_idx", ["partner_id", "state", "move_type"]),
         ("account_move", "account_move_type_state_idx", ["move_type", "state"]),
+        ("account_move", "account_move_company_id_idx", ["company_id"]),
         ("stock_quant", "stock_quant_product_location_idx", ["product_id", "location_id"]),
         ("crm_lead", "crm_lead_stage_idx", ["stage_id"]),
         ("mail_message", "mail_message_res_idx", ["res_model", "res_id"]),

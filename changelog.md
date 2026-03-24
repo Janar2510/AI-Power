@@ -12,12 +12,16 @@
 - **HR lifecycle (Phase 491):** `hr.employee.lifecycle_status` + onboarding button; `hr.contract.action_open_contract` links current contract and sets employee active (and wage when payroll field exists); first `hr.attendance` check-in promotes `onboarding` → `active`; `hr.leave.work_entry_note` populated on approval; `hr_payroll` depends `hr_attendance` and adds attendance-hours allowance lines in `compute_sheet`; `hr_contract` adds `employee.contract_id` + form inherit.
 - **Frontend / DX (Phases 481–489):** Root `package.json` + esbuild scripts (`build:web`, `build:web:min`), `addons/web/static/tsconfig.json`, typed RPC contracts (`src/types/rpc-contracts.ts`, `src/services/rpc.ts`), `src/framework/component_base.js` (signals + lifecycle), optional mobile `--card-gap` tweak in `webclient.css`.
 - **AI / ops docs & hooks:** `addons/ai_assistant/embeddings/` (pgvector `CREATE EXTENSION` helper + probe); predictive heuristics `crm.lead.ai_win_probability`, `hr.employee.ai_attrition_risk_score`; docs `docs/a11y-responsive-notes.md`, `docs/security-compliance-checklist.md`, `docs/ai-workflow-automation.md`, `docs/load-testing-notes.md`; `core/tools/json_log.py` for JSON log lines; `GET /readiness` (503 when DB missing); `sql_debug.summarize_slow_queries`; CI optional `npm ci` + `npm run build:web`.
+- **Wave M (Phases 545–549):** Phase **545** — Phase 540 DB test seeds `account.account` (expense + `asset_current`) when missing; `tests/test_translate_discover_phase545.py`; CI workflow comment on pgvector-less Postgres. Phase **546** — `account.fiscal.position`, `account.fiscal.position.tax`, `sale.order.fiscal_position_id`, `apply_fiscal_position_taxes()`. Phase **547** — `embedding_column_is_pgvector_type`; `retrieve_chunks` uses `<=>` only when `embedding` is native `vector`. Phase **548** — public `GET /web/manifest.webmanifest` + `<link rel="manifest">` on webclient shell. Phase **549** — parity matrix, gap audits, `frontend.md`, `ai-implementation-checklist`, DeploymentChecklist.
+- **Wave N (Phases 550–554):** Phase **550** — README + DeploymentChecklist: inline `#` vs `erp-bin`, Homebrew pgvector note, translation test pointer. Phase **551** — `purchase.order.fiscal_position_id`, `apply_fiscal_position_taxes()`; `account.move.fiscal_position_id`, `apply_fiscal_position_taxes()` on draft lines. Phase **552** — JSONB→vector migration + re-embed documentation; `scripts/check_embedding_column.py`. Phase **553** — `/web/sw.js` + service worker registration stub on web shell. Phase **554** — parity matrix, `ai-implementation-checklist`, account gap audit sync.
+- **Wave O (Phases 555–559):** Phase **555** — `res.partner.fiscal_position_id`; `sale.order._sale_order_prepare_vals` hook + account default from partner; PO fiscal default from partner. Phase **556** — service worker precaches `/web/assets/web.assets_web.{css,js}` with cache-first fetch. Phase **557** — `res.company.account_lock_date`; `account.move.action_post` guard. Phase **558** — command palette `role`/`aria-*`, global Escape, focus restore; Mod+K docs. Phase **559** — matrix, checklist, changelog, DeploymentChecklist.
 
 ### Changed
 - **DB tests 539–541:** Merged into `tests/test_phases_539_541_stock_mrp_sale_db.py` so `load_module_graph()` + `load_default_data()` run **once** per unittest invocation (was ~3× slower as three modules). Use `npm run test:phases-539-541-db` or `./scripts/run_phases_539_541_db.sh`.
 - **`mrp_account` manufacturing cost draft move:** When `cost_estimate` > 0 and expense + `asset_current` accounts exist, creates **two** `account.move.line` rows (balanced) so the draft entry satisfies `account.move` Phase 535 posting rules if later posted.
 
 ### Fixed
+- **`parse_po_file` (Phase 545):** Use non-greedy `msgid` / `msgstr` patterns so a block does not capture from the first quote through the last quote (which merged `msgstr` into `msgid` and broke `load_po_file` tuples).
 - **`load_default_data` translations:** `core.db.init_data` imported `discover_po_files` / `load_po_file` from `core.tools.translate` but they were missing, causing *Could not load translations: cannot import name 'discover_po_files'*. Implemented both helpers (scan `addons/*/i18n/*.po`, parse via existing `parse_po_file`).
 - **`db init` without pgvector:** `CREATE EXTENSION vector` failure left Postgres in an **aborted transaction**, so later DDL failed with `InFailedSqlTransaction`. Extension creation now runs under a **SAVEPOINT** with `ROLLBACK TO SAVEPOINT` on failure. If the extension is missing, **`fields.Vector` columns are created as JSONB** and `Registry._pgvector_native` + `_prepare_jsonb_vals` store embedding lists as JSON until you install pgvector and migrate (RAG distance queries use ILIKE fallback per existing docs).
 - **`erp-bin server` + empty Postgres DB:** If the database existed but had no ORM tables (e.g. `CREATE DATABASE` only), login failed with `relation "res_users" does not exist`. Startup now runs the same schema + default-data init when `public.res_users` is missing (not only when the database row is absent).
@@ -59,6 +63,49 @@
 
 ### Changed
 - **`menuToRoute`:** `stages` alone maps to CRM stages (`crm_stages`); `recruitment stages` still maps to `recruitment_stages` (no longer steals plain “Stages”).
+
+## 1.208.0 - Post–207: Wave U/V/W (Phases 566–573) (2026-03-24)
+
+### Added
+
+- **Phase 566:** `navbar_contract.js` — `__erpNavbarContract.markDelegated` + `data-erp-navbar-contract` on modern navbar slot and legacy `#navbar` after render.
+- **Phase 567:** `form_footer_actions.js` — `AppCore.FormFooterActions.buildFormFooterActionsHtml`; legacy `renderForm` delegates when the modern bundle is present.
+- **Phase 568:** `account.tax.compute_all` mixed percent **price_include** + other taxes (strip included chain, then tax untaxed base).
+- **Phase 569:** `ir.sequence.next_by_code(..., reference_date=…)` with `use_date_range` / `ir.sequence.date_range`; `account.move` passes move `date`; tests `tests/test_ir_sequence_date_range_phase569.py`.
+- **Phase 570:** Outgoing valuation layers consume prior positive layers’ `remaining_qty` / `remaining_value` in FIFO order; shortfall at `standard_price`.
+- **Phase 571:** `res.company.stock_valuation_auto_account_move`; optional draft balanced `account.move` on COGS (`stock.move._stock_tier_c_valuation_move_stub`).
+- **Phase 572:** Design doc `docs/account_partial_reconcile_design.md` (partial reconcile / FX — implementation deferred).
+- **Phase 573:** `docs/frontend.md` + gap table milestone: prod default remains concat; esbuild-primary not piloted in CI.
+
+### Changed
+
+- **Docs:** `parity_matrix.md` (566–573, Phase 544 text), `odoo19-webclient-gap-table.md`, `account_odoo19_gap_audit.md`, `stock_odoo19_gap_audit.md`, `stock_valuation_layers_scope.md`, `ai-implementation-checklist.md`, `DeploymentChecklist.md`.
+- **Frontend:** Rebuilt `addons/web/static/dist/modern_webclient.js` via `npm run build:web`.
+
+## 1.207.0 - Waves Q–S: web depth, account 563–564, valuation Tier A (2026-03-24)
+
+### Added
+
+- **Phase 561–562 (Wave Q):** `app/shell_chrome.js` (`attachShellChrome`, `__erpModernShell`); `app/list_control_panel.js` + `AppCore.ListControlPanel` registration; `core/list_view.js` delegates control-panel HTML when the modern bundle is present; `webclient.js` imports shell chrome. Rebuilt `addons/web/static/dist/modern_webclient.js`.
+- **Phase 563:** `account.tax.compute_all` — all **percent** + **price_include** taxes use sequential strip from gross; tests `tests/test_account_tax_multi_include_phase563.py`.
+- **Phase 564:** `ir.sequence.company_id`; `next_by_code(code, company_id=…)`; `account.move` naming uses company-aware sequences; tests `tests/test_ir_sequence_company_phase564.py` (DB optional).
+- **Phase 565:** `stock.valuation.layer` fields `remaining_qty`, `remaining_value` set on layer create in `stock_move_quant._create_valuation_layers`.
+
+### Changed
+
+- **Docs:** `parity_matrix.md` (561–565, Phase 544 text), `odoo19-webclient-gap-table.md`, `account_odoo19_gap_audit.md`, `stock_odoo19_gap_audit.md`, `stock_valuation_layers_scope.md`, `frontend.md`, `ai-implementation-checklist.md`, `DeploymentChecklist.md`.
+
+## 1.206.0 - Phase P modular frontend acceptance + account company 560 (2026-03-24)
+
+### Added
+
+- **Phase P (modular web client foundation):** Documented acceptance criteria in `docs/frontend.md`; expanded `docs/odoo19-webclient-gap-table.md` with per-area **Status** and foundation vs full-parity note; modern runtime warms the menu cache via non-blocking `env.services.menu.load(false)` in `addons/web/static/src/app/main.js` (rebuilt `addons/web/static/dist/modern_webclient.js`).
+- **Phase 560:** `account.move.company_id` and `account.journal.company_id`; create defaults move company from journal then first `res.company`; `action_post` lock check uses the move’s company when set. Performance index `account_move_company_id_idx` in `core/db/schema.py`. Tests: `tests/test_account_move_company_phase560.py`.
+- **Stock (design):** `docs/stock_valuation_layers_scope.md` — tiered valuation-layer scope before implementation; linked from `docs/stock_odoo19_gap_audit.md`.
+
+### Changed
+
+- **Parity matrix:** Modular frontend bootstrap foundation marked **done**; new row for Phase 560.
 
 ## 1.205.0 - Frontend Pro Max phases 451-464 (2026-03-19)
 
@@ -2777,3 +2824,10 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
   - Phase 12: RAG Retrieval Skeleton (document index, retrieval API)
   - Phase 13: List Search + Filters (search bar, domain from input)
   - Phase 14: External JSON-2 API (deferred)
+# Frontend Runtime Modernization
+
+- Added a phase-1 modular frontend bootstrap with `window.__erpFrontendBootstrap`.
+- Added `/web/webclient/load_menus` for Odoo-style menu bootstrap compatibility.
+- Added `addons/web/static/dist/modern_webclient.js` as the primary modern runtime entry.
+- Converted `addons/web/static/src/main.js` into a legacy boot adapter instead of the long-term shell entrypoint.
+- Added frontend migration ADR and architecture docs for the phases 1-5 re-architecture.

@@ -235,8 +235,9 @@ def login(request):
                 resp = redirect(f"/web/login/totp?db={db}")
                 resp.set_cookie("erp_totp_pending", token, httponly=True, samesite="Lax", path="/", max_age=300)
                 return resp
+            session_bootstrap = {"uid": uid, "db": db, "lang": get_session_lang_from_request(request)}
             return login_response_with_html(
-                uid, db, _webclient_html(debug_assets=_is_debug_assets(request))
+                uid, db, _webclient_html(debug_assets=_is_debug_assets(request), session_bootstrap=session_bootstrap)
             )
         return Response(
             LOGIN_HTML.format(db=db, error="Invalid login or password."),
@@ -270,8 +271,9 @@ def login_totp(request):
         code = (request.form.get("code") or "").strip()
         if verify_totp_code(uid, db, code):
             clear_totp_pending(token)
+            session_bootstrap = {"uid": uid, "db": db, "lang": get_session_lang_from_request(request)}
             resp = Response(
-                _webclient_html(debug_assets=_is_debug_assets(request)),
+                _webclient_html(debug_assets=_is_debug_assets(request), session_bootstrap=session_bootstrap),
                 content_type="text/html; charset=utf-8",
             )
             from core.http.auth import _get_user_company_id
@@ -296,6 +298,60 @@ def login_totp(request):
 def logout(request):
     """Logout - clear session."""
     return logout_response()
+
+
+@route("/web/manifest.webmanifest", auth="public", methods=["GET"])
+def web_manifest(_request: Request):
+    """PWA web app manifest stub (Phase 548). Phase 553: companion service worker stub at ``/web/sw.js``."""
+    import json
+
+    payload = {
+        "name": "ERP Platform",
+        "short_name": "ERP",
+        "start_url": "/web",
+        "display": "standalone",
+        "background_color": "#f5f5f5",
+        "theme_color": "#1a1a2e",
+    }
+    return Response(
+        json.dumps(payload),
+        content_type="application/manifest+json; charset=utf-8",
+    )
+
+
+@route("/web/sw.js", auth="public", methods=["GET"])
+def web_service_worker_stub(_request: Request):
+    """Service worker: Phase 553 activate stub; Phase 556 cache-first for concat shell assets only."""
+    body = (
+        "/* ERP Phase 556: cache shell CSS/JS only; bump CACHE when bundle content changes */\n"
+        "var CACHE = 'erp-web-shell-v1';\n"
+        "var SHELL_URLS = ['/web/assets/web.assets_web.css', '/web/assets/web.assets_web.js'];\n"
+        "self.addEventListener('install', function (e) {\n"
+        "  e.waitUntil(\n"
+        "    caches.open(CACHE).then(function (cache) {\n"
+        "      return cache.addAll(SHELL_URLS).catch(function () { return null; });\n"
+        "    }).then(function () { return self.skipWaiting(); })\n"
+        "  );\n"
+        "});\n"
+        "self.addEventListener('activate', function (e) {\n"
+        "  e.waitUntil(self.clients.claim());\n"
+        "});\n"
+        "self.addEventListener('fetch', function (e) {\n"
+        "  var path;\n"
+        "  try { path = new URL(e.request.url).pathname; } catch (err) { return; }\n"
+        "  if (SHELL_URLS.indexOf(path) < 0) return;\n"
+        "  e.respondWith(\n"
+        "    caches.match(e.request).then(function (c) {\n"
+        "      return c || fetch(e.request);\n"
+        "    })\n"
+        "  );\n"
+        "});\n"
+    )
+    return Response(
+        body,
+        content_type="application/javascript; charset=utf-8",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 SIGNUP_HTML = """<!DOCTYPE html>
@@ -388,19 +444,37 @@ def load_views(request):
     uid = get_session_uid(request)
     if uid is None:
         return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    db = get_session_db(request)
     import json
+    registry = _load_frontend_registry(uid, db)
+
+    def _json_safe(obj):
+        """Recursively replace non-JSON-serializable values (e.g. callables)."""
+        if callable(obj):
+            return None
+        if isinstance(obj, dict):
+            return {k: _json_safe(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [_json_safe(x) for x in obj]
+        return obj
+
+    return Response(
+        json.dumps(_json_safe(registry)),
+        content_type="application/json",
+    )
+
+
+def _load_frontend_registry(uid: int, db: str):
     from core.orm import Environment
     from core.data.views_registry import load_views_registry, load_views_registry_from_db
     from core.db.init_data import load_default_data
 
-    db = get_session_db(request)
     try:
         registry_obj = _get_registry(db)
         with get_cursor(db) as cr:
             env = Environment(registry_obj, cr=cr, uid=uid)
             registry_obj.set_env(env)
             registry = load_views_registry_from_db(env)
-            # Phase 170: auto-upgrade when DB menus are empty or stale
             xml_reg = load_views_registry()
             xml_menu_count = len(xml_reg.get("menus", []))
             registry_menus = registry.get("menus", [])
@@ -422,21 +496,23 @@ def load_views(request):
                         except Exception:
                             pass
             registry["fields_meta"] = fields_meta
+            return registry
     except Exception:
-        registry = load_views_registry()
+        return load_views_registry()
 
-    def _json_safe(obj):
-        """Recursively replace non-JSON-serializable values (e.g. callables)."""
-        if callable(obj):
-            return None
-        if isinstance(obj, dict):
-            return {k: _json_safe(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return [_json_safe(x) for x in obj]
-        return obj
 
+@route("/web/webclient/load_menus", auth="user", methods=["GET"])
+def load_webclient_menus(request):
+    """Odoo-style menu bootstrap endpoint for the modular frontend runtime."""
+    uid = get_session_uid(request)
+    if uid is None:
+        return Response('{"error": "unauthorized"}', status=401, content_type="application/json")
+    import json
+
+    db = get_session_db(request)
+    registry = _load_frontend_registry(uid, db)
     return Response(
-        json.dumps(_json_safe(registry)),
+        json.dumps(registry.get("menus", [])),
         content_type="application/json",
     )
 
@@ -1040,8 +1116,10 @@ def set_current_company(request):
         return Response('{"error": "invalid company_id"}', status=400, content_type="application/json")
 
 
-def _webclient_html(debug_assets: bool = False) -> str:
+def _webclient_html(debug_assets: bool = False, session_bootstrap: dict | None = None) -> str:
     """Web client shell HTML. Use debug_assets=True for individual files (no minification)."""
+    import json
+
     if debug_assets:
         urls = get_bundle_urls("web.assets_web")
         css_tags = "\n".join(f'<link rel="stylesheet" href="{u}"/>' for u in urls.get("css", []))
@@ -1050,12 +1128,30 @@ def _webclient_html(debug_assets: bool = False) -> str:
         css_tags = '<link rel="stylesheet" href="/web/assets/web.assets_web.css"/>'
         js_tags = '<script src="/web/assets/web.assets_web.js"></script>'
 
+    bootstrap = {
+        "runtime": "modern",
+        "version": "phase-2-shell-cutover",
+        "brandName": "Foundry One",
+        "theme": "light",
+        "debugAssets": bool(debug_assets),
+        "shellOwner": "modern",
+        "legacyAdapterEnabled": True,
+        "endpoints": {
+            "sessionInfo": "/web/session/get_session_info",
+            "views": "/web/load_views",
+            "menus": "/web/webclient/load_menus",
+        },
+        "session": session_bootstrap or {},
+    }
+    bootstrap_json = json.dumps(bootstrap)
+
     # Shell DOM must match addons/web/views/webclient_templates.xml (sidebar + main column).
     # Login still redirects here; main.js fills #app-sidebar and replaces #navbar contents.
     return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>ERP Platform</title>
+<link rel="manifest" href="/web/manifest.webmanifest"/>
 {css_tags}
 <style>
   body {{ margin: 0; min-height: 100vh; }}
@@ -1098,9 +1194,27 @@ def _webclient_html(debug_assets: bool = False) -> str:
   </aside>
   <button type="button" id="chat-toggle" class="chat-toggle-btn" aria-label="Open AI Assistant">AI</button>
 </div>
+<script>
+window.__erpFrontendBootstrap = {bootstrap_json};
+if (typeof localStorage !== "undefined" && localStorage.getItem("erp_theme")) {{
+  window.__erpFrontendBootstrap.theme = localStorage.getItem("erp_theme");
+}}
+</script>
+<script src="/web/static/lib/owl/owl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js" crossorigin="anonymous"></script>
 {js_tags}
+<script src="/web/static/dist/modern_webclient.js"></script>
+<script>
+if (!window.__ERPModernWebClientLoaded && window.__erpLegacyRuntime && typeof window.__erpLegacyRuntime.start === "function") {{
+  window.__erpLegacyRuntime.start();
+}}
+</script>
+<script>
+if ("serviceWorker" in navigator) {{
+  navigator.serviceWorker.register("/web/sw.js").catch(function () {{}});
+}}
+</script>
 </body>
 </html>"""
 
@@ -1193,7 +1307,12 @@ def index(request):
             return redirect("/my")
     except Exception:
         pass
+    session_bootstrap = {
+        "uid": uid,
+        "db": db,
+        "lang": get_session_lang_from_request(request),
+    }
     return Response(
-        _webclient_html(debug_assets=_is_debug_assets(request)),
+        _webclient_html(debug_assets=_is_debug_assets(request), session_bootstrap=session_bootstrap),
         content_type="text/html; charset=utf-8",
     )

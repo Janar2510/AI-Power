@@ -117,8 +117,16 @@ class TestPhases539to541Db(unittest.TestCase):
             self.skipTest("no account")
         exp = Account.search([("account_type", "=", "expense")], limit=1)
         cur = Account.search([("account_type", "=", "asset_current")], limit=1)
-        if not exp.ids or not cur.ids:
-            self.skipTest("need expense + asset_current accounts in demo data")
+        # Phase 545: seed minimal accounts so the test runs on plain db init (no demo chart).
+        suf = uuid.uuid4().hex[:6]
+        if not exp.ids:
+            exp = Account.create(
+                {"name": "P545 Expense", "code": f"E{suf}"[:16], "account_type": "expense"}
+            )
+        if not cur.ids:
+            cur = Account.create(
+                {"name": "P545 Current Asset", "code": f"A{suf}"[:16], "account_type": "asset_current"}
+            )
         Production = env.get("mrp.production")
         Bom = env.get("mrp.bom")
         BomLine = env.get("mrp.bom.line")

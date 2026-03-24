@@ -7,6 +7,7 @@ import unittest
 from werkzeug.test import Client
 
 from core.http import Application
+from core.http.routes import _webclient_html
 
 
 class TestHTTP(unittest.TestCase):
@@ -27,6 +28,51 @@ class TestHTTP(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"ERP Platform", r.data)
         self.assertIn(b"Log in", r.data)
+
+    def test_web_manifest_public_phase548(self):
+        """GET /web/manifest.webmanifest returns installable shell JSON (Phase 548)."""
+        r = self.client.get("/web/manifest.webmanifest")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("application/manifest+json", r.content_type)
+        data = json.loads(r.get_data(as_text=True))
+        self.assertEqual(data.get("name"), "ERP Platform")
+        self.assertEqual(data.get("start_url"), "/web")
+
+    def test_web_service_worker_stub_public_phase553(self):
+        """GET /web/sw.js returns public JS stub (Phase 553)."""
+        r = self.client.get("/web/sw.js")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("javascript", r.content_type)
+        self.assertIn(b"skipWaiting", r.data)
+
+    def test_web_service_worker_has_static_cache_phase556(self):
+        """Phase 556: SW uses caches + addAll for shell assets."""
+        r = self.client.get("/web/sw.js")
+        self.assertEqual(r.status_code, 200)
+        text = r.get_data(as_text=True)
+        self.assertIn("caches.open", text)
+        self.assertIn("addAll", text)
+        self.assertIn("web.assets_web", text)
+
+    def test_webclient_html_registers_service_worker_phase553(self):
+        """Web shell HTML includes service worker registration script (Phase 553)."""
+        html = _webclient_html(debug_assets=True)
+        self.assertIn("serviceWorker", html)
+        self.assertIn("/web/sw.js", html)
+
+    def test_webclient_html_injects_modern_bootstrap_phase1(self):
+        """Web shell includes modular frontend bootstrap config and primary runtime script."""
+        html = _webclient_html(debug_assets=True)
+        self.assertIn("__erpFrontendBootstrap", html)
+        self.assertIn('"runtime": "modern"', html)
+        self.assertIn('"shellOwner": "modern"', html)
+        self.assertIn("/web/static/lib/owl/owl.js", html)
+        self.assertIn("/web/static/dist/modern_webclient.js", html)
+
+    def test_webclient_load_menus_requires_auth_phase1(self):
+        """Odoo-style menu bootstrap endpoint exists and stays auth-protected."""
+        r = self.client.get("/web/webclient/load_menus")
+        self.assertEqual(r.status_code, 401)
 
     def test_jsonrpc(self):
         r = self.client.post(
@@ -49,6 +95,16 @@ class TestHTTP(unittest.TestCase):
         r = self.client.get("/web/static/src/main.js")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"ERP Platform", r.data)
+
+    def test_static_modern_webclient_js_served_phase1(self):
+        r = self.client.get("/web/static/dist/modern_webclient.js")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"__ERPModernWebClientLoaded", r.data)
+
+    def test_static_owl_runtime_served_phase2(self):
+        r = self.client.get("/web/static/lib/owl/owl.js")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"Component", r.data)
 
     def test_asset_bundle_css(self):
         r = self.client.get("/web/assets/web.assets_web.css")

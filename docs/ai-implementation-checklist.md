@@ -74,7 +74,55 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] Stock + `stock_account` gap audit: `docs/stock_odoo19_gap_audit.md`; Phases **539–541** in `tests/test_phases_539_541_stock_mrp_sale_db.py` (one `load_module_graph` + `load_default_data`); helper `./scripts/run_phases_539_541_db.sh`.
 - [x] Web dual-codebase asset strategy in `docs/frontend.md` Phase **542**; concat+guard remains default.
 - [x] `RAG_REINDEX_MODELS` includes `sale.order`; Phase **543**; `test_ai_rag_scope_phase543`.
-- [x] Account Wave L deferrals documented (Phase **544**): fiscal, multi-tax chain, partial reconcile, locks — `docs/account_odoo19_gap_audit.md`.
+- [x] Account Wave L deferrals (Phase **544**): fiscal slices **546**/**551**/**555**; minimal lock **557**; **544** row tracks multi-tax chain, partial reconcile, strict sequences — `docs/account_odoo19_gap_audit.md`.
+
+## Wave M — Phases 545–549
+
+- [x] **545:** Phase 540 in `test_phases_539_541_stock_mrp_sale_db` creates expense + `asset_current` accounts when missing; `tests/test_translate_discover_phase545.py`; CI workflow notes pgvector optional on stock Postgres image.
+- [x] **546:** Minimal fiscal positions (`account.fiscal.position`, `.tax`), `sale.order.fiscal_position_id`, `apply_fiscal_position_taxes()` — `tests/test_account_fiscal_phase546.py`.
+- [x] **547:** `embedding_column_is_pgvector_type` + `retrieve_chunks` uses `<=>` only for native `vector` column; `tests/test_embedding_column_phase547.py`.
+- [x] **548:** `GET /web/manifest.webmanifest` + manifest link in webclient shell — `tests/test_http.py`.
+- [x] **549:** `parity_matrix.md`, gap audits, `frontend.md`, this checklist updated.
+
+## Wave N — Phases 550–554
+
+- [x] **550:** README + `DeploymentChecklist.md` — inline `#` vs `erp-bin` args; Homebrew/pgvector note; pointer to `tests/test_translate_discover_phase545.py`.
+- [x] **551:** `purchase.order.fiscal_position_id`, `apply_fiscal_position_taxes()`; `account.move.fiscal_position_id` + draft line `tax_ids` via `apply_fiscal_position_taxes()` — `tests/test_account_fiscal_purchase_invoice_phase551.py`.
+- [x] **552:** JSONB→vector migration + re-embed notes in `addons/ai_assistant/embeddings/pipeline.py`; read-only `scripts/check_embedding_column.py`.
+- [x] **553:** `GET /web/sw.js` + shell `navigator.serviceWorker.register` — `tests/test_http.py`.
+- [x] **554:** `parity_matrix.md` rows 550–553, Phase **544** description update, `docs/frontend.md`, `docs/account_odoo19_gap_audit.md` Phase 551, this checklist.
+
+## Wave O — Phases 555–559
+
+- [x] **555:** `res.partner.fiscal_position_id`; `sale.order._sale_order_prepare_vals` + account merge; PO fiscal from partner — `tests/test_account_fiscal_partner_default_phase555.py`.
+- [x] **556:** SW `caches.open` / `addAll` for concat shell assets — `tests/test_http.py`.
+- [x] **557:** `res.company.account_lock_date` + post guard — `tests/test_account_lock_date_phase557.py`.
+- [x] **558:** Command palette a11y + README/`frontend.md` Mod+K.
+- [x] **559:** Parity matrix 555–559, Phase **544** row, gap audit, this checklist, `changelog.md`, `DeploymentChecklist.md`.
+
+## Phase P — Modular frontend foundation + account company (560)
+
+- [x] **Frontend:** Acceptance criteria in `docs/frontend.md` (Modular bootstrap — Phase P); `docs/odoo19-webclient-gap-table.md` status column + foundation vs full parity; `addons/web/static/src/app/main.js` non-blocking `menu.load(false)` after `startServices`; rebuild `addons/web/static/dist/modern_webclient.js` via `npm run build:web` (or `npx esbuild` as in CI).
+- [x] **Parity matrix:** Modular frontend bootstrap foundation row **done**; Phase **560** row for `account.move` / `account.journal` `company_id` + per-company lock.
+- [x] **560:** `account.move.company_id`, `account.journal.company_id`; `action_post` uses move company for `account_lock_date`; index `account_move_company_id_idx`; tests `tests/test_account_move_company_phase560.py` (DB optional).
+- [x] **Stock design:** `docs/stock_valuation_layers_scope.md` (Tier A–C pre-code); link from `docs/stock_odoo19_gap_audit.md`.
+- [x] **Account audit:** `docs/account_odoo19_gap_audit.md` Phase 560 shipped notes.
+
+## Phases 561–565 (Waves Q–S: web depth, account, stock Tier A)
+
+- [x] **561–562:** `shell_chrome.js`, `list_control_panel.js`, `list_view.js` delegation, `odoo19-webclient-gap-table.md`, `frontend.md` Wave Q section; `npm run build:web` / `npx esbuild` for `modern_webclient.js`.
+- [x] **563:** Multi-tax all-included `compute_all`; `tests/test_account_tax_multi_include_phase563.py`; gap audit + matrix **544** / **563**.
+- [x] **564:** `ir.sequence.company_id`, `next_by_code(..., company_id)`; `account_move` naming; `tests/test_ir_sequence_company_phase564.py`.
+- [x] **565:** `stock.valuation.layer` `remaining_qty` / `remaining_value`; `stock_move_quant` create paths; `stock_valuation_layers_scope.md` + `stock_odoo19_gap_audit.md`.
+
+## Phases 566–573 (post–1.207: Wave U/V/W)
+
+- [x] **566–567:** `navbar_contract.js`, `form_footer_actions.js`, `AppCore.FormFooterActions`, legacy `main.js` delegation; `odoo19-webclient-gap-table.md`; `npm run build:web` → `modern_webclient.js`.
+- [x] **568:** Mixed include/exclude `account.tax.compute_all`; tests in `tests/test_account_tax_multi_include_phase563.py`.
+- [x] **569:** `ir.sequence` `reference_date` + `use_date_range`; `account.move` passes move `date`; `tests/test_ir_sequence_date_range_phase569.py`.
+- [x] **570–571:** FIFO `remaining_*` consumption on outgoing; `res.company.stock_valuation_auto_account_move`; `stock_valuation_layers_scope.md` + `stock_odoo19_gap_audit.md`.
+- [x] **572:** `docs/account_partial_reconcile_design.md` (design-only).
+- [x] **573:** `docs/frontend.md` Phase 542 milestone + gap table assets row; `changelog.md` **1.208.0**; `DeploymentChecklist.md`; matrix **544** / **566–573**; `account_odoo19_gap_audit.md`.
 
 ## Sidebar navigation (greyed-out submenus)
 

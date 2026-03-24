@@ -11,9 +11,16 @@ class SaleOrder(Model):
     name = fields.Char(string="Order Reference", required=True, default="New")
 
     @classmethod
+    def _sale_order_prepare_vals(cls, env, vals):
+        """Hook for merged modules (Phase 555: account injects fiscal_position_id from partner)."""
+        return vals
+
+    @classmethod
     def _create_sale_order_record(cls, vals):
         """Insert sale order row after name/currency defaults (Phase 478: chain from _inherit without broken super())."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
+        vals = dict(vals)
+        vals = cls._sale_order_prepare_vals(env, vals)
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
             next_val = IrSequence.next_by_code("sale.order") if IrSequence else None

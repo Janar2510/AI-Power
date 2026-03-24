@@ -19,3 +19,8 @@ class AccountJournal(Model):
         string="Type",
         default="general",
     )
+    company_id = fields.Many2one(
+        "res.company",
+        string="Company",
+        help="Phase 560: journal belongs to this company; moves default company_id from journal when omitted.",
+    )

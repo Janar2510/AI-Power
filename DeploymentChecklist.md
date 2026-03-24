@@ -1,5 +1,35 @@
 # Deployment Checklist
 
+## Wave O — Phases 555–559 (partner fiscal, SW shell cache, lock date, palette a11y, docs) (Unreleased)
+
+### Pre-Deployment
+- [ ] **555:** New column `res.partner.fiscal_position_id`; run `db upgrade` on existing DBs. SO/PO create defaults fiscal from partner unless explicitly set.
+- [ ] **556:** Service worker caches concat bundle URLs — bump `CACHE` in `core/http/routes.py` `web_service_worker_stub` when shell assets change, or advise devs to unregister SW to avoid stale JS/CSS.
+- [ ] **557:** `res.company.account_lock_date` — set only when finance wants to block posting on/before that date (first-company heuristic).
+- [ ] **558:** No backend change; `npm run check:assets-concat` after `command_palette.js` edits.
+
+### Verification
+- [ ] Optional DB: `python -m unittest tests.test_account_fiscal_partner_default_phase555 tests.test_account_lock_date_phase557`
+- [ ] No DB: `python -m unittest tests.test_http.TestHTTP.test_web_service_worker_has_static_cache_phase556`
+
+---
+
+## Wave N — Phases 550–554 (local DX, fiscal PO+invoice, RAG migrate doc, PWA SW stub, docs) (Unreleased)
+
+### Pre-Deployment
+- [ ] **CLI:** Remind operators: do not put `# comments` on the same shell line as `erp-bin` arguments (`argparse` will treat them as extra args).
+- [ ] **Postgres without pgvector:** `db init` must complete with JSONB embedding columns; optional pgvector install is documented in README + embedding pipeline doc (Phases 550, 552).
+- [ ] **Fiscal (551):** `purchase.order.fiscal_position_id` + `apply_fiscal_position_taxes()`; `account.move.fiscal_position_id` + `apply_fiscal_position_taxes()` for **draft** moves (line `tax_ids`).
+- [ ] **RAG (552):** After enabling pgvector on an existing DB, follow migration / re-embed notes in `addons/ai_assistant/embeddings/pipeline.py` and optional `scripts/check_embedding_column.py`.
+- [ ] **Web (553):** Service worker stub registers on `/web` shell only; offline is static/cache-limited, not full CRUD.
+
+### Verification
+- [ ] No DB: `python -m unittest tests.test_translate_discover_phase545` (translation discovery).
+- [ ] Optional DB: `python -m unittest tests.test_account_fiscal_purchase_invoice_phase551`.
+- [ ] No DB: `python -m unittest tests.test_http.TestHTTP.test_web_service_worker_stub_public_phase553`.
+
+---
+
 ## Phases 539–544 (stock valuation subset, MRP cost lines, sale/purchase domains, web doc, RAG scope, account deferrals) (Unreleased)
 
 ### Pre-Deployment
@@ -46,7 +76,7 @@
 ### Pre-Deployment
 - [ ] `db upgrade` if upgrading from before Phase 526: `mrp.bom.operation` table and related columns.
 - [ ] Before deploying web UI changes: `npm install && npm run check:assets-concat` (concat bundle must not contain ESM `export`).
-- [ ] Optional: `npm run build:web` for `addons/web/static/dist/web.bundle.js` (Dockerfile notes multi-stage pattern).
+- [ ] Build the modular runtime when packaging frontend changes: `npm run build:web` for `addons/web/static/dist/modern_webclient.js`.
 - [ ] Structured access logs (optional): set `ERP_JSON_ACCESS_LOG=1` or start server with `--json-access-log`; ship `erp.http.access` lines to your log aggregator. Trace id: send `X-Request-Id` or `X-Trace-Id` header.
 - [ ] RAG: ensure `OPENAI_API_KEY` (or your `_get_api_key` source) when using `index_record_for_rag` / chunk embedding refresh; run `CREATE EXTENSION vector` on PG when using pgvector (see `addons/ai_assistant/embeddings/pipeline.py`).
 
@@ -61,7 +91,7 @@
 
 ### Pre-Deployment
 - [ ] After pull: run `python3 erp-bin db upgrade -d <db>` so new columns (`mrp.workorder`, `product.template.manufacture_on_order`, HR lifecycle fields, etc.) exist.
-- [ ] Optional web bundle: `npm install && npm run build:web` (see root `package.json`); artefacts go to `addons/web/static/dist/` (gitignored except `.gitkeep`).
+- [ ] Optional frontend rebuild: `npm install && npm run build:web` (see root `package.json`); modular runtime artefacts go to `addons/web/static/dist/`.
 - [ ] Configure load balancers: `GET /health` **liveness**, `GET /readiness` **readiness** (503 if DB missing).
 
 ### Verification
@@ -837,6 +867,7 @@ These are IDE-level Cursor rules and documentation. No DB migration, no `DEFAULT
 - [ ] Initialize database: `./erp-bin db init -d <dbname>` (re-run when adding modules like crm, ai_assistant)
 - [ ] If Postgres error `relation "res_users" does not exist`: DB exists but schema not applied — run `db init` for that DB name, or restart server (auto-inits when `public.res_users` is missing)
 - [ ] **pgvector:** Optional; without it, `db init` uses JSONB for embedding columns (no aborted transaction). Install pgvector on the server when you want `<=>` / vector RAG
+- [ ] **PWA (Phase 548):** `/web/manifest.webmanifest` is public JSON metadata + `<link rel="manifest">` on the web shell; no service worker — not offline-capable
 - [ ] Optional: install module: `./erp-bin module install -d <db> -m <module>`
 - [ ] Check config: `./erp-bin help server`
 
@@ -1644,3 +1675,31 @@ These are IDE-level Cursor rules and documentation. No DB migration, no `DEFAULT
 - [ ] POST /json/2/<model>/<method> with Authorization: bearer <key>
 - [ ] X-Odoo-Database header for multi-db
 - [ ] res_users_apikeys table created on db init (base module)
+# Frontend Runtime
+
+- Verify `window.__erpFrontendBootstrap` is present in the web shell HTML.
+- Verify `/web/static/dist/modern_webclient.js` is deployed and served.
+- Keep legacy runtime fallback available only during the phase 1-5 migration window.
+- If you rebuild the modular runtime, run `npm run build:web` before release (or `npx esbuild` with the same flags as `package.json` if local `node_modules` lacks `esbuild`).
+- **Phase P (1.206.0):** Modular bootstrap acceptance criteria live in `docs/frontend.md`; after login, the modern runtime issues a non-blocking `GET /web/webclient/load_menus` early in boot (see `addons/web/static/src/app/main.js`).
+
+# Account company scoping (Phase 560, 1.206.0)
+
+- After `db init` / schema migrate, `account_move.company_id` and `account_journal.company_id` exist; posting respects `res.company.account_lock_date` per move company when `company_id` is set.
+- Optional DB test: `python3 -m unittest tests.test_account_move_company_phase560`.
+
+# Post–1.206 waves (1.207.0 — Phases 561–565)
+
+- **561–562:** After pull, run `npm run build:web` (or `npx esbuild` per `package.json`) so `modern_webclient.js` includes shell chrome + list control panel; verify `document.documentElement` has `data-erp-shell-owner="modern"` when logged in.
+- **563:** `python3 -m unittest tests.test_account_tax_multi_include_phase563`.
+- **564:** `ir_sequence.company_id` column after migrate; optional `python3 -m unittest tests.test_ir_sequence_company_phase564` (needs two companies in DB).
+- **565:** `stock_valuation_layer.remaining_qty` / `remaining_value` columns; layers on done moves still no required `account.move`.
+
+# Post–1.207 (1.208.0 — Phases 566–573)
+
+- **566–567:** Rebuild `modern_webclient.js`; smoke form footer (Save/Cancel) and navbar slot (`data-erp-navbar-contract="566"` on delegated hosts when modern bundle loads).
+- **568:** `python3 -m unittest tests.test_account_tax_multi_include_phase563` (mixed-tax case).
+- **569:** `python3 -m unittest tests.test_ir_sequence_date_range_phase569`.
+- **570–571:** `res.company.stock_valuation_auto_account_move` on fresh `db init` / schema sync; FIFO layer consumption on outgoing; Tier C draft moves only when the company flag is set and `account` + expense/`asset_current` accounts exist.
+- **572:** Partial reconcile remains design-only (`docs/account_partial_reconcile_design.md`) until implementation is approved.
+- **573:** Prod asset default unchanged (concat + guard); document any esbuild-primary experiment in this checklist before switching templates.

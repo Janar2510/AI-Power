@@ -1,10 +1,11 @@
 {
   "name": "erp-platform",
   "private": true,
-  "description": "Web client bundler (Phase 481) — optional production bundle of main.js",
+  "description": "Modern web client bundler and frontend migration tooling",
   "scripts": {
-    "build:web": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.js --sourcemap",
-    "build:web:min": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.min.js --minify --sourcemap",
+    "build:web": "esbuild addons/web/static/src/app/main.js --bundle --format=iife --outfile=addons/web/static/dist/modern_webclient.js --sourcemap",
+    "build:web:min": "esbuild addons/web/static/src/app/main.js --bundle --format=iife --outfile=addons/web/static/dist/modern_webclient.min.js --minify --sourcemap",
+    "build:web:legacy": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.js --sourcemap",
     "check:assets-concat": "python3 scripts/check_concat_bundle.py",
     "check:uipro:setup": "bash scripts/check_ui_ux_pro_max_setup.sh",
     "install:uipro:local": "bash scripts/install_uipro_cli_local.sh",

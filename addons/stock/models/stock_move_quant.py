@@ -99,15 +99,46 @@ class StockMove(Model):
             src_internal = src_id in internal_ids
             dest_internal = dest_id in internal_ids
             if src_internal and not dest_internal:
-                # Outgoing: negative layer
-                Layer.create({
+                # Outgoing: Phase 570 Tier B — FIFO consume positive layers' remaining_*; shortfall at standard_price.
+                fifo_layers = Layer.search(
+                    [("product_id", "=", pid), ("remaining_qty", ">", 0)],
+                    order="id",
+                )
+                need = float(qty)
+                total_cogs = 0.0
+                for lid in fifo_layers.ids or []:
+                    if need <= 0:
+                        break
+                    brow = Layer.browse([lid])
+                    lr = brow.read(["remaining_qty", "remaining_value"])[0]
+                    rq = float(lr.get("remaining_qty") or 0)
+                    rv = float(lr.get("remaining_value") or 0)
+                    if rq <= 0:
+                        continue
+                    take = min(rq, need)
+                    portion = take / rq if rq else 0.0
+                    val_take = rv * portion
+                    total_cogs += val_take
+                    new_rq = rq - take
+                    new_rv = rv - val_take
+                    brow.write({"remaining_qty": new_rq, "remaining_value": new_rv})
+                    need -= take
+                if need > 0:
+                    total_cogs += need * float(unit_cost)
+                v = -total_cogs
+                uc = (total_cogs / qty) if qty else unit_cost
+                layer_vals = {
                     "product_id": pid,
                     "quantity": -qty,
-                    "unit_cost": unit_cost,
-                    "value": -qty * unit_cost,
+                    "unit_cost": uc,
+                    "value": v,
+                    "remaining_qty": -qty,
+                    "remaining_value": v,
                     "stock_move_id": move_id,
                     "description": f"Out: {name}",
-                })
+                }
+                Layer.create(layer_vals)
+                move._stock_tier_c_valuation_move_stub(pid, total_cogs, f"m{move_id}-{name}")
             elif dest_internal and not src_internal:
                 # Incoming: positive layer; for average, update product cost
                 if cost_method == "average":
@@ -132,11 +163,14 @@ class StockMove(Model):
                     new_val = cur_val + in_val
                     unit_cost = (new_val / new_qty) if new_qty else unit_cost
                     Product.browse([pid]).write({"standard_price": unit_cost})
+                inv = qty * unit_cost
                 Layer.create({
                     "product_id": pid,
                     "quantity": qty,
                     "unit_cost": unit_cost,
-                    "value": qty * unit_cost,
+                    "value": inv,
+                    "remaining_qty": qty,
+                    "remaining_value": inv,
                     "stock_move_id": move_id,
                     "description": f"In: {name}",
                 })

@@ -40,11 +40,27 @@ See **Phases 535–538** in `docs/parity_matrix.md`.
 
 ## Phase 544 — explicit deferrals (Wave L / account+)
 
-No implementation in this wave; track for later clean-room work with `odoo-19.0/addons/account/` read-only analysis:
+**Shipped (Wave M / Phase 546):** minimal **fiscal positions** — `account.fiscal.position`, `account.fiscal.position.tax` (source → destination `account.tax`), `sale.order.fiscal_position_id`, and `apply_fiscal_position_taxes()` to remap order line taxes. No automatic partner-based fiscal assignment yet.
 
-- **Fiscal positions** — map `account.fiscal.position` style rules before adding fields.
-- **Multi-tax ordering / price_include chains** — `compute_all` today supports **single** included percent tax (Phase 536); multiple included taxes remain **deferred**.
-- **Partial reconcile** — ERP uses statement line ↔ move link + `reconciled_id` string; Odoo-style partials and FX matching **deferred**.
-- **Lock dates / sequence** on `action_post` — deferred vs Odoo strict checks.
+**Shipped (Wave N / Phase 551):** same tax mapping on **`purchase.order`** / **`purchase.order.line`** (`taxes_id`, `apply_fiscal_position_taxes()`) and on **draft** **`account.move`** journal items (`tax_ids`, move-level `fiscal_position_id`, `apply_fiscal_position_taxes()`).
 
-Update this doc when a subtrack ships; keep matrix row **544** in sync.
+**Shipped (Wave O / Phase 555):** **`res.partner.fiscal_position_id`**; new sale orders default header **`fiscal_position_id`** from partner via **`sale.order._sale_order_prepare_vals`** (hook in `sale`, implementation merged from `account`); purchase orders default from partner in **`_create_purchase_order_record`**. Explicit `fiscal_position_id` on create still wins. No VAT-country / geo auto-detection.
+
+**Shipped (Wave O / Phase 557):** **`res.company.account_lock_date`** — `account.move.action_post` raises if the move’s **`date`** is on or before that lock (initially first-company heuristic; **Phase 560** resolves the company from the move).
+
+**Shipped (Phase P / 560):** **`account.move.company_id`** and **`account.journal.company_id`**. New moves default `company_id` from the journal, then from the first `res.company` row. **`action_post`** resolves **`account_lock_date`** from the move’s company when `company_id` is set; otherwise keeps the single-company fallback. Tests: `tests/test_account_move_company_phase560.py`.
+
+**Shipped (Phase 563):** **Multi-tax `price_include` chain** — when **all** taxes on the recordset are **percent** + **price_include**, `compute_all` applies sequential strip from gross (same as single tax when one row). Tests: `tests/test_account_tax_multi_include_phase563.py`.
+
+**Shipped (Phase 564):** **`ir.sequence.company_id`** and **`next_by_code(code, company_id=…)`** — company-specific row preferred, else global (`company_id` NULL). **`account.move`** passes **`company_id`** into `next_by_code` when generating names.
+
+**Shipped (Phase 568):** **Mixed percent `price_include` + other taxes** — included **percent** taxes are stripped from gross first (reverse document order), then remaining taxes run on the untaxed base. Same test module as 563.
+
+**Shipped (Phase 569):** **`ir.sequence.use_date_range`** — when enabled and a matching **`ir.sequence.date_range`** exists for **`reference_date`**, `next_by_code(..., reference_date=…)` increments the sub-row’s **`number_next`**; parent prefix/suffix/padding still apply. **`account.move`** passes **`vals["date"]`** as **`reference_date`**. Tests: `tests/test_ir_sequence_date_range_phase569.py` (mocked SQL).
+
+Remaining deferrals (clean-room vs `odoo-19.0/addons/account/` when prioritized):
+
+- **Partial reconcile + FX** — design doc **`docs/account_partial_reconcile_design.md`** (**Phase 572**); implementation **deferred** until sign-off.
+- **Full multi-company lock matrix** — only per-move company + `account_lock_date` on `res.company`; no role-based “adviser” bypass yet.
+
+Update this doc when a subtrack ships; keep matrix rows **544**, **546**, **551**, **555**, **557**, **560**, **563**, **564**, **568**, **569**, and **572** in sync.

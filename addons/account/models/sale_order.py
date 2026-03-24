@@ -6,6 +6,29 @@ from core.orm import Model, api, fields
 class SaleOrder(Model):
     _inherit = "sale.order"
 
+    @classmethod
+    def _sale_order_prepare_vals(cls, env, vals):
+        """Default fiscal_position_id from partner when not set (Phase 555)."""
+        vals = dict(vals)
+        if env and not vals.get("fiscal_position_id"):
+            pid = vals.get("partner_id")
+            if isinstance(pid, (list, tuple)) and pid:
+                pid = pid[0]
+            if pid:
+                Partner = env.get("res.partner")
+                if Partner:
+                    prow = Partner.browse([pid]).read(["fiscal_position_id"])[0]
+                    fp = prow.get("fiscal_position_id")
+                    fp_id = fp[0] if isinstance(fp, (list, tuple)) and fp else fp
+                    if fp_id:
+                        vals["fiscal_position_id"] = fp_id
+        return vals
+
+    fiscal_position_id = fields.Many2one(
+        "account.fiscal.position",
+        string="Fiscal Position",
+        help="Phase 546: map sale line taxes via apply_fiscal_position_taxes().",
+    )
     payment_term_id = fields.Many2one("account.payment.term", string="Payment Terms")  # Phase 191
     invoice_status = fields.Selection(
         selection=[
@@ -238,6 +261,41 @@ class SaleOrder(Model):
                 MoveLine.create(recv_vals)
             move.write({})  # Trigger recompute of invoice_date_due after lines exist
             order.write({"invoice_status": "invoiced"})
+        return True
+
+    def apply_fiscal_position_taxes(self):
+        """Remap ``sale.order.line`` ``tax_id`` through ``account.fiscal.position.tax`` (Phase 546)."""
+        env = self.env
+        if not env:
+            return True
+        registry = getattr(env, "registry", None)
+        FiscalModel = registry.get("account.fiscal.position") if registry else None
+        Line = env.get("sale.order.line")
+        if not FiscalModel or not Line:
+            return True
+        for order in self:
+            if not order.ids:
+                continue
+            row = order.read(["fiscal_position_id"])[0]
+            fp = row.get("fiscal_position_id")
+            fp_id = fp[0] if isinstance(fp, (list, tuple)) and fp else fp
+            if not fp_id:
+                continue
+            lines = Line.search([("order_id", "=", order.ids[0])])
+            for line in lines:
+                lr = line.read(["tax_id"])[0]
+                raw = lr.get("tax_id") or []
+                tids = []
+                for x in raw:
+                    if isinstance(x, int):
+                        tids.append(x)
+                    elif isinstance(x, (list, tuple)) and x:
+                        tids.append(int(x[0]))
+                if not tids:
+                    continue
+                mapped = FiscalModel.map_tax_ids(env, int(fp_id), tids)
+                if mapped != tids:
+                    line.write({"tax_id": [(6, 0, mapped)]})
         return True
 
     def action_create_invoice(self):

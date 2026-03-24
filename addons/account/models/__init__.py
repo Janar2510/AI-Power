@@ -1,4 +1,7 @@
+from . import res_partner
+from . import res_company
 from . import account_account
+from . import account_fiscal_position
 from . import account_payment_term
 from . import account_bank_statement
 from . import account_reconcile

@@ -12,6 +12,11 @@ class PurchaseOrder(Model):
     partner_id = fields.Many2one("res.partner", string="Vendor", required=True)
     currency_id = fields.Many2one("res.currency", string="Currency")
     payment_term_id = fields.Many2one("account.payment.term", string="Payment Terms")  # Phase 191
+    fiscal_position_id = fields.Many2one(
+        "account.fiscal.position",
+        string="Fiscal Position",
+        help="Phase 551: map purchase line taxes via apply_fiscal_position_taxes().",
+    )
     amount_total = fields.Computed(compute="_compute_amount_total", store=True, string="Total")
     state = fields.Selection(
         selection=[
@@ -251,6 +256,41 @@ class PurchaseOrder(Model):
             order._update_bill_status()
         return True
 
+    def apply_fiscal_position_taxes(self):
+        """Remap ``purchase.order.line`` ``taxes_id`` through ``account.fiscal.position.tax`` (Phase 551)."""
+        env = self.env
+        if not env:
+            return True
+        registry = getattr(env, "registry", None)
+        FiscalModel = registry.get("account.fiscal.position") if registry else None
+        Line = env.get("purchase.order.line")
+        if not FiscalModel or not Line:
+            return True
+        for order in self:
+            if not order.ids:
+                continue
+            row = order.read(["fiscal_position_id"])[0]
+            fp = row.get("fiscal_position_id")
+            fp_id = fp[0] if isinstance(fp, (list, tuple)) and fp else fp
+            if not fp_id:
+                continue
+            lines = Line.search([("order_id", "=", order.ids[0])])
+            for line in lines:
+                lr = line.read(["taxes_id"])[0]
+                raw = lr.get("taxes_id") or []
+                tids = []
+                for x in raw:
+                    if isinstance(x, int):
+                        tids.append(x)
+                    elif isinstance(x, (list, tuple)) and x:
+                        tids.append(int(x[0]))
+                if not tids:
+                    continue
+                mapped = FiscalModel.map_tax_ids(env, int(fp_id), tids)
+                if mapped != tids:
+                    line.write({"taxes_id": [(6, 0, mapped)]})
+        return True
+
     def action_create_bill(self):
         """Create vendor bill. Uses received qty when available (Phase 197)."""
         for order in self:
@@ -280,6 +320,19 @@ class PurchaseOrder(Model):
     def _create_purchase_order_record(cls, vals):
         """Insert PO row after name/currency defaults (Phase 479: same merge-safe pattern as sale.order)."""
         env = getattr(cls._registry, "_env", None) if cls._registry else None
+        vals = dict(vals)
+        if env and not vals.get("fiscal_position_id"):
+            pid = vals.get("partner_id")
+            if isinstance(pid, (list, tuple)) and pid:
+                pid = pid[0]
+            if pid:
+                Partner = env.get("res.partner")
+                if Partner:
+                    prow = Partner.browse([pid]).read(["fiscal_position_id"])[0]
+                    fp = prow.get("fiscal_position_id")
+                    fp_id = fp[0] if isinstance(fp, (list, tuple)) and fp else fp
+                    if fp_id:
+                        vals["fiscal_position_id"] = fp_id
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
             next_val = IrSequence.next_by_code("purchase.order") if IrSequence else None

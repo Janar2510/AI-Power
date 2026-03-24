@@ -409,7 +409,11 @@ Return only the JSON object, no other text."""
 
 
 def retrieve_chunks(env, query: str, limit: int = 10) -> List[Dict]:
-    """Retrieve document chunks. Phase 136: uses cosine similarity when embeddings exist; else text ilike."""
+    """Retrieve document chunks.
+
+    Phase 136 / 547: uses pgvector ``<=>`` only when the ``embedding`` column is native ``vector``;
+    JSONB fallback DBs always use ILIKE (avoids errors when OpenAI returns an embedding but SQL has no ``<=>``).
+    """
     if not query or not str(query).strip():
         return []
     try:
@@ -419,9 +423,16 @@ def retrieve_chunks(env, query: str, limit: int = 10) -> List[Dict]:
     q = str(query).strip()
     embedding = _get_embedding(env, q)
     cr = getattr(env, "cr", None) if env else None
-    if embedding is not None and cr is not None:
+    table = getattr(Chunk, "_table", "ai_document_chunk")
+    from addons.ai_assistant.embeddings.pipeline import embedding_column_is_pgvector_type
+
+    use_vector = (
+        embedding is not None
+        and cr is not None
+        and embedding_column_is_pgvector_type(cr, table, "embedding")
+    )
+    if use_vector:
         try:
-            table = getattr(Chunk, "_table", "ai_document_chunk")
             cr.execute(
                 f'''SELECT id, model, res_id, text FROM "{table}"
                 WHERE embedding IS NOT NULL

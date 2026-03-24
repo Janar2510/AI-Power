@@ -17,3 +17,9 @@ class ResCompany(Model):
     street = fields.Char(string="Street")
     city = fields.Char(string="City")
     country_id = fields.Many2one("res.country", string="Country")
+    stock_valuation_auto_account_move = fields.Boolean(
+        string="Stock valuation draft moves",
+        default=False,
+        help="Phase 571 Tier C: when account is installed, outgoing FIFO COGS may create a draft "
+        "account.move stub (best-effort; requires journals/accounts).",
+    )

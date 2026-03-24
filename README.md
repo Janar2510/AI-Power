@@ -4,6 +4,8 @@ A parity-first, AI-powered modular ERP platform that mirrors Odoo 19.0 structure
 
 ## Quick Start
 
+**Shell tip (Phase 550):** Put comments on their **own line**. Inline `# ...` after a command is passed to `argparse` as extra arguments (e.g. `erp-bin db drop -d erp    # oops` fails with “unrecognized arguments”).
+
 ```bash
 pip install -r requirements.txt
 ./erp-bin help
@@ -19,6 +21,8 @@ python3 run_tests.py
 
 Then open http://localhost:8069/ - you will be redirected to login. Use the admin user created during `db init` (login: admin, password: admin).
 
+**Web client:** **Mod+K** (macOS **Cmd+K**) opens the command palette; **Escape** closes it (Phase 558).
+
 **Database:** Requires PostgreSQL. Set `PGUSER`, `PGPASSWORD`, `PGDATABASE` if needed. Default db_user is current system user.
 
 **PostgreSQL role:** If you see "role does not exist" or "database does not exist", run with `PGUSER=postgres` (or your PostgreSQL superuser):
@@ -29,7 +33,13 @@ PGUSER=postgres ./erp-bin server
 
 **Empty database / missing tables:** If you see `relation "res_users" does not exist`, the DB exists but was never initialized. Run `./erp-bin db init -d <name>` (same name as `PGDATABASE` / `--db_name=`, default `erp`), or restart `./erp-bin server` after upgrading — the server auto-inits when `res_users` is missing.
 
-**pgvector (optional):** Semantic RAG embeddings use the Postgres `vector` type when the **pgvector** extension is installed. Without it, `db init` still completes: embeddings are stored as **JSONB** and retrieval falls back to text search. To enable vectors on Homebrew PostgreSQL, install/build pgvector for your server version and run `CREATE EXTENSION vector` (see [pgvector](https://github.com/pgvector/pgvector)). If a previous `db init` failed halfway, drop the database and re-run `db init`.
+**pgvector (optional, Phase 550):** Semantic RAG uses the Postgres `vector` type when the **pgvector** extension is available. Homebrew `postgresql@15` does **not** ship `vector.control` until you install the **pgvector** formula for that major version and ensure `shared_preload_libraries` / extension path match your server (see [pgvector](https://github.com/pgvector/pgvector) and [DeploymentChecklist.md](DeploymentChecklist.md)). **Without** the extension, `db init` must still succeed: the platform uses a savepoint around `CREATE EXTENSION`, stores embeddings as **JSONB**, and RAG retrieval avoids `<=>` (see Phase 547). If an older build left the session in a failed transaction, drop the DB and re-run `db init`.
+
+**Translation PO discovery (regression):** `tests/test_translate_discover_phase545.py` covers `discover_po_files` / `load_po_file` used during `load_default_data`.
+
+**RAG embedding column (Phase 552):** After enabling pgvector, inspect type with `scripts/check_embedding_column.py` (read-only; run from repo root with `.venv` + DB config).
+
+**DB tests (539–541):** Phase **540** creates minimal `account.account` rows (expense + current asset) inside the test when the chart has none, so `npm run test:phases-539-541-db` is less environment-dependent (Phase 545).
 
 ## Module Philosophy
 

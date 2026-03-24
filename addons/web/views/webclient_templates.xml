@@ -50,6 +50,23 @@
       </aside>
       <button type="button" id="chat-toggle" class="chat-toggle-btn" aria-label="Open AI Assistant">AI</button>
     </div>
+    <script>
+      window.__erpFrontendBootstrap = {
+        runtime: "modern",
+        version: "phase-2-shell-cutover",
+        brandName: "Foundry One",
+        theme: (typeof localStorage !== "undefined" && localStorage.getItem("erp_theme")) || "light",
+        debugAssets: false,
+        shellOwner: "modern",
+        legacyAdapterEnabled: true,
+        endpoints: {
+          sessionInfo: "/web/session/get_session_info",
+          views: "/web/load_views",
+          menus: "/web/webclient/load_menus"
+        }
+      };
+    </script>
+    <script src="/web/static/lib/owl/owl.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js" crossorigin="anonymous"></script>
     <script src="/web/static/src/services/rpc.js"></script>
     <script src="/web/static/src/services/session.js"></script>
@@ -93,6 +110,12 @@
     <script src="/web/static/src/core/settings.js"></script>
     <script src="/web/static/src/core/dashboard.js"></script>
     <script src="/web/static/src/main.js"></script>
+    <script src="/web/static/dist/modern_webclient.js"></script>
+    <script>
+      if (!window.__ERPModernWebClientLoaded && window.__erpLegacyRuntime && typeof window.__erpLegacyRuntime.start === "function") {
+        window.__erpLegacyRuntime.start();
+      }
+    </script>
   </body>
 </html>
 ]]></template>

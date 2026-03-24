@@ -21,8 +21,9 @@ def parse_po_file(path: Path) -> Dict[str, str]:
     # Merge multiline msgid/msgstr blocks (simplified)
     blocks = re.split(r"\n\n+", text)
     for block in blocks:
-        mid = re.search(r'msgid\s+"(.*)"', block, re.DOTALL)
-        mstr = re.search(r'msgstr\s+"(.*)"', block, re.DOTALL)
+        # Non-greedy: greedy (.*) would span msgid → last quote in block (breaks msgstr).
+        mid = re.search(r'msgid\s+"(.*?)"', block, re.DOTALL)
+        mstr = re.search(r'msgstr\s+"(.*?)"', block, re.DOTALL)
         if not mid or not mstr:
             continue
         key = mid.group(1).replace('\\"', '"').replace("\\n", "\n")

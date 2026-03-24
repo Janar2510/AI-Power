@@ -26,3 +26,4 @@ node_modules/
 addons/web/static/dist/*.js
 addons/web/static/dist/*.map
 !addons/web/static/dist/.gitkeep
+!addons/web/static/dist/modern_webclient.js

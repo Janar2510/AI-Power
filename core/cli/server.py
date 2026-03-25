@@ -46,6 +46,7 @@ class Server(Command):
         workers = config.get_config().get("workers", 0)
 
         if workers > 0:
+            self._ensure_default_db()
             self._run_prefork(workers, http_interface, http_port, gevent_websocket)
         else:
             self._run_single(http_interface, http_port, gevent_websocket)
@@ -193,12 +194,35 @@ class Server(Command):
             use_reloader=False,
         )
 
+    def _sync_orm_schema(self, dbname: str) -> None:
+        """Apply create-table / missing-column / index updates for loaded models (idempotent)."""
+        from core.db import init_schema
+        from core.modules import clear_loaded_addon_modules, load_module_graph
+        from core.orm import Registry
+        from core.orm.models import ModelBase
+        from core.sql_db import get_cursor
+
+        try:
+            registry = Registry(dbname)
+            ModelBase._registry = registry
+            clear_loaded_addon_modules()
+            load_module_graph()
+            with get_cursor(dbname) as cr:
+                init_schema(cr, registry)
+            _logger.info("ORM schema sync completed for database %s", dbname)
+        except Exception as e:
+            _logger.warning("ORM schema sync failed for %s: %s", dbname, e)
+
     def _ensure_default_db(self) -> None:
         """Create DB if missing; run schema + default data if core tables are absent.
 
         A PostgreSQL database can exist but be empty (e.g. created manually). Previously we
         only initialized when the database row was missing, which led to login errors like
         ``relation "res_users" does not exist``.
+
+        When the database already has ``res_users``, we still run :func:`init_schema` once
+        at startup so new ORM columns (e.g. ``account_move.company_id``) are added without
+        requiring a manual migration.
         """
         from core.sql_db import db_exists, create_database, get_cursor
         dbname = config.get_config().get("db_name", "erp")
@@ -211,6 +235,7 @@ class Server(Command):
                         ("res_users",),
                     )
                     if cr.fetchone():
+                        self._sync_orm_schema(dbname)
                         return
             except Exception as e:
                 _logger.warning("Could not inspect database %s: %s", dbname, e)

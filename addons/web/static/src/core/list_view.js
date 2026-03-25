@@ -27,7 +27,10 @@
   }
 
   function render(container, options) {
-    if (_impl) return !!_impl(container, options || {});
+    if (_impl) {
+      var implResult = _impl(container, options || {});
+      if (implResult) return true;
+    }
     var opts = options || {};
     var model = opts.model;
     var route = opts.route;

@@ -125,6 +125,15 @@
     if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
   }
 
+  function renderKpiEmptyState(container) {
+    if (!container || !window.UIComponents || !window.UIComponents.EmptyState) return;
+    container.innerHTML = window.UIComponents.EmptyState.renderHTML({
+      title: "No KPI metrics yet",
+      subtitle: "Configure dashboard widgets in Settings, or add records so widget data can load.",
+      icon: "◔",
+    });
+  }
+
   function loadKpis(rpc, root) {
     var container = root.querySelector("#dashboard-kpis");
     if (!container || !rpc || typeof rpc.callKw !== "function") return;
@@ -132,12 +141,16 @@
     rpc
       .callKw("ir.dashboard.widget", "search_read", [[]], { fields: ["id", "name", "model", "domain"], order: "sequence" })
       .then(function (widgets) {
-        if (!widgets || !widgets.length) return;
+        if (!widgets || !widgets.length) {
+          renderKpiEmptyState(container);
+          return;
+        }
         var ids = widgets.map(function (w) {
           return w.id;
         });
         return rpc.callKw("ir.dashboard.widget", "get_data", [ids], {}).then(function (data) {
           if (!container) return;
+          var appended = 0;
           (data || []).forEach(function (d, i) {
             var w = widgets[i];
             var route = MODEL_TO_ROUTE[w.model] || null;
@@ -152,11 +165,17 @@
                   trend: d.trend,
                 })
               );
+              appended++;
             }
           });
+          if (!appended) {
+            renderKpiEmptyState(container);
+          }
         });
       })
-      .catch(function () {});
+      .catch(function () {
+        renderKpiEmptyState(container);
+      });
   }
 
   function loadActivities(rpc, root) {

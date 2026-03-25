@@ -18,10 +18,18 @@
       '<button type="button" class="o-btn o-btn-secondary o-attachment-close">Close</button></div></div>' +
       '<div class="o-attachment-body"></div></div>';
     document.body.appendChild(host);
+    var prevFocus = document.activeElement;
+    var card = host.querySelector(".o-attachment-card");
+    if (card) card.setAttribute("tabindex", "-1");
 
     function close() {
       document.removeEventListener("keydown", onKey);
       host.remove();
+      if (prevFocus && typeof prevFocus.focus === "function") {
+        try {
+          prevFocus.focus();
+        } catch (e) {}
+      }
     }
 
     function render() {
@@ -60,6 +68,14 @@
     host.querySelector(".o-attachment-backdrop").onclick = close;
     document.addEventListener("keydown", onKey);
     render();
+    window.requestAnimationFrame(function () {
+      var closeBtn = host.querySelector(".o-attachment-close");
+      if (closeBtn && typeof closeBtn.focus === "function") {
+        try {
+          closeBtn.focus();
+        } catch (e) {}
+      }
+    });
     return { close: close };
   }
 

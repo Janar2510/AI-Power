@@ -1,5 +1,7 @@
 """Default routes - web client root and login."""
 
+import os
+
 from werkzeug.wrappers import Response
 from werkzeug.utils import redirect
 
@@ -321,11 +323,24 @@ def web_manifest(_request: Request):
 
 @route("/web/sw.js", auth="public", methods=["GET"])
 def web_service_worker_stub(_request: Request):
-    """Service worker: Phase 553 activate stub; Phase 556 cache-first for concat shell assets only."""
+    """Service worker: Phase 556 cache-first shell; Phase 590 precache matches concat vs per-file JS pilot."""
+    import json
+
+    esbuild_primary = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    shell_urls: list[str] = ["/web/assets/web.assets_web.css"]
+    if esbuild_primary:
+        shell_urls.extend(get_bundle_urls("web.assets_web").get("js", []))
+    else:
+        shell_urls.append("/web/assets/web.assets_web.js")
+    urls_literal = json.dumps(shell_urls)
     body = (
-        "/* ERP Phase 556: cache shell CSS/JS only; bump CACHE when bundle content changes */\n"
-        "var CACHE = 'erp-web-shell-v1';\n"
-        "var SHELL_URLS = ['/web/assets/web.assets_web.css', '/web/assets/web.assets_web.js'];\n"
+        "/* ERP Phase 556/590: cache shell assets; bump CACHE when precache set changes */\n"
+        "var CACHE = 'erp-web-shell-v2';\n"
+        f"var SHELL_URLS = {urls_literal};\n"
         "self.addEventListener('install', function (e) {\n"
         "  e.waitUntil(\n"
         "    caches.open(CACHE).then(function (cache) {\n"
@@ -1120,9 +1135,20 @@ def _webclient_html(debug_assets: bool = False, session_bootstrap: dict | None =
     """Web client shell HTML. Use debug_assets=True for individual files (no minification)."""
     import json
 
+    esbuild_primary = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
     if debug_assets:
         urls = get_bundle_urls("web.assets_web")
         css_tags = "\n".join(f'<link rel="stylesheet" href="{u}"/>' for u in urls.get("css", []))
+        js_tags = "\n".join(f'<script src="{u}"></script>' for u in urls.get("js", []))
+    elif esbuild_primary:
+        # Pilot: skip concat JS on the critical path (same ordering as manifest). CSS stays bundled.
+        urls = get_bundle_urls("web.assets_web")
+        css_tags = '<link rel="stylesheet" href="/web/assets/web.assets_web.css"/>'
         js_tags = "\n".join(f'<script src="{u}"></script>' for u in urls.get("js", []))
     else:
         css_tags = '<link rel="stylesheet" href="/web/assets/web.assets_web.css"/>'
@@ -1134,6 +1160,7 @@ def _webclient_html(debug_assets: bool = False, session_bootstrap: dict | None =
         "brandName": "Foundry One",
         "theme": "light",
         "debugAssets": bool(debug_assets),
+        "esbuildPrimary": bool(esbuild_primary),
         "shellOwner": "modern",
         "legacyAdapterEnabled": True,
         # Aligns with SECURITY_HEADERS script-src (no unsafe-eval): shell uses fallbackMount without client-side eval probe.

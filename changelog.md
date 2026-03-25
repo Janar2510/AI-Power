@@ -1,5 +1,67 @@
 # Changelog
 
+## 1.213.0 — 2026-03-25
+
+### Added
+
+- **Phases 603–606:** Modular **kanban card chrome** (`kanban_card_chrome.js`, `AppCore.KanbanCardChrome`, `.o-kanban-card` + `.o-card-gradient`; `kanban_renderer.js` delegates); **Gantt** and **activity matrix** legacy toolbars/tables tokenized in `main.js` / `webclient.css` (**604**); **`account.move.currency_id`** defaults from **`account.journal.currency_id`** on create (**605**, `tests/test_account_move_currency_from_journal_phase605.py`); checklist **437** first row — **`helpers.js`** precedes **`form_view.js`** / **`list_view.js`** in **`web.assets_web`** (**606**).
+
+### Documentation
+
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**, **`docs/account_odoo19_gap_audit.md`**, **`odoo19-webclient-gap-table.md`**.
+
+## 1.212.1 — 2026-03-25
+
+### Fixed
+
+- **Server startup (Phase 602):** Existing databases (where **`res_users`** already exists) now run **`init_schema`** on each **`erp-bin`** start so missing ORM columns such as **`account_move.company_id`** are added automatically. Previously startup returned early and only empty/new DBs received schema migrations, which caused SQL errors like **`column "company_id" does not exist`** after upgrading code. Prefork mode calls **`_ensure_default_db()`** before workers start.
+
+### Documentation
+
+- **`parity_matrix.md`** row **602**; **`DeploymentChecklist.md`**; **`ai-implementation-checklist.md`**.
+
+## 1.212.0 — 2026-03-25
+
+### Added
+
+- **Phases 597–600 (post–v1.211):** Modular **form chatter chrome** (`app/chatter_strip.js`, `AppCore.ChatterStrip`, tokenized `webclient.css`, `main.js` / `loadChatter` delegation); **dashboard** KPI empty state via `UIComponents.EmptyState` and **activity** meta line with model hint (`activity_feed.js`); **`account.journal.currency_id`** defaulting from company on create (**599**, `tests/test_account_journal_currency_phase599.py`); **shortcut contract** `core/webclient_shortcut_contract.js` + `test_webclient_shortcut_contract.js`; legacy **list fallback** toolbar/table/facet styles moved off inline `style=` where targeted in `main.js`.
+
+### Changed
+
+- **`design-system/specs/form-view.md`:** Chatter subsection (Activity header + scroll host).
+
+### Documentation
+
+- **`docs/frontend.md`:** `__ERP_DEBUG_SIDEBAR_MENU` playbook + Alt+ shortcut reference; **`ai-implementation-checklist.md`** ticks for sidebar debug + expanded keyboard shortcuts; **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/account_odoo19_gap_audit.md`**, **`docs/odoo19-webclient-gap-table.md`** (Views row).
+
+## 1.211.0 — 2026-03-25
+
+### Added
+
+- **Phases 590–596 (parallel frontend + backend track):** Home KPI **`wireHomeKpiStrip`** (`search_count` for opportunities, orders, partners); **`list_view` / `discuss` setImpl** fallthrough when adapter returns false; **`DiscussView`** respects **`opts.rpc`**. CRM routes **`getTitle`** for configuration lists. List **Print** and form **Print** open **`PdfViewer`** (PDF); **PdfViewer** Escape + focus restore; **AttachmentViewer** focus polish. **`/web/sw.js`** **CACHE `erp-web-shell-v2`** and dynamic **SHELL_URLS** (concat JS vs manifest JS when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`**). **`test_pdf_viewer.js`**, **`tests/test_parallel_track_be_phase590.py`**, HTTP tests for SW precache modes.
+
+### Changed
+
+- **`docs/odoo19-webclient-gap-table.md`:** Views row documents KPI RPC / modular boundaries (**590**).
+
+### Documentation
+
+- **`parity_matrix.md`** rows **590–596**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**, **`docs/frontend.md`** (SW precache note).
+
+## 1.210.0 — 2026-03-24
+
+### Added
+
+- **Phases 584–589 (post–v1.209 frontend wave):** **`navbar_chrome.js`** + **`AppCore.NavbarChrome.buildHtml`** (Foundry One glass row, global search host); **`core/navbar.js`** delegates with fallback, **`wireGlobalSearch`** → command palette, systray via **`window.__erpLegacyRuntime.renderSystrayMount`**. **`dashboard_kpi_strip.js`** / **`AppCore.DashboardKpiStrip`** on home. **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`:** **`_webclient_html`** emits per-manifest JS script tags (Phase **586**); bootstrap **`esbuildPrimary`**. HTTP test **`test_webclient_html_esbuild_primary_env_lists_per_file_js_phase584`**.
+
+### Changed
+
+- **`webclient.css`:** Navbar column shell, glass/search row, home KPI strip, brand wordmark **`var(--font-display)`**, reduced-motion for **`.o-view-exit`** and KPI cards.
+
+### Documentation
+
+- **`odoo19-webclient-gap-table.md`**, **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/frontend.md`**, **`ai-implementation-checklist.md`** (451–464 evidence), **`.github/workflows/ci.yml`** comment.
+
 ## Unreleased
 
 ### Added

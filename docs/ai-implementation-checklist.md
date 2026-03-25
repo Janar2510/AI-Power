@@ -133,29 +133,61 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **582–583:** `next_by_code` company_id on SO/PO/bank statement; `account_lock_adviser_group_id` bypass on post.
 - [x] **Release docs:** `core/release.py` **1.209.0**, `changelog.md`, `DeploymentChecklist.md`, `docs/parity_matrix.md`.
 
+## Phases 584–589 (post–v1.209: FE-1 / FE-2 / release 1.210.0)
+
+- [x] **584:** `navbar_chrome.js` + `AppCore.NavbarChrome.buildHtml`; `core/navbar.js` delegates; glass search row + `wireGlobalSearch`; `__erpLegacyRuntime.renderSystrayMount` after navbar render.
+- [x] **585:** `dashboard_kpi_strip.js` + `AppCore.DashboardKpiStrip`; `renderHome` KPI strip (`dashboard-home.md` grid).
+- [x] **586:** `ERP_WEBCLIENT_ESBUILD_PRIMARY` → `_webclient_html` per-file JS; bootstrap `esbuildPrimary`; `tests/test_http.py` coverage.
+- [x] **587–589:** Shell CSS tokens/layout; parity matrix + gap table; `core/release.py` **1.210.0**, `changelog.md`, `DeploymentChecklist.md`, `frontend.md`, CI comment.
+
+## Phases 590–596 (parallel track / v1.211.0)
+
+- [x] **590:** KPI **`wireHomeKpiStrip`**; **`ListView`/`DiscussView` setImpl** + fallthrough in `list_view.js`/`discuss.js`; **`opts.rpc`** in discuss core renderer.
+- [x] **591–592:** CRM **`getTitle`**; list/form PDF via **`PdfViewer`**; **`test_pdf_viewer.js`**; attachment focus restore.
+- [x] **593:** SW dynamic precache + **`tests/test_http.py`** SW tests.
+- [x] **594:** **`tests/test_parallel_track_be_phase590.py`** (CRM config XML + lost reason model).
+- [x] **595–596:** Gap table Views row; release **1.211.0** docs.
+
+## Phases 597–601 (post–v1.211: chatter, dashboard, account journal, shortcuts, release 1.212.0)
+
+- [x] **597:** Modular **chatter chrome** (`chatter_strip.js`, `AppCore.ChatterStrip`, `main.js` / `loadChatter`); `form-view.md` chatter section; `webclient.css` tokens.
+- [x] **598:** **Dashboard** KPI empty state (`EmptyState`); **activity feed** meta includes **res_model** hint.
+- [x] **599:** **`account.journal.currency_id`** default from company; **`test_account_journal_currency_phase599.py`**.
+- [x] **600:** **`webclient_shortcut_contract.js`** + **`test_webclient_shortcut_contract.js`**; legacy **list fallback** toolbar/table token CSS in `main.js` / `webclient.css`.
+- [x] **601:** Release **1.212.0** docs (changelog, matrix, DeploymentChecklist, gap table).
+- [x] **602:** **`init_schema`** on **`erp-bin`** startup for existing DBs (**`_sync_orm_schema`**); prefork **`_ensure_default_db`**; release **1.212.1** docs (**evidence:** `core/cli/server.py`, `changelog.md`, matrix, DeploymentChecklist).
+
+## Phases 603–607 (kanban card, gantt/activity tokens, move currency, checklist 437 bite, release 1.213.0)
+
+- [x] **603:** **`KanbanCardChrome`** + **`kanban_renderer`** delegation; **`kanban-view.md`** card shell (**evidence:** `kanban_card_chrome.js`, `app/main.js`, `webclient.css`).
+- [x] **604:** **Gantt** / **activity matrix** legacy **`main.js`** toolbars + tables tokenized (**evidence:** `main.js`, `webclient.css`).
+- [x] **605:** **`account.move.currency_id`** from **`journal_id.currency_id`** on create (**evidence:** `account_move.py`, `test_account_move_currency_from_journal_phase605.py`).
+- [x] **606:** Checklist **437** load order — **`helpers.js`** immediately before **`form_view.js`** in **`web.assets_web`** (**evidence:** `addons/web/__manifest__.py` asset list order).
+- [x] **607:** Release **1.213.0** docs (changelog, matrix, DeploymentChecklist, gap table, account audit).
+
 ## Sidebar navigation (greyed-out submenus)
 
-- [ ] CRM Configuration submenus (Stages, Tags, Lost Reasons) resolve actions and routes; `crm.lost.reason` model installed after upgrade.
-- [ ] `DATA_ROUTES_SLUGS` in `main.js` stays aligned with `actionToRoute` / `getModelForRoute` for new list routes.
-- [ ] `window.__ERP_DEBUG_SIDEBAR_MENU` can be used to trace any remaining menus without routes.
+- [x] CRM Configuration submenus (Stages, Tags, Lost Reasons) resolve actions and routes; `crm.lost.reason` model installed after upgrade (**evidence:** `crm_views.xml` act_windows + menus; `tests/test_parallel_track_be_phase590.py`; `DATA_ROUTES_SLUGS` / `getModelForRoute` already include `crm_stages`, `crm_tags`, `crm_lost_reasons`).
+- [x] `DATA_ROUTES_SLUGS` in `main.js` stays aligned with `actionToRoute` / `getModelForRoute` for new list routes (**verified for CRM config slugs in this wave**).
+- [x] `window.__ERP_DEBUG_SIDEBAR_MENU` can be used to trace any remaining menus without routes (**evidence:** `docs/frontend.md` playbook; `main.js` opt-in logging when flag is true).
 
 ## Frontend Pro Max phases 451-464 (1.205)
 
-- [ ] Typography tokens (`--font-*`, `--text-*`, leading/tracking tokens) are present and used by shell/headings.
-- [ ] Glassmorphism tokens (`--color-glass`, `--glass-blur`, `--glass-border`) are applied to navbar/modal/dropdowns without breaking contrast.
-- [ ] View transition classes (`.o-view-enter/.o-view-exit`) are active and reduced-motion safe.
-- [ ] Skeleton helper (`AppCore.Helpers.renderSkeletonHtml`) is used for list/form/report loading states.
-- [ ] Empty state component (`UIComponents.EmptyState`) is wired in list no-record branch.
-- [ ] `services/systray_registry.js` is loaded and systray async badge updates from `/web/async/call_notify`.
-- [ ] `AppCore.DiscussView.setImpl` and `AppCore.ListView.setImpl` boundaries are available.
-- [ ] PDF preview component opens `/report/pdf/...` from both list and form actions.
-- [ ] Attachment viewer opens image previews and supports close/keyboard flow.
-- [ ] Expanded keyboard shortcuts (`Alt+N/S/E/L/K/P`, `Esc`) execute expected actions.
-- [ ] JS unit tests are wired for helpers/systray/onboarding/attachment viewer.
+- [x] Typography tokens (`--font-*`, `--text-*`, leading/tracking tokens) are present and used by shell/headings (**evidence:** `webclient.css` navbar brand + KPI strip use `var(--font-display)` / `var(--font-body)` / `var(--text-*)`; foundations unchanged).
+- [x] Glassmorphism tokens (`--color-glass`, `--glass-blur`, `--glass-border`) are applied to navbar/modal/dropdowns without breaking contrast (**evidence:** `#navbar` + `.o-navbar-glass-row` use `var(--color-glass)` / `var(--glass-border)` / inner surfaces).
+- [x] View transition classes (`.o-view-enter/.o-view-exit`) are active and reduced-motion safe (**evidence:** `main.js` `routeApplyInternal`; `@media (prefers-reduced-motion: reduce)` clears animation/transform on enter/exit and KPI hover).
+- [x] Skeleton helper (`AppCore.Helpers.renderSkeletonHtml`) is used for list/form/report loading states (**evidence:** `main.js` `skeletonHtml()` delegates to `HelpersCore.renderSkeletonHtml`; `loadRecords` / report tables use it).
+- [x] Empty state component (`UIComponents.EmptyState`) is wired in list no-record branch (**evidence:** `core/list_view.js` uses `UI.EmptyState.renderHTML` when available).
+- [x] `services/systray_registry.js` is loaded and systray async badge updates from `/web/async/call_notify` (**evidence:** manifest + `main.js` `renderSystrayMount` fetch; **584** calls mount after `AppCore.Navbar.render`).
+- [x] `AppCore.DiscussView.setImpl` and `AppCore.ListView.setImpl` boundaries are available (**evidence:** `main.js` registers adapters returning false → default **`core/*`** renderers; **590**).
+- [x] PDF preview component opens `/report/pdf/...` from both list and form actions (**evidence:** list **Print** + form **Print** → **`PdfViewer.open`**; **591**).
+- [x] Attachment viewer opens image previews and supports close/keyboard flow (**evidence:** **Esc** / arrows existing; close button focus on open + restore focus on close — **592**).
+- [x] Expanded keyboard shortcuts (`Alt+N/S/E/L/K/P`, `Esc`) execute expected actions (**evidence:** `main.js` keydown handler; frozen **`__ERP_WEBCLIENT_SHORTCUT_CONTRACT`** + **`test_webclient_shortcut_contract.js`** documents the Alt+ set and Escape branch).
+- [x] JS unit tests are wired for helpers/systray/onboarding/attachment viewer (**evidence:** **`test_pdf_viewer.js`** added to **`test_runner.html`** — **592**).
 
 ## Phases 437–450 (1.204)
 
-- [ ] `core/helpers.js` is loaded before `form_view.js` / `list_view.js` and shared helpers are available at `window.AppCore.Helpers`.
+- [x] `core/helpers.js` is loaded before `form_view.js` / `list_view.js` and shared helpers are available at `window.AppCore.Helpers` (**evidence:** **`web.assets_web`** order in **`addons/web/__manifest__.py`** — **`helpers.js`** precedes **`form_view.js`** and **`list_view.js`**; Phase **606**).
 - [ ] `SearchModel` facet lifecycle works end-to-end (`addFacet/removeFacet/renderFacets`) and `search_default_*` context values become initial facets.
 - [ ] Search autocomplete suggestions appear from search-view fields and selected suggestion applies a domain facet.
 - [ ] Custom filter builder can add ad-hoc domain facets and reload list results.

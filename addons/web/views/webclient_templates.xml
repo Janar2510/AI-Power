@@ -109,6 +109,7 @@
     <script src="/web/static/src/core/list_view.js"></script>
     <script src="/web/static/src/core/settings.js"></script>
     <script src="/web/static/src/core/dashboard.js"></script>
+    <script src="/web/static/src/core/webclient_shortcut_contract.js"></script>
     <script src="/web/static/src/main.js"></script>
     <script src="/web/static/dist/modern_webclient.js"></script>
     <script>

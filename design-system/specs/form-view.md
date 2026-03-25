@@ -22,6 +22,9 @@ Inherits [foundations.md](./foundations.md) and [app-shell.md](./app-shell.md).
 - Loading placeholders use `AppCore.Helpers.renderSkeletonHtml`.
 - No-data panes use `UIComponents.EmptyState`.
 
+## Chatter (discussion)
+- Host in `.o-chatter-chrome` with readonly **Activity** header, scrollable message list (`.o-chatter-messages-scroll`), and compose block; use `--space-*` and `--card-gap`; shell may combine with `.o-card-gradient` per foundations.
+
 ## Attachments and reports
 - Image previews may open `UIComponents.AttachmentViewer`.
 - Report preview uses `UIComponents.PdfViewer` with `/report/pdf/...`.

@@ -11,6 +11,7 @@ Inherits [foundations.md](./foundations.md) and [app-shell.md](./app-shell.md).
 - Empty columns show actionable empty states (not plain text).
 
 ## Card behavior
+- Card shell: `.o-kanban-card` with `.o-card-gradient` on the outer card; title in `.o-kanban-card-title`; secondary fields in `.o-kanban-card-body` / `.o-kanban-card-field` (tokens only, no inline `style=` on new chrome).
 - Multi-select is supported with a visible bulk action bar.
 - Progressive loading supports "load more" in large columns.
 

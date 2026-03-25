@@ -1,5 +1,78 @@
 # Deployment Checklist
 
+## Post–212.1 — Phases 603–607 (kanban card, gantt/activity CSS, move currency, 1.213.0) (v1.213.0)
+
+### Pre-Deployment
+
+- [ ] **603–604:** `npm run check:assets-concat && npm run build:web`. Smoke: open **Kanban** on leads/tasks — cards show **gradient** shell + field strip; **Gantt** / **Activity** views (fallback paths) — toolbar buttons align with list token styles.
+- [ ] **605:** `db upgrade` not strictly required if **`init_schema`** already ran (**602**); new moves inherit **`currency_id`** from journal when column exists.
+- [ ] **606:** No manifest-only risk beyond concat order — run **`npm run check:assets-concat`**.
+
+### Verification
+
+- [ ] With DB: `python3 -m unittest tests.test_account_move_currency_from_journal_phase605`
+- [ ] Browser: kanban drag/select still works (`.kanban-card` class retained on chrome path).
+
+---
+
+## Post–212.0 — Phase 602 (ORM schema sync on existing DB) (v1.212.1)
+
+### Pre-Deployment
+
+- [ ] **602:** No manual SQL required for typical upgrades: after pull, **restart `erp-bin`** once. Check logs for **`ORM schema sync completed for database`** (or a warning if sync failed).
+- [ ] If you previously worked around missing columns with ad-hoc **`ALTER TABLE`**, reconcile with ORM: new columns from **`add_missing_columns`** should match models; resolve duplicate/constraints manually if you added conflicting DDL.
+
+### Verification
+
+- [ ] With DB: open accounting or any screen that queries **`account_move`** with **`company_id`** — no **`column "company_id" does not exist`** (after code that defines the field is deployed).
+
+---
+
+## Post–211 — Phases 597–601 (chatter chrome, dashboard polish, journal currency, shortcuts contract, list tokens) (v1.212.0)
+
+### Pre-Deployment
+
+- [ ] **597–598:** `npm run check:assets-concat && npm run build:web`. Smoke: open a CRM lead/project task/helpdesk form with **message_ids** — **Activity** header, chatter list + compose; home dashboard with no KPI widgets shows empty state; activity rows show deadline + model hint when `res_model` is present.
+- [ ] **599:** `db upgrade` — new column **`account_journal.currency_id`** (nullable); existing journals keep NULL until edited (optional backfill from company currency in SQL if product requires).
+- [ ] **600:** No DB migration; optional console check: `window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT.alt.length === 6`.
+
+### Verification
+
+- [ ] With DB: `python3 -m unittest tests.test_account_journal_currency_phase599`
+- [ ] Browser: `/web/static/tests/test_runner.html` — **webclientShortcutContract** suite passes.
+
+---
+
+## Post–210 — Phases 590–596 (parallel FE/BE: KPI RPC, PDF/a11y, SW v2, CRM static tests) (v1.211.0)
+
+### Pre-Deployment
+
+- [ ] **590–592:** `npm run check:assets-concat && npm run build:web`. Smoke: home KPI numbers load (RPC); **#pipeline** from first KPI card; list **Print** opens PDF overlay; form **Print** opens PDF overlay; **Esc** closes PDF/attachment modals; focus returns to trigger.
+- [ ] **593:** **`CACHE` is `erp-web-shell-v2`** — clients with an older SW should hard-refresh or unregister the service worker once after deploy. With **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`**, precache matches per-file JS URLs (see `web_service_worker_stub`).
+- [ ] **594:** No DB migration; CRM config menus unchanged — unittest guards XML/model wiring.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_http.TestHTTP.test_web_service_worker_precache_per_file_js_when_esbuild_primary_phase590 tests.test_http.TestHTTP.test_web_service_worker_default_precache_includes_concat_js_phase590 tests.test_parallel_track_be_phase590`
+- [ ] Browser: open `/web/static/tests/test_runner.html` — includes **pdf_viewer** suite.
+
+---
+
+## Post–209 — Phases 584–589 (navbar chrome, home KPI strip, esbuild-primary pilot, FE tokens, release) (v1.210.0)
+
+### Pre-Deployment
+
+- [ ] **584–585:** `npm install && npm run check:assets-concat && npm run build:web` → `addons/web/static/dist/modern_webclient.js`. Smoke: login, navbar glass search opens command palette (Mod+K still works), home shows KPI strip links.
+- [ ] **586:** Staging only: set **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** and verify shell (many `<script src="/web/static/...">` tags, **no** `/web/assets/web.assets_web.js`). Expect higher request count; service worker cache lists may need review if you precache concat JS.
+- [ ] **587–588:** No DB migration; visual check light/dark + **prefers-reduced-motion** for route transitions.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_http.TestHTTP.test_webclient_html_esbuild_primary_env_lists_per_file_js_phase584` (with deps installed).
+- [ ] Clear `ERP_WEBCLIENT_ESBUILD_PRIMARY` (or set `0`) for production unless staging sign-off is complete.
+
+---
+
 ## Post–208 — Phases 574–583 (web slices, partial reconcile, stock valuation depth, sequence + lock adviser) (v1.209.0)
 
 ### Pre-Deployment

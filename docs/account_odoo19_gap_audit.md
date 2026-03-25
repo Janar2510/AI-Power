@@ -58,9 +58,13 @@ See **Phases 535–538** in `docs/parity_matrix.md`.
 
 **Shipped (Phase 569):** **`ir.sequence.use_date_range`** — when enabled and a matching **`ir.sequence.date_range`** exists for **`reference_date`**, `next_by_code(..., reference_date=…)` increments the sub-row’s **`number_next`**; parent prefix/suffix/padding still apply. **`account.move`** passes **`vals["date"]`** as **`reference_date`**. Tests: `tests/test_ir_sequence_date_range_phase569.py` (mocked SQL).
 
+**Shipped (Phase 599):** **`account.journal.currency_id`** — optional currency on the journal; on **create**, when omitted, defaults from **`res.company.currency_id`** for the journal’s **`company_id`** (or first company). Tests: `tests/test_account_journal_currency_phase599.py`.
+
+**Shipped (Phase 605):** **`account.move.currency_id`** — on **create**, when omitted, defaults from **`account.journal.currency_id`** when **`journal_id`** is set. Tests: `tests/test_account_move_currency_from_journal_phase605.py`.
+
 Remaining deferrals (clean-room vs `odoo-19.0/addons/account/` when prioritized):
 
 - **Partial reconcile (no FX in v1 slice)** — **`account.reconcile.allocation`** + wizard **`allocate_amount`** (**Phase 577**); design **`docs/account_partial_reconcile_design.md`** (**572**). **FX** remains **deferred** (separate phase after stable partial-only).
 - **Full multi-company lock matrix** — only per-move company + `account_lock_date` on `res.company`; no role-based “adviser” bypass yet.
 
-Update this doc when a subtrack ships; keep matrix rows **544**, **546**, **551**, **555**, **557**, **560**, **563**, **564**, **568**, **569**, **572**, and **577** in sync.
+Update this doc when a subtrack ships; keep matrix rows **544**, **546**, **551**, **555**, **557**, **560**, **563**, **564**, **568**, **569**, **572**, **577**, **599**, and **605** in sync.

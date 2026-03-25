@@ -1504,6 +1504,9 @@
     if (route === 'elearning') return 'eLearning';
     if (route === 'timesheets') return 'Timesheets';
     if (route === 'tickets') return 'Tickets';
+    if (route === 'crm_stages') return 'CRM Stages';
+    if (route === 'crm_tags') return 'CRM Tags';
+    if (route === 'crm_lost_reasons') return 'Lost Reasons';
     return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records';
   }
 
@@ -1657,6 +1660,15 @@
     header.className = 'o-home-apps-header';
     header.innerHTML = '<h2 class="o-home-apps-title">Apps</h2><p class="o-home-apps-subtitle">Choose a module to start working.</p>';
     root.appendChild(header);
+    var kpiStrip = document.createElement('div');
+    kpiStrip.className = 'o-home-kpi-strip-outer';
+    if (window.AppCore && window.AppCore.DashboardKpiStrip && typeof window.AppCore.DashboardKpiStrip.buildHtml === 'function') {
+      kpiStrip.innerHTML = window.AppCore.DashboardKpiStrip.buildHtml();
+    }
+    root.appendChild(kpiStrip);
+    if (window.AppCore && window.AppCore.DashboardKpiStrip && typeof window.AppCore.DashboardKpiStrip.wireHomeKpiStrip === 'function') {
+      window.AppCore.DashboardKpiStrip.wireHomeKpiStrip(kpiStrip, rpc);
+    }
     if (window.UIComponents && window.UIComponents.OnboardingPanel && typeof window.UIComponents.OnboardingPanel.renderHTML === "function") {
       var onboardingWrap = document.createElement("div");
       onboardingWrap.innerHTML = window.UIComponents.OnboardingPanel.renderHTML({
@@ -1834,10 +1846,10 @@
     const modes = getAvailableViewModes(route).filter(function (m) { return m === 'list' || m === 'kanban' || m === 'graph' || m === 'calendar' || m === 'activity' || m === 'pivot' || m === 'gantt'; });
     if (modes.length < 2) return '';
     const labels = { list: 'List', kanban: 'Kanban', graph: 'Graph', pivot: 'Pivot', calendar: 'Calendar', activity: 'Activity', gantt: 'Gantt' };
-    let html = '<span class="view-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
+    let html = '<span class="view-switcher o-list-view-switcher">';
     modes.forEach(function (m) {
       const active = m === currentView;
-      html += '<button type="button" class="btn-view' + (active ? ' active' : '') + '" data-view="' + m + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (labels[m] || m) + '</button>';
+      html += '<button type="button" class="btn-view' + (active ? ' active' : '') + '" data-view="' + m + '">' + (labels[m] || m) + '</button>';
     });
     return html + '</span>';
   }
@@ -1907,11 +1919,11 @@
     const order = (currentListState.route === route && currentListState.order) || null;
     actionStack = [{ label: title, hash: route }];
     let html = '<h2>' + title + '</h2>';
-    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
+    html += '<p class="o-list-fallback-toolbar">';
     html += renderViewSwitcher(route, currentView);
-    html += '<div role="search" style="display:inline-flex;gap:0.25rem;align-items:center"><input type="text" id="list-search" placeholder="Search..." aria-label="Search records" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    html += '<button type="button" id="btn-ai-search" title="Natural language search" style="padding:0.5rem 1rem;background:var(--color-accent, #6366f1);color:white;border:none;border-radius:4px;cursor:pointer">AI Search</button></div>';
+    html += '<div role="search" class="o-list-fallback-search"><input type="text" id="list-search" placeholder="Search..." aria-label="Search records" class="o-list-search-field" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+    html += '<button type="button" id="btn-search" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">Search</button>';
+    html += '<button type="button" id="btn-ai-search" title="Natural language search" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--accent">AI Search</button></div>';
     const searchView = viewsSvc && viewsSvc.getView(model, 'search');
     const searchFilters = (searchView && searchView.filters) || [];
     const searchGroupBys = (searchView && searchView.group_bys) || [];
@@ -1919,40 +1931,40 @@
     const currentGroupBy = currentListState.groupBy || null;
     searchFilters.forEach(function (f) {
       const active = activeFilters.indexOf(f.name) >= 0;
-      html += '<button type="button" class="btn-search-filter' + (active ? ' active' : '') + '" data-filter="' + (f.name || '').replace(/"/g, '&quot;') + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (f.string || f.name || '').replace(/</g, '&lt;') + '</button>';
+      html += '<button type="button" class="btn-search-filter' + (active ? ' active' : '') + '" data-filter="' + (f.name || '').replace(/"/g, '&quot;') + '">' + (f.string || f.name || '').replace(/</g, '&lt;') + '</button>';
     });
     if (searchGroupBys.length) {
-      html += '<select id="list-group-by" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">Group by</option>';
+      html += '<select id="list-group-by" class="o-list-toolbar-select"><option value="">Group by</option>';
       searchGroupBys.forEach(function (g) {
         html += '<option value="' + (g.group_by || '').replace(/"/g, '&quot;') + '"' + (currentGroupBy === g.group_by ? ' selected' : '') + '>' + (g.string || g.name || '').replace(/</g, '&lt;') + '</option>';
       });
       html += '</select>';
     }
-    html += '<select id="list-saved-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">Saved filters</option>';
+    html += '<select id="list-saved-filter" class="o-list-toolbar-select"><option value="">Saved filters</option>';
     savedFiltersList.forEach(function (f) {
       html += '<option value="' + (f.id != null ? String(f.id) : '').replace(/"/g, '&quot;') + '"' + (currentListState.savedFilterId == f.id ? ' selected' : '') + '>' + (f.name || 'Filter').replace(/</g, '&lt;') + '</option>';
     });
     html += '</select>';
-    html += '<button type="button" id="btn-save-filter" style="padding:0.5rem 0.75rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Save</button>';
+    html += '<button type="button" id="btn-save-filter" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Save</button>';
     if (model === 'crm.lead') {
-      html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+      html += '<select id="list-stage-filter" class="o-list-toolbar-select"><option value="">All stages</option></select>';
     }
-    html += '<button type="button" id="btn-export" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Export CSV</button>';
-    html += '<button type="button" id="btn-export-excel" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Export Excel</button>';
-    html += '<button type="button" id="btn-import" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Import</button>';
+    html += '<button type="button" id="btn-export" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Export CSV</button>';
+    html += '<button type="button" id="btn-export-excel" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Export Excel</button>';
+    html += '<button type="button" id="btn-import" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Import</button>';
     const reportName = getReportName(model);
-    if (reportName) html += '<button type="button" id="btn-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Print</button>';
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
+    if (reportName) html += '<button type="button" id="btn-print" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Print</button>';
+    html += '<button type="button" id="btn-add" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">' + addLabel + '</button></p>';
     const hasFacets = (activeFilters.length > 0 || currentGroupBy);
     if (hasFacets) {
-      html += '<p class="facet-chips" style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:var(--space-sm);align-items:center">';
+      html += '<p class="facet-chips o-list-facet-row">';
       activeFilters.forEach(function (fname) {
         const f = searchFilters.find(function (x) { return x.name === fname; });
-        html += '<span class="facet-chip" data-type="filter" data-name="' + (fname || '').replace(/"/g, '&quot;') + '" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--color-primary, #1a1a2e);color:white;border-radius:4px;font-size:0.85rem">' + (f ? (f.string || fname) : fname).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove" aria-label="Remove" style="background:none;border:none;color:white;cursor:pointer;padding:0;font-size:1rem;line-height:1">&times;</button></span>';
+        html += '<span class="facet-chip o-list-facet-chip" data-type="filter" data-name="' + (fname || '').replace(/"/g, '&quot;') + '">' + (f ? (f.string || fname) : fname).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove o-list-facet-remove" aria-label="Remove">&times;</button></span>';
       });
       if (currentGroupBy) {
         const g = searchGroupBys.find(function (x) { return x.group_by === currentGroupBy; });
-        html += '<span class="facet-chip" data-type="groupby" data-name="' + (currentGroupBy || '').replace(/"/g, '&quot;') + '" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--color-primary, #1a1a2e);color:white;border-radius:4px;font-size:0.85rem">Group: ' + (g ? (g.string || currentGroupBy) : currentGroupBy).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove" aria-label="Remove" style="background:none;border:none;color:white;cursor:pointer;padding:0;font-size:1rem;line-height:1">&times;</button></span>';
+        html += '<span class="facet-chip o-list-facet-chip" data-type="groupby" data-name="' + (currentGroupBy || '').replace(/"/g, '&quot;') + '">Group: ' + (g ? (g.string || currentGroupBy) : currentGroupBy).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove o-list-facet-remove" aria-label="Remove">&times;</button></span>';
       }
       html += '</p>';
     }
@@ -1969,18 +1981,18 @@
       });
       const numericCols = ['expected_revenue', 'revenue', 'amount', 'quantity'];
       function renderTable(nameMap) {
-        let tbl = '<div id="bulk-action-bar" style="display:none;margin-bottom:0.5rem;padding:0.5rem;background:var(--color-bg-secondary,#f0f0f0);border-radius:4px;align-items:center;gap:0.5rem;flex-wrap:wrap;flex-direction:row"><span id="bulk-selected-count" style="font-size:0.9rem"></span><button type="button" id="bulk-delete" style="padding:0.35rem 0.75rem;background:#c00;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.9rem">Delete Selected</button><button type="button" id="bulk-clear" style="padding:0.35rem 0.75rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff;font-size:0.9rem">Clear</button></div>';
-        tbl += '<table role="grid" aria-label="Records" style="width:100%;border-collapse:collapse"><thead><tr role="row">';
-        tbl += '<th role="columnheader" style="width:2rem;padding:0.5rem;border-bottom:1px solid #ddd"><input type="checkbox" id="list-select-all" aria-label="Select all" title="Select all"></th>';
+        let tbl = '<div id="bulk-action-bar" class="o-bulk-action-bar"><span id="bulk-selected-count" class="o-bulk-selected-count"></span><button type="button" id="bulk-delete" class="o-btn o-bulk-delete-btn">Delete Selected</button><button type="button" id="bulk-clear" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Clear</button></div>';
+        tbl += '<table role="grid" aria-label="Records" class="o-list-fallback-table"><thead><tr role="row">';
+        tbl += '<th role="columnheader" class="o-list-th o-list-th--checkbox"><input type="checkbox" id="list-select-all" aria-label="Select all" title="Select all"></th>';
         cols.forEach(c => {
           const f = typeof c === 'object' ? c.name : c;
           const label = (typeof c === 'object' ? c.name || c : c);
           const isSorted = order && (order.startsWith(f + ' ') || order.startsWith(f + ','));
           const dir = isSorted && order.indexOf('desc') >= 0 ? 'desc' : 'asc';
           const arrow = isSorted ? (dir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
-          tbl += '<th role="columnheader" class="sortable-col" data-field="' + (f || '').replace(/"/g, '&quot;') + '" style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd;cursor:pointer;user-select:none">' + (label || '').replace(/</g, '&lt;') + arrow + '</th>';
+          tbl += '<th role="columnheader" class="sortable-col o-list-th o-list-th--sortable" data-field="' + (f || '').replace(/"/g, '&quot;') + '">' + (label || '').replace(/</g, '&lt;') + arrow + '</th>';
         });
-        tbl += '<th role="columnheader" style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd;width:2rem"></th></tr></thead><tbody>';
+        tbl += '<th role="columnheader" class="o-list-th o-list-th--actions"></th></tr></thead><tbody>';
         const groupByField = currentListState.groupBy;
         const groups = groupByField ? (function () {
           const g = {};
@@ -1995,22 +2007,22 @@
           if (isGroupHeader) {
             const gval = r;
             const label = (nameMap && nameMap[groupByField] && gval != null) ? (nameMap[groupByField][gval] || gval) : (gval != null ? String(gval) : '(No value)');
-            tbl += '<tr role="row" class="group-header" style="background:var(--color-bg-secondary, #f0f0f0);font-weight:600"><td role="gridcell" colspan="' + (cols.length + 1) + '" style="padding:0.5rem;border-bottom:1px solid #ddd">' + String(label).replace(/</g, '&lt;') + '</td></tr>';
+            tbl += '<tr role="row" class="group-header o-list-group-header"><td role="gridcell" class="o-list-td o-list-group-cell" colspan="' + (cols.length + 2) + '">' + String(label).replace(/</g, '&lt;') + '</td></tr>';
             return;
           }
           if (isSubtotal) {
-            tbl += '<tr role="row" class="group-subtotal" style="background:var(--color-bg-secondary, #f8f8f8);font-weight:500"><td colspan="1" style="padding:0.5rem;border-bottom:1px solid #eee"></td>';
+            tbl += '<tr role="row" class="group-subtotal o-list-subtotal-row"><td class="o-list-td o-list-td--checkbox"></td>';
             cols.forEach(c => {
               const f = typeof c === 'object' ? c.name : c;
               const sum = r[f];
               const isNum = numericCols.indexOf(f) >= 0;
-              tbl += '<td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee">' + (isNum && sum != null ? Number(sum).toLocaleString() : '').replace(/</g, '&lt;') + '</td>';
+              tbl += '<td role="gridcell" class="o-list-td">' + (isNum && sum != null ? Number(sum).toLocaleString() : '').replace(/</g, '&lt;') + '</td>';
             });
-            tbl += '<td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee"></td></tr>';
+            tbl += '<td role="gridcell" class="o-list-td o-list-td--actions"></td></tr>';
             return;
           }
           tbl += '<tr role="row" tabindex="0" data-id="' + (r.id || '') + '" class="list-data-row">';
-          tbl += '<td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee"><input type="checkbox" class="list-row-select" data-id="' + (r.id || '') + '" aria-label="Select row"></td>';
+          tbl += '<td role="gridcell" class="o-list-td o-list-td--checkbox"><input type="checkbox" class="list-row-select" data-id="' + (r.id || '') + '" aria-label="Select row"></td>';
           cols.forEach(c => {
             const f = typeof c === 'object' ? c.name : c;
             let val = r[f];
@@ -2036,10 +2048,10 @@
                 if (selLabel !== val) val = selLabel;
               }
             }
-            tbl += '<td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee">' + (val != null ? String(val) : '').replace(/</g, '&lt;') + '</td>';
+            tbl += '<td role="gridcell" class="o-list-td">' + (val != null ? String(val) : '').replace(/</g, '&lt;') + '</td>';
           });
-          tbl += '<td role="gridcell" style="padding:0.5rem"><a href="#' + route + '/edit/' + (r.id || '') + '" style="font-size:0.9rem;margin-right:0.5rem">Edit</a>';
-          tbl += '<a href="#" class="btn-delete" data-id="' + (r.id || '') + '" style="font-size:0.9rem;color:#c00;margin-left:0.25rem">Delete</a></td></tr>';
+          tbl += '<td role="gridcell" class="o-list-td o-list-td--actions"><a href="#' + route + '/edit/' + (r.id || '') + '" class="o-list-action-link">Edit</a>';
+          tbl += '<a href="#" class="btn-delete o-list-delete-link" data-id="' + (r.id || '') + '">Delete</a></td></tr>';
         }
         if (groups) {
           groups.forEach(function (grp) {
@@ -2064,10 +2076,10 @@
         if (total > 0 && records && records.length) {
           const from = off + 1;
           const to = Math.min(off + lim, total);
-          pager = '<p class="list-pager" style="margin-top:0.5rem;font-size:0.9rem;color:#666">';
+          pager = '<p class="list-pager o-list-pager">';
           pager += from + '-' + to + ' of ' + total + ' ';
-          pager += '<button type="button" class="btn-pager-prev" ' + (off <= 0 ? 'disabled' : '') + ' style="margin-left:0.5rem;padding:0.25rem 0.5rem;cursor:' + (off <= 0 ? 'not-allowed' : 'pointer') + '">Prev</button>';
-          pager += ' <button type="button" class="btn-pager-next" ' + (off + lim >= total ? 'disabled' : '') + ' style="margin-left:0.25rem;padding:0.25rem 0.5rem;cursor:' + (off + lim >= total ? 'not-allowed' : 'pointer') + '">Next</button>';
+          pager += '<button type="button" class="btn-pager-prev o-list-pager-btn" ' + (off <= 0 ? 'disabled' : '') + '>Prev</button>';
+          pager += ' <button type="button" class="btn-pager-next o-list-pager-btn" ' + (off + lim >= total ? 'disabled' : '') + '>Next</button>';
           pager += '</p>';
         }
         main.innerHTML = html + tbl + pager;
@@ -2082,7 +2094,10 @@
           }
           function updateBar() {
             const ids = getSelectedIds();
-            if (bar) { bar.style.display = ids.length ? 'flex' : 'none'; bar.style.flexDirection = 'row'; }
+            if (bar) {
+              bar.style.display = ids.length ? 'flex' : 'none';
+              bar.style.flexDirection = 'row';
+            }
             if (countEl) countEl.textContent = ids.length ? ids.length + ' selected' : '';
             if (selectAll) selectAll.checked = ids.length && main.querySelectorAll('.list-row-select').length === ids.length;
           }
@@ -2237,7 +2252,13 @@
     if (btnPrint && reportName && records && records.length) {
       btnPrint.onclick = function () {
         const ids = records.map(function (r) { return r.id; }).filter(function (x) { return x; });
-        if (ids.length) window.open('/report/html/' + reportName + '/' + ids.join(','), '_blank', 'noopener');
+        if (!ids.length) return;
+        const pdfUrl = '/report/pdf/' + reportName + '/' + ids.join(',');
+        if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === 'function') {
+          window.UIComponents.PdfViewer.open(pdfUrl, 'List print preview');
+        } else {
+          window.open('/report/html/' + reportName + '/' + ids.join(','), '_blank', 'noopener');
+        }
       };
     }
     const btnSearch = document.getElementById('btn-search');
@@ -2625,9 +2646,15 @@
   function loadChatter(model, recordId, messageIds) {
     const container = document.querySelector('.chatter-messages-list');
     if (!container) return;
+    const CS = window.AppCore && window.AppCore.ChatterStrip;
+    const useStrip = CS && typeof CS.appendChatterRows === 'function' && typeof CS.setChatterError === 'function';
     container.innerHTML = '';
     if (!messageIds || !messageIds.length) {
-      container.innerHTML = '<p style="color:var(--text-muted,#666);font-size:0.9rem">No messages yet.</p>';
+      if (useStrip) {
+        CS.appendChatterRows(container, [], {});
+      } else {
+        container.innerHTML = '<p class="o-chatter-empty">No messages yet.</p>';
+      }
       return;
     }
     rpc.callKw('mail.message', 'search_read', [[['id', 'in', messageIds]]], {
@@ -2639,6 +2666,10 @@
       const uniq = authorIds.filter(function (x, i, a) { return a.indexOf(x) === i; });
       const nameMap = {};
       const renderRows = function () {
+        if (useStrip) {
+          CS.appendChatterRows(container, rows, nameMap);
+          return;
+        }
         rows.forEach(function (r) {
           const authorName = r.author_id ? (nameMap[r.author_id] || 'User #' + (Array.isArray(r.author_id) ? r.author_id[0] : r.author_id)) : 'Unknown';
           const dateStr = r.date ? String(r.date).replace('T', ' ').slice(0, 16) : '';
@@ -2647,11 +2678,11 @@
           const aids = r.attachment_ids || [];
           if (aids.length) {
             const ids = aids.map(function (x) { return Array.isArray(x) ? x[0] : x; });
-            attHtml = '<div style="margin-top:0.35rem;font-size:0.85rem">' + ids.map(function (aid) {
-              return '<a href="/web/attachment/download/' + aid + '" target="_blank" rel="noopener" style="color:var(--color-primary);margin-right:0.5rem">📎 Attachment</a>';
+            attHtml = '<div class="o-chatter-attachments">' + ids.map(function (aid) {
+              return '<a href="/web/attachment/download/' + aid + '" target="_blank" rel="noopener" class="o-chatter-attachment-link">Attachment</a>';
             }).join('') + '</div>';
           }
-          container.insertAdjacentHTML('beforeend', '<div class="chatter-msg" style="padding:0.5rem 0;border-bottom:1px solid var(--border-color,#eee)"><div style="font-size:0.85rem;color:var(--text-muted,#666)">' + authorName + ' · ' + dateStr + '</div><div style="margin-top:0.25rem">' + body + '</div>' + attHtml + '</div>');
+          container.insertAdjacentHTML('beforeend', '<div class="chatter-msg o-chatter-msg"><div class="o-chatter-msg-meta">' + authorName + ' · ' + dateStr + '</div><div class="o-chatter-msg-body">' + body + '</div>' + attHtml + '</div>');
         });
       };
       if (uniq.length) {
@@ -2662,7 +2693,11 @@
       }
       renderRows();
     }).catch(function () {
-      container.innerHTML = '<p style="color:var(--text-muted,#666);font-size:0.9rem">Could not load messages.</p>';
+      if (useStrip) {
+        CS.setChatterError(container, 'Could not load messages.');
+      } else {
+        container.innerHTML = '<p class="o-chatter-error">Could not load messages.</p>';
+      }
     });
   }
 
@@ -2863,7 +2898,10 @@
     const o2m = getOne2manyInfo(model, fname);
     const m2m = getMany2manyInfo(model, fname);
     if (fname === 'message_ids' && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
-      return '<p><label>' + label + '</label><div id="chatter-messages" class="o-chatter" data-model="' + model + '" style="margin-top:0.5rem;padding:var(--space-md,0.75rem);background:var(--color-bg,#f5f5f5);border-radius:var(--radius-md,8px);border:1px solid var(--border-color,#ddd)"><div class="chatter-messages-list" style="max-height:200px;overflow-y:auto;margin-bottom:var(--space-md,0.75rem)"></div><div class="chatter-compose"><textarea id="chatter-input" placeholder="Add a comment..." style="width:100%;min-height:60px;padding:0.5rem;border:1px solid var(--border-color,#ddd);border-radius:4px;resize:vertical"></textarea><div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap"><input type="file" id="chatter-file" multiple style="font-size:0.85rem"><span id="chatter-attachments" style="font-size:0.85rem;color:var(--text-muted)"></span></div><label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.5rem;font-size:0.9rem;cursor:pointer"><input type="checkbox" id="chatter-send-email"> Send as email</label><button type="button" id="chatter-send" style="margin-top:0.5rem;padding:0.5rem 1rem;background:var(--color-primary,#1a1a2e);color:white;border:none;border-radius:4px;cursor:pointer">Send</button></div></div></p>';
+      if (window.AppCore && window.AppCore.ChatterStrip && typeof window.AppCore.ChatterStrip.buildChatterChromeHtml === 'function') {
+        return window.AppCore.ChatterStrip.buildChatterChromeHtml({ model: model, label: label });
+      }
+      return '<p><label>' + label + '</label><div id="chatter-messages" class="o-chatter o-chatter-chrome o-card-gradient" data-model="' + model + '"><header class="o-chatter-chrome-head" aria-label="Discussion"><span class="o-chatter-chrome-title">Activity</span></header><div class="chatter-messages-list o-chatter-messages-scroll"></div><div class="chatter-compose o-chatter-compose"><textarea id="chatter-input" class="o-chatter-textarea" placeholder="Add a comment..." rows="3"></textarea><div class="o-chatter-compose-row"><input type="file" id="chatter-file" class="o-chatter-file" multiple><span id="chatter-attachments" class="o-chatter-attachments-hint"></span></div><label class="o-chatter-send-email-label"><input type="checkbox" id="chatter-send-email"> Send as email</label><button type="button" id="chatter-send" class="o-btn o-btn-primary o-chatter-send">Send</button></div></div></p>';
     }
     if (o2m) {
       var lineFields = getOne2manyLineFields(model, fname);
@@ -3050,6 +3088,20 @@
           window.open(url, "_blank", "noopener");
         }
       };
+    }
+    var printFormA = document.getElementById("btn-print-form");
+    if (printFormA && getReportName(model) && id) {
+      printFormA.addEventListener("click", function (e) {
+        e.preventDefault();
+        var rn = getReportName(model);
+        if (!rn || !id) return;
+        var pdfUrl = "/report/pdf/" + rn + "/" + id;
+        if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === "function") {
+          window.UIComponents.PdfViewer.open(pdfUrl, "Print preview");
+        } else {
+          window.open(printFormA.getAttribute("href") || "#", "_blank", "noopener");
+        }
+      });
     }
     fields.forEach(f => {
       const fn = typeof f === 'object' ? f.name : f;
@@ -4254,7 +4306,7 @@
       });
       });
     }).catch(err => {
-      main.innerHTML = '<h2>' + title + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load') + '</p>';
+      main.innerHTML = '<h2>' + title + '</h2><p class="error o-list-load-error">' + (err.message || 'Failed to load') + '</p>';
     });
   }
 
@@ -4286,7 +4338,7 @@
         renderActivityMatrix(model, route, records, types, activities, searchTerm, savedFiltersList || [], info.uid);
       });
     }).catch(function () {
-      main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error" style="color:#c00">Failed to load activities.</p>';
+      main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error o-list-load-error">Failed to load activities.</p>';
     });
   }
 
@@ -4302,7 +4354,7 @@
         renderGanttView(model, route, records, searchTerm, savedFiltersList || [], dateStart, dateStop, groupBy);
       })
       .catch(function () {
-        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error" style="color:#c00">Failed to load Gantt data.</p>';
+        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error o-list-load-error">Failed to load Gantt data.</p>';
       });
   }
 
@@ -4321,18 +4373,18 @@
     const addLabel = route === 'tasks' ? 'Add task' : route === 'manufacturing' ? 'Add MO' : 'Add';
     actionStack = [{ label: title, hash: route }];
     let html = '<h2>' + title + '</h2>';
-    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+    html += '<p class="o-gantt-fallback-toolbar">';
     html += renderViewSwitcher(route, currentView);
-    html += '<div role="search" style="display:inline-flex;gap:0.25rem"><input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button></div>';
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
+    html += '<div role="search" class="o-gantt-fallback-search"><input type="text" id="list-search" placeholder="Search..." class="o-list-search-field" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+    html += '<button type="button" id="btn-search" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">Search</button></div>';
+    html += '<button type="button" id="btn-add" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">' + addLabel + '</button></p>';
     const now = new Date();
     const rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const rangeEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0);
     const totalDays = Math.ceil((rangeEnd - rangeStart) / (24 * 60 * 60 * 1000));
     const dayWidth = 24;
     const timelineWidth = totalDays * dayWidth;
-    html += '<div class="gantt-view" style="overflow-x:auto"><table role="grid" style="width:100%;border-collapse:collapse;min-width:600px"><thead><tr><th style="text-align:left;padding:0.5rem;min-width:180px">Name</th><th style="padding:0.25rem;min-width:' + timelineWidth + 'px">' + rangeStart.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) + ' – ' + rangeEnd.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) + '</th></tr></thead><tbody>';
+    html += '<div class="gantt-view o-gantt-scroll"><table role="grid" class="o-gantt-table"><thead><tr><th class="o-gantt-th o-gantt-th--name">Name</th><th class="o-gantt-th o-gantt-th--timeline" style="min-width:' + timelineWidth + 'px">' + rangeStart.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) + ' – ' + rangeEnd.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) + '</th></tr></thead><tbody>';
     (records || []).forEach(function (r) {
       const startVal = r[dateStart];
       const stopVal = r[dateStop];
@@ -4341,11 +4393,11 @@
       const left = Math.max(0, Math.floor((startDate - rangeStart) / (24 * 60 * 60 * 1000)) * dayWidth);
       const width = Math.max(dayWidth, Math.ceil((stopDate - startDate) / (24 * 60 * 60 * 1000)) * dayWidth);
       const name = (r.name || '—').replace(/</g, '&lt;');
-      html += '<tr><td style="padding:0.5rem;border-bottom:1px solid #eee"><a href="#' + route + '/edit/' + (r.id || '') + '" style="text-decoration:none;color:inherit;font-weight:500">' + name + '</a></td><td style="padding:0.25rem;border-bottom:1px solid #eee;position:relative;min-width:' + timelineWidth + 'px;height:28px"><div style="position:absolute;left:' + left + 'px;width:' + width + 'px;height:20px;background:var(--color-primary,#1a1a2e);border-radius:4px;top:4px" title="' + (startVal || '') + ' – ' + (stopVal || '') + '"></div></td></tr>';
+      html += '<tr><td class="o-gantt-td o-gantt-td--name"><a href="#' + route + '/edit/' + (r.id || '') + '">' + name + '</a></td><td class="o-gantt-td o-gantt-td--timeline" style="min-width:' + timelineWidth + 'px"><div class="o-gantt-bar" style="left:' + left + 'px;width:' + width + 'px" title="' + String(startVal || '').replace(/"/g, '&quot;') + ' – ' + String(stopVal || '').replace(/"/g, '&quot;') + '"></div></td></tr>';
     });
     html += '</tbody></table></div>';
     if (!records || !records.length) {
-      html = html.replace('</div>', '<p style="color:var(--text-muted);margin:1rem 0">No records with dates.</p></div>');
+      html = html.replace('</div>', '<p class="o-gantt-empty">No records with dates.</p></div>');
     }
     main.innerHTML = html;
     currentListState = { model: model, route: route, searchTerm: searchTerm || '', viewType: 'gantt' };
@@ -4379,24 +4431,24 @@
     const addLabel = route === 'leads' ? 'Add lead' : route === 'tasks' ? 'Add task' : 'Add';
     actionStack = [{ label: title, hash: route }];
     let html = '<h2>' + title + '</h2>';
-    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+    html += '<p class="o-activity-matrix-toolbar">';
     html += renderViewSwitcher(route, currentView);
-    html += '<div role="search" style="display:inline-flex;gap:0.25rem"><input type="text" id="list-search" placeholder="Search..." aria-label="Search" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button></div>';
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
+    html += '<div role="search" class="o-activity-matrix-search"><input type="text" id="list-search" placeholder="Search..." aria-label="Search" class="o-list-search-field" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+    html += '<button type="button" id="btn-search" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">Search</button></div>';
+    html += '<button type="button" id="btn-add" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">' + addLabel + '</button></p>';
     const byRecordType = {};
     (activities || []).forEach(function (a) {
       const key = a.res_id + '_' + (a.activity_type_id || 0);
       if (!byRecordType[key]) byRecordType[key] = [];
       byRecordType[key].push(a);
     });
-    html += '<div class="activity-matrix" style="overflow-x:auto"><table role="grid" style="width:100%;border-collapse:collapse;min-width:400px"><thead><tr role="row"><th role="columnheader" style="text-align:left;padding:0.5rem;border-bottom:1px solid var(--border-color);min-width:180px">Record</th>';
+    html += '<div class="activity-matrix o-activity-matrix-scroll"><table role="grid" class="o-activity-matrix-table"><thead><tr role="row"><th role="columnheader" class="o-activity-matrix-th o-activity-matrix-th--record">Record</th>';
     (activityTypes || []).forEach(function (t) {
-      html += '<th role="columnheader" style="text-align:left;padding:0.5rem;border-bottom:1px solid var(--border-color);min-width:120px">' + (t.name || '').replace(/</g, '&lt;') + '</th>';
+      html += '<th role="columnheader" class="o-activity-matrix-th">' + (t.name || '').replace(/</g, '&lt;') + '</th>';
     });
     html += '</tr></thead><tbody>';
     (records || []).forEach(function (r) {
-      html += '<tr role="row"><td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee"><a href="#' + route + '/edit/' + (r.id || '') + '" style="text-decoration:none;color:inherit;font-weight:500">' + (r.name || '—').replace(/</g, '&lt;') + '</a></td>';
+      html += '<tr role="row"><td role="gridcell" class="o-activity-matrix-td o-activity-matrix-td--record"><a href="#' + route + '/edit/' + (r.id || '') + '">' + (r.name || '—').replace(/</g, '&lt;') + '</a></td>';
       (activityTypes || []).forEach(function (t) {
         const key = (r.id || '') + '_' + (t.id || 0);
         const cellActs = byRecordType[key] || [];
@@ -4404,16 +4456,16 @@
         cellActs.forEach(function (a) {
           const d = a.date_deadline || '';
           const summary = (a.summary || 'Activity').replace(/</g, '&lt;');
-          cellHtml += '<div style="font-size:0.85rem;margin-bottom:0.25rem"><a href="#' + route + '/edit/' + (r.id || '') + '" style="color:inherit">' + summary + (d ? ' <span style="color:var(--text-muted)">' + d + '</span>' : '') + '</a></div>';
+          cellHtml += '<div class="o-activity-matrix-cell-line"><a href="#' + route + '/edit/' + (r.id || '') + '">' + summary + (d ? ' <span class="o-activity-matrix-cell-meta">' + String(d).replace(/</g, '&lt;') + '</span>' : '') + '</a></div>';
         });
-        cellHtml += '<button type="button" class="btn-schedule-activity" data-record-id="' + (r.id || '') + '" data-type-id="' + (t.id || '') + '" data-type-name="' + (t.name || '').replace(/"/g, '&quot;') + '" style="padding:0.2rem 0.4rem;font-size:0.8rem;border:1px dashed var(--border-color);background:transparent;border-radius:4px;cursor:pointer;color:var(--text-muted)">+ Schedule</button>';
-        html += '<td role="gridcell" style="padding:0.5rem;border-bottom:1px solid #eee;vertical-align:top">' + cellHtml + '</td>';
+        cellHtml += '<button type="button" class="btn-schedule-activity o-activity-schedule-btn" data-record-id="' + (r.id || '') + '" data-type-id="' + (t.id || '') + '" data-type-name="' + (t.name || '').replace(/"/g, '&quot;') + '">+ Schedule</button>';
+        html += '<td role="gridcell" class="o-activity-matrix-td">' + cellHtml + '</td>';
       });
       html += '</tr>';
     });
     html += '</tbody></table></div>';
     if (!records || !records.length) {
-      html = html.replace('</div>', '<p style="color:var(--text-muted);margin:1rem 0">No records.</p></div>');
+      html = html.replace('</div>', '<p class="o-activity-matrix-empty">No records.</p></div>');
     }
     main.innerHTML = html;
     currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: 'activity' };
@@ -4931,7 +4983,7 @@
     const vs = renderViewSwitcher(route, currentView);
     const mid =
       model === 'crm.lead' || model === 'helpdesk.ticket'
-        ? '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>'
+        ? '<select id="list-stage-filter" class="o-list-toolbar-select"><option value="">All stages</option></select>'
         : '';
     const KS = window.AppCore && window.AppCore.KanbanControlStrip;
     let html =
@@ -5344,6 +5396,7 @@
 
   window.addEventListener('hashchange', route);
 
+  /* Alt+ shortcuts: see core/webclient_shortcut_contract.js → __ERP_WEBCLIENT_SHORTCUT_CONTRACT */
   document.addEventListener('keydown', function (e) {
     if (e.key === "Escape") {
       var closeBtn = document.querySelector(".o-report-preview-close, .o-attachment-close");
@@ -5462,6 +5515,16 @@
     if (AppCore.CalendarView && typeof AppCore.CalendarView.setImpl === "function") AppCore.CalendarView.setImpl(renderCalendar);
     if (AppCore.GanttView && typeof AppCore.GanttView.setImpl === "function") AppCore.GanttView.setImpl(renderGanttView);
     if (AppCore.ActivityView && typeof AppCore.ActivityView.setImpl === "function") AppCore.ActivityView.setImpl(renderActivityMatrix);
+    if (AppCore.DiscussView && typeof AppCore.DiscussView.setImpl === "function") {
+      AppCore.DiscussView.setImpl(function () {
+        return false;
+      });
+    }
+    if (AppCore.ListView && typeof AppCore.ListView.setImpl === "function") {
+      AppCore.ListView.setImpl(function () {
+        return false;
+      });
+    }
   }
 
   function bootLegacyWebClient() {
@@ -5525,6 +5588,7 @@
   window.__erpLegacyRuntime = window.__erpLegacyRuntime || {};
   window.__erpLegacyRuntime.start = bootLegacyWebClient;
   window.__erpLegacyRuntime.booted = false;
+  window.__erpLegacyRuntime.renderSystrayMount = renderSystrayMount;
   if (frontendBootstrap.runtime !== 'modern') {
     bootLegacyWebClient();
   }

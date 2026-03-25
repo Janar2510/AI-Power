@@ -70,6 +70,51 @@ class TestHTTP(unittest.TestCase):
         self.assertIn("/web/static/dist/modern_webclient.js", html)
         self.assertIn('"cspScriptEvalBlocked": true', html)
 
+    def test_webclient_html_esbuild_primary_env_lists_per_file_js_phase584(self):
+        """ERP_WEBCLIENT_ESBUILD_PRIMARY=1 serves per-file JS (no concat bundle tag) + bootstrap flag."""
+        old = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY")
+        try:
+            os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = "1"
+            html = _webclient_html(debug_assets=False)
+            self.assertIn('"esbuildPrimary": true', html)
+            self.assertNotIn("/web/assets/web.assets_web.js", html)
+            self.assertIn("/web/static/src/services/rpc.js", html)
+            self.assertIn("/web/assets/web.assets_web.css", html)
+        finally:
+            if old is None:
+                os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)
+            else:
+                os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
+
+    def test_web_service_worker_precache_per_file_js_when_esbuild_primary_phase590(self):
+        """SW SHELL_URLS lists manifest JS entries when ERP_WEBCLIENT_ESBUILD_PRIMARY=1."""
+        old = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY")
+        try:
+            os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = "1"
+            r = self.client.get("/web/sw.js")
+            self.assertEqual(r.status_code, 200)
+            text = r.get_data(as_text=True)
+            self.assertIn("erp-web-shell-v2", text)
+            self.assertIn("/web/static/src/services/rpc.js", text)
+            self.assertNotIn("/web/assets/web.assets_web.js", text)
+        finally:
+            if old is None:
+                os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)
+            else:
+                os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
+
+    def test_web_service_worker_default_precache_includes_concat_js_phase590(self):
+        """Default SW precache still includes bundled web.assets_web.js (concat path)."""
+        old = os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)
+        try:
+            r = self.client.get("/web/sw.js")
+            text = r.get_data(as_text=True)
+            self.assertIn("/web/assets/web.assets_web.js", text)
+            self.assertIn("erp-web-shell-v2", text)
+        finally:
+            if old is not None:
+                os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
+
     def test_webclient_load_menus_requires_auth_phase1(self):
         """Odoo-style menu bootstrap endpoint exists and stays auth-protected."""
         r = self.client.get("/web/webclient/load_menus")

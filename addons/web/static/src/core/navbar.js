@@ -249,6 +249,30 @@
     });
   }
 
+  function wireGlobalSearch(navbar) {
+    var input = navbar.querySelector("#o-global-search-input");
+    if (!input || !window.Services || !window.Services.commandPalette) return;
+    function openPaletteWithSeed() {
+      var seed = (input.value || "").trim();
+      window.Services.commandPalette.open();
+      var ci = document.getElementById("o-command-input");
+      if (ci && seed) {
+        ci.value = seed;
+        ci.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+    input.addEventListener("focus", function (e) {
+      e.preventDefault();
+      openPaletteWithSeed();
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openPaletteWithSeed();
+      }
+    });
+  }
+
   function wireNotifications(navbar) {
     var badge = navbar.querySelector(".notification-badge");
     var list = navbar.querySelector("#notification-list");
@@ -317,73 +341,121 @@
     var userCompanies = opts.userCompanies || null;
     var userLangs = Array.isArray(opts.userLangs) ? opts.userLangs : [];
     var currentLang = opts.currentLang || "en_US";
-    var currentLanguage = userLangs.find(function (lang) { return lang.code === currentLang; }) || userLangs[0] || null;
-    var currentCompany = userCompanies && userCompanies.current_company ? userCompanies.current_company : null;
     var theme = getPreferredTheme(opts.theme);
 
-    var html = "";
-    html += '<div class="o-navbar-shell">';
-    if (useSidebar) {
-      html += '<button type="button" class="nav-hamburger o-navbar-icon-button" aria-label="Open menu">&#9776;</button>';
-      html += '<button type="button" class="nav-sidebar-toggle o-navbar-icon-button" aria-label="Collapse sidebar" title="Collapse menu" aria-expanded="true">&#9664;</button>';
-    } else {
-      html += '<button type="button" class="nav-hamburger o-navbar-icon-button o-navbar-icon-button--ghost" aria-label="Toggle menu" hidden>&#9776;</button>';
-    }
-    html += '<span class="nav-toolbar-left o-navbar-toolbar-left">';
-    html += '<a href="#home" class="logo logo-link o-navbar-brand-lockup" title="Apps"><span class="o-navbar-brand-emblem" aria-hidden="true">F1</span><span class="o-navbar-brand-wordmark">' + escHtml(brandName) + "</span></a>";
-    if (useSidebar) {
-      html += '<button type="button" id="nav-apps-home" class="nav-link o-navbar-link nav-apps-home" title="Apps">Apps</button>';
-      if (selectedAppName) {
-        html += '<span class="nav-current-app o-navbar-current-app">' + escHtml(selectedAppName) + "</span>";
-      }
-    }
-    if (!useSidebar) {
-      html += '<nav role="navigation" class="nav-menu o-navbar-menu" aria-label="Main navigation">';
-      if (staleBannerHtml) {
-        html += '<span class="nav-menu-stale-banner o-navbar-status-banner">' + staleBannerHtml + "</span>";
-      }
-      html += navItems.map(renderMenuItem).join("");
-      html += "</nav>";
-    }
-    html += "</span>";
-
-    html += '<span class="nav-user o-navbar-utility">';
-    if (userCompanies && userCompanies.allowed_companies && userCompanies.allowed_companies.length > 1) {
-      html += '<span class="nav-dropdown company-switcher o-navbar-dropdown" data-dropdown-mode="click">';
-      html += '<button type="button" class="nav-link o-navbar-link o-navbar-utility-button company-switcher-btn" title="Switch company" aria-haspopup="true" aria-expanded="false">' + escHtml(currentCompany && currentCompany.name ? currentCompany.name : "Company") + '<span class="o-navbar-caret" aria-hidden="true">&#9662;</span></button>';
-      html += '<span class="nav-dropdown-content company-dropdown o-navbar-dropdown-panel" hidden>';
-      userCompanies.allowed_companies.forEach(function (company) {
-        var active = currentCompany && company.id === currentCompany.id ? " nav-link-active is-active" : "";
-        html += '<button type="button" class="nav-link o-navbar-link o-navbar-dropdown-button company-option' + active + '" data-company-id="' + escAttr(company.id || "") + '">' + escHtml(company.name || "") + "</button>";
-      });
-      html += "</span></span>";
-    } else if (currentCompany) {
-      html += '<span class="nav-company-badge o-navbar-chip" title="Current company">' + escHtml(currentCompany.name || "") + "</span>";
-    }
-
-    if (userLangs.length > 1) {
-      html += '<span class="nav-dropdown lang-switcher o-navbar-dropdown" data-dropdown-mode="click">';
-      html += '<button type="button" class="nav-link o-navbar-link o-navbar-utility-button lang-switcher-btn" title="Language" aria-haspopup="true" aria-expanded="false">' + escHtml((currentLanguage && (currentLanguage.name || currentLanguage.code)) || "Lang") + '<span class="o-navbar-caret" aria-hidden="true">&#9662;</span></button>';
-      html += '<span class="nav-dropdown-content lang-dropdown o-navbar-dropdown-panel" hidden>';
-      userLangs.forEach(function (lang) {
-        var active = lang.code === currentLang ? " nav-link-active is-active" : "";
-        html += '<button type="button" class="nav-link o-navbar-link o-navbar-dropdown-button lang-option' + active + '" data-lang="' + escAttr(lang.code || "") + '">' + escHtml(lang.name || lang.code || "") + "</button>";
-      });
-      html += "</span></span>";
-    }
-
-    html += '<button type="button" class="nav-link o-navbar-link o-navbar-icon-button theme-toggle" title="Toggle dark mode" aria-label="Toggle theme" data-theme-value="' + escAttr(theme) + '">' + (theme === "dark" ? "&#9790;" : "&#9788;") + "</button>";
-    html += '<span class="nav-dropdown notification-bell o-navbar-dropdown" data-dropdown-mode="click">';
-    html += '<button type="button" class="nav-link o-navbar-link o-navbar-icon-button notification-bell-btn" title="Notifications" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">&#128276;<span class="notification-badge o-navbar-badge" hidden>0</span></button>';
-    html += '<span class="nav-dropdown-content notification-dropdown o-navbar-dropdown-panel o-navbar-notification-panel" hidden>';
-    html += '<div class="notification-header o-navbar-panel-header"><span>Notifications</span><button type="button" class="nav-link o-navbar-link mark-all-read">Mark all read</button></div>';
-    html += '<div id="notification-list" class="o-navbar-notification-list"><p class="o-navbar-empty">Loading notifications...</p></div>';
-    html += "</span></span>";
-
-    html += '<a href="#discuss" class="nav-link o-navbar-link" title="Discuss">Discuss</a>';
-    html += '<span class="o-systray-registry"></span>';
-    html += '<a href="/web/logout" class="nav-link o-navbar-link">Logout</a>';
-    html += "</span></div>";
+    var NC = window.AppCore && window.AppCore.NavbarChrome;
+    var html =
+      NC && typeof NC.buildHtml === "function"
+        ? NC.buildHtml({
+            brandName: brandName,
+            appSidebar: useSidebar,
+            selectedAppName: selectedAppName,
+            staleBannerHtml: staleBannerHtml,
+            navItems: navItems,
+            userCompanies: userCompanies,
+            userLangs: userLangs,
+            currentLang: currentLang,
+            theme: theme,
+          })
+        : (function () {
+            var currentLanguage = userLangs.find(function (lang) {
+              return lang.code === currentLang;
+            }) || userLangs[0] || null;
+            var currentCompany = userCompanies && userCompanies.current_company ? userCompanies.current_company : null;
+            var fallback = "";
+            fallback += '<div class="o-navbar-shell">';
+            if (useSidebar) {
+              fallback += '<button type="button" class="nav-hamburger o-navbar-icon-button" aria-label="Open menu">&#9776;</button>';
+              fallback +=
+                '<button type="button" class="nav-sidebar-toggle o-navbar-icon-button" aria-label="Collapse sidebar" title="Collapse menu" aria-expanded="true">&#9664;</button>';
+            } else {
+              fallback +=
+                '<button type="button" class="nav-hamburger o-navbar-icon-button o-navbar-icon-button--ghost" aria-label="Toggle menu" hidden>&#9776;</button>';
+            }
+            fallback += '<span class="nav-toolbar-left o-navbar-toolbar-left">';
+            fallback +=
+              '<a href="#home" class="logo logo-link o-navbar-brand-lockup" title="Apps"><span class="o-navbar-brand-emblem" aria-hidden="true">F1</span><span class="o-navbar-brand-wordmark">' +
+              escHtml(brandName) +
+              "</span></a>";
+            if (useSidebar) {
+              fallback += '<button type="button" id="nav-apps-home" class="nav-link o-navbar-link nav-apps-home" title="Apps">Apps</button>';
+              if (selectedAppName) {
+                fallback += '<span class="nav-current-app o-navbar-current-app">' + escHtml(selectedAppName) + "</span>";
+              }
+            }
+            if (!useSidebar) {
+              fallback += '<nav role="navigation" class="nav-menu o-navbar-menu" aria-label="Main navigation">';
+              if (staleBannerHtml) {
+                fallback += '<span class="nav-menu-stale-banner o-navbar-status-banner">' + staleBannerHtml + "</span>";
+              }
+              fallback += navItems.map(renderMenuItem).join("");
+              fallback += "</nav>";
+            }
+            fallback += "</span>";
+            fallback += '<span class="nav-user o-navbar-utility">';
+            if (userCompanies && userCompanies.allowed_companies && userCompanies.allowed_companies.length > 1) {
+              fallback += '<span class="nav-dropdown company-switcher o-navbar-dropdown" data-dropdown-mode="click">';
+              fallback +=
+                '<button type="button" class="nav-link o-navbar-link o-navbar-utility-button company-switcher-btn" title="Switch company" aria-haspopup="true" aria-expanded="false">' +
+                escHtml(currentCompany && currentCompany.name ? currentCompany.name : "Company") +
+                '<span class="o-navbar-caret" aria-hidden="true">&#9662;</span></button>';
+              fallback += '<span class="nav-dropdown-content company-dropdown o-navbar-dropdown-panel" hidden>';
+              userCompanies.allowed_companies.forEach(function (company) {
+                var active = currentCompany && company.id === currentCompany.id ? " nav-link-active is-active" : "";
+                fallback +=
+                  '<button type="button" class="nav-link o-navbar-link o-navbar-dropdown-button company-option' +
+                  active +
+                  '" data-company-id="' +
+                  escAttr(company.id || "") +
+                  '">' +
+                  escHtml(company.name || "") +
+                  "</button>";
+              });
+              fallback += "</span></span>";
+            } else if (currentCompany) {
+              fallback +=
+                '<span class="nav-company-badge o-navbar-chip" title="Current company">' + escHtml(currentCompany.name || "") + "</span>";
+            }
+            if (userLangs.length > 1) {
+              fallback += '<span class="nav-dropdown lang-switcher o-navbar-dropdown" data-dropdown-mode="click">';
+              fallback +=
+                '<button type="button" class="nav-link o-navbar-link o-navbar-utility-button lang-switcher-btn" title="Language" aria-haspopup="true" aria-expanded="false">' +
+                escHtml((currentLanguage && (currentLanguage.name || currentLanguage.code)) || "Lang") +
+                '<span class="o-navbar-caret" aria-hidden="true">&#9662;</span></button>';
+              fallback += '<span class="nav-dropdown-content lang-dropdown o-navbar-dropdown-panel" hidden>';
+              userLangs.forEach(function (lang) {
+                var active = lang.code === currentLang ? " nav-link-active is-active" : "";
+                fallback +=
+                  '<button type="button" class="nav-link o-navbar-link o-navbar-dropdown-button lang-option' +
+                  active +
+                  '" data-lang="' +
+                  escAttr(lang.code || "") +
+                  '">' +
+                  escHtml(lang.name || lang.code || "") +
+                  "</button>";
+              });
+              fallback += "</span></span>";
+            }
+            fallback +=
+              '<button type="button" class="nav-link o-navbar-link o-navbar-icon-button theme-toggle" title="Toggle dark mode" aria-label="Toggle theme" data-theme-value="' +
+              escAttr(theme) +
+              '">' +
+              (theme === "dark" ? "&#9790;" : "&#9788;") +
+              "</button>";
+            fallback += '<span class="nav-dropdown notification-bell o-navbar-dropdown" data-dropdown-mode="click">';
+            fallback +=
+              '<button type="button" class="nav-link o-navbar-link o-navbar-icon-button notification-bell-btn" title="Notifications" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">&#128276;<span class="notification-badge o-navbar-badge" hidden>0</span></button>';
+            fallback += '<span class="nav-dropdown-content notification-dropdown o-navbar-dropdown-panel o-navbar-notification-panel" hidden>';
+            fallback +=
+              '<div class="notification-header o-navbar-panel-header"><span>Notifications</span><button type="button" class="nav-link o-navbar-link mark-all-read">Mark all read</button></div>';
+            fallback += '<div id="notification-list" class="o-navbar-notification-list"><p class="o-navbar-empty">Loading notifications...</p></div>';
+            fallback += "</span></span>";
+            fallback += '<a href="#discuss" class="nav-link o-navbar-link" title="Discuss">Discuss</a>';
+            fallback += '<span class="o-systray-registry"></span>';
+            fallback += '<a href="/web/logout" class="nav-link o-navbar-link">Logout</a>';
+            fallback += "</span></div>";
+            return fallback;
+          })();
 
     navbar.innerHTML = html;
     if (window.Services && window.Services.debugMenu && typeof window.Services.debugMenu.mount === "function") {
@@ -399,6 +471,7 @@
     var cleanups = [];
     wireThemeToggle(navbar);
     wireSessionActions(navbar);
+    wireGlobalSearch(navbar);
     var loadNotificationList = wireNotifications(navbar);
     cleanups = cleanups.concat(wireDropdowns(navbar, opts, loadNotificationList));
 
@@ -412,6 +485,9 @@
     }
 
     navbar.__erpNavbarCleanup = cleanups;
+    if (window.__erpLegacyRuntime && typeof window.__erpLegacyRuntime.renderSystrayMount === "function") {
+      window.__erpLegacyRuntime.renderSystrayMount();
+    }
     return true;
   }
 

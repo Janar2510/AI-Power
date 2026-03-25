@@ -1454,6 +1454,92 @@
     return html;
   }
 
+  // addons/web/static/src/app/chatter_strip.js
+  var chatter_strip_exports = {};
+  __export(chatter_strip_exports, {
+    appendChatterRows: () => appendChatterRows,
+    buildChatterChromeHtml: () => buildChatterChromeHtml,
+    setChatterError: () => setChatterError
+  });
+  function escAttr2(v) {
+    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  }
+  function buildChatterChromeHtml(options) {
+    var model = options && options.model || "";
+    var label = options && options.label || "Messages";
+    return "<p><label>" + escAttr2(label) + '</label><div id="chatter-messages" class="o-chatter o-chatter-chrome o-card-gradient" data-model="' + escAttr2(model) + '"><header class="o-chatter-chrome-head" aria-label="Discussion"><span class="o-chatter-chrome-title">Activity</span></header><div class="chatter-messages-list o-chatter-messages-scroll"></div><div class="chatter-compose o-chatter-compose"><textarea id="chatter-input" class="o-chatter-textarea" placeholder="Add a comment..." rows="3"></textarea><div class="o-chatter-compose-row"><input type="file" id="chatter-file" class="o-chatter-file" multiple /><span id="chatter-attachments" class="o-chatter-attachments-hint"></span></div><label class="o-chatter-send-email-label"><input type="checkbox" id="chatter-send-email" /> Send as email</label><button type="button" id="chatter-send" class="o-btn o-btn-primary o-chatter-send">Send</button></div></div></p>';
+  }
+  function escapeBodyText(body) {
+    return String(body || "").replace(/</g, "&lt;").replace(/\n/g, "<br>");
+  }
+  function appendChatterRows(container, rows, nameMap) {
+    if (!container) return;
+    container.innerHTML = "";
+    nameMap = nameMap || {};
+    if (!rows || !rows.length) {
+      container.innerHTML = '<p class="o-chatter-empty">No messages yet.</p>';
+      return;
+    }
+    rows.forEach(function(r) {
+      var authorName = r.author_id ? nameMap[r.author_id] || "User #" + (Array.isArray(r.author_id) ? r.author_id[0] : r.author_id) : "Unknown";
+      var dateStr = r.date ? String(r.date).replace("T", " ").slice(0, 16) : "";
+      var body = escapeBodyText(r.body || "");
+      var attHtml = "";
+      var aids = r.attachment_ids || [];
+      if (aids.length) {
+        var ids = aids.map(function(x) {
+          return Array.isArray(x) ? x[0] : x;
+        });
+        attHtml = '<div class="o-chatter-attachments">' + ids.map(function(aid) {
+          return '<a href="/web/attachment/download/' + encodeURIComponent(String(aid)) + '" target="_blank" rel="noopener" class="o-chatter-attachment-link">Attachment</a>';
+        }).join("") + "</div>";
+      }
+      var div = document.createElement("div");
+      div.className = "chatter-msg o-chatter-msg";
+      div.innerHTML = '<div class="o-chatter-msg-meta">' + escAttr2(authorName) + " \xB7 " + escAttr2(dateStr) + '</div><div class="o-chatter-msg-body">' + body + "</div>" + attHtml;
+      container.appendChild(div);
+    });
+  }
+  function setChatterError(container, message) {
+    if (!container) return;
+    container.innerHTML = '<p class="o-chatter-error">' + escAttr2(message || "Could not load messages.") + "</p>";
+  }
+
+  // addons/web/static/src/app/kanban_card_chrome.js
+  var kanban_card_chrome_exports = {};
+  __export(kanban_card_chrome_exports, {
+    buildKanbanCardHtml: () => buildKanbanCardHtml
+  });
+  function escAttr3(v) {
+    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  }
+  function escHtml4(v) {
+    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  }
+  function buildKanbanCardHtml(record, options) {
+    const opts = options || {};
+    const fields = Array.isArray(opts.fields) ? opts.fields : ["name", "expected_revenue", "date_deadline"];
+    const draggable = opts.onStageChange ? ' draggable="true"' : "";
+    const rid = record && record.id != null ? String(record.id) : "";
+    const name = (record && record.name != null ? record.name : "\u2014").replace(/</g, "&lt;");
+    let html = '<div class="kanban-card o-kanban-card o-card-gradient" data-id="' + escAttr3(rid) + '"' + draggable + ">";
+    html += '<div class="o-kanban-card-head"><label class="o-kanban-card-select-row"><input type="checkbox" class="kanban-select" data-id="' + escAttr3(rid) + '"><strong class="o-kanban-card-title">' + name + "</strong></label></div>";
+    html += '<div class="o-kanban-card-body">';
+    if (typeof opts.cardTemplate === "function") {
+      html += '<div class="kanban-template">' + String(opts.cardTemplate(record) || "") + "</div>";
+    }
+    fields.forEach(function(fname) {
+      if (fname === "name") return;
+      const v = record[fname];
+      if (v == null || v === "") return;
+      let disp = v;
+      if (Array.isArray(disp) && disp.length) disp = disp[1] != null ? disp[1] : disp[0];
+      html += '<div class="o-kanban-card-field" data-field="' + escAttr3(fname) + '"><span class="o-kanban-card-field-value">' + escHtml4(disp) + "</span></div>";
+    });
+    html += "</div></div>";
+    return html;
+  }
+
   // addons/web/static/src/app/main.js
   function registerModernViewFacades() {
     window.AppCore = window.AppCore || {};
@@ -1461,6 +1547,8 @@
     window.AppCore.FormFooterActions = form_footer_actions_exports;
     window.AppCore.BreadcrumbStrip = breadcrumb_strip_exports;
     window.AppCore.KanbanControlStrip = kanban_control_strip_exports;
+    window.AppCore.ChatterStrip = chatter_strip_exports;
+    window.AppCore.KanbanCardChrome = kanban_card_chrome_exports;
   }
   function bootModernWebClient() {
     if (window.__ERPModernWebClientLoaded) {

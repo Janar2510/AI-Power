@@ -29,6 +29,14 @@ class AccountMove(Model):
                 fallback = Company.search([], limit=1)
                 if fallback.ids:
                     vals["company_id"] = fallback.ids[0]
+        if not vals.get("currency_id") and vals.get("journal_id"):
+            env = getattr(cls._registry, "_env", None) if cls._registry else None
+            Journal = env.get("account.journal") if env else None
+            if Journal:
+                jcur = Journal.browse(vals["journal_id"]).read(["currency_id"])[0].get("currency_id")
+                cid = jcur[0] if isinstance(jcur, (list, tuple)) and jcur else jcur
+                if cid:
+                    vals["currency_id"] = cid
         if vals.get("name") == "New" or not vals.get("name"):
             env = getattr(cls._registry, "_env", None) if cls._registry else None
             IrSequence = env.get("ir.sequence") if env else None

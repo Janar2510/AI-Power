@@ -49,16 +49,25 @@
       if (!isFolded) {
         var visible = recs.slice(0, 20);
         visible.forEach(function (r) {
-        const name = (r.name || "—").replace(/</g, "&lt;");
-        const rev = r.expected_revenue != null ? r.expected_revenue : "";
-        const draggable = onStageChange ? ' draggable="true"' : "";
-        html += '<div class="kanban-card" data-id="' + (r.id || "") + '"' + draggable + ' style="background:var(--color-surface-1);padding:0.5rem;margin-bottom:0.5rem;border-radius:var(--radius-sm);box-shadow:0 1px 3px rgba(0,0,0,0.1);cursor:pointer;border:1px solid var(--border-color)">';
-        html += '<label style="display:flex;gap:var(--space-xs);align-items:center"><input type="checkbox" class="kanban-select" data-id="' + (r.id || "") + '"><strong>' + name + "</strong></label>";
-        if (options && typeof options.cardTemplate === "function") {
-          html += '<div class="kanban-template">' + String(options.cardTemplate(r) || "") + "</div>";
+        var KC = window.AppCore && window.AppCore.KanbanCardChrome;
+        if (KC && typeof KC.buildKanbanCardHtml === "function") {
+          html += KC.buildKanbanCardHtml(r, {
+            onStageChange: onStageChange,
+            fields: fields,
+            cardTemplate: options && options.cardTemplate,
+          });
+        } else {
+          const name = (r.name || "—").replace(/</g, "&lt;");
+          const rev = r.expected_revenue != null ? r.expected_revenue : "";
+          const draggable = onStageChange ? ' draggable="true"' : "";
+          html += '<div class="kanban-card" data-id="' + (r.id || "") + '"' + draggable + ' style="background:var(--color-surface-1);padding:0.5rem;margin-bottom:0.5rem;border-radius:var(--radius-sm);box-shadow:0 1px 3px rgba(0,0,0,0.1);cursor:pointer;border:1px solid var(--border-color)">';
+          html += '<label style="display:flex;gap:var(--space-xs);align-items:center"><input type="checkbox" class="kanban-select" data-id="' + (r.id || "") + '"><strong>' + name + "</strong></label>";
+          if (options && typeof options.cardTemplate === "function") {
+            html += '<div class="kanban-template">' + String(options.cardTemplate(r) || "") + "</div>";
+          }
+          if (rev !== "") html += "<br><span style='font-size:0.85rem;color:var(--text-muted)'>" + rev + "</span>";
+          html += "</div>";
         }
-        if (rev !== "") html += "<br><span style='font-size:0.85rem;color:var(--text-muted)'>" + rev + "</span>";
-        html += "</div>";
         });
         if (recs.length > 20) {
           html += '<button type="button" class="kanban-load-more o-btn o-btn-secondary" data-stage-id="' + sid + '" data-offset="20">Load more</button>';

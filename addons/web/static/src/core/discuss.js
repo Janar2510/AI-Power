@@ -13,9 +13,12 @@
   }
 
   function render(container, opts) {
-    if (_impl) return !!_impl(container, opts || {});
+    if (_impl) {
+      var implResult = _impl(container, opts || {});
+      if (implResult) return true;
+    }
     opts = opts || {};
-    var rpc = window.Services && window.Services.rpc;
+    var rpc = (opts.rpc && typeof opts.rpc.callKw === "function" ? opts.rpc : null) || (window.Services && window.Services.rpc);
     if (!rpc || !container) return false;
 
     container.innerHTML =

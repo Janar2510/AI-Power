@@ -8,13 +8,18 @@ import { registerNavbarFacade } from "./navbar_facade.js";
 import * as BreadcrumbStrip from "./breadcrumb_strip.js";
 import * as KanbanControlStrip from "./kanban_control_strip.js";
 import * as MenuUtils from "./menu_utils.js";
+import * as ChatterStrip from "./chatter_strip.js";
+import * as KanbanCardChrome from "./kanban_card_chrome.js";
 
 function registerModernViewFacades() {
   window.AppCore = window.AppCore || {};
+  // Navbar HTML builder: core/navbar_chrome.js → AppCore.NavbarChrome. Home KPI: core/dashboard_kpi_strip.js + wireHomeKpiStrip from legacy main.js.
   window.AppCore.ListControlPanel = ListControlPanel;
   window.AppCore.FormFooterActions = FormFooterActions;
   window.AppCore.BreadcrumbStrip = BreadcrumbStrip;
   window.AppCore.KanbanControlStrip = KanbanControlStrip;
+  window.AppCore.ChatterStrip = ChatterStrip;
+  window.AppCore.KanbanCardChrome = KanbanCardChrome;
 }
 
 function bootModernWebClient() {

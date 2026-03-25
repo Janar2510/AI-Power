@@ -28,6 +28,24 @@
     return "info";
   }
 
+  /** Short labels aligned with dashboard-home routing hints (dashboard.js MODEL_TO_ROUTE). */
+  const MODEL_LABEL = {
+    "crm.lead": "Lead",
+    "res.partner": "Contact",
+    "sale.order": "Order",
+    "account.move": "Invoice",
+    "product.product": "Product",
+    "project.task": "Task",
+  };
+
+  function formatModelHint(resModel) {
+    if (!resModel) return "";
+    const m = String(resModel);
+    if (MODEL_LABEL[m]) return MODEL_LABEL[m];
+    const parts = m.split(".");
+    return parts.length ? parts[parts.length - 1].replace(/_/g, " ") : m;
+  }
+
   window.UIComponents.ActivityFeed = {
     render(container, activities) {
       if (!container) return;
@@ -80,7 +98,9 @@
 
         const meta = document.createElement("div");
         meta.className = "o-activity-meta";
-        meta.textContent = deadlineLabel(a.date_deadline);
+        const when = deadlineLabel(a.date_deadline);
+        const hint = formatModelHint(a.res_model);
+        meta.textContent = hint && when ? when + " · " + hint : when || hint;
 
         col.appendChild(top);
         col.appendChild(meta);

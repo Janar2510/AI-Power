@@ -1,6 +1,7 @@
 """Sale order (Phase 112)."""
 
 from core.orm import Model, Recordset, api, fields
+from core.orm.company_context import default_company_id_for_env
 
 
 class SaleOrder(Model):
@@ -21,9 +22,17 @@ class SaleOrder(Model):
         env = getattr(cls._registry, "_env", None) if cls._registry else None
         vals = dict(vals)
         vals = cls._sale_order_prepare_vals(env, vals)
+        if not vals.get("company_id") and env:
+            dcid = default_company_id_for_env(env)
+            if dcid:
+                vals = dict(vals, company_id=dcid)
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
-            next_val = IrSequence.next_by_code("sale.order") if IrSequence else None
+            cid = vals.get("company_id")
+            cid = cid[0] if isinstance(cid, (list, tuple)) and cid else cid
+            next_val = (
+                IrSequence.next_by_code("sale.order", company_id=cid) if IrSequence else None
+            )
             if isinstance(next_val, str):
                 vals = dict(vals, name=next_val)
             elif next_val is not None:
@@ -32,21 +41,22 @@ class SaleOrder(Model):
                 vals = dict(vals, name="New")
         if env and ("currency_id" not in vals or not vals.get("currency_id")):
             Company = env.get("res.company")
-            if Company:
-                companies = Company.search([], limit=1)
-                if companies.ids:
-                    cdata = Company.browse(companies.ids[0]).read(["currency_id"])[0]
-                    cid = cdata.get("currency_id")
-                    if isinstance(cid, (list, tuple)) and cid:
-                        cid = cid[0]
-                    if cid:
-                        vals = dict(vals, currency_id=cid)
+            comp_id = vals.get("company_id")
+            comp_id = comp_id[0] if isinstance(comp_id, (list, tuple)) and comp_id else comp_id
+            if Company and comp_id:
+                cdata = Company.browse(comp_id).read(["currency_id"])[0]
+                cid = cdata.get("currency_id")
+                if isinstance(cid, (list, tuple)) and cid:
+                    cid = cid[0]
+                if cid:
+                    vals = dict(vals, currency_id=cid)
         return super().create(vals)
 
     @classmethod
     def create(cls, vals):
         return cls._create_sale_order_record(vals)
     partner_id = fields.Many2one("res.partner", string="Customer", required=True, tracking=True)
+    company_id = fields.Many2one("res.company", string="Company")
     date_order = fields.Datetime(string="Order Date", default=lambda: __import__("datetime").datetime.utcnow().isoformat())
     state = fields.Selection(
         selection=[

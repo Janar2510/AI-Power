@@ -1136,6 +1136,8 @@ def _webclient_html(debug_assets: bool = False, session_bootstrap: dict | None =
         "debugAssets": bool(debug_assets),
         "shellOwner": "modern",
         "legacyAdapterEnabled": True,
+        # Aligns with SECURITY_HEADERS script-src (no unsafe-eval): shell uses fallbackMount without client-side eval probe.
+        "cspScriptEvalBlocked": True,
         "endpoints": {
             "sessionInfo": "/web/session/get_session_info",
             "views": "/web/load_views",

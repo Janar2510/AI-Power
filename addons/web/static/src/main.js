@@ -98,6 +98,10 @@
   }
 
   function renderBreadcrumbs() {
+    var BS = window.AppCore && window.AppCore.BreadcrumbStrip;
+    if (BS && typeof BS.buildBreadcrumbsHtml === 'function') {
+      return BS.buildBreadcrumbsHtml(actionStack || []);
+    }
     if (window.UIComponents && window.UIComponents.Breadcrumbs && typeof window.UIComponents.Breadcrumbs.renderHTML === "function") {
       return window.UIComponents.Breadcrumbs.renderHTML(actionStack || []);
     }
@@ -975,6 +979,9 @@
       kbBtn.onclick = function () {
         showShortcutHelp();
       };
+    }
+    if (window.__erpNavbarFacade && typeof window.__erpNavbarFacade.markSystrayRendered === 'function') {
+      window.__erpNavbarFacade.markSystrayRendered(host);
     }
   }
 
@@ -4921,16 +4928,32 @@
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     const currentView = (currentListState.route === route && currentListState.viewType) || 'kanban';
     const kanbanView = viewsSvc && viewsSvc.getView(model, 'kanban');
-    let html = '<h2>' + title + '</h2>';
-    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
-    html += renderViewSwitcher(route, currentView);
-    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    if (model === 'crm.lead' || model === 'helpdesk.ticket') {
-      html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
-    }
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p>';
-    html += '<div id="kanban-area"></div>';
+    const vs = renderViewSwitcher(route, currentView);
+    const mid =
+      model === 'crm.lead' || model === 'helpdesk.ticket'
+        ? '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>'
+        : '';
+    const KS = window.AppCore && window.AppCore.KanbanControlStrip;
+    let html =
+      KS && typeof KS.buildKanbanChromeHtml === 'function'
+        ? KS.buildKanbanChromeHtml({
+            title: title,
+            viewSwitcherHtml: vs,
+            searchTerm: searchTerm || '',
+            addLabel: addLabel,
+            middleSlotHtml: mid,
+          })
+        : '<h2>' +
+          title +
+          '</h2><p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">' +
+          vs +
+          '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' +
+          (searchTerm || '').replace(/"/g, '&quot;') +
+          '"><button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>' +
+          mid +
+          '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' +
+          addLabel +
+          '</button></p><div id="kanban-area"></div>';
     main.innerHTML = html;
     currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: currentView };
     main.querySelectorAll('.btn-view').forEach(btn => {

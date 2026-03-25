@@ -308,12 +308,23 @@ class AccountMove(Model):
                 companies = Company.search([], limit=1)
             if not companies.ids:
                 continue
-            lock_row = companies.read(["account_lock_date"])[0]
+            lock_row = companies.read(["account_lock_date", "account_lock_adviser_group_id"])[0]
             lock_raw = lock_row.get("account_lock_date")
             if not lock_raw:
                 continue
             lock_str = str(lock_raw)[:10]
             if move_str <= lock_str:
+                adv = lock_row.get("account_lock_adviser_group_id")
+                adv_id = adv[0] if isinstance(adv, (list, tuple)) and adv else adv
+                if adv_id and env:
+                    User = env.get("res.users")
+                    uid = getattr(env, "uid", None)
+                    if User and uid:
+                        urow = User.browse(uid).read(["group_ids"])[0]
+                        raw_g = urow.get("group_ids") or []
+                        user_gids = [x[0] if isinstance(x, (list, tuple)) and x else x for x in raw_g]
+                        if adv_id in user_gids:
+                            continue
                 raise ValueError(
                     f"Cannot post move on or before account lock date {lock_str} (move date {move_str})"
                 )

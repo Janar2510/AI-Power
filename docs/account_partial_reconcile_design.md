@@ -1,6 +1,6 @@
 # Partial reconcile + FX — design (pre-implementation)
 
-**Status:** Design-only (**Phase 572**). No production code beyond this document until product sign-off. Compare read-only `odoo-19.0/addons/account` reconciliation / `account.partial.reconcile` behaviour when a checkout is available.
+**Status:** Design (**Phase 572**) + **partial-only implementation** (**Phase 577**): `account.reconcile.allocation`, wizard `allocate_amount`, idempotent caps vs statement/move line residuals. **FX** and full Odoo `account.partial.reconcile` parity remain **out of scope** until a follow-on phase. Compare read-only `odoo-19.0/addons/account` when a checkout is available.
 
 ## Goals
 
@@ -36,8 +36,14 @@
 
 ## Sign-off checklist
 
-- [ ] Product confirms scope (partial only vs FX in v1).
-- [ ] Parity matrix row + `account_odoo19_gap_audit.md` updated.
-- [ ] DB migration + ACLs + at least one DB-optional unittest.
+- [x] Product confirms scope (partial only vs FX in v1) — **partial-only shipped**; FX deferred.
+- [x] Parity matrix row + `account_odoo19_gap_audit.md` updated (**544** / **577**).
+- [x] ACLs + DB-optional unittest (`tests/test_account_reconcile_allocation_phase577.py`).
 
-Update this file when implementation starts; keep **Phase 544** / matrix text in sync.
+## Known limitation — `statement_line.move_id`
+
+When allocations fully cover a statement line, the wizard sets **`account.bank.statement.line.move_id`** to **one** move (derived from the first allocation). Splits across **several** `account.move` records remain auditable via **`account.reconcile.allocation`** rows; `move_id` is a convenience pointer, not a full multi-move representation. A later phase can add an explicit relation or Odoo-style parity if product requires it.
+
+---
+
+Update this file when FX or fuller parity starts; keep **Phase 544** / matrix text in sync.

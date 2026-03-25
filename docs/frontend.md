@@ -148,6 +148,8 @@ When planning web changes, compare **read-only** `odoo-19.0/addons/web/__manifes
 
 **Milestone (Phase 573 / Wave U, v1.208.0):** Production default remains **concat + guard**; **esbuild-primary** templates are **not** piloted in CI. After each `npm run build:web`, smoke: login, list filters/control panel, form save/cancel, shell markers (`data-erp-shell-owner`, `data-erp-navbar-contract` when modern bundle loads).
 
+**Pilot hook (Phase 576 / v1.209.0):** For staged regression of a **single bundled shell** (no concat `web.assets_web.js` on the critical path), operators may set **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** in the server environment and switch the webclient template to load **`/web/assets/modern_webclient.js`** (or equivalent single entry) **only** after running the smoke checklist above plus breadcrumb/kanban/systray markers (`data-erp-systray-contract` when facade runs). The repository default remains **concat + `modern_webclient.js` as additive**; CI does not enable this flag.
+
 ## PWA manifest stub (Phase 548) + service worker stub (Phase 553)
 
 - **Public** `GET /web/manifest.webmanifest` returns minimal Web App Manifest JSON (`name`, `start_url`, `display`, theme colours).

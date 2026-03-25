@@ -68,6 +68,7 @@ class TestHTTP(unittest.TestCase):
         self.assertIn('"shellOwner": "modern"', html)
         self.assertIn("/web/static/lib/owl/owl.js", html)
         self.assertIn("/web/static/dist/modern_webclient.js", html)
+        self.assertIn('"cspScriptEvalBlocked": true', html)
 
     def test_webclient_load_menus_requires_auth_phase1(self):
         """Odoo-style menu bootstrap endpoint exists and stays auth-protected."""
@@ -100,6 +101,8 @@ class TestHTTP(unittest.TestCase):
         r = self.client.get("/web/static/dist/modern_webclient.js")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"__ERPModernWebClientLoaded", r.data)
+        self.assertIn(b"fallbackMount", r.data)
+        self.assertIn(b'mode: "fallback"', r.data)
 
     def test_static_owl_runtime_served_phase2(self):
         r = self.client.get("/web/static/lib/owl/owl.js")
@@ -197,3 +200,12 @@ class TestHTTP(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers.get("X-Frame-Options"), "SAMEORIGIN")
         self.assertEqual(r.headers.get("X-Content-Type-Options"), "nosniff")
+
+    def test_csp_keeps_eval_blocked_while_modern_shell_supports_fallback(self):
+        """Modern shell stays compatible with strict CSP and does not require unsafe-eval."""
+        r = self.client.get("/health")
+        self.assertEqual(r.status_code, 200)
+        csp = r.headers.get("Content-Security-Policy", "")
+        self.assertIn("script-src", csp)
+        self.assertNotIn("unsafe-eval", csp)
+        self.assertNotIn("trusted-types-eval", csp)

@@ -4,12 +4,17 @@ import { WebClient } from "./webclient.js";
 import * as ListControlPanel from "./list_control_panel.js";
 import * as FormFooterActions from "./form_footer_actions.js";
 import { registerNavbarContract } from "./navbar_contract.js";
+import { registerNavbarFacade } from "./navbar_facade.js";
+import * as BreadcrumbStrip from "./breadcrumb_strip.js";
+import * as KanbanControlStrip from "./kanban_control_strip.js";
 import * as MenuUtils from "./menu_utils.js";
 
 function registerModernViewFacades() {
   window.AppCore = window.AppCore || {};
   window.AppCore.ListControlPanel = ListControlPanel;
   window.AppCore.FormFooterActions = FormFooterActions;
+  window.AppCore.BreadcrumbStrip = BreadcrumbStrip;
+  window.AppCore.KanbanControlStrip = KanbanControlStrip;
 }
 
 function bootModernWebClient() {
@@ -19,6 +24,7 @@ function bootModernWebClient() {
   window.__ERPModernWebClientLoaded = true;
 
   registerNavbarContract();
+  registerNavbarFacade();
   registerModernViewFacades();
 
   const bootstrap = createBootstrap();

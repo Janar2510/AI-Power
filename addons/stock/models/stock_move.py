@@ -51,10 +51,40 @@ class StockMove(Model):
             j = Journal.search([], limit=1)
         if not j.ids:
             return
-        exp = Account.search([("account_type", "=", "expense")], limit=1)
-        ast = Account.search([("account_type", "=", "asset_current")], limit=1)
-        if not exp.ids or not ast.ids:
-            return
+        exp_id = None
+        ast_id = None
+        Template = env.get("product.template")
+        Category = env.get("product.category")
+        Product = env.get("product.product")
+        if Product and Template and Category:
+            fg = {}
+            try:
+                fg = Category.fields_get() if hasattr(Category, "fields_get") else {}
+            except Exception:
+                fg = {}
+            if "stock_cogs_account_id" in fg and "stock_valuation_account_id" in fg:
+                prow = Product.browse([product_id]).read(["product_template_id"])[0]
+                tid = prow.get("product_template_id")
+                tid = tid[0] if isinstance(tid, (list, tuple)) and tid else tid
+                if tid:
+                    trow = Template.browse(tid).read(["categ_id"])[0]
+                    cid = trow.get("categ_id")
+                    cid = cid[0] if isinstance(cid, (list, tuple)) and cid else cid
+                    if cid:
+                        cat = Category.browse(cid).read(
+                            ["stock_cogs_account_id", "stock_valuation_account_id"]
+                        )[0]
+                        ca = cat.get("stock_cogs_account_id")
+                        va = cat.get("stock_valuation_account_id")
+                        exp_id = ca[0] if isinstance(ca, (list, tuple)) and ca else ca
+                        ast_id = va[0] if isinstance(va, (list, tuple)) and va else va
+        if not exp_id or not ast_id:
+            exp = Account.search([("account_type", "=", "expense")], limit=1)
+            ast = Account.search([("account_type", "=", "asset_current")], limit=1)
+            if not exp.ids or not ast.ids:
+                return
+            exp_id = exp.ids[0]
+            ast_id = ast.ids[0]
         origin = f"STK-COGS:{ref_name or product_id}"
         if Move.search([("invoice_origin", "=", origin)], limit=1).ids:
             return
@@ -70,14 +100,14 @@ class StockMove(Model):
             return
         MoveLine.create({
             "move_id": mid,
-            "account_id": exp.ids[0],
+            "account_id": exp_id,
             "name": f"COGS {product_id}",
             "debit": cogs_value,
             "credit": 0.0,
         })
         MoveLine.create({
             "move_id": mid,
-            "account_id": ast.ids[0],
+            "account_id": ast_id,
             "name": f"Stock out {product_id}",
             "debit": 0.0,
             "credit": cogs_value,

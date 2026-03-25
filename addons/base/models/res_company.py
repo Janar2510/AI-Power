@@ -23,3 +23,8 @@ class ResCompany(Model):
         help="Phase 571 Tier C: when account is installed, outgoing FIFO COGS may create a draft "
         "account.move stub (best-effort; requires journals/accounts).",
     )
+    stock_valuation_allow_negative = fields.Boolean(
+        string="Allow negative stock valuation",
+        default=True,
+        help="Phase 582: when False, outgoing moves error if FIFO/AVCO cannot cover qty.",
+    )

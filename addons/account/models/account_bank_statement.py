@@ -15,7 +15,16 @@ class AccountBankStatement(Model):
         if vals.get("name") == "New" or not vals.get("name"):
             env = getattr(cls._registry, "_env", None) if cls._registry else None
             IrSequence = env.get("ir.sequence") if env else None
-            next_val = IrSequence.next_by_code("account.bank.statement") if IrSequence else None
+            Journal = env.get("account.journal") if env else None
+            cid = None
+            jid = vals.get("journal_id")
+            jid = jid[0] if isinstance(jid, (list, tuple)) and jid else jid
+            if Journal and jid:
+                jr = Journal.browse(jid).read(["company_id"])[0].get("company_id")
+                cid = jr[0] if isinstance(jr, (list, tuple)) and jr else jr
+            next_val = (
+                IrSequence.next_by_code("account.bank.statement", company_id=cid) if IrSequence else None
+            )
             vals = dict(vals, name=f"BSTAT/{next_val:05d}" if next_val is not None else "New")
         return super().create(vals)
 

@@ -24,5 +24,11 @@ class StockValuationLayer(Model):
         help="Phase 565 Tier A: initial copy of value for layer consumption tracking.",
     )
     stock_move_id = fields.Many2one("stock.move", string="Stock Move", ondelete="set null")
+    lot_id = fields.Many2one(
+        "stock.lot",
+        string="Lot/Serial",
+        ondelete="set null",
+        help="Phase 579: FIFO consumption can match lot-specific layers.",
+    )
     description = fields.Char(string="Description")
     create_date = fields.Datetime(string="Created", default=lambda: datetime.utcnow().isoformat())

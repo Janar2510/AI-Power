@@ -885,9 +885,42 @@
     }
     return window.owl;
   }
+  function cspScriptEvalBlocked() {
+    const b = typeof window !== "undefined" && window.__erpFrontendBootstrap;
+    if (b && b.cspScriptEvalBlocked === false) {
+      return false;
+    }
+    return true;
+  }
+  function fallbackMount(ComponentClass, target, config, error) {
+    if (!ComponentClass || typeof ComponentClass.fallbackMount !== "function") {
+      throw error;
+    }
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn(
+        "[modern-webclient] Falling back to CSP-safe shell mount for",
+        ComponentClass && ComponentClass.name ? ComponentClass.name : "anonymous-component",
+        error
+      );
+    }
+    if (target) {
+      target.innerHTML = "";
+    }
+    return ComponentClass.fallbackMount(config && config.env || null, target, error);
+  }
   function mountComponent(ComponentClass, target, config) {
-    const owl3 = getOwl();
-    return owl3.mount(ComponentClass, target, config || {});
+    const cfg = config || {};
+    if (ComponentClass && typeof ComponentClass.fallbackMount === "function" && cspScriptEvalBlocked()) {
+      return Promise.resolve(ComponentClass.fallbackMount(cfg.env || null, target));
+    }
+    try {
+      const owl3 = getOwl();
+      return Promise.resolve(owl3.mount(ComponentClass, target, cfg)).catch(function(error) {
+        return fallbackMount(ComponentClass, target, cfg, error);
+      });
+    } catch (error) {
+      return Promise.resolve(fallbackMount(ComponentClass, target, cfg, error));
+    }
   }
 
   // addons/web/static/src/app/navbar.js
@@ -899,6 +932,49 @@
       if (typeof cleanup === "function") cleanup();
     });
     host.__modernNavbarCleanup = [];
+  }
+  function renderNavbarIntoHost(env, host) {
+    const shell = env.services.shell.state;
+    if (!host || !window.AppCore || !window.AppCore.Navbar) return;
+    cleanupHost(host);
+    window.AppCore.Navbar.render({
+      navbar: host,
+      appSidebar: document.getElementById("app-sidebar"),
+      brandName: shell.brandName,
+      navItems: [],
+      selectedAppName: shell.currentAppName,
+      staleBannerHtml: shell.staleBannerHtml,
+      userCompanies: shell.userCompanies,
+      userLangs: shell.userLangs,
+      currentLang: shell.currentLang,
+      theme: shell.theme
+    });
+    if (window.__erpNavbarContract && typeof window.__erpNavbarContract.markDelegated === "function") {
+      window.__erpNavbarContract.markDelegated(host);
+    }
+    const cleanups = [];
+    const hamburger = host.querySelector(".nav-hamburger");
+    if (hamburger && window.__erpModernShellController) {
+      const onHamburgerClick = function() {
+        window.__erpModernShellController.toggleMobileSidebar();
+      };
+      hamburger.addEventListener("click", onHamburgerClick);
+      cleanups.push(function() {
+        hamburger.removeEventListener("click", onHamburgerClick);
+      });
+    }
+    const sidebarToggle = host.querySelector(".nav-sidebar-toggle");
+    if (sidebarToggle && window.__erpModernShellController) {
+      const onSidebarToggle = function() {
+        const collapsed = window.__erpModernShellController.toggleSidebarCollapse();
+        sidebarToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      };
+      sidebarToggle.addEventListener("click", onSidebarToggle);
+      cleanups.push(function() {
+        sidebarToggle.removeEventListener("click", onSidebarToggle);
+      });
+    }
+    host.__modernNavbarCleanup = cleanups;
   }
   var NavBar = class extends Component {
     static template = xml`<div t-ref="host" class="o-modern-navbar-slot"></div>`;
@@ -916,48 +992,22 @@
     }
     renderShell() {
       const host = this.hostRef.el;
-      const shell = this.env.services.shell.state;
-      if (!host || !window.AppCore || !window.AppCore.Navbar) return;
-      cleanupHost(host);
-      window.AppCore.Navbar.render({
-        navbar: host,
-        appSidebar: document.getElementById("app-sidebar"),
-        brandName: shell.brandName,
-        navItems: [],
-        selectedAppName: shell.currentAppName,
-        staleBannerHtml: shell.staleBannerHtml,
-        userCompanies: shell.userCompanies,
-        userLangs: shell.userLangs,
-        currentLang: shell.currentLang,
-        theme: shell.theme
-      });
-      if (window.__erpNavbarContract && typeof window.__erpNavbarContract.markDelegated === "function") {
-        window.__erpNavbarContract.markDelegated(host);
-      }
-      const cleanups = [];
-      const hamburger = host.querySelector(".nav-hamburger");
-      if (hamburger && window.__erpModernShellController) {
-        const onHamburgerClick = function() {
-          window.__erpModernShellController.toggleMobileSidebar();
-        };
-        hamburger.addEventListener("click", onHamburgerClick);
-        cleanups.push(function() {
-          hamburger.removeEventListener("click", onHamburgerClick);
-        });
-      }
-      const sidebarToggle = host.querySelector(".nav-sidebar-toggle");
-      if (sidebarToggle && window.__erpModernShellController) {
-        const onSidebarToggle = function() {
-          const collapsed = window.__erpModernShellController.toggleSidebarCollapse();
-          sidebarToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-        };
-        sidebarToggle.addEventListener("click", onSidebarToggle);
-        cleanups.push(function() {
-          sidebarToggle.removeEventListener("click", onSidebarToggle);
-        });
-      }
-      host.__modernNavbarCleanup = cleanups;
+      renderNavbarIntoHost(this.env, host);
     }
+  };
+  NavBar.fallbackMount = function fallbackMount2(env, target) {
+    const render = function() {
+      renderNavbarIntoHost(env, target);
+    };
+    render();
+    const unsubscribe = env.services.shell.subscribe(render);
+    return {
+      destroy() {
+        cleanupHost(target);
+        if (typeof unsubscribe === "function") unsubscribe();
+      },
+      mode: "fallback"
+    };
   };
   function mountNavBar(env, target) {
     if (!target) return null;
@@ -1084,6 +1134,15 @@
     });
     host.__modernSidebarCleanup = [];
   }
+  function renderSidebarIntoHost(env, host) {
+    if (!host) return;
+    const shell = env.services.shell.state;
+    const tree = shell.sidebarTree || [];
+    const route = shell.route || "home";
+    cleanupHost2(host);
+    host.innerHTML = '<div class="o-sidebar-inner"><div class="o-sidebar-scroll">' + (shell.staleBannerHtml ? '<div class="o-sidebar-stale">' + shell.staleBannerHtml + "</div>" : "") + '<nav class="o-sidebar-nav" role="navigation">' + (tree.length ? buildSidebarBranch(tree, 0, route, env.services.views) : '<p class="o-sidebar-empty">No menu items.</p>') + "</nav></div></div>";
+    wireSidebar(host);
+  }
   var Sidebar = class extends Component2 {
     static template = xml2`<div t-ref="host" class="o-modern-sidebar-slot"></div>`;
     setup() {
@@ -1100,14 +1159,22 @@
     }
     renderShell() {
       const host = this.hostRef.el;
-      if (!host) return;
-      const shell = this.env.services.shell.state;
-      const tree = shell.sidebarTree || [];
-      const route = shell.route || "home";
-      cleanupHost2(host);
-      host.innerHTML = '<div class="o-sidebar-inner"><div class="o-sidebar-scroll">' + (shell.staleBannerHtml ? '<div class="o-sidebar-stale">' + shell.staleBannerHtml + "</div>" : "") + '<nav class="o-sidebar-nav" role="navigation">' + (tree.length ? buildSidebarBranch(tree, 0, route, this.env.services.views) : '<p class="o-sidebar-empty">No menu items.</p>') + "</nav></div></div>";
-      wireSidebar(host);
+      renderSidebarIntoHost(this.env, host);
     }
+  };
+  Sidebar.fallbackMount = function fallbackMount3(env, target) {
+    const render = function() {
+      renderSidebarIntoHost(env, target);
+    };
+    render();
+    const unsubscribe = env.services.shell.subscribe(render);
+    return {
+      destroy() {
+        cleanupHost2(target);
+        if (typeof unsubscribe === "function") unsubscribe();
+      },
+      mode: "fallback"
+    };
   };
   function mountSidebar(env, target) {
     if (!target) return null;
@@ -1320,11 +1387,80 @@
     };
   }
 
+  // addons/web/static/src/app/navbar_facade.js
+  function registerNavbarFacade() {
+    window.__erpNavbarFacade = {
+      phase: "575",
+      /** Call after systray HTML is injected into .o-systray-registry. */
+      markSystrayRendered(host) {
+        if (!host || !host.setAttribute) return;
+        host.setAttribute("data-erp-systray-contract", "575");
+      }
+    };
+  }
+
+  // addons/web/static/src/app/breadcrumb_strip.js
+  var breadcrumb_strip_exports = {};
+  __export(breadcrumb_strip_exports, {
+    buildBreadcrumbsHtml: () => buildBreadcrumbsHtml
+  });
+  function escLabel(s) {
+    return String(s == null ? "" : s).replace(/</g, "&lt;");
+  }
+  function buildBreadcrumbsHtml(actionStack) {
+    const stack = Array.isArray(actionStack) ? actionStack : [];
+    if (window.UIComponents && window.UIComponents.Breadcrumbs && typeof window.UIComponents.Breadcrumbs.renderHTML === "function") {
+      return window.UIComponents.Breadcrumbs.renderHTML(stack);
+    }
+    if (stack.length <= 1) return "";
+    let html = '<nav class="breadcrumbs" aria-label="Breadcrumb">';
+    stack.forEach(function(entry, i) {
+      if (i === stack.length - 1) {
+        html += '<span class="breadcrumb-item active">' + escLabel(entry.label) + "</span>";
+      } else {
+        html += '<a class="breadcrumb-item" href="javascript:void(0)" data-bc-idx="' + i + '">' + escLabel(entry.label) + "</a>";
+        html += '<span class="breadcrumb-sep">/</span>';
+      }
+    });
+    html += "</nav>";
+    return html;
+  }
+
+  // addons/web/static/src/app/kanban_control_strip.js
+  var kanban_control_strip_exports = {};
+  __export(kanban_control_strip_exports, {
+    buildKanbanChromeHtml: () => buildKanbanChromeHtml
+  });
+  function escAttr(v) {
+    return String(v == null ? "" : v).replace(/"/g, "&quot;");
+  }
+  function escHtml3(v) {
+    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  }
+  function buildKanbanChromeHtml(opts) {
+    const title = opts.title || "";
+    const vs = opts.viewSwitcherHtml || "";
+    const st = opts.searchTerm || "";
+    const addLabel = opts.addLabel || "Add";
+    const mid = opts.middleSlotHtml || "";
+    let html = "<h2>" + escHtml3(title) + "</h2>";
+    html += '<p class="o-kanban-control-strip" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
+    html += vs;
+    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + escAttr(st) + '">';
+    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+    html += mid;
+    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + escHtml3(addLabel) + "</button></p>";
+    html += '<div id="kanban-area"></div>';
+    return html;
+  }
+
   // addons/web/static/src/app/main.js
   function registerModernViewFacades() {
     window.AppCore = window.AppCore || {};
     window.AppCore.ListControlPanel = list_control_panel_exports;
     window.AppCore.FormFooterActions = form_footer_actions_exports;
+    window.AppCore.BreadcrumbStrip = breadcrumb_strip_exports;
+    window.AppCore.KanbanControlStrip = kanban_control_strip_exports;
   }
   function bootModernWebClient() {
     if (window.__ERPModernWebClientLoaded) {
@@ -1332,6 +1468,7 @@
     }
     window.__ERPModernWebClientLoaded = true;
     registerNavbarContract();
+    registerNavbarFacade();
     registerModernViewFacades();
     const bootstrap = createBootstrap();
     const env = createEnv(bootstrap);

@@ -1,6 +1,7 @@
 """Purchase order (Phase 117, 154)."""
 
 from core.orm import Model, Recordset, api, fields
+from core.orm.company_context import default_company_id_for_env
 
 
 class PurchaseOrder(Model):
@@ -10,6 +11,7 @@ class PurchaseOrder(Model):
 
     name = fields.Char(string="Order Reference", required=True, default="New")
     partner_id = fields.Many2one("res.partner", string="Vendor", required=True)
+    company_id = fields.Many2one("res.company", string="Company")
     currency_id = fields.Many2one("res.currency", string="Currency")
     payment_term_id = fields.Many2one("account.payment.term", string="Payment Terms")  # Phase 191
     fiscal_position_id = fields.Many2one(
@@ -333,21 +335,29 @@ class PurchaseOrder(Model):
                     fp_id = fp[0] if isinstance(fp, (list, tuple)) and fp else fp
                     if fp_id:
                         vals["fiscal_position_id"] = fp_id
+        if not vals.get("company_id") and env:
+            dcid = default_company_id_for_env(env)
+            if dcid:
+                vals = dict(vals, company_id=dcid)
         if vals.get("name") == "New" or not vals.get("name"):
             IrSequence = env.get("ir.sequence") if env else None
-            next_val = IrSequence.next_by_code("purchase.order") if IrSequence else None
+            cid = vals.get("company_id")
+            cid = cid[0] if isinstance(cid, (list, tuple)) and cid else cid
+            next_val = (
+                IrSequence.next_by_code("purchase.order", company_id=cid) if IrSequence else None
+            )
             vals = dict(vals, name=f"PO/{next_val:05d}" if next_val is not None else "New")
         if env and ("currency_id" not in vals or not vals.get("currency_id")):
             Company = env.get("res.company")
-            if Company:
-                companies = Company.search([], limit=1)
-                if companies.ids:
-                    cdata = Company.browse(companies.ids[0]).read(["currency_id"])[0]
-                    cid = cdata.get("currency_id")
-                    if isinstance(cid, (list, tuple)) and cid:
-                        cid = cid[0]
-                    if cid:
-                        vals = dict(vals, currency_id=cid)
+            comp_id = vals.get("company_id")
+            comp_id = comp_id[0] if isinstance(comp_id, (list, tuple)) and comp_id else comp_id
+            if Company and comp_id:
+                cdata = Company.browse(comp_id).read(["currency_id"])[0]
+                cid = cdata.get("currency_id")
+                if isinstance(cid, (list, tuple)) and cid:
+                    cid = cid[0]
+                if cid:
+                    vals = dict(vals, currency_id=cid)
         return super().create(vals)
 
     @classmethod

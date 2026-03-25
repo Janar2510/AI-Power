@@ -6,6 +6,8 @@ from . import account_payment_term
 from . import account_bank_statement
 from . import account_reconcile
 from . import account_reconcile_wizard
+from . import account_reconcile_allocation
+from . import product_category
 from . import account_journal
 from . import account_report
 from . import account_tax

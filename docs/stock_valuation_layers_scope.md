@@ -1,6 +1,6 @@
 # Stock valuation layers — scope design (pre-code)
 
-**Status:** **Tier A (565)** + **Tier B FIFO consumption (570)** + **Tier C stub (571)** — outgoing moves consume positive layers’ `remaining_*` in **FIFO** order (`id`); shortfall uses product `standard_price`. **`res.company.stock_valuation_auto_account_move`** (on `res.company`, base module): when **True** and `account` is installed, a best-effort balanced draft **`account.move`** may be created (expense / `asset_current`), idempotent by `invoice_origin` `STK-COGS:…`.
+**Status:** **Tier A (565)** + **Tier B (570 FIFO + 578 AVCO + 579 lot + 580 negative policy)** + **Tier C stub (571 + 581 category accounts)** — FIFO outgoing consumes layers by `id` with optional **lot** domain (**579**); **`average`** outgoing uses `qty * standard_price` with pro-rata **`remaining_*`** reduction (**578**); when **`res.company.stock_valuation_allow_negative`** is **False**, insufficient layers raise (**580**, field on base `res.company`, default True). **`res.company.stock_valuation_auto_account_move`**: optional draft **`account.move`** (expense / `asset_current` or category accounts when defined — **581**), idempotent by `invoice_origin` `STK-COGS:…`.
 
 **References:** Read-only `odoo-19.0/addons/stock_account/` (workspace sibling of `erp-platform/`) vs ERP `erp-platform/addons/stock_account/` and [stock_odoo19_gap_audit.md](stock_odoo19_gap_audit.md).
 

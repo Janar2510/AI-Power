@@ -11,13 +11,13 @@
 
 ## Odoo 19 `stock_account` (behavioural breadth)
 
-Upstream adds valuation on **moves** (`value`, `account_move_id`, anglo-saxon / real-time / periodic), **stock.valuation.layer**, lot valuation, multi-company, and reporting. ERP implements **layers** with **FIFO remaining consumption** on outgoing (Phase **570**) and an **optional** draft **`account.move`** stub when **`res.company.stock_valuation_auto_account_move`** is set (Phase **571**); not full Odoo `_run_valuation` / anglo-saxon parity.
+Upstream adds valuation on **moves** (`value`, `account_move_id`, anglo-saxon / real-time / periodic), **stock.valuation.layer**, lot valuation, multi-company, and reporting. ERP implements **layers** with **FIFO remaining consumption** (Phase **570**), **AVCO-style outgoing** when `cost_method == "average"` (Phase **578**), **lot-scoped layer domain** (Phase **579**), **negative-stock guard** via **`stock_valuation_allow_negative`** (Phase **580**), and an **optional** draft **`account.move`** stub (Phase **571**) with **category account hints** when present (Phase **581**); not full Odoo `_run_valuation` / anglo-saxon parity.
 
 ## Gap table
 
 | Theme | Odoo-style | ERP today | Direction |
 |-------|------------|-----------|-----------|
-| Valuation layers | FIFO/AVCO layers, `_run_valuation` | `stock.valuation.layer` + `remaining_*`; outgoing consumes prior layers **FIFO** (Phase **570**); no full Odoo runner | AVCO policy refinement deferred |
+| Valuation layers | FIFO/AVCO layers, `_run_valuation` | `stock.valuation.layer` + `remaining_*`; **FIFO** (570) + **average outgoing** (578) + **lot_id** (579) + **allow_negative** flag (580); no full Odoo runner | Landed cost / full anglo-saxon deferred |
 | Account entries from stock | Real-time posting on done moves | Optional Tier **571** draft `account.move` (company flag); `stock_account` still no mandatory posting | MRP cost stub uses `account.move` separately |
 | Picking valuation flag | N/A as single field | `valuation_state` marks transfer “valued” for integrations | Keep; document as **subset** (Phase 539) |
 | Quant value | Valued quants, ownership exclusions | Quantity-focused quants | Align later if product needs COGS |

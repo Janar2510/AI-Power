@@ -139,6 +139,21 @@ function cleanupHost(host) {
   host.__modernSidebarCleanup = [];
 }
 
+function renderSidebarIntoHost(env, host) {
+  if (!host) return;
+  const shell = env.services.shell.state;
+  const tree = shell.sidebarTree || [];
+  const route = shell.route || "home";
+  cleanupHost(host);
+  host.innerHTML =
+    '<div class="o-sidebar-inner"><div class="o-sidebar-scroll">' +
+    (shell.staleBannerHtml ? '<div class="o-sidebar-stale">' + shell.staleBannerHtml + "</div>" : "") +
+    '<nav class="o-sidebar-nav" role="navigation">' +
+    (tree.length ? buildSidebarBranch(tree, 0, route, env.services.views) : '<p class="o-sidebar-empty">No menu items.</p>') +
+    "</nav></div></div>";
+  wireSidebar(host);
+}
+
 export class Sidebar extends Component {
   static template = xml`<div t-ref="host" class="o-modern-sidebar-slot"></div>`;
 
@@ -157,20 +172,24 @@ export class Sidebar extends Component {
 
   renderShell() {
     const host = this.hostRef.el;
-    if (!host) return;
-    const shell = this.env.services.shell.state;
-    const tree = shell.sidebarTree || [];
-    const route = shell.route || "home";
-    cleanupHost(host);
-    host.innerHTML =
-      '<div class="o-sidebar-inner"><div class="o-sidebar-scroll">' +
-      (shell.staleBannerHtml ? '<div class="o-sidebar-stale">' + shell.staleBannerHtml + "</div>" : "") +
-      '<nav class="o-sidebar-nav" role="navigation">' +
-      (tree.length ? buildSidebarBranch(tree, 0, route, this.env.services.views) : '<p class="o-sidebar-empty">No menu items.</p>') +
-      "</nav></div></div>";
-    wireSidebar(host);
+    renderSidebarIntoHost(this.env, host);
   }
 }
+
+Sidebar.fallbackMount = function fallbackMount(env, target) {
+  const render = function () {
+    renderSidebarIntoHost(env, target);
+  };
+  render();
+  const unsubscribe = env.services.shell.subscribe(render);
+  return {
+    destroy() {
+      cleanupHost(target);
+      if (typeof unsubscribe === "function") unsubscribe();
+    },
+    mode: "fallback",
+  };
+};
 
 export function mountSidebar(env, target) {
   if (!target) return null;

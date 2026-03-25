@@ -21,6 +21,9 @@
 - **`mrp_account` manufacturing cost draft move:** When `cost_estimate` > 0 and expense + `asset_current` accounts exist, creates **two** `account.move.line` rows (balanced) so the draft entry satisfies `account.move` Phase 535 posting rules if later posted.
 
 ### Fixed
+- **Stock valuation (average / FIFO outgoing):** Outgoing moves now consume positive layers with the same **per-layer `min(remaining_qty, need)`** walk for all cost methods, then apply **`standard_price`** only to the uncovered shortfall — fixes **over-consumption** of `remaining_*` when `out_qty` exceeds on-hand layers and negative valuation is allowed (`tests/test_stock_valuation_outgoing_shortfall_phase586.py`).
+- **Multi-company SO/PO defaults:** `sale.order` / `purchase.order` use **`core.orm.company_context.default_company_id_for_env`** (RPC `context.company_id` from session) before falling back to the user’s or first company; currency default follows the resolved `company_id`.
+- **CSP + Owl shell:** `_webclient_html` sets **`cspScriptEvalBlocked: true`**; `owl_bridge.js` uses it so navbar/sidebar **`fallbackMount` without a client `new Function` probe** (no extra CSP violations; no unsafe-eval required). Rebuild: `npm run build:web`.
 - **`parse_po_file` (Phase 545):** Use non-greedy `msgid` / `msgstr` patterns so a block does not capture from the first quote through the last quote (which merged `msgstr` into `msgid` and broke `load_po_file` tuples).
 - **`load_default_data` translations:** `core.db.init_data` imported `discover_po_files` / `load_po_file` from `core.tools.translate` but they were missing, causing *Could not load translations: cannot import name 'discover_po_files'*. Implemented both helpers (scan `addons/*/i18n/*.po`, parse via existing `parse_po_file`).
 - **`db init` without pgvector:** `CREATE EXTENSION vector` failure left Postgres in an **aborted transaction**, so later DDL failed with `InFailedSqlTransaction`. Extension creation now runs under a **SAVEPOINT** with `ROLLBACK TO SAVEPOINT` on failure. If the extension is missing, **`fields.Vector` columns are created as JSONB** and `Registry._pgvector_native` + `_prepare_jsonb_vals` store embedding lists as JSON until you install pgvector and migrate (RAG distance queries use ILIKE fallback per existing docs).
@@ -63,6 +66,22 @@
 
 ### Changed
 - **`menuToRoute`:** `stages` alone maps to CRM stages (`crm_stages`); `recruitment stages` still maps to `recruitment_stages` (no longer steals plain “Stages”).
+
+## 1.209.0 - Post–208: Waves X/Y/Z/H (Phases 574–583) (2026-03-24)
+
+### Added
+
+- **Phase 574:** `AppCore.BreadcrumbStrip` / `buildBreadcrumbsHtml` in `addons/web/static/src/app/breadcrumb_strip.js`; legacy `main.js` delegates when the modern bundle loads.
+- **Phase 575:** `AppCore.KanbanControlStrip` (`kanban_control_strip.js`); `navbar_facade.js` — `__erpNavbarFacade.markSystrayRendered` sets `data-erp-systray-contract="575"`.
+- **Phase 576:** Documented optional env **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** for a future esbuild-primary template pilot (`docs/frontend.md`); CI comment in `.github/workflows/ci.yml`.
+- **Phase 577:** `account.reconcile.allocation` model; wizard line **`allocate_amount`**; `action_reconcile` partial allocations with residual caps; `tests/test_account_reconcile_allocation_phase577.py`.
+- **Phases 578–581:** Stock valuation — **average** outgoing COGS + pro-rata layer reduction; **`stock.valuation.layer.lot_id`** and lot-scoped FIFO domain; **`res.company.stock_valuation_allow_negative`** (base); optional **`product.category`** COGS/valuation account fields for Tier C stub; `tests/test_stock_valuation_post208_phase578_581.py`.
+- **Phase 582:** `next_by_code(..., company_id=)` on **sale.order**, **purchase.order**, and **account.bank.statement** naming.
+- **Phase 583:** **`res.company.account_lock_adviser_group_id`** — users in that group bypass **`account_lock_date`** on `account.move.action_post`.
+
+### Changed
+
+- **Docs:** `docs/parity_matrix.md` (574–583), `odoo19-webclient-gap-table.md`, `account_odoo19_gap_audit.md`, `account_partial_reconcile_design.md` (partial-only shipped; FX deferred), `stock_valuation_layers_scope.md`, `stock_odoo19_gap_audit.md`, `docs/ai-implementation-checklist.md`, `DeploymentChecklist.md`.
 
 ## 1.208.0 - Post–207: Wave U/V/W (Phases 566–573) (2026-03-24)
 
@@ -2831,3 +2850,4 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
 - Added `addons/web/static/dist/modern_webclient.js` as the primary modern runtime entry.
 - Converted `addons/web/static/src/main.js` into a legacy boot adapter instead of the long-term shell entrypoint.
 - Added frontend migration ADR and architecture docs for the phases 1-5 re-architecture.
+- Added a CSP-safe shell mount fallback so modern navbar/sidebar rendering no longer depends on OWL runtime template compilation with `unsafe-eval`.

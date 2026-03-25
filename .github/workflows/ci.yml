@@ -46,6 +46,8 @@ jobs:
           pip install "passlib[bcrypt]>=1.7"
           pip install pytest-cov
 
+      # Phase 576: optional future pilot — ERP_WEBCLIENT_ESBUILD_PRIMARY=1 + template switch (not default).
+      # Run full shell regression from DeploymentChecklist before enabling in production.
       - name: Web concat guard + bundle (esbuild)
         run: |
           if [ -f package.json ]; then

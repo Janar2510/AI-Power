@@ -89,22 +89,17 @@ class AccountReconcileWizard(TransientModel):
             rec._prepare_wizard_lines()
         return records
 
-    def action_reconcile(self):
-        """Reconcile selected statement lines with move lines."""
-        if not self or not self.ids:
-            return None
+    def _action_reconcile_legacy_full_match(self):
+        """Full statement line ↔ move link when allocation model is unavailable."""
         env = getattr(self, "env", None)
         StmtLine = env.get("account.bank.statement.line") if env else None
-        if not StmtLine:
+        MoveLine = env.get("account.move.line") if env else None
+        WizardLine = env.get("account.reconcile.wizard.line") if env else None
+        if not StmtLine or not MoveLine or not WizardLine:
             return None
         recon_id = str(uuid.uuid4())
         for wiz in self:
             line_ids = wiz.line_ids.ids if wiz.line_ids else []
-            if not line_ids:
-                continue
-            WizardLine = env.get("account.reconcile.wizard.line") if env else None
-            if not WizardLine:
-                continue
             for line in WizardLine.browse(line_ids):
                 row = line.read(["statement_line_id", "move_line_id"])[0]
                 stmt_val = row.get("statement_line_id")
@@ -113,9 +108,6 @@ class AccountReconcileWizard(TransientModel):
                 move_line_id = move_val[0] if isinstance(move_val, (list, tuple)) and move_val else move_val
                 if not stmt_line_id or not move_line_id:
                     continue
-                MoveLine = env.get("account.move.line") if env else None
-                if not MoveLine:
-                    continue
                 ml_row = MoveLine.browse(move_line_id).read(["move_id"])[0]
                 move_id = ml_row.get("move_id")
                 move_id = move_id[0] if isinstance(move_id, (list, tuple)) and move_id else move_id
@@ -123,6 +115,106 @@ class AccountReconcileWizard(TransientModel):
                     continue
                 StmtLine.browse(stmt_line_id).write({"move_id": move_id})
                 MoveLine.browse(move_line_id).write({"reconciled_id": recon_id})
+        self.unlink()
+        return None
+
+    def action_reconcile(self):
+        """Reconcile selected statement lines with move lines (Phase 577: partial allocations)."""
+        if not self or not self.ids:
+            return None
+        env = getattr(self, "env", None)
+        StmtLine = env.get("account.bank.statement.line") if env else None
+        MoveLine = env.get("account.move.line") if env else None
+        Move = env.get("account.move") if env else None
+        Alloc = env.get("account.reconcile.allocation") if env else None
+        WizardLine = env.get("account.reconcile.wizard.line") if env else None
+        if not StmtLine or not MoveLine or not WizardLine:
+            return None
+        if not Alloc:
+            return self._action_reconcile_legacy_full_match()
+        recon_id = str(uuid.uuid4())
+
+        def _sum_alloc_stmt(sid: int) -> float:
+            if not Alloc:
+                return 0.0
+            rows = Alloc.search_read([("statement_line_id", "=", sid)], ["amount"])
+            return sum(float(r.get("amount") or 0) for r in rows)
+
+        def _sum_alloc_ml(mlid: int) -> float:
+            if not Alloc:
+                return 0.0
+            rows = Alloc.search_read([("move_line_id", "=", mlid)], ["amount"])
+            return sum(float(r.get("amount") or 0) for r in rows)
+
+        for wiz in self:
+            line_ids = wiz.line_ids.ids if wiz.line_ids else []
+            if not line_ids:
+                continue
+            touched_stmt = set()
+            touched_ml = set()
+            for line in WizardLine.browse(line_ids):
+                row = line.read(["statement_line_id", "move_line_id", "allocate_amount"])[0]
+                stmt_val = row.get("statement_line_id")
+                stmt_line_id = stmt_val[0] if isinstance(stmt_val, (list, tuple)) and stmt_val else stmt_val
+                move_val = row.get("move_line_id")
+                move_line_id = move_val[0] if isinstance(move_val, (list, tuple)) and move_val else move_val
+                if not stmt_line_id or not move_line_id:
+                    continue
+                srow = StmtLine.browse(stmt_line_id).read(["amount"])[0]
+                stmt_amt = abs(float(srow.get("amount") or 0))
+                ml_row = MoveLine.browse(move_line_id).read(["debit", "credit", "move_id"])[0]
+                bal = abs(float(ml_row.get("debit") or 0) - float(ml_row.get("credit") or 0))
+                user_amt = float(row.get("allocate_amount") or 0)
+                if user_amt > 0:
+                    want = min(user_amt, stmt_amt, bal)
+                else:
+                    want = min(stmt_amt, bal)
+                stmt_left = stmt_amt - _sum_alloc_stmt(stmt_line_id)
+                ml_left = bal - _sum_alloc_ml(move_line_id)
+                alloc_amt = min(want, stmt_left, ml_left)
+                if alloc_amt <= 1e-9:
+                    continue
+                move_id = ml_row.get("move_id")
+                move_id = move_id[0] if isinstance(move_id, (list, tuple)) and move_id else move_id
+                comp = None
+                if move_id and Move:
+                    crow = Move.browse(move_id).read(["company_id"])[0].get("company_id")
+                    comp = crow[0] if isinstance(crow, (list, tuple)) and crow else crow
+                if Alloc:
+                    Alloc.create({
+                        "statement_line_id": stmt_line_id,
+                        "move_line_id": move_line_id,
+                        "amount": alloc_amt,
+                        "company_id": comp,
+                    })
+                touched_stmt.add(stmt_line_id)
+                touched_ml.add(move_line_id)
+
+            if not Alloc:
+                continue
+            for sid in touched_stmt:
+                stmt_amt = abs(
+                    float(StmtLine.browse(sid).read(["amount"])[0].get("amount") or 0)
+                )
+                if _sum_alloc_stmt(sid) + 0.01 < stmt_amt:
+                    continue
+                alloc_rows = Alloc.search_read([("statement_line_id", "=", sid)], ["move_line_id"])
+                if not alloc_rows:
+                    continue
+                ml_ref = alloc_rows[0].get("move_line_id")
+                mlid = ml_ref[0] if isinstance(ml_ref, (list, tuple)) and ml_ref else ml_ref
+                if not mlid:
+                    continue
+                mv = MoveLine.browse(mlid).read(["move_id"])[0].get("move_id")
+                mid = mv[0] if isinstance(mv, (list, tuple)) and mv else mv
+                if mid:
+                    StmtLine.browse(sid).write({"move_id": mid})
+            for mlid in touched_ml:
+                mdata = MoveLine.browse(mlid).read(["debit", "credit"])[0]
+                bal = abs(float(mdata.get("debit") or 0) - float(mdata.get("credit") or 0))
+                if _sum_alloc_ml(mlid) + 0.01 < bal:
+                    continue
+                MoveLine.browse(mlid).write({"reconciled_id": recon_id})
         self.unlink()
         return None
 
@@ -157,4 +249,9 @@ class AccountReconcileWizardLine(TransientModel):
     move_line_id = fields.Many2one(
         "account.move.line",
         string="Journal Item",
+    )
+    allocate_amount = fields.Float(
+        string="Amount to allocate",
+        default=0.0,
+        help="Phase 577: 0 = auto (min of statement line and move line open amounts).",
     )

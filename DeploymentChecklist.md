@@ -1,5 +1,23 @@
 # Deployment Checklist
 
+## Post–208 — Phases 574–583 (web slices, partial reconcile, stock valuation depth, sequence + lock adviser) (v1.209.0)
+
+### Pre-Deployment
+
+- [ ] **574–575:** After UI changes: `npm install && npm run check:assets-concat && npm run build:web` → `addons/web/static/dist/modern_webclient.js`.
+- [ ] **576:** Do **not** set `ERP_WEBCLIENT_ESBUILD_PRIMARY=1` in production until shell regression (login, list control panel, form footer, breadcrumbs, kanban chrome, systray contract marker) passes on a staging template that loads esbuild-only entry.
+- [ ] **577:** `db upgrade` — table **`account_reconcile_allocation`**; partial reconcile wizard uses **`allocate_amount`** (0 = auto min). FX not in this slice.
+- [ ] **578–581:** `db upgrade` — **`stock_valuation_layer.lot_id`**; **`res_company.stock_valuation_allow_negative`** (default True); optional **`product_category`** account columns when `account` defines them.
+- [ ] **582:** Ensure **`ir.sequence`** rows for `sale.order` / `purchase.order` / `account.bank.statement` are **per company** where multi-company applies.
+- [ ] **583:** Set **`account_lock_adviser_group_id`** only for a trusted internal group if finance wants lock bypass for power users.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_account_reconcile_allocation_phase577 tests.test_stock_valuation_post208_phase578_581`
+- [ ] Optional: bank reconcile wizard smoke with two partial allocations then full close of statement line / move line.
+
+---
+
 ## Wave O — Phases 555–559 (partner fiscal, SW shell cache, lock date, palette a11y, docs) (Unreleased)
 
 ### Pre-Deployment

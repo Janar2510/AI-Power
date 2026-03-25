@@ -124,6 +124,15 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **572:** `docs/account_partial_reconcile_design.md` (design-only).
 - [x] **573:** `docs/frontend.md` Phase 542 milestone + gap table assets row; `changelog.md` **1.208.0**; `DeploymentChecklist.md`; matrix **544** / **566–573**; `account_odoo19_gap_audit.md`.
 
+## Phases 574–583 (post–1.208: Waves X/Y/Z/H)
+
+- [x] **574–575:** Breadcrumb strip + kanban chrome + navbar systray facade; `odoo19-webclient-gap-table.md`; `npm run build:web` → `modern_webclient.js`.
+- [x] **576:** `ERP_WEBCLIENT_ESBUILD_PRIMARY` pilot documented in `docs/frontend.md`; CI comment `.github/workflows/ci.yml`.
+- [x] **577:** `account.reconcile.allocation`, wizard `allocate_amount`, `account_partial_reconcile_design.md` + matrix **544** / **577**, `account_odoo19_gap_audit.md`; `tests/test_account_reconcile_allocation_phase577.py`.
+- [x] **578–581:** AVCO outgoing, `lot_id` layers, `stock_valuation_allow_negative`, category account fields; `stock_valuation_layers_scope.md`, `stock_odoo19_gap_audit.md`; `tests/test_stock_valuation_post208_phase578_581.py`.
+- [x] **582–583:** `next_by_code` company_id on SO/PO/bank statement; `account_lock_adviser_group_id` bypass on post.
+- [x] **Release docs:** `core/release.py` **1.209.0**, `changelog.md`, `DeploymentChecklist.md`, `docs/parity_matrix.md`.
+
 ## Sidebar navigation (greyed-out submenus)
 
 - [ ] CRM Configuration submenus (Stages, Tags, Lost Reasons) resolve actions and routes; `crm.lost.reason` model installed after upgrade.

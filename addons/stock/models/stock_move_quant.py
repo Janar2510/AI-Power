@@ -71,22 +71,36 @@ class StockMove(Model):
                     })
 
     def _create_valuation_layers(self):
-        """Phase 173: Create stock.valuation.layer on done moves (in/out of internal)."""
+        """Create stock.valuation.layer on done moves (FIFO / AVCO / lot / negative policy)."""
         Layer = self.env.get("stock.valuation.layer")
         Location = self.env.get("stock.location")
         Product = self.env.get("product.product")
+        Company = self.env.get("res.company")
         if not Layer or not Location or not Product:
             return
+        allow_negative = True
+        if Company:
+            crows = Company.search_read([], ["stock_valuation_allow_negative"], limit=1)
+            if crows and crows[0].get("stock_valuation_allow_negative") is False:
+                allow_negative = False
         internal_ids = [r["id"] for r in Location.search_read([("type", "=", "internal")], ["id"])]
         if not internal_ids:
             return
         for move in self:
-            row = move.read(["product_id", "location_id", "location_dest_id", "product_uom_qty", "name"])[0]
+            row = move.read(
+                ["product_id", "location_id", "location_dest_id", "product_uom_qty", "name", "lot_id"]
+            )[0]
             pid = row.get("product_id")
             src_id = row.get("location_id")
             dest_id = row.get("location_dest_id")
             qty = row.get("product_uom_qty", 0)
             name = row.get("name") or ""
+            lot_raw = row.get("lot_id")
+            lot_id = (
+                lot_raw[0]
+                if isinstance(lot_raw, (list, tuple)) and lot_raw
+                else (lot_raw if lot_raw else False)
+            )
             if not pid or qty <= 0:
                 continue
             pid = pid[0] if isinstance(pid, (list, tuple)) else pid
@@ -95,17 +109,21 @@ class StockMove(Model):
             move_id = move.id if hasattr(move, "id") else (move.ids[0] if move.ids else None)
             prod_rows = Product.browse([pid]).read(["standard_price", "cost_method"])
             unit_cost = prod_rows[0].get("standard_price", 0) if prod_rows else 0
-            cost_method = prod_rows[0].get("cost_method", "standard") if prod_rows else "standard"
+            cost_method = (prod_rows[0].get("cost_method", "standard") if prod_rows else "standard") or "standard"
             src_internal = src_id in internal_ids
             dest_internal = dest_id in internal_ids
             if src_internal and not dest_internal:
-                # Outgoing: Phase 570 Tier B — FIFO consume positive layers' remaining_*; shortfall at standard_price.
-                fifo_layers = Layer.search(
-                    [("product_id", "=", pid), ("remaining_qty", ">", 0)],
-                    order="id",
-                )
-                need = float(qty)
+                domain = [("product_id", "=", pid), ("remaining_qty", ">", 0)]
+                if lot_id:
+                    domain.append(("lot_id", "=", lot_id))
+                else:
+                    domain.append(("lot_id", "=", False))
+                fifo_layers = Layer.search(domain, order="id")
+                out_qty = float(qty)
                 total_cogs = 0.0
+                # FIFO and average both consume positive layers by qty (min per layer, walk in id order).
+                # Pro-rating AVCO COGS across full out_qty against partial on-hand corrupted remaining_*.
+                need = out_qty
                 for lid in fifo_layers.ids or []:
                     if need <= 0:
                         break
@@ -119,11 +137,18 @@ class StockMove(Model):
                     portion = take / rq if rq else 0.0
                     val_take = rv * portion
                     total_cogs += val_take
-                    new_rq = rq - take
-                    new_rv = rv - val_take
-                    brow.write({"remaining_qty": new_rq, "remaining_value": new_rv})
+                    brow.write(
+                        {
+                            "remaining_qty": rq - take,
+                            "remaining_value": rv - val_take,
+                        }
+                    )
                     need -= take
                 if need > 0:
+                    if not allow_negative:
+                        raise ValueError(
+                            "Insufficient valuation layers for outgoing move (negative stock disallowed)."
+                        )
                     total_cogs += need * float(unit_cost)
                 v = -total_cogs
                 uc = (total_cogs / qty) if qty else unit_cost
@@ -135,15 +160,13 @@ class StockMove(Model):
                     "remaining_qty": -qty,
                     "remaining_value": v,
                     "stock_move_id": move_id,
+                    "lot_id": lot_id or None,
                     "description": f"Out: {name}",
                 }
                 Layer.create(layer_vals)
                 move._stock_tier_c_valuation_move_stub(pid, total_cogs, f"m{move_id}-{name}")
             elif dest_internal and not src_internal:
-                # Incoming: positive layer; for average, update product cost
                 if cost_method == "average":
-                    # Weighted average: (old_val + in_qty*in_cost) / (old_qty + in_qty)
-                    # cur_qty from quants already includes this move; old_qty = cur_qty - qty
                     Quant = self.env.get("stock.quant")
                     cur_qty = 0.0
                     cur_val = 0.0
@@ -159,7 +182,7 @@ class StockMove(Model):
                         )
                         cur_val = sum(r.get("value", 0) for r in layers)
                     in_val = qty * unit_cost
-                    new_qty = cur_qty  # already includes this move
+                    new_qty = cur_qty
                     new_val = cur_val + in_val
                     unit_cost = (new_val / new_qty) if new_qty else unit_cost
                     Product.browse([pid]).write({"standard_price": unit_cost})
@@ -172,5 +195,6 @@ class StockMove(Model):
                     "remaining_qty": qty,
                     "remaining_value": inv,
                     "stock_move_id": move_id,
+                    "lot_id": lot_id or None,
                     "description": f"In: {name}",
                 })

@@ -24,7 +24,7 @@ Odoo CE `account` typically spreads across many models: move/posting pipeline, f
 | Posting gate | Draft-only post; balanced lines; lines require accounts; strict sequence/lock dates in full Odoo | Balanced lines + lines required (Phase 467+535); draft-only post; account on each line enforced | Close critical invariants first; defer lock dates / sequences |
 | Move types / payments | Rich move types, payment registers, outstanding accounts | Narrow `move_type`; payments via `payment.transaction` bridge | Document subset; extend when sale/purchase need it |
 | Taxes | Fiscal positions, included/excluded price, multi-tax ordering, repartition lines | `compute_all` percent/fixed; **single-tax price_include** (Phase 536) | Expand only with tests per flow |
-| Bank / reconcile | Statement models, matching rules, partial reconcile, FX | Statement + `_auto_reconcile` + wizard (`action_reconcile`); `reconciled_id` string | Partial reconcile = **deferred** (matrix) |
+| Bank / reconcile | Statement models, matching rules, partial reconcile, FX | Statement + `_auto_reconcile` + wizard (`action_reconcile`); `reconciled_id` string; **577** `account.reconcile.allocation` + wizard `allocate_amount` (partial slice; FX still deferred) | Partial **implemented** (allocation audit); FX = **deferred** |
 | Reporting | Full reporting engine + optional `account_reports` | SQL TB / P&amp;L / BS helpers on `account.account` | **Deferred** full parity; keep subset documented |
 | Security / audit | Record rules, tax audit, lock | `_audit` on `account.move`; base ACLs | Align when security track prioritises |
 
@@ -60,7 +60,7 @@ See **Phases 535–538** in `docs/parity_matrix.md`.
 
 Remaining deferrals (clean-room vs `odoo-19.0/addons/account/` when prioritized):
 
-- **Partial reconcile + FX** — design doc **`docs/account_partial_reconcile_design.md`** (**Phase 572**); implementation **deferred** until sign-off.
+- **Partial reconcile (no FX in v1 slice)** — **`account.reconcile.allocation`** + wizard **`allocate_amount`** (**Phase 577**); design **`docs/account_partial_reconcile_design.md`** (**572**). **FX** remains **deferred** (separate phase after stable partial-only).
 - **Full multi-company lock matrix** — only per-move company + `account_lock_date` on `res.company`; no role-based “adviser” bypass yet.
 
-Update this doc when a subtrack ships; keep matrix rows **544**, **546**, **551**, **555**, **557**, **560**, **563**, **564**, **568**, **569**, and **572** in sync.
+Update this doc when a subtrack ships; keep matrix rows **544**, **546**, **551**, **555**, **557**, **560**, **563**, **564**, **568**, **569**, **572**, and **577** in sync.

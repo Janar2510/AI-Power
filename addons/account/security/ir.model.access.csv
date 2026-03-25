@@ -10,5 +10,6 @@ access_account_bank_statement_user,account.bank.statement user,model_account_ban
 access_account_bank_statement_line_user,account.bank.statement.line user,model_account_bank_statement_line,,1,1,1,1
 access_account_reconcile_wizard_user,account.reconcile.wizard user,model_account_reconcile_wizard,,1,1,1,1
 access_account_reconcile_wizard_line_user,account.reconcile.wizard.line user,model_account_reconcile_wizard_line,,1,1,1,1
+access_account_reconcile_allocation_user,account.reconcile.allocation user,model_account_reconcile_allocation,,1,1,1,1
 access_account_fiscal_position_user,account.fiscal.position user,model_account_fiscal_position,,1,1,1,1
 access_account_fiscal_position_tax_user,account.fiscal.position.tax user,model_account_fiscal_position_tax,,1,1,1,1

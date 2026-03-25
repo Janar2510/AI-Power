@@ -32,7 +32,9 @@ export function createBootstrap() {
     theme: bootstrap.theme || "light",
     debugAssets: !!bootstrap.debugAssets,
     session: bootstrap.session || null,
-    menus: Array.isArray(bootstrap.menus) ? bootstrap.menus : [],
+    // Omitting `menus` in __erpFrontendBootstrap must mean "load from API", not a cached empty list.
+    menus:
+      Array.isArray(bootstrap.menus) && bootstrap.menus.length > 0 ? bootstrap.menus : null,
     shellOwner: bootstrap.shellOwner || "modern",
     endpoints: Object.assign({
       sessionInfo: "/web/session/get_session_info",

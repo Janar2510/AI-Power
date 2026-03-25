@@ -1,5 +1,37 @@
 # Deployment Checklist
 
+## Post–218 — Phases 630–635 (app routing parity, website/eCommerce placeholders, strict routing flag, 1.219.0) (v1.219.0)
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat && npm run build:web`** after **`main.js`** changes.
+- [ ] No DB migration for this wave.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_main_js_route_consistency_phase631 -v`
+- [ ] Browser: from **#home**, open tiles **Website** and **eCommerce** — expect **empty-state** placeholders (not silent return to home).
+- [ ] Optional QA: `window.__ERP_STRICT_ROUTING = true` — open an intentionally missing slug and confirm **Route not available** empty state instead of home.
+
+---
+
+## Post–215 — Phases 620–628 (kanban load-more parity, home layout, router test, 1.218.0) (v1.218.0)
+
+### Ops note (empty registry / `Available: []`)
+
+- If **`call_kw`** returns **500** and logs show **`Model … not found. Available: []`**, the ORM registry was built with a bad addons path (often after **`_get_registry`** overwrote config with cwd-relative **`addons`**). **Pull ≥ fix in `core/http/auth.py`**, then **restart the app server** (restart clears in-memory **`_registries`** cache). Run from project root or use an absolute **`--addons-path=`** on **`erp-bin server`**.
+
+### Pre-Deployment
+
+- [ ] **620–622:** `npm run check:assets-concat && npm run build:web`. Smoke: Kanban with **>20** cards in a column — **Load more** adds cards with the same chrome (`.o-kanban-card` when modern bundle registers **`KanbanCardChrome`**); checkbox on newly loaded row updates **bulk** bar.
+- [ ] **623–626:** Smoke: **#home** — app tiles appear **above** the KPI strip; scrolling to **Dashboard** section still shows **`AppCore.Dashboard.render`** widgets (no KPI regression).
+
+### Verification
+
+- [ ] Browser: `/web/static/tests/test_runner.html` — **kanban_renderer** + **router** suites pass.
+
+---
+
 ## Post–214 — Phases 614–619 (pivot/calendar chrome, ActionManager tests, RPC context merge, 1.215.0) (v1.215.0)
 
 ### Pre-Deployment

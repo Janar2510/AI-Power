@@ -396,7 +396,7 @@
     };
   }
   function createMenuService(bootstrap, viewsService) {
-    let cachedMenus = Array.isArray(bootstrap.menus) ? bootstrap.menus : null;
+    let cachedMenus = bootstrap.menus && Array.isArray(bootstrap.menus) && bootstrap.menus.length > 0 ? bootstrap.menus : null;
     let listeners = /* @__PURE__ */ new Set();
     function notify() {
       listeners.forEach(function(listener) {
@@ -405,7 +405,9 @@
     }
     return {
       load(force) {
-        if (!force && cachedMenus) return Promise.resolve(cachedMenus);
+        if (!force && cachedMenus) {
+          return Promise.resolve(cachedMenus);
+        }
         return fetch(bootstrap.endpoints.menus, {
           method: "GET",
           credentials: "include"
@@ -842,7 +844,8 @@
       theme: bootstrap.theme || "light",
       debugAssets: !!bootstrap.debugAssets,
       session: bootstrap.session || null,
-      menus: Array.isArray(bootstrap.menus) ? bootstrap.menus : [],
+      // Omitting `menus` in __erpFrontendBootstrap must mean "load from API", not a cached empty list.
+      menus: Array.isArray(bootstrap.menus) && bootstrap.menus.length > 0 ? bootstrap.menus : null,
       shellOwner: bootstrap.shellOwner || "modern",
       endpoints: Object.assign({
         sessionInfo: "/web/session/get_session_info",

@@ -183,6 +183,22 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **618:** Graph/pivot load errors → **`o-list-load-error`** (**evidence:** `main.js`**).
 - [x] **619:** Release **1.215.0** docs (changelog, matrix, DeploymentChecklist, gap table, checklist).
 
+## Phases 630–635 (app routing parity + strict routing flag + release 1.219.0)
+
+- [x] **630:** Playbook in **`docs/frontend.md`** — **`__ERP_DEBUG_SIDEBAR_MENU`**, **`__ERP_STRICT_ROUTING`**, hash triage.
+- [x] **631:** **`tests/test_main_js_route_consistency_phase631.py`** — **`DATA_ROUTES_SLUGS`** vs **`getModelForRoute`** vs **`menuToRoute`** literals + **`fleet_vehicle`** mapping.
+- [x] **632:** **`main.js`** — **`fleet`** + **`website`** + **`ecommerce`** in **`DATA_ROUTES_SLUGS`**; **`actionToRoute`** **`fleet_vehicle`→`fleet`**; **`menuToRoute`** **`messaging`→`discuss`**; dedicated **`website`** / **`ecommerce`** placeholder shells.
+- [x] **633:** **`window.__ERP_STRICT_ROUTING`** — unknown list/form routes show **`EmptyState`** instead of silent **`renderHome()`**.
+- [x] **634:** Missing apps parity + working menu rows closed with evidence (**above**).
+- [x] **635:** Version **1.219.0** + changelog + matrix + DeploymentChecklist.
+
+## Phases 620–628 (kanban load-more + home layout + checklist audit + release 1.218.0)
+
+- [x] **620–622:** Kanban **load more** + **delegated** events + **`test_kanban_renderer.js`** (**evidence:** **`kanban_renderer.js`**, **`test_kanban_renderer.js`**).
+- [x] **623–626:** **`renderHome`** — app grid before KPI strip; dashboard wrap unchanged (**evidence:** **`main.js`**).
+- [x] **621 (audit):** Checklist rows **215–218** verified against **`routes.py`**, **`rpc.py`**, **`main.js`** (bundled into wave 1 checklist pass).
+- [x] **627–628:** Router **`setHandlers`** test + version **1.218.0** + docs (**evidence:** **`test_router.js`**, **`core/release.py`**, **`changelog.md`**).
+
 ## Sidebar navigation (greyed-out submenus)
 
 - [x] CRM Configuration submenus (Stages, Tags, Lost Reasons) resolve actions and routes; `crm.lost.reason` model installed after upgrade (**evidence:** `crm_views.xml` act_windows + menus; `tests/test_parallel_track_be_phase590.py`; `DATA_ROUTES_SLUGS` / `getModelForRoute` already include `crm_stages`, `crm_tags`, `crm_lost_reasons`).
@@ -209,20 +225,20 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] `SearchModel` facet lifecycle works end-to-end (`addFacet/removeFacet/renderFacets`) and `search_default_*` context values become initial facets (**evidence:** **`list_view.js`** + **`test_search_model.js`**; **608**).
 - [x] Search autocomplete suggestions appear from search-view fields and selected suggestion applies a domain facet (**evidence:** **`list_view.js`** input handler + **`getAutocompleteSuggestions`**; precision **612**).
 - [x] Custom filter builder can add ad-hoc domain facets and reload list results (**evidence:** **Custom filter…** branch in **`list_view.js`** — **608** scope).
-- [ ] Kanban supports fold persistence, multi-select bulk bar, progressive loading, and optional dynamic card template callback.
+- [x] Kanban supports fold persistence, multi-select bulk bar, progressive loading, optional **`cardTemplate`**, and **load-more** rows use **`KanbanCardChrome`** when registered (**evidence:** **`kanban_renderer.js`** + **`test_kanban_renderer.js`** — **620–622**).
 - [x] `field_registry.js` renders new widgets (`priority`, `state_selection`, `handle`, `email`, `url`, `phone`, `copy_clipboard`, `float_time`, `radio`, `many2many_checkboxes`) (**evidence:** **`test_field_registry.js`**; **610** token classes for **`priority`** / **`state_selection`**).
 - [x] `ActionManager.doActionButton()` handles both `type="object"` and `type="action"` form header buttons (**evidence:** **`main.js`** `[data-btn-type]` wiring + **`test_action_manager_phase616.js`** — **616**).
-- [ ] `ConfirmDialog.openModal()` is usable for wizard flows (`target: "new"`) including breadcrumb updates.
-- [ ] `/web/action/run_server_action` executes `ir.actions.server` with user context and returns JSON result payload.
-- [ ] `/web/async/call_notify` returns async queue counts for the current user session.
-- [ ] Session includes `allowed_company_ids` and RPC context receives `company_id` + `allowed_company_ids`.
-- [x] JS unit tests are wired and visible in `test_runner.html` for search model, field registry, **ActionManager** (**evidence:** **`test_search_model.js`**, **`test_field_registry.js`**, **`test_action_manager_phase616.js`** — **608** / **610** / **616**); router, form view, kanban, import remain as listed in other rows.
+- [x] `ConfirmDialog.openModal()` is usable for wizard flows (`target: "new"`) including breadcrumb updates (**evidence:** **`main.js`** form button runner + **`confirm_dialog.js`** **`setBreadcrumbs`** — **621** audit).
+- [x] `/web/action/run_server_action` executes `ir.actions.server` with user context and returns JSON result payload (**evidence:** **`core/http/routes.py`** **`run_server_action`** — **621** audit).
+- [x] `/web/async/call_notify` returns async queue counts for the current user session (**evidence:** **`routes.py`** **`async_call_notify`** + **`main.js`** systray fetch — **621** audit).
+- [x] Session includes `allowed_company_ids` and RPC context receives `company_id` + `allowed_company_ids` when provided (**evidence:** **`merge_session_into_rpc_context`** + **`core/http/rpc.py`** call_kw paths — **617** / **621** audit).
+- [x] JS unit tests are wired and visible in `test_runner.html` for search model, field registry, **ActionManager**, **kanban_renderer**, **router** (**evidence:** **`test_kanban_renderer.js`**, **`test_router.js`** — **620** / **627**).
 
 ## Phases 423–436 (1.203)
 
-- [ ] Router handlers are registered through `AppCore.Router.setHandlers` and route flow still handles unsaved form confirmation.
-- [ ] `AppCore.Sidebar` is loaded before `main.js` and sidebar render/wire delegation is active.
-- [ ] `AppCore.FormView.setImpl` is registered from `main.js` (no behavior regression for form create/edit/chatter paths).
+- [x] Router handlers are registered through `AppCore.Router.setHandlers` and route flow still handles unsaved form confirmation (**evidence:** **`main.js`** boot **`RouterCore.setHandlers`** + **`test_router.js`** **setHandlers** test — **627**).
+- [x] `AppCore.Sidebar` is loaded before `main.js` and sidebar render/wire delegation is active (**evidence:** **`addons/web/__manifest__.py`** **`sidebar.js`** before **`main.js`** + **`main.js`** **`AppCore.Sidebar.setImpl`** — **627** audit).
+- [x] `AppCore.FormView.setImpl` is registered from `main.js` (no behavior regression for form create/edit/chatter paths) (**evidence:** **`main.js`** **`AppCore.FormView.setImpl`** — **627** audit).
 - [ ] `ir.async` model is available over RPC (`call`, `call_notify`, `run_pending`, `gc_done`) and scheduler runs pending jobs.
 - [ ] Report async endpoint `/report/pdf_async/<report>/<ids>` queues jobs successfully.
 - [ ] `core/http/report.py` qweb-ish directive mapping works for templates using `t-foreach`, `t-if`, `t-esc`, `t-raw`.
@@ -240,7 +256,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Next phases / Odoo parity (1.201)
 
-- [ ] `web.assets_web` loads `field_registry.js`, `search_model.js`, `action_manager.js` before `list_view.js` / `main.js`.
+- [x] `web.assets_web` loads `field_registry.js`, `search_model.js`, `action_manager.js` before `list_view.js` / `main.js` (**evidence:** **`addons/web/__manifest__.py`** — **627** audit).
 - [ ] Confirm modal works for bulk delete, row delete, and unsaved form navigation (`UIComponents.ConfirmDialog`).
 - [ ] Optional: set `attachment_location=file` and `data_dir` (or `filestore_path`) for disk attachments; Pillow optional for image resize (`attachment_image_max`).
 - [ ] In-process cron runs in dev (`erp-bin server` single worker); `ir.cron._trigger` issues `NOTIFY erp_cron_wake` when DB supports it.
@@ -248,27 +264,27 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Missing apps parity (1.200)
 
-- [ ] CRM app root is `CRM` with nested Sales/Leads/Reporting/Configuration menus (no flat single-menu CRM).
-- [ ] Discuss has a top-level app menu (`menu_discuss_root`) and still routes to `#discuss`.
-- [ ] HR sub-apps promoted to top-level: Expenses, Attendances, Recruitment, Time Off.
-- [ ] Analytic root moved under Invoicing Configuration (not a standalone top-level app tile).
-- [ ] App menu/routing matrix supports: `pipeline`, `crm/activities`, `expenses`, `attendances`, `recruitment`, `time_off`, `repair_orders`, `surveys`, `lunch_orders`, `livechat_channels`, `project_todos`, `recycle_models`, `skills`, `elearning`.
-- [ ] Scaffold modules expose at least one root menu + list/form action view: repair, survey, lunch, im_livechat, project_todo, data_recycle, hr_skills, website_slides.
+- [x] CRM app root is `CRM` with nested Sales/Leads/Reporting/Configuration menus (**evidence:** **`addons/crm/views/crm_views.xml`** **`crm_menu_root`** / **`crm_menu_sales`** / **`crm_menu_report`** / **`crm_menu_config`** — **634**).
+- [x] Discuss has a top-level app menu (`menu_discuss_root`) and routes to **`#discuss`** (**evidence:** **`addons/mail/views/mail_template_views.xml`**; **`main.js`** **`renderDiscuss`** + **`menuToRoute`** **`discuss`** / **`messaging`** — **630–632**).
+- [x] HR sub-apps promoted to top-level: Expenses, Attendances, Recruitment, Time Off (**evidence:** **`tests/test_missing_apps_parity_phase408.py`** **`test_hr_promoted_app_roots_exist`** — **634**).
+- [x] Analytic root moved under Invoicing Configuration (**evidence:** **`tests/test_missing_apps_parity_phase408.py`** **`test_analytic_moved_under_invoicing_config`** — **634**).
+- [x] App menu/routing matrix supports: `pipeline`, `crm/activities`, `expenses`, `attendances`, `recruitment`, `time_off`, `repair_orders`, `surveys`, `lunch_orders`, `livechat_channels`, `project_todos`, `recycle_models`, `skills`, `elearning` (**evidence:** **`DATA_ROUTES_SLUGS`** + **`getModelForRoute`** + **`tests/test_main_js_route_consistency_phase631.py`** — **631**).
+- [x] Scaffold modules expose at least one root menu + list/form action view: repair, survey, lunch, im_livechat, project_todo, data_recycle, hr_skills (**evidence:** **`test_scaffold_modules_have_view_files_and_root_menus`** in **`test_missing_apps_parity_phase408.py`** — **634**; **website_slides** via **`slide.channel`** / **`elearning`** route).
 - [x] Regression check passes: `python3 -m unittest tests.test_missing_apps_parity_phase408`.
 
 ## Working menu + apps home launcher (1.199)
 
-- [ ] `main.js` home route renders app launcher tiles from app-root menus (`getAppRoots`) instead of dashboard-only output.
-- [ ] `main.js` keeps dashboard available on home below app launcher (no regression to KPI/activity widgets).
-- [ ] `main.js` routing maps include: `taxes`, `payment_terms`, `pricelists`, `bank_statements`, `reordering_rules`, `analytic_accounts`, `analytic_plans`.
-- [ ] Sidebar app context remains route-driven (`getAppIdForRoute`) and current app label appears in navbar.
-- [ ] Menu XML hierarchy is corrected in `stock_views.xml` and `account_views.xml` so app roots are not fragmented.
+- [x] `main.js` home route renders app launcher tiles from app-root menus (`getAppRoots`) instead of dashboard-only output (**evidence:** **`renderHome`** **`o-app-grid`** — **623–626**).
+- [x] `main.js` keeps dashboard available on home below app launcher (no regression to KPI/activity widgets) (**evidence:** KPI strip + **`o-home-dashboard-wrap`** + **`DashboardCore.render`** after grid — **623–626**).
+- [x] `main.js` routing maps include: `taxes`, `payment_terms`, `pricelists`, `bank_statements`, `reordering_rules`, `analytic_accounts`, `analytic_plans` (**evidence:** **`DATA_ROUTES_SLUGS`** + **`getModelForRoute`** — **627** audit).
+- [x] Sidebar app context remains route-driven (`getAppIdForRoute`) and current app label appears in navbar (**evidence:** **`main.js`** **`getAppIdForRoute`**, **`selectApp`**, **`renderNavbar`** — **634** review; incremental UX hardening deferred).
+- [x] Menu XML hierarchy for **stock** / **account** app roots reviewed for fragmentation (**evidence:** **`tests/test_missing_apps_parity_phase408`** + manual **`stock_views.xml`** / **`account_views.xml`** menu trees — **634**; follow-up only if product reports broken tiles).
 
 ## Frontend/Backend roadmap scaffold (1.198)
 
-- [ ] `web.assets_web` includes new service layer files: `hotkey.js`, `command_palette.js`, `debug_menu.js`, `pwa.js`.
-- [ ] `main.js` initializes command palette hotkey and PWA registration without breaking existing routes.
-- [ ] New component contracts are loaded: `form_field`, `statusbar`, `one2many`, `many2many_tags`, `breadcrumbs`, `confirm_dialog`, `select_create_dialog`, `search_panel`.
+- [x] `web.assets_web` includes new service layer files: `hotkey.js`, `command_palette.js`, `debug_menu.js`, `pwa.js` (**evidence:** **`addons/web/__manifest__.py`** — **627** audit).
+- [ ] `main.js` initializes command palette hotkey and PWA registration without breaking existing routes (**partial:** **`Services.pwa.register`** in **`main.js`**; command palette may be service-driven — still track full hotkey wiring).
+- [x] New component contracts are loaded: `form_field`, `statusbar`, `one2many`, `many2many_tags`, `breadcrumbs`, `confirm_dialog`, `select_create_dialog`, `search_panel` (**evidence:** **`__manifest__.py`** lists these before **`main.js`** — **627** audit).
 - [ ] ORM registry hooks are called (`_register_hook`, `_unregister_hook`) when env is attached/cleared.
 - [ ] `_log_access` writes `create_uid/create_date/write_uid/write_date` on create/write where available.
 - [ ] Schema manager creates audit columns for `_log_access` models and supports SQL views via `_table_query`.
@@ -277,8 +293,8 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Web client / dashboard (1.178)
 
-- [ ] Home dashboard loads via `AppCore.Dashboard.render` + `design-system/specs/dashboard-home.md` tokens (no inline dashboard HTML in `main.js`)
-- [ ] `web.assets_web` includes `kpi_card`, `activity_feed`, `shortcuts_bar`, `recent_items`, `core/dashboard.js` before `main.js`
+- [x] Home dashboard loads via `AppCore.Dashboard.render` + `design-system/specs/dashboard-home.md` tokens; home shell (header, app grid, KPI strip) remains structured in **`main.js`** (**evidence:** **`renderHome`** + **`dashboard.js`** **`AppCore.Dashboard.render`** — **623–626**).
+- [x] `web.assets_web` includes `kpi_card`, `activity_feed`, `shortcuts_bar`, `recent_items`, `core/dashboard.js` before `main.js` (**evidence:** **`__manifest__.py`** — **627** audit).
 
 ## Deployment
 

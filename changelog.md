@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.219.1 — 2026-03-25
+
+### Fixed
+
+- **Modern web client sidebar / “Navigation menus missing”:** `createBootstrap()` treated a missing `menus` key as `[]`, and `menu.load()` skipped the network fetch because empty arrays are truthy. Bootstrap now uses `menus: null` when nothing is inlined, and the menu service only seeds cache from a **non-empty** array so `/web/webclient/load_menus` runs and the sidebar populates.
+
+## 1.219.0 — 2026-03-25
+
+### Added
+
+- **Phases 630–635 (app routing / menu parity):** Playbook in **`docs/frontend.md`** for triaging hashes that fall back to Home; **`tests/test_main_js_route_consistency_phase631.py`** keeps **`DATA_ROUTES_SLUGS`**, **`menuToRoute`** literals, and **`getModelForRoute`** aligned; **`window.__ERP_STRICT_ROUTING`** shows an **empty state** for unknown list/form slugs instead of silently opening Home.
+- **`main.js`:** **`fleet`** in **`DATA_ROUTES_SLUGS`**; **`actionToRoute`** maps **`fleet_vehicle` → `fleet`**; **`menuToRoute`** treats **“Messaging”** like Discuss; dedicated **Website** / **eCommerce** placeholder views ( **`EmptyState`** ) so app tiles do not bounce to Home with no feedback.
+
+### Documentation
+
+- **`ai-implementation-checklist.md`** — Missing apps parity + working menu rows closed with evidence; **`parity_matrix.md`**, **`DeploymentChecklist.md`**.
+
+## 1.218.1 — 2026-03-25
+
+### Fixed
+
+- **Registry / `call_kw`:** **`_get_registry`** no longer calls **`parse_config(["--addons-path=addons"])`**, which could leave the ORM with **zero models** when **`addons`** did not resolve from the process cwd (**`Available: []`**, **`hr.expense` not found**). Prefork cron worker uses **absolute** **`addons`** path. See **DeploymentChecklist** ops note.
+
+## 1.218.0 — 2026-03-25
+
+### Added
+
+- **Phases 620–622:** Kanban **`load more`** appends cards via the same **`buildKanbanCardHtmlString`** path as the first page (**`KanbanCardChrome.buildKanbanCardHtml`** when registered, else legacy). **Delegated** `change` / `click` / **`dragstart`/`dragend`** on the container so bulk selection and DnD work for dynamically inserted cards. JS tests: **`test_kanban_renderer.js`** (chrome parity after load more; bulk bar after delegated checkbox on appended row).
+- **Phases 623–626:** **`renderHome`** layout — **`getAppRoots`** app launcher grid **before** the KPI strip (then onboarding, then **`AppCore.Dashboard.render`** wrap). KPI strip + dashboard behaviour unchanged.
+- **Phase 627:** **`test_router.js`** — **`AppCore.Router.setHandlers`** + **`routeApply`** invokes registered **`applyRoute`** (shell route contract test).
+
+### Documentation
+
+- **`ai-implementation-checklist.md`:** Rows **212–218**, **223**, **224–225**, **243**, **261–263**, **269**, **272**, **279–281** marked done with file evidence where implemented.
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`odoo19-webclient-gap-table.md`**.
+
 ## 1.215.0 — 2026-03-25
 
 ### Added

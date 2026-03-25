@@ -61,7 +61,10 @@ function createFallbackViews(bootstrap) {
 }
 
 function createMenuService(bootstrap, viewsService) {
-  let cachedMenus = Array.isArray(bootstrap.menus) ? bootstrap.menus : null;
+  let cachedMenus =
+    bootstrap.menus && Array.isArray(bootstrap.menus) && bootstrap.menus.length > 0
+      ? bootstrap.menus
+      : null;
   let listeners = new Set();
 
   function notify() {
@@ -72,7 +75,9 @@ function createMenuService(bootstrap, viewsService) {
 
   return {
     load(force) {
-      if (!force && cachedMenus) return Promise.resolve(cachedMenus);
+      if (!force && cachedMenus) {
+        return Promise.resolve(cachedMenus);
+      }
       return fetch(bootstrap.endpoints.menus, {
         method: "GET",
         credentials: "include",

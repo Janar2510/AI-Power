@@ -166,6 +166,21 @@ When planning web changes, compare **read-only** `odoo-19.0/addons/web/__manifes
 - **Phase 556 / 593:** The worker **pre-caches** shell URLs with **cache-first** `fetch` (**`CACHE`:** `erp-web-shell-v2` in `web_service_worker_stub`): default **concat** CSS + `web.assets_web.js`; when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`**, precache is **CSS + each manifest JS file** from `get_bundle_urls("web.assets_web")`. Bump **`CACHE`** in [core/http/routes.py](core/http/routes.py) when the precache set changes materially, or unregister the SW during development to avoid stale CSS/JS.
 - **Limitation:** **No offline RPC** or full app cache — shell static files only; CRUD and JSON-RPC require network.
 
+## Troubleshooting: app tile opens Home (Phases 630–633)
+
+Symptom: choosing an app from the launcher or sidebar changes the URL hash but the UI shows **Home** again. In legacy **`main.js`**, **`routeApplyInternal`** calls **`getModelForRoute(route)`**; when it returns **nothing**, the router falls back to **`renderHome()`** with no message.
+
+**Diagnose**
+
+1. Note **`location.hash`** (e.g. `#expenses`, `#website`).
+2. In the console, set **`window.__ERP_DEBUG_SIDEBAR_MENU = true`** and reload; menus that cannot resolve a route log **`[sidebar] menu without route`** (see **`main.js`** near **`_warnSidebarMenuDisabled`**).
+3. Optional: set **`window.__ERP_STRICT_ROUTING = true`** — unknown list routes render an **empty state** instead of silently returning home (Phase **633**).
+
+**Fix direction**
+
+- Align **`menuToRoute`**, **`actionToRoute`**, **`DATA_ROUTES_SLUGS`**, and **`getModelForRoute`** in **`addons/web/static/src/main.js`** with real menu **`name`** strings and **`ir.actions.act_window`** metadata.
+- Run **`python3 -m unittest tests.test_main_js_route_consistency_phase631`** after editing routes.
+
 ## Non-Goals
 
 - Exact Odoo Owl/legacy JS implementation

@@ -110,7 +110,10 @@ class Server(Command):
 
         def worker_cron() -> None:
             global _shutdown_requested
-            config.parse_config(["--addons-path=addons"])
+            from pathlib import Path
+
+            _root = Path(__file__).resolve().parent.parent.parent
+            config.parse_config([f"--addons-path={_root / 'addons'}"])
             from core.sql_db import get_cursor
             from core.db import init_schema
             from core.orm import Registry, Environment

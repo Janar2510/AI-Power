@@ -191,7 +191,11 @@ def verify_password(plain: str, stored: str) -> bool:
 def _get_registry(dbname: str) -> Registry:
     """Get or create registry for database."""
     if dbname not in _registries:
-        config.parse_config(["--addons-path=addons"])
+        # Do NOT call parse_config(["--addons-path=addons"]) here: it replaces the
+        # entire global config and resolves "addons" relative to cwd. Wrong cwd
+        # → no modules discovered → empty registry → call_kw "Available: []".
+        # Server startup already ran parse_config; otherwise get_addons_paths()
+        # falls back to addons/ next to core/tools/config.py.
         reg = Registry(dbname)
         ModelBase._registry = reg
         # Clear addon modules so they reload with this registry (avoids stale

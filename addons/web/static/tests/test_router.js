@@ -41,6 +41,17 @@
       H.assertTrue((window.location.hash || "").indexOf("pipeline") >= 0);
     });
 
+    test("setHandlers registers callbacks for route flow (phase 627)", function () {
+      var sawApply = 0;
+      R.setHandlers({
+        applyRoute: function () {
+          sawApply += 1;
+        },
+      });
+      R.routeApply("home", "home");
+      H.assertEqual(sawApply, 1, "applyRoute invoked after setHandlers");
+    });
+
     return results;
   }
 

@@ -132,7 +132,7 @@
    * Keep in sync with routeApplyInternal, isFormRoute, and keyboard shortcuts below.
    */
   var DATA_ROUTES_SLUGS =
-    'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans|subscriptions|meetings|timesheets|applicants|contracts|account_reconcile_wizard|recruitment_stages|crm_stages|crm_tags|crm_lost_reasons';
+    'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|fleet|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans|subscriptions|meetings|timesheets|applicants|contracts|account_reconcile_wizard|recruitment_stages|crm_stages|crm_tags|crm_lost_reasons|website|ecommerce';
 
   /** Opt-in: set window.__ERP_DEBUG_SIDEBAR_MENU = true to log menus with no resolvable route. */
   function _warnSidebarMenuDisabled(menu, actionRef, hasResolvedAction, route) {
@@ -231,6 +231,7 @@
     if (m === 'crm_stage') return 'crm_stages';
     if (m === 'crm_tag') return 'crm_tags';
     if (m === 'crm_lost_reason') return 'crm_lost_reasons';
+    if (m === 'fleet_vehicle') return 'fleet';
     return m || null;
   }
 
@@ -246,7 +247,7 @@
     if (name === 'leads') return 'leads';
     if (name === 'my pipeline') return 'pipeline';
     if (name === 'my activities') return 'crm/activities';
-    if (name === 'discuss') return 'discuss';
+    if (name === 'discuss' || name === 'messaging') return 'discuss';
     if (name === 'orders') return 'orders';
     if (name === 'products') return 'products';
     if (name === 'tasks') return 'tasks';
@@ -1660,6 +1661,34 @@
     header.className = 'o-home-apps-header';
     header.innerHTML = '<h2 class="o-home-apps-title">Apps</h2><p class="o-home-apps-subtitle">Choose a module to start working.</p>';
     root.appendChild(header);
+
+    /* Phases 623–626: app launcher (getAppRoots) first; KPI strip + dashboard below — no KPI regression */
+    var grid = document.createElement('div');
+    grid.className = 'o-app-grid';
+    if (!appRoots.length) {
+      grid.innerHTML = '<p class="o-app-grid-empty">No apps available.</p>';
+    } else {
+      appRoots.forEach(function (node) {
+        var menu = node.menu || {};
+        var appId = menu.id || '';
+        var tile = document.createElement('button');
+        tile.type = 'button';
+        tile.className = 'o-app-tile o-card-gradient';
+        if (String(appId) === String(storedAppId)) tile.className += ' o-app-tile--active';
+        var icon = _sidebarIconHtml(menu);
+        var defaultRoute = getDefaultRouteForAppNode(node) || 'home';
+        tile.innerHTML =
+          '<span class="o-app-tile-icon-wrap">' + icon + '</span>' +
+          '<span class="o-app-tile-name">' + escNavHtml(menu.name || 'App') + '</span>' +
+          '<span class="o-app-tile-route">' + escNavHtml(defaultRoute) + '</span>';
+        tile.addEventListener('click', function () {
+          selectApp(appId);
+        });
+        grid.appendChild(tile);
+      });
+    }
+    root.appendChild(grid);
+
     var kpiStrip = document.createElement('div');
     kpiStrip.className = 'o-home-kpi-strip-outer';
     if (window.AppCore && window.AppCore.DashboardKpiStrip && typeof window.AppCore.DashboardKpiStrip.buildHtml === 'function') {
@@ -1688,32 +1717,6 @@
         },
       });
     }
-
-    var grid = document.createElement('div');
-    grid.className = 'o-app-grid';
-    if (!appRoots.length) {
-      grid.innerHTML = '<p class="o-app-grid-empty">No apps available.</p>';
-    } else {
-      appRoots.forEach(function (node) {
-        var menu = node.menu || {};
-        var appId = menu.id || '';
-        var tile = document.createElement('button');
-        tile.type = 'button';
-        tile.className = 'o-app-tile o-card-gradient';
-        if (String(appId) === String(storedAppId)) tile.className += ' o-app-tile--active';
-        var icon = _sidebarIconHtml(menu);
-        var defaultRoute = getDefaultRouteForAppNode(node) || 'home';
-        tile.innerHTML =
-          '<span class="o-app-tile-icon-wrap">' + icon + '</span>' +
-          '<span class="o-app-tile-name">' + escNavHtml(menu.name || 'App') + '</span>' +
-          '<span class="o-app-tile-route">' + escNavHtml(defaultRoute) + '</span>';
-        tile.addEventListener('click', function () {
-          selectApp(appId);
-        });
-        grid.appendChild(tile);
-      });
-    }
-    root.appendChild(grid);
 
     var dashboardWrap = document.createElement('section');
     dashboardWrap.className = 'o-home-dashboard-wrap';
@@ -5291,6 +5294,48 @@
     loadReport();
   }
 
+  /** Phase 632–633: website/eCommerce app roots; phase 633 strict routing for unknown slugs */
+  function renderAppShellPlaceholder(route, title, subtitle) {
+    actionStack = [{ label: title, hash: route }];
+    var hint = subtitle || 'This surface is not fully wired to the list client yet.';
+    if (window.UIComponents && window.UIComponents.EmptyState && typeof window.UIComponents.EmptyState.renderHTML === 'function') {
+      main.innerHTML = window.UIComponents.EmptyState.renderHTML({
+        icon: '\u25C7',
+        title: title,
+        subtitle: hint,
+        actionLabel: 'Go to Home',
+      });
+      window.UIComponents.EmptyState.wire(main, {
+        actionFn: function () {
+          window.location.hash = '#home';
+        },
+      });
+    } else {
+      main.innerHTML =
+        '<section class="o-empty-state" role="status">' +
+        '<h3 class="o-empty-state-title">' +
+        String(title).replace(/</g, '&lt;') +
+        '</h3><p class="o-empty-state-subtitle">' +
+        String(hint).replace(/</g, '&lt;') +
+        '</p>' +
+        '<button type="button" class="o-btn o-btn-primary" id="o-placeholder-home">Go to Home</button></section>';
+      var bh = document.getElementById('o-placeholder-home');
+      if (bh) {
+        bh.onclick = function () {
+          window.location.hash = '#home';
+        };
+      }
+    }
+  }
+
+  function renderUnknownRoutePlaceholder(route) {
+    var sub =
+      'No model mapping for #' +
+      String(route || '').replace(/</g, '&lt;') +
+      '. Set window.__ERP_DEBUG_SIDEBAR_MENU = true and reload to log unresolved menus.';
+    renderAppShellPlaceholder(route, 'Route not available', sub);
+  }
+
   function routeApplyInternal(hash, base) {
     if (main) {
       main.classList.remove("o-view-enter");
@@ -5333,6 +5378,18 @@
       renderSalesRevenueReport();
     } else if (discussMatch || discussChannelMatch) {
       renderDiscuss(discussChannelMatch ? discussChannelMatch[1] : null);
+    } else if (base === 'website') {
+      renderAppShellPlaceholder(
+        'website',
+        'Website',
+        'Website pages and editor are scaffolded in modules; use Settings and other apps until the web client route is completed.'
+      );
+    } else if (base === 'ecommerce') {
+      renderAppShellPlaceholder(
+        'ecommerce',
+        'eCommerce',
+        'Shop flows are partially scaffolded. Use Products, Sale Orders, or Invoicing for catalogue and orders.'
+      );
     } else if (settingsApiKeysMatch) {
       renderApiKeysSettings();
     } else if (settingsTotpMatch) {
@@ -5345,31 +5402,37 @@
       const route = listMatch[1];
       const model = getModelForRoute(route);
       if (model) loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+      else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (newMatch) {
       const route = newMatch[1];
       const model = getModelForRoute(route);
       if (model) renderForm(model, route);
+      else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (editMatch) {
       const route = editMatch[1], id = editMatch[2];
       const model = getModelForRoute(route);
       if (model) renderForm(model, route, id);
+      else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (genericListMatch) {
       const route = genericListMatch[1];
       const model = getModelForRoute(route);
       if (model) loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+      else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (genericNewMatch) {
       const route = genericNewMatch[1];
       const model = getModelForRoute(route);
       if (model) renderForm(model, route);
+      else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (genericEditMatch) {
       const route = genericEditMatch[1], id = genericEditMatch[2];
       const model = getModelForRoute(route);
       if (model) renderForm(model, route, id);
+      else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else {
       renderHome();

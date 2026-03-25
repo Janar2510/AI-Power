@@ -31,6 +31,16 @@
       });
     });
 
+    test("priority uses o-priority-widget token class", function () {
+      var h = W.render("res.partner", { name: "prio", widget: "priority" }, api);
+      H.assertTrue(h.indexOf("o-priority-widget") >= 0 && h.indexOf("o-priority-star") >= 0);
+    });
+
+    test("state_selection uses o-state-selection-select", function () {
+      var h = W.render("res.partner", { name: "st", widget: "state_selection" }, api);
+      H.assertTrue(h.indexOf("o-state-selection-select") >= 0);
+    });
+
     return results;
   }
 

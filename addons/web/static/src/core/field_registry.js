@@ -129,9 +129,14 @@
     var fname = f.name;
     var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
     var html = '<p class="attr-field" data-fname="' + esc(fname) + '"><label>' + esc(label) + '</label>';
-    html += '<span class="o-priority-widget" style="display:inline-flex;gap:var(--space-xs);margin-top:var(--space-sm)">';
+    html += '<span class="o-priority-widget">';
     for (var i = 1; i <= 3; i += 1) {
-      html += '<label style="cursor:pointer"><input type="radio" name="' + esc(fname) + '" value="' + i + '" style="display:none"><span style="color:var(--color-warning)">★</span></label>';
+      html +=
+        '<label><input type="radio" name="' +
+        esc(fname) +
+        '" value="' +
+        i +
+        '"><span class="o-priority-star" aria-hidden="true">★</span></label>';
     }
     html += "</span></p>";
     return html;
@@ -142,7 +147,7 @@
     var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
     return (
       '<p class="attr-field" data-fname="' + esc(fname) + '"><label>' + esc(label) + '</label>' +
-      '<select name="' + esc(fname) + '" style="margin-top:var(--space-sm);padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm)">' +
+      '<select name="' + esc(fname) + '" class="o-state-selection-select">' +
       '<option value="normal">● Normal</option><option value="warning">● Warning</option><option value="blocked">● Blocked</option></select></p>'
     );
   });

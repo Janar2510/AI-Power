@@ -1540,6 +1540,98 @@
     return html;
   }
 
+  // addons/web/static/src/app/graph_view_chrome.js
+  (function() {
+    function escAttr4(v) {
+      return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+    function buildToolbarHtml(options) {
+      var o = options || {};
+      var viewSwitcherHtml = o.viewSwitcherHtml || "";
+      var graphType = o.graphType || "bar";
+      var searchTerm = o.searchTerm || "";
+      var model = o.model || "";
+      var addLabel = o.addLabel || "Add";
+      var types = ["bar", "line", "pie"];
+      var html = '<div class="o-graph-toolbar o-graph-toolbar-chrome">';
+      html += viewSwitcherHtml;
+      html += '<span class="o-graph-type-switcher graph-type-switcher" role="group" aria-label="Chart type">';
+      types.forEach(function(t) {
+        var active = t === graphType;
+        html += '<button type="button" class="o-graph-type-btn btn-graph-type' + (active ? " active" : "") + '" data-type="' + escAttr4(t) + '">' + (t.charAt(0).toUpperCase() + t.slice(1)) + "</button>";
+      });
+      html += "</span>";
+      html += '<div role="search" class="o-graph-search-wrap o-list-fallback-search">';
+      html += '<input type="text" id="list-search" class="o-graph-search-field o-list-search-field" placeholder="Search..." aria-label="Search records" value="' + escAttr4(searchTerm) + '">';
+      html += '<button type="button" id="btn-search" class="o-btn o-graph-search-btn o-list-toolbar-btn o-list-toolbar-btn--primary">Search</button>';
+      if (model === "crm.lead") {
+        html += '<select id="list-stage-filter" class="o-graph-stage-select o-list-toolbar-select" aria-label="Stage"><option value="">All stages</option></select>';
+      }
+      html += '<button type="button" id="btn-add" class="o-btn o-graph-add-btn o-list-toolbar-btn o-list-toolbar-btn--primary">' + escAttr4(addLabel) + "</button>";
+      html += "</div></div>";
+      return html;
+    }
+    window.AppCore = window.AppCore || {};
+    window.AppCore.GraphViewChrome = { buildToolbarHtml };
+  })();
+
+  // addons/web/static/src/app/pivot_view_chrome.js
+  (function() {
+    function escAttr4(v) {
+      return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+    function buildToolbarHtml(options) {
+      var o = options || {};
+      var viewSwitcherHtml = o.viewSwitcherHtml || "";
+      var searchTerm = o.searchTerm || "";
+      var model = o.model || "";
+      var addLabel = o.addLabel || "Add";
+      var html = '<div class="o-pivot-toolbar o-pivot-toolbar-chrome">';
+      html += viewSwitcherHtml;
+      html += '<button type="button" id="btn-pivot-flip" class="o-pivot-toolbar-btn o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Flip axes</button>';
+      html += '<button type="button" id="btn-pivot-download" class="o-pivot-toolbar-btn o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Download CSV</button>';
+      html += '<div role="search" class="o-pivot-search-wrap o-list-fallback-search">';
+      html += '<input type="text" id="list-search" class="o-pivot-search-field o-list-search-field" placeholder="Search..." aria-label="Search records" value="' + escAttr4(searchTerm) + '">';
+      html += '<button type="button" id="btn-search" class="o-btn o-pivot-search-btn o-list-toolbar-btn o-list-toolbar-btn--primary">Search</button>';
+      if (model === "crm.lead") {
+        html += '<select id="list-stage-filter" class="o-pivot-stage-select o-list-toolbar-select" aria-label="Stage"><option value="">All stages</option></select>';
+      }
+      html += '<button type="button" id="btn-add" class="o-btn o-pivot-add-btn o-list-toolbar-btn o-list-toolbar-btn--primary">' + escAttr4(addLabel) + "</button>";
+      html += "</div></div>";
+      return html;
+    }
+    window.AppCore = window.AppCore || {};
+    window.AppCore.PivotViewChrome = { buildToolbarHtml };
+  })();
+
+  // addons/web/static/src/app/calendar_view_chrome.js
+  (function() {
+    function escAttr4(v) {
+      return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+    function buildToolbarHtml(options) {
+      var o = options || {};
+      var viewSwitcherHtml = o.viewSwitcherHtml || "";
+      var monthTitle = o.monthTitle || "";
+      var searchTerm = o.searchTerm || "";
+      var addLabel = o.addLabel || "Add";
+      var html = '<div class="o-calendar-toolbar o-calendar-toolbar-chrome">';
+      html += viewSwitcherHtml;
+      html += '<button type="button" id="cal-prev" class="o-calendar-nav-btn o-btn o-list-toolbar-btn o-list-toolbar-btn--muted" aria-label="Previous month">Prev</button>';
+      html += '<span id="cal-title" class="o-calendar-month-title">' + escAttr4(monthTitle) + "</span>";
+      html += '<button type="button" id="cal-next" class="o-calendar-nav-btn o-btn o-list-toolbar-btn o-list-toolbar-btn--muted" aria-label="Next month">Next</button>';
+      html += '<button type="button" id="cal-today" class="o-calendar-nav-btn o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Today</button>';
+      html += '<div role="search" class="o-calendar-search-wrap o-list-fallback-search">';
+      html += '<input type="text" id="list-search" class="o-calendar-search-field o-list-search-field" placeholder="Search..." aria-label="Search records" value="' + escAttr4(searchTerm) + '">';
+      html += '<button type="button" id="btn-search" class="o-btn o-calendar-search-btn o-list-toolbar-btn o-list-toolbar-btn--primary">Search</button>';
+      html += '<button type="button" id="btn-add" class="o-btn o-calendar-add-btn o-list-toolbar-btn o-list-toolbar-btn--primary">' + escAttr4(addLabel) + "</button>";
+      html += "</div></div>";
+      return html;
+    }
+    window.AppCore = window.AppCore || {};
+    window.AppCore.CalendarViewChrome = { buildToolbarHtml };
+  })();
+
   // addons/web/static/src/app/main.js
   function registerModernViewFacades() {
     window.AppCore = window.AppCore || {};

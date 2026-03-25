@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.215.0 — 2026-03-25
+
+### Added
+
+- **Phases 614–617:** **`AppCore.PivotViewChrome`** + **`AppCore.CalendarViewChrome`**; legacy **`main.js`** pivot/calendar toolbars delegate with tokenized **`.o-pivot-*`** / **`.o-calendar-*`** layout (**`webclient.css`**); **`design-system/specs/pivot-view.md`**, **`calendar-view.md`**. **Concat** **`web.assets_web`** now includes **`graph_view_chrome.js`**, **`pivot_view_chrome.js`**, **`calendar_view_chrome.js`** (before **`main.js`**).
+- **Phase 616:** JS runner test **`test_action_manager_phase616.js`** for **`ActionManager.doActionButton`** **`type="object"`** vs **`type="action"`** (mock RPC + fetch).
+- **Phase 617:** **`core.rpc_session_context.merge_session_into_rpc_context`** — shared merge used by **`dispatch_jsonrpc`** call_kw paths; **`tests/test_merge_rpc_context_phase617.py`**.
+
+### Fixed
+
+- **Phase 618:** Graph/pivot load errors use **`o-list-load-error`** (token **`var(--color-danger)`**) instead of inline **`#c00`**.
+
+### Documentation
+
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**, **`odoo19-webclient-gap-table.md`**.
+
+## 1.214.0 — 2026-03-25
+
+### Added
+
+- **Phases 608–612:** **SearchModel** clears **facets** and reapplies **`search_default_*`** when the list **model** changes; **`applyDefaultsFromContext`** supports **boolean**, **numeric**, **string**, and **`in`** list values; **`getAutocompleteSuggestions`** only returns fields whose name or label matches the term (**612**). **Graph** legacy toolbar delegates to **`AppCore.GraphViewChrome.buildToolbarHtml`** (**609**, `graph_view_chrome.js`, `design-system/specs/graph-view.md`). **Field registry** **`priority`** / **`state_selection`** use token classes **`.o-priority-widget`** / **`.o-state-selection-select`** (**610**). **Phase 611:** regression **`tests/test_account_lock_adviser_phase611.py`** for **`account_lock_adviser_group_id`** post bypass; **`account_odoo19_gap_audit.md`** synced with **583**.
+
+### Documentation
+
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**, **`odoo19-webclient-gap-table.md`**.
+
 ## 1.213.0 — 2026-03-25
 
 ### Added

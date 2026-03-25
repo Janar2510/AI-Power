@@ -10,6 +10,9 @@ import * as KanbanControlStrip from "./kanban_control_strip.js";
 import * as MenuUtils from "./menu_utils.js";
 import * as ChatterStrip from "./chatter_strip.js";
 import * as KanbanCardChrome from "./kanban_card_chrome.js";
+import "./graph_view_chrome.js";
+import "./pivot_view_chrome.js";
+import "./calendar_view_chrome.js";
 
 function registerModernViewFacades() {
   window.AppCore = window.AppCore || {};

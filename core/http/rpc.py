@@ -21,6 +21,7 @@ from .auth import (
     get_session_allowed_company_ids_from_request,
     _get_registry,
 )
+from core.rpc_session_context import merge_session_into_rpc_context
 
 _logger = logging.getLogger("erp.rpc")
 
@@ -191,11 +192,7 @@ def dispatch_jsonrpc(request: Request) -> Response:
             db = get_session_db(request)
             company_id = get_session_company_id_from_request(request)
             allowed_company_ids = get_session_allowed_company_ids_from_request(request)
-            env_context = dict(method_kwargs.pop("context", {}) or {})
-            if company_id and "company_id" not in env_context:
-                env_context["company_id"] = company_id
-            if allowed_company_ids and "allowed_company_ids" not in env_context:
-                env_context["allowed_company_ids"] = allowed_company_ids
+            env_context = merge_session_into_rpc_context(method_kwargs, company_id, allowed_company_ids)
 
             if uid is None:
                 _logger.warning("RPC 401: no session (cookie missing or invalid)")
@@ -344,11 +341,7 @@ def dispatch_jsonrpc(request: Request) -> Response:
                 try:
                     company_id = get_session_company_id_from_request(request)
                     allowed_company_ids = get_session_allowed_company_ids_from_request(request)
-                    env_context = dict(method_kwargs.pop("context", {}) or {})
-                    if company_id and "company_id" not in env_context:
-                        env_context["company_id"] = company_id
-                    if allowed_company_ids and "allowed_company_ids" not in env_context:
-                        env_context["allowed_company_ids"] = allowed_company_ids
+                    env_context = merge_session_into_rpc_context(method_kwargs, company_id, allowed_company_ids)
                     result = _call_kw(uid, db, model_name, method_name, method_args, method_kwargs, env_context=env_context)
                     # Serialize for JSON: Recordset/Model -> ids, keep list/dict/bool as-is
                     from core.orm.models import Recordset

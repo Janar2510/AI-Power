@@ -165,6 +165,24 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **606:** Checklist **437** load order — **`helpers.js`** immediately before **`form_view.js`** in **`web.assets_web`** (**evidence:** `addons/web/__manifest__.py` asset list order).
 - [x] **607:** Release **1.213.0** docs (changelog, matrix, DeploymentChecklist, gap table, account audit).
 
+## Phases 608–613 (SearchModel + graph chrome + field tokens + lock adviser + release 1.214.0)
+
+- [x] **608:** **`SearchModel.applyDefaultsFromContext`** for **`search_default_*`**; **`facets`** + **`_facetsDefaultsApplied`** reset when list **model** changes (**evidence:** `search_model.js`, `main.js`, `test_search_model.js`).
+- [x] **609:** **`AppCore.GraphViewChrome.buildToolbarHtml`**; **`main.js`** graph fallback delegates; **`design-system/specs/graph-view.md`**; **`webclient.css`** graph toolbar tokens (**evidence:** `app/graph_view_chrome.js`, `__manifest__.py`, `app/main.js` side-effect import for esbuild).
+- [x] **610:** **`priority`** / **`state_selection`** widgets use **`webclient.css`** classes (**evidence:** `field_registry.js`, `test_field_registry.js`).
+- [x] **611:** **`test_account_lock_adviser_phase611.py`** + **`account_odoo19_gap_audit.md`** adviser bypass note (**583**).
+- [x] **612:** **`getAutocompleteSuggestions`** matches name/label only (**evidence:** `search_model.js`, `test_search_model.js`).
+- [x] **613:** Release **1.214.0** docs (changelog, matrix, DeploymentChecklist, gap table, checklist).
+
+## Phases 614–619 (pivot/calendar chrome, ActionManager tests, RPC context, release 1.215.0)
+
+- [x] **614:** **`AppCore.PivotViewChrome`** + **`pivot-view.md`** + **`.o-pivot-*`** table tokens (**evidence:** `pivot_view_chrome.js`, `main.js`, `webclient.css`, `__manifest__.py`).
+- [x] **615:** **`AppCore.CalendarViewChrome`** + **`calendar-view.md`** + **`.o-calendar-*`** grid (**evidence:** `calendar_view_chrome.js`, `main.js`).
+- [x] **616:** **`ActionManager.doActionButton`** **`object`** vs **`action`** — **`test_action_manager_phase616.js`** + **`test_runner.html`** (**evidence:** checklist **437** row).
+- [x] **617:** **`merge_session_into_rpc_context`** in **`core/rpc_session_context.py`** + **`tests/test_merge_rpc_context_phase617.py`** (**evidence:** `core/http/rpc.py` imports).
+- [x] **618:** Graph/pivot load errors → **`o-list-load-error`** (**evidence:** `main.js`**).
+- [x] **619:** Release **1.215.0** docs (changelog, matrix, DeploymentChecklist, gap table, checklist).
+
 ## Sidebar navigation (greyed-out submenus)
 
 - [x] CRM Configuration submenus (Stages, Tags, Lost Reasons) resolve actions and routes; `crm.lost.reason` model installed after upgrade (**evidence:** `crm_views.xml` act_windows + menus; `tests/test_parallel_track_be_phase590.py`; `DATA_ROUTES_SLUGS` / `getModelForRoute` already include `crm_stages`, `crm_tags`, `crm_lost_reasons`).
@@ -188,17 +206,17 @@ Verification checklist for AI assistant module deployment and feature additions.
 ## Phases 437–450 (1.204)
 
 - [x] `core/helpers.js` is loaded before `form_view.js` / `list_view.js` and shared helpers are available at `window.AppCore.Helpers` (**evidence:** **`web.assets_web`** order in **`addons/web/__manifest__.py`** — **`helpers.js`** precedes **`form_view.js`** and **`list_view.js`**; Phase **606**).
-- [ ] `SearchModel` facet lifecycle works end-to-end (`addFacet/removeFacet/renderFacets`) and `search_default_*` context values become initial facets.
-- [ ] Search autocomplete suggestions appear from search-view fields and selected suggestion applies a domain facet.
-- [ ] Custom filter builder can add ad-hoc domain facets and reload list results.
+- [x] `SearchModel` facet lifecycle works end-to-end (`addFacet/removeFacet/renderFacets`) and `search_default_*` context values become initial facets (**evidence:** **`list_view.js`** + **`test_search_model.js`**; **608**).
+- [x] Search autocomplete suggestions appear from search-view fields and selected suggestion applies a domain facet (**evidence:** **`list_view.js`** input handler + **`getAutocompleteSuggestions`**; precision **612**).
+- [x] Custom filter builder can add ad-hoc domain facets and reload list results (**evidence:** **Custom filter…** branch in **`list_view.js`** — **608** scope).
 - [ ] Kanban supports fold persistence, multi-select bulk bar, progressive loading, and optional dynamic card template callback.
-- [ ] `field_registry.js` renders new widgets (`priority`, `state_selection`, `handle`, `email`, `url`, `phone`, `copy_clipboard`, `float_time`, `radio`, `many2many_checkboxes`).
-- [ ] `ActionManager.doActionButton()` handles both `type="object"` and `type="action"` form header buttons.
+- [x] `field_registry.js` renders new widgets (`priority`, `state_selection`, `handle`, `email`, `url`, `phone`, `copy_clipboard`, `float_time`, `radio`, `many2many_checkboxes`) (**evidence:** **`test_field_registry.js`**; **610** token classes for **`priority`** / **`state_selection`**).
+- [x] `ActionManager.doActionButton()` handles both `type="object"` and `type="action"` form header buttons (**evidence:** **`main.js`** `[data-btn-type]` wiring + **`test_action_manager_phase616.js`** — **616**).
 - [ ] `ConfirmDialog.openModal()` is usable for wizard flows (`target: "new"`) including breadcrumb updates.
 - [ ] `/web/action/run_server_action` executes `ir.actions.server` with user context and returns JSON result payload.
 - [ ] `/web/async/call_notify` returns async queue counts for the current user session.
 - [ ] Session includes `allowed_company_ids` and RPC context receives `company_id` + `allowed_company_ids`.
-- [ ] JS unit tests are wired and visible in `test_runner.html` for search model, field registry, router, form view, kanban, import.
+- [x] JS unit tests are wired and visible in `test_runner.html` for search model, field registry, **ActionManager** (**evidence:** **`test_search_model.js`**, **`test_field_registry.js`**, **`test_action_manager_phase616.js`** — **608** / **610** / **616**); router, form view, kanban, import remain as listed in other rows.
 
 ## Phases 423–436 (1.203)
 

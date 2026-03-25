@@ -1,5 +1,34 @@
 # Deployment Checklist
 
+## Post–214 — Phases 614–619 (pivot/calendar chrome, ActionManager tests, RPC context merge, 1.215.0) (v1.215.0)
+
+### Pre-Deployment
+
+- [ ] **614–615:** `npm run check:assets-concat && npm run build:web`. Smoke: **Pivot** and **Calendar** views — toolbars use list-toolbar tokens; pivot table scrolls inside **`.o-pivot-container`**; calendar cells use **`.o-calendar-cell`** / event links.
+- [ ] **616–618:** No DB migration; graph/pivot load failures show red text via **`var(--color-danger)`** (**`o-list-load-error`**).
+
+### Verification
+
+- [ ] Browser: `/web/static/tests/test_runner.html` — **action_manager_do_action_button** suite passes.
+- [ ] No DB: `python3 -m unittest tests.test_merge_rpc_context_phase617`
+
+---
+
+## Post–213 — Phases 608–613 (SearchModel, graph chrome, field tokens, lock adviser test, 1.214.0) (v1.214.0)
+
+### Pre-Deployment
+
+- [ ] **608–610:** `npm run check:assets-concat && npm run build:web`. Smoke: open a list whose action defines **`search_default_*`** in context — initial facet chips appear; switch to another model’s list — facets reset; **Graph** view — toolbar uses tokenized buttons (no raw `#ddd` on type toggles when chrome loads).
+- [ ] **611:** No schema change; optional DB unittest for adviser bypass.
+- [ ] **612:** No extra migration; autocomplete dropdown only lists matching search-view fields.
+
+### Verification
+
+- [ ] Browser: `/web/static/tests/test_runner.html` — **search_model** + **field_registry** suites pass.
+- [ ] With DB: `python3 -m unittest tests.test_account_lock_adviser_phase611`
+
+---
+
 ## Post–212.1 — Phases 603–607 (kanban card, gantt/activity CSS, move currency, 1.213.0) (v1.213.0)
 
 ### Pre-Deployment

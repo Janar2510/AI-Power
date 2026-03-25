@@ -1856,7 +1856,13 @@
 
   function renderList(model, route, records, searchTerm, totalCount, offset, limit, savedFiltersList) {
     savedFiltersList = savedFiltersList || [];
-    if (!currentListState.__searchModel || currentListState.__searchModel.model !== model) {
+    var prevSearchModel = currentListState.__searchModel;
+    var prevListModel = prevSearchModel && prevSearchModel.model;
+    if (!prevSearchModel || prevListModel !== model) {
+      if (prevListModel != null && prevListModel !== model) {
+        currentListState.facets = [];
+        currentListState._facetsDefaultsApplied = false;
+      }
       if (window.AppCore && window.AppCore.SearchModel) {
         currentListState.__searchModel = new window.AppCore.SearchModel(model, viewsSvc, currentListState);
       } else {
@@ -4550,7 +4556,7 @@
         renderGraph(model, route, graphView, rows, groupby[0], fields, groupLabels, searchTerm, savedFiltersList);
       })
       .catch(function (err) {
-        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load graph') + '</p>';
+        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error o-list-load-error">' + (err.message || 'Failed to load graph') + '</p>';
       });
   }
 
@@ -4585,21 +4591,31 @@
       };
     });
     let html = '<h2>' + title + '</h2>';
-    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
-    html += renderViewSwitcher(route, currentView);
-    html += '<span class="graph-type-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
-    ['bar', 'line', 'pie'].forEach(function (t) {
-      const active = t === graphType;
-      html += '<button type="button" class="btn-graph-type' + (active ? ' active' : '') + '" data-type="' + t + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (t.charAt(0).toUpperCase() + t.slice(1)) + '</button>';
-    });
-    html += '</span>';
-    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    if (model === 'crm.lead') {
-      html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+    if (window.AppCore && window.AppCore.GraphViewChrome && typeof window.AppCore.GraphViewChrome.buildToolbarHtml === 'function') {
+      html += window.AppCore.GraphViewChrome.buildToolbarHtml({
+        viewSwitcherHtml: renderViewSwitcher(route, currentView),
+        graphType: graphType,
+        searchTerm: searchTerm || '',
+        model: model,
+        addLabel: route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add',
+      });
+    } else {
+      html += '<p class="o-graph-toolbar-fallback" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+      html += renderViewSwitcher(route, currentView);
+      html += '<span class="graph-type-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
+      ['bar', 'line', 'pie'].forEach(function (t) {
+        const active = t === graphType;
+        html += '<button type="button" class="btn-graph-type' + (active ? ' active' : '') + '" data-type="' + t + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (t.charAt(0).toUpperCase() + t.slice(1)) + '</button>';
+      });
+      html += '</span>';
+      html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+      html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+      if (model === 'crm.lead') {
+        html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+      }
+      html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
     }
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
-    html += '<div class="o-graph-container" style="position:relative;width:100%;max-width:800px;height:400px;margin:var(--space-md) 0;padding:var(--space-md)">';
+    html += '<div class="o-graph-container">';
     html += '<canvas id="graph-canvas"></canvas>';
     html += '</div>';
     main.innerHTML = html;
@@ -4722,7 +4738,7 @@
         renderPivot(model, route, pivotView, data.rows, rowNames, colNames, measures, data.rowLabelMap, data.colLabelMap, searchTerm, savedFiltersList);
       })
       .catch(function (err) {
-        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error" style="color:#c00">' + (err.message || 'Failed to load pivot') + '</p>';
+        main.innerHTML = '<h2>' + getTitle(route) + '</h2><p class="error o-list-load-error">' + (err.message || 'Failed to load pivot') + '</p>';
       });
   }
 
@@ -4776,37 +4792,47 @@
     Object.keys(matrix).forEach(function (k) { grandTotal += matrix[k]; });
     actionStack = [{ label: title, hash: route }];
     currentListState = { model: model, route: route, searchTerm: searchTerm || '', stageFilter: stageFilter, viewType: 'pivot' };
+    const pivotAddLabel = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add';
     let html = '<h2>' + title + '</h2>';
-    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
-    html += renderViewSwitcher(route, 'pivot');
-    html += '<button type="button" id="btn-pivot-flip" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Flip axes</button>';
-    html += '<button type="button" id="btn-pivot-download" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Download CSV</button>';
-    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    if (model === 'crm.lead') {
-      html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+    if (window.AppCore && window.AppCore.PivotViewChrome && typeof window.AppCore.PivotViewChrome.buildToolbarHtml === 'function') {
+      html += window.AppCore.PivotViewChrome.buildToolbarHtml({
+        viewSwitcherHtml: renderViewSwitcher(route, 'pivot'),
+        searchTerm: searchTerm || '',
+        model: model,
+        addLabel: pivotAddLabel,
+      });
+    } else {
+      html += '<p class="o-pivot-toolbar-fallback" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+      html += renderViewSwitcher(route, 'pivot');
+      html += '<button type="button" id="btn-pivot-flip" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Flip axes</button>';
+      html += '<button type="button" id="btn-pivot-download" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Download CSV</button>';
+      html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+      html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+      if (model === 'crm.lead') {
+        html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+      }
+      html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + pivotAddLabel + '</button></p>';
     }
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
-    html += '<div class="o-pivot-container o-card-gradient" style="overflow-x:auto;border:1px solid var(--border-color);border-radius:var(--radius-md);padding:var(--space-md);margin:var(--space-md) 0">';
-    html += '<table style="width:100%;border-collapse:collapse;min-width:400px"><thead><tr><th style="padding:var(--space-sm);border:1px solid var(--border-color);text-align:left;background:var(--color-bg)"></th>';
+    html += '<div class="o-pivot-container o-card-gradient">';
+    html += '<table class="o-pivot-table"><thead><tr><th class="o-pivot-th o-pivot-th--corner"></th>';
     colLabels.forEach(function (l) {
-      html += '<th style="padding:var(--space-sm);border:1px solid var(--border-color);text-align:right;background:var(--color-bg)">' + (l || '').replace(/</g, '&lt;') + '</th>';
+      html += '<th class="o-pivot-th o-pivot-th--measure">' + (l || '').replace(/</g, '&lt;') + '</th>';
     });
-    html += '<th style="padding:var(--space-sm);border:1px solid var(--border-color);text-align:right;background:var(--color-bg);font-weight:600">Total</th></tr></thead><tbody>';
+    html += '<th class="o-pivot-th o-pivot-th--total">Total</th></tr></thead><tbody>';
     rowVals.forEach(function (rv, ri) {
-      html += '<tr><td style="padding:var(--space-sm);border:1px solid var(--border-color);font-weight:500">' + (rowLabels[ri] || '').replace(/</g, '&lt;') + '</td>';
+      html += '<tr><td class="o-pivot-td o-pivot-td--rowhead">' + (rowLabels[ri] || '').replace(/</g, '&lt;') + '</td>';
       colVals.forEach(function (cv) {
         const key = rv + '_' + cv;
         const val = matrix[key] || 0;
-        html += '<td style="padding:var(--space-sm);border:1px solid var(--border-color);text-align:right">' + (typeof val === 'number' ? val.toLocaleString() : val) + '</td>';
+        html += '<td class="o-pivot-td o-pivot-td--num">' + (typeof val === 'number' ? val.toLocaleString() : val) + '</td>';
       });
-      html += '<td style="padding:var(--space-sm);border:1px solid var(--border-color);text-align:right;font-weight:600">' + (rowTotals[rv] || 0).toLocaleString() + '</td></tr>';
+      html += '<td class="o-pivot-td o-pivot-td--num o-pivot-td--rowtotal">' + (rowTotals[rv] || 0).toLocaleString() + '</td></tr>';
     });
-    html += '<tr><td style="padding:var(--space-sm);border:1px solid var(--border-color);font-weight:600;background:var(--color-bg)">Total</td>';
+    html += '<tr><td class="o-pivot-td o-pivot-td--coltotal">Total</td>';
     colVals.forEach(function (cv) {
-      html += '<td style="padding:var(--space-sm);border:1px solid var(--border-color);text-align:right;font-weight:600;background:var(--color-bg)">' + (colTotals[cv] || 0).toLocaleString() + '</td>';
+      html += '<td class="o-pivot-td o-pivot-td--num o-pivot-td--coltotal">' + (colTotals[cv] || 0).toLocaleString() + '</td>';
     });
-    html += '<td style="padding:var(--space-sm);border:1px solid var(--border-color);text-align:right;font-weight:600;background:var(--color-bg)">' + grandTotal.toLocaleString() + '</td></tr>';
+    html += '<td class="o-pivot-td o-pivot-td--num o-pivot-td--grandtotal">' + grandTotal.toLocaleString() + '</td></tr>';
     html += '</tbody></table></div>';
     main.innerHTML = html;
     main.querySelectorAll('.btn-view').forEach(function (btn) {
@@ -4906,20 +4932,31 @@
       recordsByDate[dateStr].push(r);
     });
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const calAddLabelCommon = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add';
+    const calAddLabel = (model === 'calendar.event') ? 'Add meeting' : calAddLabelCommon;
+    const monthTitleStr = firstDay.toLocaleString('default', { month: 'long', year: 'numeric' });
     let html = '<h2>' + title + '</h2>';
-    html += '<p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
-    html += renderViewSwitcher(route, 'calendar');
-    html += '<button type="button" id="cal-prev" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Prev</button>';
-    html += '<span id="cal-title" style="min-width:140px;font-weight:600">' + firstDay.toLocaleString('default', { month: 'long', year: 'numeric' }) + '</span>';
-    html += '<button type="button" id="cal-next" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Next</button>';
-    html += '<button type="button" id="cal-today" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Today</button>';
-    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-    const calAddLabel = (model === 'calendar.event') ? 'Add meeting' : 'Add lead';
-    html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + calAddLabel + '</button></p>';
-    html += '<div class="o-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border-color);border:1px solid var(--border-color);border-radius:var(--radius-md);overflow:hidden">';
+    if (window.AppCore && window.AppCore.CalendarViewChrome && typeof window.AppCore.CalendarViewChrome.buildToolbarHtml === 'function') {
+      html += window.AppCore.CalendarViewChrome.buildToolbarHtml({
+        viewSwitcherHtml: renderViewSwitcher(route, 'calendar'),
+        monthTitle: monthTitleStr,
+        searchTerm: searchTerm || '',
+        addLabel: calAddLabel,
+      });
+    } else {
+      html += '<p class="o-calendar-toolbar-fallback" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+      html += renderViewSwitcher(route, 'calendar');
+      html += '<button type="button" id="cal-prev" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Prev</button>';
+      html += '<span id="cal-title" style="min-width:140px;font-weight:600">' + monthTitleStr + '</span>';
+      html += '<button type="button" id="cal-next" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Next</button>';
+      html += '<button type="button" id="cal-today" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Today</button>';
+      html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+      html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+      html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + calAddLabel + '</button></p>';
+    }
+    html += '<div class="o-calendar o-calendar-grid">';
     dayNames.forEach(function (dn) {
-      html += '<div style="padding:var(--space-sm);background:var(--color-bg);font-weight:600;font-size:0.85rem">' + dn + '</div>';
+      html += '<div class="o-calendar-weekday">' + dn + '</div>';
     });
     const totalCells = Math.ceil((startPad + daysInMonth) / 7) * 7;
     for (var i = 0; i < totalCells; i++) {
@@ -4927,12 +4964,12 @@
       const isEmpty = dayNum < 1 || dayNum > daysInMonth;
       const dateStr = isEmpty ? '' : calYear + '-' + String(calMonth).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
       const dayRecs = dateStr ? (recordsByDate[dateStr] || []) : [];
-      let cellContent = isEmpty ? '' : '<span style="font-size:0.9rem;color:var(--text-muted)">' + dayNum + '</span>';
+      let cellContent = isEmpty ? '' : '<span class="o-calendar-daynum">' + dayNum + '</span>';
       dayRecs.forEach(function (rec) {
         const label = (rec[stringField] || 'Untitled').replace(/</g, '&lt;').slice(0, 30);
-        cellContent += '<div style="margin-top:0.25rem"><a href="#' + route + '/edit/' + (rec.id || '') + '" style="display:block;padding:0.2rem 0.4rem;background:var(--color-primary);color:white;border-radius:4px;font-size:0.8rem;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + label + '</a></div>';
+        cellContent += '<div class="o-calendar-event-wrap"><a href="#' + route + '/edit/' + (rec.id || '') + '" class="o-calendar-event-link">' + label + '</a></div>';
       });
-      html += '<div style="min-height:80px;padding:var(--space-sm);background:#fff">' + cellContent + '</div>';
+      html += '<div class="o-calendar-cell' + (isEmpty ? ' o-calendar-cell--empty' : '') + '">' + cellContent + '</div>';
     }
     html += '</div>';
     main.innerHTML = html;

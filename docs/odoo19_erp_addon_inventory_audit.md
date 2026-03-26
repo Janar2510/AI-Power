@@ -92,6 +92,10 @@ Full raw list (249 names) can be regenerated with **`scripts/diff_odoo_erp_addon
 bash scripts/diff_odoo_erp_addons.sh
 # Optional snapshot:
 ODOO19_ADDONS=/path/to/odoo-19.0/addons bash scripts/diff_odoo_erp_addons.sh /tmp/addon-diff.txt
+# Phase 678: fail if core addon folders are missing from erp-platform/addons/ (CI opt-in):
+ERP_DIFF_REQUIRE_CORE=1 ODOO19_ADDONS=/path/to/odoo-19.0/addons bash scripts/diff_odoo_erp_addons.sh
+# CI (Phase 684D): same directory for Odoo and ERP paths — diff output empty but core-folder guard still runs:
+# ERP_DIFF_REQUIRE_CORE=1 ODOO19_ADDONS="$GITHUB_WORKSPACE/addons" bash scripts/diff_odoo_erp_addons.sh
 ```
 
 Equivalent one-liners:

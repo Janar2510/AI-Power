@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.224.0 — 2026-03-26
+
+### Added
+
+- **Phases 680–684 (FE):** **`setViewAndReload`** dispatches **`dispatchActWindowForListRoute`** with **`source: 'listViewSwitch'`** before changing hash; **`ViewManager.syncListRouteFromMain`**; **`frontend.md`** documents **680–682** and **681** breadcrumb-stack deferral. Tests **`test_phase682_view_manager_sync_list_route_from_main`**, **`test_phase680_set_view_reload_dispatches_list_action`**.
+- **Phases 685–688:** **`res.partner.create`** → **`_create_res_partner_record`**; **`tests/test_res_partner_merge_safe_create_phase685.py`**; **Website** / **eCommerce** placeholders gain secondary actions (**Open Products** / **Open Sale Orders**) via **`empty_state.js`** + **`.o-empty-state-secondary`** in **`webclient.css`**.
+
+### Documentation
+
+- **`parity_matrix.md`**, **`odoo19-webclient-gap-table.md`**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**.
+
+### Notes
+
+- **647+** FX remains **planned** (no code in **1.224.0**).
+- **CI:** **`ERP_DIFF_REQUIRE_CORE=1`** step with **`ODOO19_ADDONS`** set to workspace **`addons/`** (self-compare) to verify **`web`**, **`sale`**, **`account`** folders.
+
+## 1.223.0 — 2026-03-24
+
+### Added
+
+- **Phases 668–672 (FE — hash navigation + docs):** **Alt+K** on a list slug calls **`dispatchActWindowForListRoute(..., { source: 'shortcutAltK' })`** before **`loadRecords`** in **`main.js`**; **`webclient_shortcut_contract.js`** updated. **`docs/frontend.md`**: **668** hash-audit notes, **669** why form **`/new`** / **`/edit`** skip pre-dispatch, **670** **`ActionManager.decodeStackFromHash`** vs full Odoo stack parity. **`tests/test_modern_action_contract_phase636.py`** (**`test_phase668_alt_k_dispatches_list_action`**). **`docs/odoo19-webclient-gap-table.md`** Views row **+672**.
+- **Phases 673–676 (BE — checklist):** Docstrings for draft-only confirm (**673**); **`inter_company_rules`** create path documented as **674**; **`tests/test_purchase_merge_safe_create_phase675.py`** asserts **`purchase.order`** merge-safe **`create`**; **676** covered by existing **`mrp.production.action_cancel`** + **`tests.test_mrp_phase153`**.
+- **Phases 678–679 (optional):** **`ERP_DIFF_REQUIRE_CORE=1`** on **`scripts/diff_odoo_erp_addons.sh`** enforces presence of **`web`**, **`sale`**, **`account`** under **`addons/`**; **679** (checklist **490–524** depth slice) **deferred** — no product pick this release.
+- **647+** remains **planned** only (matrix + design docs); no FX implementation.
+
+### Documentation
+
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**.
+
 ## 1.222.0 — 2026-03-24
 
 ### Added

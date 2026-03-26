@@ -2062,6 +2062,10 @@ i.o-sidebar-icon {
   color: var(--text-muted);
 }
 
+.o-empty-state-secondary {
+  margin-inline-start: var(--space-sm);
+}
+
 .o-list-handle {
   cursor: grab;
   user-select: none;

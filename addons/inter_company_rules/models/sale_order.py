@@ -19,7 +19,8 @@ class SaleOrderInterCompany(Model):
 
     @classmethod
     def create(cls, vals):
-        # Registry merge replaces create on sale.order; super() from this class is invalid (Phase 478).
+        # Phase 478 / 674: registry merge replaces create on sale.order; use
+        # _create_sale_order_record (not super().create) for merge-safe stacking.
         rec = cls._create_sale_order_record(vals)
         try:
             env = rec.env

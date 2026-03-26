@@ -57,6 +57,19 @@
       }
       return Promise.resolve(null);
     },
+    /**
+     * Phase 682: single entry for list-route act_window sync; main.js injects getActionForRoute.
+     */
+    syncListRouteFromMain(route, getActionForRoute, options) {
+      if (!route || typeof getActionForRoute !== "function") {
+        return Promise.resolve(null);
+      }
+      const action = getActionForRoute(route);
+      if (!action) {
+        return Promise.resolve(null);
+      }
+      return this.openFromActWindow(action, options || { source: "viewManagerSyncList" });
+    },
   };
 
   window.AppCore.ViewManager = ViewManager;

@@ -35,3 +35,13 @@ if [[ -n "$OUT" ]]; then
 else
   report
 fi
+
+# Phase 678: optional CI guard — ERP addons dir must contain core modules (low-noise default: unset).
+if [[ "${ERP_DIFF_REQUIRE_CORE:-}" == "1" ]]; then
+  for _need in web sale account; do
+    if ! grep -qx "$_need" "$TMP/erp.txt"; then
+      echo "diff_odoo_erp_addons: missing required ERP addon folder: $_need (set ERP_DIFF_REQUIRE_CORE=0 to skip)" >&2
+      exit 1
+    fi
+  done
+fi

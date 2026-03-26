@@ -129,7 +129,11 @@ class SaleOrder(Model):
         self._action_confirm_sale_core()
 
     def _action_confirm_sale_core(self):
-        """Core sale confirmation side effects shared by downstream extensions."""
+        """Core sale confirmation side effects shared by downstream extensions.
+
+        Phase 673: only **draft** rows transition to **sale**; **cancel** (and any non-draft)
+        state is ignored so cancelled orders cannot be re-confirmed.
+        """
         if not self:
             return True
         draft_ids = []

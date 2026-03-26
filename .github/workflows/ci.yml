@@ -56,6 +56,10 @@ jobs:
             npm run build:web
           fi
 
+      # Phase 684D: require web, sale, account under addons/ (ODOO path = ERP path → empty comm, guard still runs).
+      - name: Core addon folders (ERP_DIFF_REQUIRE_CORE)
+        run: ERP_DIFF_REQUIRE_CORE=1 ODOO19_ADDONS="${GITHUB_WORKSPACE}/addons" bash scripts/diff_odoo_erp_addons.sh
+
       # Postgres image has no pgvector extension: db init must succeed anyway (JSONB embedding fallback).
       # Optional: use a pgvector-enabled image locally for RAG vector distance tests.
       - name: Init test databases

@@ -41,6 +41,10 @@ class ResPartner(Model):
         return super().create(vals)
 
     @classmethod
+    def create(cls, vals):
+        return cls._create_res_partner_record(vals)
+
+    @classmethod
     def _onchange_country_id(cls, vals):
         """Clear state_id when country changes."""
         return {"state_id": None}

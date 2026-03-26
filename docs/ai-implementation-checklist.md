@@ -15,11 +15,11 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] `purchase_stock` `purchase.order` `receipt_count` uses the same picking domain as received-qty (OR `purchase_id` / `origin`) (**evidence:** **`tests.test_purchase_receipt_domain_phase473.TestPurchaseStockReceiptCountDomain`** — **664**).
 - [x] `purchase.order.action_cancel()` cancels open incoming pickings (draft/assigned) for the PO and related `stock.move` rows before setting state to `cancel` (restricts to `incoming` picking type when configured, same pattern as SO outgoing) (**evidence:** **`tests.test_purchase_cancel_pickings_phase476`** — **666**).
 - [x] With `stock` installed, `sale.order.action_cancel()` cancels open **outgoing** pickings (draft/assigned) for the SO (`sale_id` or `origin`) and related moves before setting state to `cancel` (**evidence:** **`tests.test_sale_cancel_pickings_phase477`** — **666**).
-- [ ] `purchase.order.button_confirm()` and `sale.order._action_confirm_sale_core()` only confirm **draft** orders; cancelled orders are not returned to confirmed states.
-- [ ] `inter_company_rules` `sale.order.create` calls `sale.order._create_sale_order_record` instead of `super().create` (registry merge-safe).
-- [ ] New `purchase.order` `create` overrides should delegate to `cls._create_purchase_order_record(vals)` (merge-safe), same as sale.
-- [ ] New `res.partner` `create` overrides should delegate to `cls._create_res_partner_record(vals)` (merge-safe).
-- [ ] New `account.move` `create` overrides should delegate to `cls._create_account_move_record(vals)` (merge-safe).
+- [x] `purchase.order.button_confirm()` and `sale.order._action_confirm_sale_core()` only confirm **draft** orders; cancelled orders are not returned to confirmed states (**Phase 673** — docstrings + **`tests.test_confirm_draft_guard_phase478`**).
+- [x] `inter_company_rules` `sale.order.create` calls `sale.order._create_sale_order_record` instead of `super().create` (registry merge-safe) (**Phase 674** — `addons/inter_company_rules/models/sale_order.py`).
+- [x] New `purchase.order` `create` overrides should delegate to `cls._create_purchase_order_record(vals)` (merge-safe), same as sale (**Phase 675** — **`tests.test_purchase_merge_safe_create_phase675`**).
+- [x] New `res.partner` `create` overrides should delegate to `cls._create_res_partner_record(vals)` (merge-safe) (**Phase 685** — **`addons/base/models/res_partner.py`**, **`tests.test_res_partner_merge_safe_create_phase685`**).
+- [x] New `account.move` `create` overrides should delegate to `cls._create_account_move_record(vals)` (merge-safe) (**Phase 686** — verified in **`addons/account/models/account_move.py`**).
 - [ ] New `payment.transaction` `create` overrides should delegate to `cls._create_payment_transaction_record(vals)` then run any post-create sync (merge-safe).
 - [ ] New `product.template` `create` overrides should delegate to `cls._create_product_template_record(vals)` then run `_create_variant_ids` when variants apply (merge-safe).
 - [ ] New `mrp.production` `create` overrides should delegate to `cls._create_mrp_production_record(vals)` (merge-safe).
@@ -28,7 +28,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] New `account.bank.statement` `create` overrides should delegate to `cls._create_account_bank_statement_record(vals)` (merge-safe).
 - [ ] New `hr.leave` `create` overrides should delegate to `cls._create_hr_leave_record(vals)` (merge-safe).
 - [ ] New `hr.expense.sheet` / `hr.payslip` `create` overrides should delegate to `cls._create_hr_expense_sheet_record(vals)` / `cls._create_hr_payslip_record(vals)` (merge-safe).
-- [ ] `mrp.production.action_cancel()` cancels open production-linked `stock.move` rows (draft/assigned) before setting the MO to `cancel`.
+- [x] `mrp.production.action_cancel()` cancels open production-linked `stock.move` rows (draft/assigned) before setting the MO to `cancel` (**Phase 676** — **`tests.test_mrp_phase153.TestMrpPhase153.test_mrp_cancel_cancels_open_moves`**).
 - [ ] `account.move.action_post()` rejects non-draft moves, lines without `account_id`, moves without journal lines, and unbalanced debit/credit totals.
 - [ ] Completed `payment.transaction` rows linked by `account_move_id` reduce `account.move.amount_residual` and auto-sync invoice state to `paid` when fully covered.
 - [ ] `account.move.transaction_count` and `account.move.amount_paid` include direct `payment.transaction.account_move_id` links when `transaction_ids` is empty.
@@ -37,6 +37,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Phases 490–524 (business depth, frontend, AI, production)
 
+- [ ] **Phase 679 (optional):** no slice taken in **1.223.0** — product backlog; pick one row here when prioritised.
 - [ ] MRP: `mrp.workorder`, reservation + quant completion on MO done; SO-driven MO when `product.template.manufacture_on_order` and `sale_mrp` loaded.
 - [ ] HR: employee lifecycle + contract start + attendance promotion; leave approval note; payroll + attendance lines.
 - [ ] Web: `npm run build:web` succeeds when Node is available; `tsconfig.json` + `framework/component_base.js` present.

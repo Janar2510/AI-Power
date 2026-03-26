@@ -688,9 +688,13 @@
    */
   function dispatchActWindowForListRoute(route, options) {
     if (!route) return;
+    var VM = window.AppCore && window.AppCore.ViewManager;
+    if (VM && typeof VM.syncListRouteFromMain === 'function') {
+      VM.syncListRouteFromMain(route, getActionForRoute, options || { source: 'routeApplyList' });
+      return;
+    }
     var action = getActionForRoute(route);
     if (!action) return;
-    var VM = window.AppCore && window.AppCore.ViewManager;
     if (VM && typeof VM.openFromActWindow === 'function') {
       VM.openFromActWindow(action, options || { source: 'routeApplyList' });
     }
@@ -4281,6 +4285,7 @@
     try {
       sessionStorage.setItem('view_' + route, view);
     } catch (e) {}
+    dispatchActWindowForListRoute(route, { source: 'listViewSwitch' });
     window.location.hash = route + (view && view !== 'list' ? '?view=' + view : '');
   }
 
@@ -5358,22 +5363,38 @@
   }
 
   /** Phase 632–633: website/eCommerce app roots; phase 633 strict routing for unknown slugs */
-  function renderAppShellPlaceholder(route, title, subtitle) {
+  /** @param {{ secondaryActionLabel?: string, secondaryHash?: string }} [placeholderOpts] Phase 687: backend deep link */
+  function renderAppShellPlaceholder(route, title, subtitle, placeholderOpts) {
+    placeholderOpts = placeholderOpts || {};
     actionStack = [{ label: title, hash: route }];
     var hint = subtitle || 'This surface is not fully wired to the list client yet.';
+    var secLabel = placeholderOpts.secondaryActionLabel || '';
+    var secHash = placeholderOpts.secondaryHash || '';
     if (window.UIComponents && window.UIComponents.EmptyState && typeof window.UIComponents.EmptyState.renderHTML === 'function') {
       main.innerHTML = window.UIComponents.EmptyState.renderHTML({
         icon: '\u25C7',
         title: title,
         subtitle: hint,
         actionLabel: 'Go to Home',
+        secondaryActionLabel: secLabel,
       });
       window.UIComponents.EmptyState.wire(main, {
         actionFn: function () {
           window.location.hash = '#home';
         },
+        secondaryActionFn: secHash
+          ? function () {
+              window.location.hash = '#' + secHash;
+            }
+          : undefined,
       });
     } else {
+      var btn2 =
+        secLabel && secHash
+          ? '<button type="button" class="o-btn o-btn-secondary o-empty-state-secondary" id="o-placeholder-backend">' +
+            String(secLabel).replace(/</g, '&lt;') +
+            '</button>'
+          : '';
       main.innerHTML =
         '<section class="o-empty-state" role="status">' +
         '<h3 class="o-empty-state-title">' +
@@ -5381,11 +5402,19 @@
         '</h3><p class="o-empty-state-subtitle">' +
         String(hint).replace(/</g, '&lt;') +
         '</p>' +
-        '<button type="button" class="o-btn o-btn-primary" id="o-placeholder-home">Go to Home</button></section>';
+        '<button type="button" class="o-btn o-btn-primary" id="o-placeholder-home">Go to Home</button>' +
+        btn2 +
+        '</section>';
       var bh = document.getElementById('o-placeholder-home');
       if (bh) {
         bh.onclick = function () {
           window.location.hash = '#home';
+        };
+      }
+      var bb = document.getElementById('o-placeholder-backend');
+      if (bb && secHash) {
+        bb.onclick = function () {
+          window.location.hash = '#' + secHash;
         };
       }
     }
@@ -5445,13 +5474,15 @@
       renderAppShellPlaceholder(
         'website',
         'Website',
-        'Website pages and editor are scaffolded in modules; use Settings and other apps until the web client route is completed.'
+        'Website pages and editor are scaffolded in modules; open Products for catalogue data, or Home.',
+        { secondaryActionLabel: 'Open Products', secondaryHash: 'products' }
       );
     } else if (base === 'ecommerce') {
       renderAppShellPlaceholder(
         'ecommerce',
         'eCommerce',
-        'Shop flows are partially scaffolded. Use Products, Sale Orders, or Invoicing for catalogue and orders.'
+        'Shop flows are partially scaffolded. Use Products, Sale Orders, or Invoicing for catalogue and orders.',
+        { secondaryActionLabel: 'Open Sale Orders', secondaryHash: 'orders' }
       );
     } else if (settingsApiKeysMatch) {
       renderApiKeysSettings();
@@ -5598,14 +5629,18 @@
     } else if (e.key === 'l' || e.key === 'L') {
       if (formMatch) {
         e.preventDefault();
-        window.location.hash = formMatch[1];
+        var routeList = formMatch[1];
+        window.location.hash = routeList;
+        /* Phase 668: hashchange runs routeApplyInternal → dispatchActWindowForListRoute for list slug */
       }
     } else if (e.key === 'k' || e.key === 'K') {
       if (listMatch) {
         e.preventDefault();
         currentListState.viewType = "kanban";
-        const model = getModelForRoute(listMatch[1]);
-        if (model) loadRecords(model, listMatch[1], currentListState.searchTerm || "");
+        var routeKanban = listMatch[1];
+        dispatchActWindowForListRoute(routeKanban, { source: 'shortcutAltK' });
+        const model = getModelForRoute(routeKanban);
+        if (model) loadRecords(model, routeKanban, currentListState.searchTerm || "");
       }
     } else if (e.key === 'p' || e.key === 'P') {
       const previewBtn = document.getElementById("btn-preview-pdf") || document.getElementById("btn-print-form");

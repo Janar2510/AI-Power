@@ -382,6 +382,7 @@ class MrpProduction(Model):
         return True
 
     def action_cancel(self):
+        """Cancel MO; Phase 676: draft/assigned production **stock.move** rows first (**_cancel_open_production_moves**)."""
         env = getattr(self, "env", None)
         MO = env.get("mrp.production") if env else None
         Wo = env.get("mrp.workorder") if env else None

@@ -365,7 +365,11 @@ class PurchaseOrder(Model):
         return cls._create_purchase_order_record(vals)
 
     def button_confirm(self):
-        """Confirm order and create incoming stock.picking (Phase 197)."""
+        """Confirm order and create incoming stock.picking (Phase 197).
+
+        Phase 673: only **draft** rows become **purchase**; **cancel** orders are skipped
+        (no re-confirm).
+        """
         if not self:
             return True
         draft_ids = []

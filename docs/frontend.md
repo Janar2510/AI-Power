@@ -76,7 +76,7 @@ The active product direction is defined by the Foundry One brand system and the 
 
 ### Alt+ shortcuts (legacy `main.js`)
 
-- Behaviour is implemented in `addons/web/static/src/main.js` (`keydown`, `e.altKey`). A frozen **contract** for documentation and tests lives in `addons/web/static/src/core/webclient_shortcut_contract.js` as **`window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT`** (six **Alt+** bindings: **N** new on list, **S** save form, **E** edit, **L** back to list, **K** kanban on list, **P** print/preview when controls exist; plus **Escape** for preview/attachment close). **`addons/web/static/tests/test_webclient_shortcut_contract.js`** asserts contract shape.
+- Behaviour is implemented in `addons/web/static/src/main.js` (`keydown`, `e.altKey`). A frozen **contract** for documentation and tests lives in `addons/web/static/src/core/webclient_shortcut_contract.js` as **`window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT`** (six **Alt+** bindings: **N** new on list, **S** save form, **E** edit, **L** back to list, **K** kanban on list (**668:** **`dispatchActWindowForListRoute`** with **`shortcutAltK`**), **P** print/preview when controls exist; plus **Escape** for preview/attachment close). **`addons/web/static/tests/test_webclient_shortcut_contract.js`** asserts contract shape.
 
 ### Sidebar route debugging
 
@@ -92,9 +92,26 @@ The active product direction is defined by the Foundry One brand system and the 
 - **`dispatchActWindowForListRoute`** in **`main.js`** runs when **`routeApplyInternal`** handles a **list** slug (including deep links): if **`getActionForRoute`** resolves an **`ir.actions.act_window`**, **`ViewManager.openFromActWindow`** runs **before** **`loadRecords`** (no same-hash **`route()`** re-entry — unlike **`navigateActWindowIfAvailable`**).
 - After **create** / **write** on a form, returning to the list sets the hash, dispatches the same helper (**`source: 'formSaveReturnList'`**), then **`loadRecords`**.
 
+## Hash navigation audit + Alt+K (Phases 668–669)
+
+- **668:** Many code paths still assign **`window.location.hash`** directly (kanban **Add**, **Alt+N** to **`/new`**, generic links). **Alt+K** (list route → kanban view) now calls **`dispatchActWindowForListRoute(route, { source: 'shortcutAltK' })`** before **`loadRecords`**, keeping the action service aligned with the current list slug without changing the hash. **Alt+L** still sets the hash to the list slug; **`hashchange`** → **`routeApplyInternal`** runs the same list dispatch as other deep links (**658**).
+- **669:** **`#<route>/new`** and **`#<route>/edit/<id>`** are handled in **`routeApplyInternal`** via **`renderForm`**. We **do not** call **`dispatchActWindowForListRoute`** immediately before **`renderForm`**: **`openFromActWindow`** / **`doAction`** would rewrite the hash to the list action and fight the form URL. Parent list sync remains **list slug** entry and **form save → list** (**659**).
+
+## Action stack query vs Odoo (Phase 670 — light)
+
+- **`ActionManager.decodeStackFromHash(hash)`** in **`action_manager.js`** reads a **`stack=`** query parameter (base64 JSON array) and returns the decoded stack or **`null`**. **`routeApplyInternal`** in **`main.js`** assigns the result to **`actionStack`** when non-empty so in-hash stack state is restored on navigation.
+- Full Odoo **breadcrumb / action stack** parity (every **`doAction`** push matching upstream) is **not** claimed here; this is **read path** alignment for hashes that already carry **`?stack=`**.
+
+## View switch + ViewManager list sync (Phases 680–682)
+
+- **680:** **`setViewAndReload`** (list ↔ kanban / graph / … via **`?view=`** on the same slug) calls **`dispatchActWindowForListRoute(route, { source: 'listViewSwitch' })`** before updating the hash so the action service stays aligned when switching modes.
+- **681:** Pushing **`ActionManager.doAction`** entries on every **sidebar** **`openFromActWindow`** is **deferred**: **`renderList`** currently resets **`actionStack`** to a single crumb, which would discard a multi-level stack. Until list render preserves stack depth, only **`?stack=`** restore + report routes build multi-step crumbs.
+- **682:** **`AppCore.ViewManager.syncListRouteFromMain(route, getActionForRoute, options)`** centralises list-route **`act_window`** dispatch; **`dispatchActWindowForListRoute`** in **`main.js`** delegates to it (fallback to inline **`openFromActWindow`** if the helper is missing).
+
 ## Website / eCommerce shell tiles (Phase 660 — product scope)
 
 - **`#website`** and **`#ecommerce`** (or equivalent slugs from **`menuToRoute`**) remain **empty-state placeholders** in the legacy hash client: they signal that **`website` / `website_sale` backend modules** are not surfaced as a full public site builder or shop UX in this client.
+- **Phase 687:** Placeholders include a **secondary** action — **Open Products** (**`#products`**) on **Website**, **Open Sale Orders** (**`#orders`**) on **eCommerce** — via **`UIComponents.EmptyState`** **`secondaryActionLabel`** / **`secondaryActionFn`**.
 - **Non-goal (this release):** building storefront/editor flows in **`main.js`**. Use backend menus (Products, Sale Orders, Invoicing, etc.) for catalogue and orders until a dedicated phase scopes **Website** front-office parity. See **`docs/deferred_product_backlog.md`** for related deferrals.
 
 ## Testing

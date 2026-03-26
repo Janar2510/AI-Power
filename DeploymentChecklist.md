@@ -1,5 +1,35 @@
 # Deployment Checklist
 
+## Post–223 — Phases 680–688 + release 1.224.0
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat && npm run build:web`** after **`main.js`**, **`view_manager.js`**, **`empty_state.js`**, or **`webclient.css`** changes.
+- [ ] No DB migration for **680–688**; **647+** FX unchanged (planned only).
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_modern_action_contract_phase636 tests.test_main_js_route_consistency_phase631 tests.test_res_partner_merge_safe_create_phase685 -v`
+- [ ] Browser: list **view switcher** (kanban/graph/…) still loads; **Website** tile → **Open Products** navigates to **`#products`**.
+
+---
+
+## Post–222 — Phases 668–679 + release 1.223.0
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat && npm run build:web`** after **`main.js`** / shortcut contract changes (**668**).
+- [ ] No DB migration for **668–679**; **647+** FX unchanged (planned only).
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_modern_action_contract_phase636 tests.test_main_js_route_consistency_phase631 tests.test_purchase_merge_safe_create_phase675 -v`
+- [ ] Optional DB: `python3 -m unittest tests.test_confirm_draft_guard_phase478 tests.test_mrp_phase153 -v`
+- [ ] Optional diff: `ODOO19_ADDONS=/path/to/odoo-19.0/addons bash scripts/diff_odoo_erp_addons.sh`; with **`ERP_DIFF_REQUIRE_CORE=1`**, script exits non-zero if **`web`**, **`sale`**, or **`account`** is missing from **`addons/`**.
+- [ ] Browser: **Alt+K** on a list route still switches to kanban; action service stays in sync.
+
+---
+
 ## Post–221 — Phases 658–667 + release 1.222.0
 
 ### Pre-Deployment

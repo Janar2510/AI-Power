@@ -59,6 +59,24 @@ class TestModernActionContractPhase636(unittest.TestCase):
         self.assertIn("source: 'formSaveReturnList'", self.legacy_main)
         self.assertIn("dispatchActWindowForListRoute(route", self.legacy_main)
 
+    def test_phase668_alt_k_dispatches_list_action(self):
+        self.assertIn("source: 'shortcutAltK'", self.legacy_main)
+        self.assertRegex(
+            self.legacy_main,
+            r"dispatchActWindowForListRoute\(routeKanban,\s*\{\s*source:\s*'shortcutAltK'\s*\}\)",
+        )
+
+    def test_phase682_view_manager_sync_list_route_from_main(self):
+        self.assertIn("syncListRouteFromMain", self.view_manager)
+        self.assertRegex(
+            self.legacy_main,
+            r"syncListRouteFromMain\(route,\s*getActionForRoute",
+        )
+
+    def test_phase680_set_view_reload_dispatches_list_action(self):
+        self.assertIn("source: 'listViewSwitch'", self.legacy_main)
+        self.assertIn("dispatchActWindowForListRoute(route, { source: 'listViewSwitch' })", self.legacy_main)
+
 
 if __name__ == "__main__":
     unittest.main()

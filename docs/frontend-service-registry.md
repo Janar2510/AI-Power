@@ -21,6 +21,7 @@ Defines the service layer for the modular frontend runtime.
 
 - services are now created through the modular runtime in `addons/web/static/src/app/services.js`
 - the service registry is exposed through `env.registries.category("services")`
+- **`action`** (Phases **636–639**): `doAction` (legacy classifier + `actionToRoute` for act_window), `navigateFromMenu`, `doActionButton` → `ActionManager`; exposed as `window.ERPFrontendRuntime.action`
 - `menu`, `router`, and `theme` now drive shell refreshes directly
 - `shell` is the coordinating UI-state service for the modular webclient during migration
 

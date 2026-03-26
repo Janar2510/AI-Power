@@ -1,5 +1,52 @@
 # Deployment Checklist
 
+## Post–221 — Phases 658–667 + release 1.222.0
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat && npm run build:web`** after **`main.js`** changes (**658–659**).
+- [ ] No DB migration for **658–667**; **647+** FX unchanged (planned only).
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_modern_action_contract_phase636 tests.test_sale_confirm_side_effects_phase665 tests.test_purchase_receipt_domain_phase473 tests.test_sale_cancel_pickings_phase477 tests.test_purchase_cancel_pickings_phase476 -v`
+- [ ] Optional: `ODOO19_ADDONS=/path/to/odoo-19.0/addons bash scripts/diff_odoo_erp_addons.sh` — expect large “Odoo only” list (localisation); ERP-only names should match **`docs/odoo19_erp_addon_inventory_audit.md`**.
+- [ ] Browser: deep link to a list hash (e.g. bookmark **`#…`** for a model list) still loads data; with modern runtime, no navigation loop.
+
+---
+
+## Post–220 — Phases 648–657 + release 1.221.0
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat && npm run build:web`** after **`main.js`**, **`list_view.js`**, **`list_control_panel_shim.js`**, **`view_manager.js`**, or **`app/services.js`** changes.
+- [ ] No DB migration for **648–657**; **647+** FX remains planning-only until product approves.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_modern_action_contract_phase636 tests.test_schema_audit_columns tests.test_report_qweb_phase656 tests.test_record_rule_company_phase657 -v`
+- [ ] No DB (regression): `python3 -m unittest tests.test_sale_invoice_phase466 tests.test_purchase_bill_phase471 tests.test_sale_confirm_phase465 -v`
+- [ ] Browser: sidebar link with **`act_window`** updates hash; with modern shell bootstrapped, navigation still reaches the list client (**`doAction`** → hash → **`routeApplyInternal`**).
+- [ ] Browser: list view renders filters / group-by / favourites bar (shim loaded before **`list_view.js`**).
+
+---
+
+## Post–219 — Phases 636–647 (action hub, async RPC contract, planned FX) (v1.220.0)
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** after **`app/services.js`**, **`sidebar.js`**, or **`app/main.js`** changes.
+- [ ] No DB migration for **636–646**; **647+** is planning-only until FX scope is approved.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_modern_action_contract_phase636 tests.test_ir_async_rpc_phase644 -v`
+- [ ] No DB: `python3 -m unittest tests.test_sale_cancel_pickings_phase477 tests.test_purchase_cancel_pickings_phase476 -v` (regression for **640–643**)
+- [ ] Browser: sidebar item with **`ir.actions.act_window`** — hash updates and legacy **`routeApply`** still run (primary click uses **`navigateFromMenu`**).
+- [ ] Authenticated session (optional): **`GET /report/pdf_async/<report>/<ids>`** returns JSON **`queued`** when **`ir.async`** is loaded.
+
+---
+
 ## Post–218 — Phases 630–635 (app routing parity, website/eCommerce placeholders, strict routing flag, 1.219.0) (v1.219.0)
 
 ### Pre-Deployment

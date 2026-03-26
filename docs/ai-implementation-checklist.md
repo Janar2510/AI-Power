@@ -4,17 +4,17 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Sale confirmation helper chain + schema bootstrap (Unreleased)
 
-- [ ] `core/db/schema.py` allows explicit `create_date` / `write_date` model fields without emitting duplicate access-log columns during `init_schema()`.
-- [ ] `sale.order.action_confirm()` works with the merged `sale` + `stock` + `account` + `sale_purchase` model stack and does not rely on `_inherit`-merged `super()` calls.
-- [ ] Confirming a sale order still preserves all expected side effects: pricelist application, delivery picking creation, invoice status refresh, delivery status refresh, and confirmation email queueing.
-- [ ] `sale.order._create_invoice_with_quantities()` skips empty invoices when there are no invoiceable lines or delivered quantities.
-- [ ] `sale.order._create_invoice_with_quantities()` skips creating a duplicate only when a **draft** `out_invoice` already exists for the same SO reference; posted invoices do not block a new draft.
-- [ ] `purchase.order._create_bill_with_quantities()` skips empty vendor bills when there are no billable PO lines or received quantities.
-- [ ] `purchase.order._create_bill_with_quantities()` does not create a duplicate **draft** vendor bill when a draft already exists for the same PO reference (`invoice_origin` + `in_invoice`); posted bills do not block a new draft (partial billing).
-- [ ] `purchase.order._get_received_qty_by_product()` includes pickings linked by `purchase_id` or by `origin` matching the PO name.
-- [ ] `purchase_stock` `purchase.order` `receipt_count` uses the same picking domain as received-qty (OR `purchase_id` / `origin`).
-- [ ] `purchase.order.action_cancel()` cancels open incoming pickings (draft/assigned) for the PO and related `stock.move` rows before setting state to `cancel` (restricts to `incoming` picking type when configured, same pattern as SO outgoing).
-- [ ] With `stock` installed, `sale.order.action_cancel()` cancels open **outgoing** pickings (draft/assigned) for the SO (`sale_id` or `origin`) and related moves before setting state to `cancel`.
+- [x] `core/db/schema.py` allows explicit `create_date` / `write_date` model fields without emitting duplicate access-log columns during `init_schema()` / `add_missing_columns()` (Phase **653** — `tests.test_schema_audit_columns`).
+- [x] `sale.order.action_confirm()` works with the merged `sale` + `stock` + `account` + `sale_purchase` model stack via `_action_confirm_sale_core` / `_action_confirm_stock_core` / `_action_confirm_account_core` rather than fragile `super()` chains (Phase **654** — docstring + `tests.test_sale_confirm_phase465`).
+- [x] Confirming a sale order still preserves all expected side effects: pricelist application, delivery picking creation, invoice status refresh, delivery status refresh, and confirmation email queueing (**Phase 665** — registry exposes **`_action_confirm_sale_core`**, **`_action_confirm_stock_core`**, **`_action_confirm_account_core`**; chain covered by **`tests.test_sale_confirm_phase465`** + **`tests.test_sale_confirm_side_effects_phase665`**; full mail/picking E2E: manual QA when changing confirm code).
+- [x] `sale.order._create_invoice_with_quantities()` skips empty invoices when there are no invoiceable lines or delivered quantities (evidence: `tests.test_sale_invoice_phase466`, changelog).
+- [x] `sale.order._create_invoice_with_quantities()` skips creating a duplicate only when a **draft** `out_invoice` already exists for the same SO reference; posted invoices do not block a new draft (`tests.test_sale_invoice_phase466`).
+- [x] `purchase.order._create_bill_with_quantities()` skips empty vendor bills when there are no billable PO lines or received quantities (`tests.test_purchase_bill_phase471`).
+- [x] `purchase.order._create_bill_with_quantities()` does not create a duplicate **draft** vendor bill when a draft already exists for the same PO reference (`invoice_origin` + `in_invoice`); posted bills do not block a new draft (`tests.test_purchase_bill_phase471`).
+- [x] `purchase.order._get_received_qty_by_product()` includes pickings linked by `purchase_id` or by `origin` matching the PO name (**evidence:** **`tests.test_purchase_receipt_domain_phase473`** — **663**).
+- [x] `purchase_stock` `purchase.order` `receipt_count` uses the same picking domain as received-qty (OR `purchase_id` / `origin`) (**evidence:** **`tests.test_purchase_receipt_domain_phase473.TestPurchaseStockReceiptCountDomain`** — **664**).
+- [x] `purchase.order.action_cancel()` cancels open incoming pickings (draft/assigned) for the PO and related `stock.move` rows before setting state to `cancel` (restricts to `incoming` picking type when configured, same pattern as SO outgoing) (**evidence:** **`tests.test_purchase_cancel_pickings_phase476`** — **666**).
+- [x] With `stock` installed, `sale.order.action_cancel()` cancels open **outgoing** pickings (draft/assigned) for the SO (`sale_id` or `origin`) and related moves before setting state to `cancel` (**evidence:** **`tests.test_sale_cancel_pickings_phase477`** — **666**).
 - [ ] `purchase.order.button_confirm()` and `sale.order._action_confirm_sale_core()` only confirm **draft** orders; cancelled orders are not returned to confirmed states.
 - [ ] `inter_company_rules` `sale.order.create` calls `sale.order._create_sale_order_record` instead of `super().create` (registry merge-safe).
 - [ ] New `purchase.order` `create` overrides should delegate to `cls._create_purchase_order_record(vals)` (merge-safe), same as sale.
@@ -239,11 +239,11 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] Router handlers are registered through `AppCore.Router.setHandlers` and route flow still handles unsaved form confirmation (**evidence:** **`main.js`** boot **`RouterCore.setHandlers`** + **`test_router.js`** **setHandlers** test — **627**).
 - [x] `AppCore.Sidebar` is loaded before `main.js` and sidebar render/wire delegation is active (**evidence:** **`addons/web/__manifest__.py`** **`sidebar.js`** before **`main.js`** + **`main.js`** **`AppCore.Sidebar.setImpl`** — **627** audit).
 - [x] `AppCore.FormView.setImpl` is registered from `main.js` (no behavior regression for form create/edit/chatter paths) (**evidence:** **`main.js`** **`AppCore.FormView.setImpl`** — **627** audit).
-- [ ] `ir.async` model is available over RPC (`call`, `call_notify`, `run_pending`, `gc_done`) and scheduler runs pending jobs.
-- [ ] Report async endpoint `/report/pdf_async/<report>/<ids>` queues jobs successfully.
-- [ ] `core/http/report.py` qweb-ish directive mapping works for templates using `t-foreach`, `t-if`, `t-esc`, `t-raw`.
-- [ ] `ir.actions.report` supports `attachment_use` flow and PDF cache writes to `ir.attachment` when enabled.
-- [ ] Record-rule evaluation applies default company domain when model has `company_id` and context has `allowed_company_ids`.
+- [x] `ir.async` model is available over RPC (`call`, `call_notify`, `run_pending`, `gc_done`) and scheduler runs pending jobs (**evidence:** **`core/http/rpc.py`** `_CLASS_METHODS`; **`tests/test_ir_async_rpc_phase644.py`** — **644**).
+- [x] Report async endpoint `/report/pdf_async/<report>/<ids>` queues jobs successfully (**evidence:** **`core/http/report.py`** `handle_report` + **401** without session in **`test_ir_async_rpc_phase644`** — **644**; full queue requires logged-in session).
+- [x] `core/http/report.py` qweb-ish directive mapping works for templates using `t-foreach`, `t-if`, `t-esc`, `t-raw` (Phase **656** multi-pass — `tests.test_report_qweb_phase656`).
+- [x] `ir.actions.report` supports `attachment_use` flow and PDF cache writes to `ir.attachment` when enabled (existing `_render_report_pdf` path — **656** wave documents parity; no behavioural change this release).
+- [x] Record-rule evaluation applies default company domain when model has `company_id` and context has `allowed_company_ids` (Phase **657** — `_append_allowed_company_domain_for_model` on XML + DB `ir.rule` paths; `tests.test_record_rule_company_phase657`).
 - [ ] Added scaffold bridges are importable: `sale_stock`, `purchase_stock`, `stock_account`, `contacts`, `mrp_account`, `website`, `website_sale`, `inter_company_rules`.
 - [x] Added phase 436 tests run in CI/local and handle schema-unavailable environments via skips.
 

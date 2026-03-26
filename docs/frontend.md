@@ -82,6 +82,21 @@ The active product direction is defined by the Foundry One brand system and the 
 
 - Set **`window.__ERP_DEBUG_SIDEBAR_MENU = true`** in the browser console, then **reload**. Menus that have no resolvable hash route log a warning (see `main.js` near `_warnSidebarMenuDisabled`). Use this to find stale or misconfigured `ir.ui.menu` / action targets after menu changes. Clear the flag when finished.
 
+## View open path (Phases 648–652)
+
+- Sidebar leaf clicks and the app picker (**`selectApp`**) that target an **`ir.actions.act_window`** should flow through **`navigateActWindowIfAvailable`** in **`main.js`**, which prefers **`AppCore.ViewManager.openFromActWindow`** (and thus **`env.services.action.doAction`** when the modular runtime is bootstrapped).
+- Acceptance: no duplicate **`actionToRoute`** logic beyond **`menu_utils`** / **`ActionManager`**; hash navigation still triggers legacy **`routeApplyInternal`** after **`doAction`** updates the hash.
+
+## List route + form return (Phases 658–659)
+
+- **`dispatchActWindowForListRoute`** in **`main.js`** runs when **`routeApplyInternal`** handles a **list** slug (including deep links): if **`getActionForRoute`** resolves an **`ir.actions.act_window`**, **`ViewManager.openFromActWindow`** runs **before** **`loadRecords`** (no same-hash **`route()`** re-entry — unlike **`navigateActWindowIfAvailable`**).
+- After **create** / **write** on a form, returning to the list sets the hash, dispatches the same helper (**`source: 'formSaveReturnList'`**), then **`loadRecords`**.
+
+## Website / eCommerce shell tiles (Phase 660 — product scope)
+
+- **`#website`** and **`#ecommerce`** (or equivalent slugs from **`menuToRoute`**) remain **empty-state placeholders** in the legacy hash client: they signal that **`website` / `website_sale` backend modules** are not surfaced as a full public site builder or shop UX in this client.
+- **Non-goal (this release):** building storefront/editor flows in **`main.js`**. Use backend menus (Products, Sale Orders, Invoicing, etc.) for catalogue and orders until a dedicated phase scopes **Website** front-office parity. See **`docs/deferred_product_backlog.md`** for related deferrals.
+
 ## Testing
 
 - **JS unit tests**: Mock server, deterministic RPC fixtures
@@ -165,6 +180,20 @@ When planning web changes, compare **read-only** `odoo-19.0/addons/web/__manifes
 - **Phase 553:** **Public** `GET /web/sw.js` serves a minimal service worker (`install` → `skipWaiting`, `activate` → `clients.claim`). The shell registers it with `navigator.serviceWorker.register("/web/sw.js")` when supported.
 - **Phase 556 / 593:** The worker **pre-caches** shell URLs with **cache-first** `fetch` (**`CACHE`:** `erp-web-shell-v2` in `web_service_worker_stub`): default **concat** CSS + `web.assets_web.js`; when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`**, precache is **CSS + each manifest JS file** from `get_bundle_urls("web.assets_web")`. Bump **`CACHE`** in [core/http/routes.py](core/http/routes.py) when the precache set changes materially, or unregister the SW during development to avoid stale CSS/JS.
 - **Limitation:** **No offline RPC** or full app cache — shell static files only; CRUD and JSON-RPC require network.
+
+## Modular action service (Phases 636–639)
+
+Aligned with Odoo 19 **`webclient/actions`** boundaries (clean-room): the bundled runtime owns **`env.services.action`** as the single entry for navigation from actions and sidebar items.
+
+| API | Role |
+|-----|------|
+| **`doAction(actionDef, options)`** | Delegates to legacy **`Services.action`** for classification; for **`ir.actions.act_window`** (or legacy `{ type: 'window', action }`) applies **`actionToRoute`** and **`router.navigate`** so the hash matches the shell. |
+| **`navigateFromMenu(menu)`** | Resolves **`views.getAction(menu.action)`** and calls **`doAction`**, else **`menuToRoute(menu)`** + navigate. Sidebar leaf links use **`data-menu-id`** and call this on primary click (Phase **637**). |
+| **`doActionButton(opts)`** | Pass-through to **`window.ActionManager.doActionButton`** (object / action / report buttons). |
+
+**Runtime handle:** **`window.ERPFrontendRuntime.action`** (same object as **`env.services.action`**) for debugging and future legacy bridges.
+
+New product work should prefer these APIs over adding routes directly in **`main.js`**.
 
 ## Troubleshooting: app tile opens Home (Phases 630–633)
 

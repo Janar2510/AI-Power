@@ -1,4 +1,4 @@
-"""Phase 465: merged sale confirmation should compose sale + stock + account hooks."""
+"""Phase 465 / 654: merged sale confirmation should compose sale + stock + account hooks."""
 
 import unittest
 from pathlib import Path

@@ -77,6 +77,7 @@
             "web/static/src/core/webclient_shortcut_contract.js",
             "web/static/src/core/field_utils.js",
             "web/static/src/core/view_manager.js",
+            "web/static/src/core/list_control_panel_shim.js",
             "web/static/src/core/search_model.js",
             "web/static/src/core/action_manager.js",
             "web/static/src/core/list_view.js",

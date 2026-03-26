@@ -1,6 +1,6 @@
 # Partial reconcile + FX — design (pre-implementation)
 
-**Status:** Design (**Phase 572**) + **partial-only implementation** (**Phase 577**): `account.reconcile.allocation`, wizard `allocate_amount`, idempotent caps vs statement/move line residuals. **FX** and full Odoo `account.partial.reconcile` parity remain **out of scope** until a follow-on phase. Compare read-only `odoo-19.0/addons/account` when a checkout is available.
+**Status:** Design (**Phase 572**) + **partial-only implementation** (**Phase 577**): `account.reconcile.allocation`, wizard `allocate_amount`, idempotent caps vs statement/move line residuals. **FX** and full Odoo `account.partial.reconcile` parity remain **out of scope** until a follow-on phase (**Phase 647+** — **product + design sign-off** gate; no implementation in releases **1.221.0** / **1.222.0**). Compare read-only `odoo-19.0/addons/account` when a checkout is available.
 
 ## Goals
 

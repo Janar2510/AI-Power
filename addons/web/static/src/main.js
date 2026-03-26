@@ -662,7 +662,41 @@
     return out;
   }
 
-  function getDefaultRouteForAppNode(node) {
+  /**
+   * Phase 648: Prefer env.services.action via ViewManager.openFromActWindow for act_window navigation
+   * (sidebar, app picker) instead of only assigning location.hash.
+   */
+  function navigateActWindowIfAvailable(action, targetRoute, options) {
+    var slug = targetRoute || 'home';
+    var nextHash = '#' + slug;
+    var VM = window.AppCore && window.AppCore.ViewManager;
+    if (VM && typeof VM.openFromActWindow === 'function' && action) {
+      if (window.location.hash === nextHash) {
+        renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
+        route();
+        return true;
+      }
+      VM.openFromActWindow(action, options || {});
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Phase 658: List routes from hash / deep links dispatch act_window through ViewManager → action service.
+   * No same-hash → route() branch (avoids re-entrancy when called from routeApplyInternal).
+   */
+  function dispatchActWindowForListRoute(route, options) {
+    if (!route) return;
+    var action = getActionForRoute(route);
+    if (!action) return;
+    var VM = window.AppCore && window.AppCore.ViewManager;
+    if (VM && typeof VM.openFromActWindow === 'function') {
+      VM.openFromActWindow(action, options || { source: 'routeApplyList' });
+    }
+  }
+
+  function getDefaultNavFromAppNode(node) {
     if (!node) return null;
     var queue = [node];
     while (queue.length) {
@@ -671,12 +705,17 @@
       if (m) {
         var action = m.action && viewsSvc ? viewsSvc.getAction(m.action) : null;
         var route = action ? actionToRoute(action) : menuToRoute(m);
-        if (route) return route;
+        if (route) return { menu: m, action: action, route: route };
       }
       var children = cur && cur.children ? cur.children : [];
       for (var i = 0; i < children.length; i++) queue.push(children[i]);
     }
     return null;
+  }
+
+  function getDefaultRouteForAppNode(node) {
+    var nav = getDefaultNavFromAppNode(node);
+    return nav ? nav.route : null;
   }
 
   function selectApp(appId) {
@@ -689,8 +728,12 @@
     });
     if (!selectedRoot) return;
     if (typeof localStorage !== 'undefined') localStorage.setItem('erp_sidebar_app', String(appId));
-    var targetRoute = getDefaultRouteForAppNode(selectedRoot) || 'home';
+    var nav = getDefaultNavFromAppNode(selectedRoot);
+    var targetRoute = nav && nav.route ? nav.route : 'home';
     var nextHash = '#' + targetRoute;
+    if (navigateActWindowIfAvailable(nav && nav.action, targetRoute, { source: 'selectApp', appId: String(appId) })) {
+      return;
+    }
     if (window.location.hash === nextHash) {
       renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
       route();
@@ -888,8 +931,26 @@
     });
 
     sidebar.querySelectorAll('a.o-sidebar-link').forEach(function (a) {
-      a.addEventListener('click', function () {
+      a.addEventListener('click', function (e) {
         if (window.innerWidth <= 1023) closeMobileSidebar();
+        var menuId = a.getAttribute('data-menu-id');
+        if (!menuId || !viewsSvc) return;
+        var menus = viewsSvc.getMenus() || [];
+        var m = null;
+        for (var mi = 0; mi < menus.length; mi++) {
+          if (String((menus[mi].id || menus[mi].name || '')) === String(menuId)) {
+            m = menus[mi];
+            break;
+          }
+        }
+        if (!m) return;
+        var act = m.action ? viewsSvc.getAction(m.action) : null;
+        var r = act ? actionToRoute(act) : menuToRoute(m);
+        var href = (a.getAttribute('href') || '').replace(/^#/, '');
+        if (r && href && href !== r) return;
+        if (navigateActWindowIfAvailable(act, r, { source: 'sidebar', menuId: String(menuId) })) {
+          e.preventDefault();
+        }
       });
     });
 
@@ -4147,6 +4208,7 @@
         formDirty = false;
         showToast('Record created', 'success');
         window.location.hash = route;
+        dispatchActWindowForListRoute(route, { source: 'formSaveReturnList' });
         loadRecords(model, route, currentListState.searchTerm);
       })
       .catch(err => handleSaveError(form, err, btn));
@@ -4170,6 +4232,7 @@
         formDirty = false;
         showToast('Record saved', 'success');
         window.location.hash = route;
+        dispatchActWindowForListRoute(route, { source: 'formSaveReturnList' });
         loadRecords(model, route, currentListState.searchTerm);
       })
       .catch(err => handleSaveError(form, model, err, btn));
@@ -5401,7 +5464,10 @@
     } else if (listMatch) {
       const route = listMatch[1];
       const model = getModelForRoute(route);
-      if (model) loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+      if (model) {
+        dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
+        loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+      }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (newMatch) {
@@ -5419,7 +5485,10 @@
     } else if (genericListMatch) {
       const route = genericListMatch[1];
       const model = getModelForRoute(route);
-      if (model) loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+      if (model) {
+        dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
+        loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+      }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (genericNewMatch) {

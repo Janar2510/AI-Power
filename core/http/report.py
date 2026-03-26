@@ -74,27 +74,25 @@ def _load_template(module: str, rel_path: str) -> Optional[str]:
         return None
 
 
-def _qwebish_to_jinja(content: str) -> str:
-    """Very small QWeb-ish directive mapping for report templates."""
+def _qwebish_to_jinja(content: str, *, max_passes: int = 32) -> str:
+    """Very small QWeb-ish directive mapping for report templates (Phase 656: multi-pass for nested tags)."""
     s = content or ""
-    # <t t-foreach="records" t-as="r">...</t>
-    s = re.sub(
-        r'<t\s+[^>]*t-foreach="([^"]+)"\s+[^>]*t-as="([^"]+)"[^>]*>',
-        r"{% for \2 in \1 %}",
-        s,
-    )
-    # <t t-if="cond">...</t>
-    s = re.sub(r'<t\s+[^>]*t-if="([^"]+)"[^>]*>', r"{% if \1 %}", s)
-    # <t t-esc="expr"/> or with closing tag
-    s = re.sub(r'<t\s+[^>]*t-esc="([^"]+)"\s*/>', r"{{ \1 | e }}", s)
-    s = re.sub(r'<t\s+[^>]*t-esc="([^"]+)"[^>]*>\s*</t>', r"{{ \1 | e }}", s)
-    # <t t-raw="expr"/>
-    s = re.sub(r'<t\s+[^>]*t-raw="([^"]+)"\s*/>', r"{{ \1 | safe }}", s)
-    s = re.sub(r'<t\s+[^>]*t-raw="([^"]+)"[^>]*>\s*</t>', r"{{ \1 | safe }}", s)
-    # Generic </t>
-    s = s.replace("</t>", "{% endfor %}")
-    # Balance accidental endfor for if blocks: convert `endfor` near preceding if to endif when obvious.
-    s = re.sub(r"(\{% if [^%]+%\})((?:.|\n)*?)\{% endfor %\}", r"\1\2{% endif %}", s)
+    for _ in range(max_passes):
+        prev = s
+        s = re.sub(
+            r'<t\s+[^>]*t-foreach="([^"]+)"\s+[^>]*t-as="([^"]+)"[^>]*>',
+            r"{% for \2 in \1 %}",
+            s,
+        )
+        s = re.sub(r'<t\s+[^>]*t-if="([^"]+)"[^>]*>', r"{% if \1 %}", s)
+        s = re.sub(r'<t\s+[^>]*t-esc="([^"]+)"\s*/>', r"{{ \1 | e }}", s)
+        s = re.sub(r'<t\s+[^>]*t-esc="([^"]+)"[^>]*>\s*</t>', r"{{ \1 | e }}", s)
+        s = re.sub(r'<t\s+[^>]*t-raw="([^"]+)"\s*/>', r"{{ \1 | safe }}", s)
+        s = re.sub(r'<t\s+[^>]*t-raw="([^"]+)"[^>]*>\s*</t>', r"{{ \1 | safe }}", s)
+        s = s.replace("</t>", "{% endfor %}")
+        s = re.sub(r"(\{% if [^%]+%\})((?:.|\n)*?)\{% endfor %\}", r"\1\2{% endif %}", s)
+        if s == prev:
+            break
     return s
 
 

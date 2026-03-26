@@ -147,6 +147,8 @@ def add_missing_columns(
                 ("write_uid", "INTEGER"),
                 ("write_date", "TIMESTAMP"),
             ):
+                if audit_col in field_defs:
+                    continue
                 if not column_exists(cursor, table, audit_col):
                     try:
                         cursor.execute(f'ALTER TABLE "{table}" ADD COLUMN "{audit_col}" {audit_type}')

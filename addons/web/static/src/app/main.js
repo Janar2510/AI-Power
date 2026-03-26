@@ -55,6 +55,8 @@ function bootModernWebClient() {
     version: bootstrap.version,
     boot: bootModernWebClient,
     menuUtils: MenuUtils,
+    /** Phase 636: modular action entry (doAction, navigateFromMenu, doActionButton). */
+    action: env.services.action,
   };
   window.__ERPModernWebClientRuntime = runtime;
   window.ERPFrontendRuntime = runtime;

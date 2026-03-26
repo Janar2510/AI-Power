@@ -5,6 +5,7 @@ import {
   getAppRoots,
   getCurrentRoute,
   getDefaultRouteForAppNode,
+  menuToRoute,
 } from "./menu_utils.js";
 
 function createFallbackSession(bootstrap) {
@@ -279,16 +280,75 @@ function createRouterService() {
 
 function createActionService(viewsService, menuService, routerService) {
   const legacyAction = window.Services && window.Services.action ? window.Services.action : null;
+
+  function navigateForActWindow(actionDef) {
+    const route = actionToRoute(actionDef || {});
+    if (route) {
+      routerService.navigate(route);
+      return route;
+    }
+    return null;
+  }
+
   return {
+    /**
+     * Odoo-style action dispatch: legacy classifier + hash navigation for act_window.
+     * Phase 636: when legacy returns { type: 'window', action }, apply actionToRoute so the shell updates.
+     */
     doAction(actionDef, options) {
+      const rawType = (actionDef && actionDef.type) || "";
+      const isWindowType = rawType === "ir.actions.act_window" || rawType === "window";
       if (legacyAction && typeof legacyAction.doAction === "function") {
-        return Promise.resolve(legacyAction.doAction(actionDef, options));
+        return Promise.resolve(legacyAction.doAction(actionDef, options)).then(function (result) {
+          const windowPayload = result && result.type === "window" ? result : null;
+          if (isWindowType || windowPayload) {
+            const act = (windowPayload && windowPayload.action) || actionDef;
+            navigateForActWindow(act);
+          }
+          return result;
+        });
       }
       const route = actionToRoute(actionDef || {});
       if (route) {
         routerService.navigate(route);
       }
       return Promise.resolve(route);
+    },
+    /**
+     * Phase 649 bridge: open list/form route from act_window; delegates to AppCore.ViewManager when present.
+     */
+    openFromActWindow(actionDef, options) {
+      const VM = window.AppCore && window.AppCore.ViewManager;
+      if (VM && typeof VM.openFromActWindow === "function") {
+        return VM.openFromActWindow(actionDef, options || {});
+      }
+      return this.doAction(actionDef, options || {});
+    },
+    /**
+     * Phase 637: single entry for sidebar / app picker — act_window from menu metadata or menuToRoute fallback.
+     */
+    navigateFromMenu(menu) {
+      if (!menu || typeof menu !== "object") {
+        return Promise.resolve(null);
+      }
+      const actionRef = menu.action;
+      const action = actionRef ? viewsService.getAction(actionRef) : null;
+      if (action) {
+        return this.doAction(action, { fromMenu: true, menu: menu });
+      }
+      const fallbackRoute = menuToRoute(menu);
+      if (fallbackRoute) {
+        routerService.navigate(fallbackRoute);
+        return Promise.resolve(fallbackRoute);
+      }
+      return Promise.resolve(null);
+    },
+    /** Phase 636: delegate form/list object buttons to legacy ActionManager. */
+    doActionButton(opts) {
+      if (window.ActionManager && typeof window.ActionManager.doActionButton === "function") {
+        return window.ActionManager.doActionButton(opts || {});
+      }
+      return Promise.reject(new Error("ActionManager.doActionButton not available"));
     },
     getActionForRoute(route) {
       const menus = menuService.getAll();

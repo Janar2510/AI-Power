@@ -120,7 +120,12 @@ class SaleOrder(Model):
         return result
 
     def action_confirm(self):
-        """Confirm the order (draft -> sale). Applies pricelist (Phase 187), sends confirmation email (Phase 143)."""
+        """Confirm the order (draft -> sale).
+
+        Phase 654: merged stack uses ``_action_confirm_sale_core`` (pricelist, email) so ``stock`` / ``account``
+        modules can override ``action_confirm`` to call the same helper plus picking / invoice side effects
+        without relying on fragile ``super()`` ordering across ``_inherit`` merges.
+        """
         self._action_confirm_sale_core()
 
     def _action_confirm_sale_core(self):

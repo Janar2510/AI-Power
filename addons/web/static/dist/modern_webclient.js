@@ -604,16 +604,73 @@
   }
   function createActionService(viewsService, menuService, routerService) {
     const legacyAction = window.Services && window.Services.action ? window.Services.action : null;
+    function navigateForActWindow(actionDef) {
+      const route = actionToRoute(actionDef || {});
+      if (route) {
+        routerService.navigate(route);
+        return route;
+      }
+      return null;
+    }
     return {
+      /**
+       * Odoo-style action dispatch: legacy classifier + hash navigation for act_window.
+       * Phase 636: when legacy returns { type: 'window', action }, apply actionToRoute so the shell updates.
+       */
       doAction(actionDef, options) {
+        const rawType = actionDef && actionDef.type || "";
+        const isWindowType = rawType === "ir.actions.act_window" || rawType === "window";
         if (legacyAction && typeof legacyAction.doAction === "function") {
-          return Promise.resolve(legacyAction.doAction(actionDef, options));
+          return Promise.resolve(legacyAction.doAction(actionDef, options)).then(function(result) {
+            const windowPayload = result && result.type === "window" ? result : null;
+            if (isWindowType || windowPayload) {
+              const act = windowPayload && windowPayload.action || actionDef;
+              navigateForActWindow(act);
+            }
+            return result;
+          });
         }
         const route = actionToRoute(actionDef || {});
         if (route) {
           routerService.navigate(route);
         }
         return Promise.resolve(route);
+      },
+      /**
+       * Phase 649 bridge: open list/form route from act_window; delegates to AppCore.ViewManager when present.
+       */
+      openFromActWindow(actionDef, options) {
+        const VM = window.AppCore && window.AppCore.ViewManager;
+        if (VM && typeof VM.openFromActWindow === "function") {
+          return VM.openFromActWindow(actionDef, options || {});
+        }
+        return this.doAction(actionDef, options || {});
+      },
+      /**
+       * Phase 637: single entry for sidebar / app picker — act_window from menu metadata or menuToRoute fallback.
+       */
+      navigateFromMenu(menu) {
+        if (!menu || typeof menu !== "object") {
+          return Promise.resolve(null);
+        }
+        const actionRef = menu.action;
+        const action = actionRef ? viewsService.getAction(actionRef) : null;
+        if (action) {
+          return this.doAction(action, { fromMenu: true, menu });
+        }
+        const fallbackRoute = menuToRoute(menu);
+        if (fallbackRoute) {
+          routerService.navigate(fallbackRoute);
+          return Promise.resolve(fallbackRoute);
+        }
+        return Promise.resolve(null);
+      },
+      /** Phase 636: delegate form/list object buttons to legacy ActionManager. */
+      doActionButton(opts) {
+        if (window.ActionManager && typeof window.ActionManager.doActionButton === "function") {
+          return window.ActionManager.doActionButton(opts || {});
+        }
+        return Promise.reject(new Error("ActionManager.doActionButton not available"));
       },
       getActionForRoute(route) {
         const menus = menuService.getAll();
@@ -1086,7 +1143,7 @@
         html += "</div></section>";
         return;
       }
-      html += '<a class="o-sidebar-link' + (isActive ? " o-sidebar-link--active" : "") + (depth > 0 ? " o-sidebar-link--nested" : "") + (route ? "" : " o-sidebar-link-disabled") + '" href="' + (route ? "#" + route : "#") + '">';
+      html += '<a class="o-sidebar-link' + (isActive ? " o-sidebar-link--active" : "") + (depth > 0 ? " o-sidebar-link--nested" : "") + (route ? "" : " o-sidebar-link-disabled") + '" href="' + (route ? "#" + route : "#") + '" data-menu-id="' + escHtml(String(menu.id || "")) + '">';
       if (depth === 0) {
         html += sidebarIconHtml(menu);
       }
@@ -1095,7 +1152,7 @@
     });
     return html;
   }
-  function wireSidebar(host, onAfterWire) {
+  function wireSidebar(host, env, onAfterWire) {
     const cleanups = [];
     const folds = getFoldState();
     host.querySelectorAll(".o-sidebar-category-head").forEach(function(button) {
@@ -1115,7 +1172,22 @@
       });
     });
     host.querySelectorAll("a.o-sidebar-link").forEach(function(link) {
-      const onClick = function() {
+      const onClick = function(ev) {
+        if (ev.defaultPrevented) return;
+        if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+        const menuId = link.getAttribute("data-menu-id") || "";
+        const actionSvc = env && env.services && env.services.action;
+        if (menuId && actionSvc && typeof actionSvc.navigateFromMenu === "function") {
+          const menus = env.services.menu.getAll();
+          const menu = menus.find(function(m) {
+            return m && String(m.id || "") === menuId;
+          });
+          if (menu) {
+            ev.preventDefault();
+            actionSvc.navigateFromMenu(menu).catch(function() {
+            });
+          }
+        }
         if (window.innerWidth <= 1023 && window.__erpModernShellController) {
           window.__erpModernShellController.closeMobileSidebar();
         }
@@ -1144,7 +1216,7 @@
     const route = shell.route || "home";
     cleanupHost2(host);
     host.innerHTML = '<div class="o-sidebar-inner"><div class="o-sidebar-scroll">' + (shell.staleBannerHtml ? '<div class="o-sidebar-stale">' + shell.staleBannerHtml + "</div>" : "") + '<nav class="o-sidebar-nav" role="navigation">' + (tree.length ? buildSidebarBranch(tree, 0, route, env.services.views) : '<p class="o-sidebar-empty">No menu items.</p>') + "</nav></div></div>";
-    wireSidebar(host);
+    wireSidebar(host, env);
   }
   var Sidebar = class extends Component2 {
     static template = xml2`<div t-ref="host" class="o-modern-sidebar-slot"></div>`;
@@ -1670,7 +1742,9 @@
       app,
       version: bootstrap.version,
       boot: bootModernWebClient,
-      menuUtils: menu_utils_exports
+      menuUtils: menu_utils_exports,
+      /** Phase 636: modular action entry (doAction, navigateFromMenu, doActionButton). */
+      action: env.services.action
     };
     window.__ERPModernWebClientRuntime = runtime;
     window.ERPFrontendRuntime = runtime;

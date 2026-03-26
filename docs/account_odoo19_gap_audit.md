@@ -65,6 +65,7 @@ See **Phases 535–538** in `docs/parity_matrix.md`.
 Remaining deferrals (clean-room vs `odoo-19.0/addons/account/` when prioritized):
 
 - **Partial reconcile (no FX in v1 slice)** — **`account.reconcile.allocation`** + wizard **`allocate_amount`** (**Phase 577**); design **`docs/account_partial_reconcile_design.md`** (**572**). **FX** remains **deferred** (separate phase after stable partial-only).
+- **Phase 647+ (planned)** — **Multi-currency FX** on partial reconcile allocations and statement lines: gated on product scope; extends **577** design; tracked in **`docs/parity_matrix.md`** row **647+**.
 - **Multi-company lock matrix** — per-move company + **`account_lock_date`** on **`res.company`** (**557**, **560**). **Adviser bypass:** **`res.company.account_lock_adviser_group_id`** — users in that group skip the lock check (**583**; evidence **`tests/test_account_lock_adviser_phase611.py`**, **Phase 611**).
 
-Update this doc when a subtrack ships; keep matrix rows **544**, **546**, **551**, **555**, **557**, **560**, **563**, **564**, **568**, **569**, **572**, **577**, **583**, **599**, **605**, and **611** in sync.
+Update this doc when a subtrack ships; keep matrix rows **544**, **546**, **551**, **555**, **557**, **560**, **563**, **564**, **568**, **569**, **572**, **577**, **583**, **599**, **605**, **611**, and **647+** in sync.

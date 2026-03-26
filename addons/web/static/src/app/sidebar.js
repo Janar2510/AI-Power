@@ -82,7 +82,16 @@ function buildSidebarBranch(nodes, depth, activeRoute, viewsService) {
       return;
     }
 
-    html += '<a class="o-sidebar-link' + (isActive ? " o-sidebar-link--active" : "") + (depth > 0 ? " o-sidebar-link--nested" : "") + (route ? "" : " o-sidebar-link-disabled") + '" href="' + (route ? "#" + route : "#") + '">';
+    html +=
+      '<a class="o-sidebar-link' +
+      (isActive ? " o-sidebar-link--active" : "") +
+      (depth > 0 ? " o-sidebar-link--nested" : "") +
+      (route ? "" : " o-sidebar-link-disabled") +
+      '" href="' +
+      (route ? "#" + route : "#") +
+      '" data-menu-id="' +
+      escHtml(String(menu.id || "")) +
+      '">';
     if (depth === 0) {
       html += sidebarIconHtml(menu);
     }
@@ -92,7 +101,7 @@ function buildSidebarBranch(nodes, depth, activeRoute, viewsService) {
   return html;
 }
 
-function wireSidebar(host, onAfterWire) {
+function wireSidebar(host, env, onAfterWire) {
   const cleanups = [];
   const folds = getFoldState();
 
@@ -114,7 +123,21 @@ function wireSidebar(host, onAfterWire) {
   });
 
   host.querySelectorAll("a.o-sidebar-link").forEach(function (link) {
-    const onClick = function () {
+    const onClick = function (ev) {
+      if (ev.defaultPrevented) return;
+      if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+      const menuId = link.getAttribute("data-menu-id") || "";
+      const actionSvc = env && env.services && env.services.action;
+      if (menuId && actionSvc && typeof actionSvc.navigateFromMenu === "function") {
+        const menus = env.services.menu.getAll();
+        const menu = menus.find(function (m) {
+          return m && String(m.id || "") === menuId;
+        });
+        if (menu) {
+          ev.preventDefault();
+          actionSvc.navigateFromMenu(menu).catch(function () {});
+        }
+      }
       if (window.innerWidth <= 1023 && window.__erpModernShellController) {
         window.__erpModernShellController.closeMobileSidebar();
       }
@@ -151,7 +174,7 @@ function renderSidebarIntoHost(env, host) {
     '<nav class="o-sidebar-nav" role="navigation">' +
     (tree.length ? buildSidebarBranch(tree, 0, route, env.services.views) : '<p class="o-sidebar-empty">No menu items.</p>') +
     "</nav></div></div>";
-  wireSidebar(host);
+  wireSidebar(host, env);
 }
 
 export class Sidebar extends Component {

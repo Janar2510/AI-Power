@@ -35,6 +35,28 @@
       }
       return rpc.callKw(model, "unlink", [[id]], {});
     },
+    /**
+     * Phase 649: single entry to open a list/form route from ir.actions.act_window metadata.
+     * Prefer modular env.services.action (aligns with Odoo view_service + action pipeline).
+     */
+    openFromActWindow(action, options) {
+      const rt = window.__ERPModernWebClientRuntime;
+      const svc = rt && rt.env && rt.env.services && rt.env.services.action;
+      if (svc && typeof svc.doAction === "function" && action) {
+        return Promise.resolve(svc.doAction(action, options || {}));
+      }
+      const mu =
+        (rt && rt.menuUtils) ||
+        (window.ERPFrontendRuntime && window.ERPFrontendRuntime.menuUtils);
+      if (mu && typeof mu.actionToRoute === "function") {
+        const route = mu.actionToRoute(action);
+        if (route) {
+          window.location.hash = "#" + route;
+          return Promise.resolve(route);
+        }
+      }
+      return Promise.resolve(null);
+    },
   };
 
   window.AppCore.ViewManager = ViewManager;

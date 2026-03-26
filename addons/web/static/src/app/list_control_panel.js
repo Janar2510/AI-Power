@@ -1,7 +1,7 @@
 /**
  * Wave Q (Phase 562): list view control-panel HTML builders (extracted boundary).
- * Legacy list_view.js delegates here when window.AppCore.ListControlPanel is set
- * by the modern bundle (clean-room; no Odoo paste).
+ * Legacy `web.assets_web` loads `core/list_control_panel_shim.js` (Phase 650) before `list_view.js`;
+ * the modern bundle assigns the same API from this module. Keep the two copies in sync.
  */
 
 function escHtml(v) {

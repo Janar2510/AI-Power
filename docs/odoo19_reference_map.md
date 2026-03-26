@@ -12,6 +12,8 @@ Use this when comparing behaviour to upstream **Odoo 19 CE**. Implement **clean-
 
 If `odoo-19.0` is missing locally, clone Odoo 19 CE into `AI Power/odoo-19.0` and add the folder to your Cursor workspace alongside `erp-platform`.
 
+**Addon folder inventory (which names exist in each repo):** [docs/odoo19_erp_addon_inventory_audit.md](odoo19_erp_addon_inventory_audit.md).
+
 ## High-priority addon mapping
 
 | Domain | Odoo 19 path | ERP platform path |

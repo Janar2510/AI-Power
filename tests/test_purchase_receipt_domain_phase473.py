@@ -74,6 +74,12 @@ class _FakeRec:
         self.ids = [oid]
         self.name = name
 
+    def read(self, fields):
+        row = {"id": self.ids[0]}
+        if "name" in fields:
+            row["name"] = self.name
+        return [row]
+
 
 class _FakeRecs:
     def __init__(self, env, items):

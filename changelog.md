@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.222.0 — 2026-03-24
+
+### Added
+
+- **Phases 658–662 (FE — list deep links + form return + Website scope):** **`dispatchActWindowForListRoute`** in **`main.js`** runs **`ViewManager.openFromActWindow`** before **`loadRecords`** for list routes and after form create/write when returning to list (**`formSaveReturnList`**). **Phase 660:** **`frontend.md`** + gap table document **Website/eCommerce** hash tiles as **placeholders** (no storefront in legacy client). Tests: **`tests/test_modern_action_contract_phase636.py`** (**658–659** assertions).
+- **Phases 663–666 (BE — checklist closure):** **663–664** verified — **`purchase.order._get_received_qty_by_product`** and **`purchase_stock.receipt_count`** already use **`purchase_id` OR `origin`** (**473/474**). **665:** **`tests/test_sale_confirm_side_effects_phase665.py`** asserts merged **`_action_confirm_*`** hooks on **`sale.order`**. **666:** sale/purchase cancel + pickings cross-checked via existing **476/477** tests (no code drift).
+- **Phase 667 (tooling):** **`scripts/diff_odoo_erp_addons.sh`** — optional **`ODOO19_ADDONS`** env; **`docs/odoo19_erp_addon_inventory_audit.md`** updated.
+
+### Documentation
+
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**.
+
+### Notes
+
+- **647+** FX partial reconcile remains **planned** (product gate); matrix unchanged except wave **667** tooling row.
+
+### Fixed
+
+- **`tests.test_purchase_receipt_domain_phase473`:** **`_FakeRec`** now implements **`read()`** so **`purchase_stock._compute_receipt_count`** contract test matches the real recordset API.
+
+## 1.221.0 — 2026-03-24
+
+### Added
+
+- **Phases 648–652 (view open path / control panel):** Legacy **`navigateActWindowIfAvailable`** in **`main.js`** routes sidebar clicks and **`selectApp`** through **`AppCore.ViewManager.openFromActWindow`** when an **`ir.actions.act_window`** exists (defers to **`env.services.action.doAction`** in the modern runtime). **`services.action.openFromActWindow`** bridges the same entry. **`list_control_panel_shim.js`** in **`web.assets_web`** removes duplicated list control-panel HTML from **`list_view.js`** (Phase **650**). Tests extended in **`tests/test_modern_action_contract_phase636.py`**.
+- **Phase 653:** **`add_missing_columns`** skips auto audit columns when the model already defines the same field (no duplicate **`create_date`** / **`write_date`** ALTER). **`tests/test_schema_audit_columns.py`** (`TestAddMissingColumnsAuditPhase653`).
+- **Phase 654:** **`sale.order.action_confirm`** docstring documents the merge-safe **`_action_confirm_sale_core`** hook for **`stock`** / **`account`** layers; **`tests/test_sale_confirm_phase465.py`** header references **654**.
+- **Phase 656:** **`_qwebish_to_jinja`** multi-pass conversion for nested QWeb-ish tags; **`tests/test_report_qweb_phase656.py`**.
+- **Phase 657:** **`_append_allowed_company_domain_for_model`** shared helper; DB-backed **`ir.rule`** path now applies the default **`company_id in allowed_company_ids`** guard when the model is company-scoped; **`tests/test_record_rule_company_phase657.py`**.
+
+### Documentation
+
+- **`parity_matrix.md`**, **`odoo19-webclient-gap-table.md`**, **`frontend.md`**, **`frontend-view-contracts.md`**, **`ai-implementation-checklist.md`**, **`DeploymentChecklist.md`**.
+
+## 1.220.0 — 2026-03-26
+
+### Added
+
+- **Phases 636–639 (modular action hub):** **`env.services.action`** applies **`actionToRoute`** after legacy **`ir.actions.act_window`** handling; **`navigateFromMenu`**, **`doActionButton`**; sidebar leaf links use **`data-menu-id`** and call **`navigateFromMenu`** on primary click; **`ERPFrontendRuntime.action`** alias. **`tests/test_modern_action_contract_phase636.py`**, **`docs/frontend.md`**, **`docs/odoo19-webclient-gap-table.md`** (Views row).
+- **Phases 640–643 (parity closure):** Documented existing **SO/PO/MO** cancel + picking/move behaviour and draft invoice guards in **`docs/parity_matrix.md`** (evidence: **476–477** tests).
+- **Phases 644–646 (platform contract tests):** **`tests/test_ir_async_rpc_phase644.py`** — **`call_kw`** whitelist for **`ir.async`** methods; **`GET /report/pdf_async/...`** returns **401** without session.
+
+### Documentation
+
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`account_odoo19_gap_audit.md`** (Phase **647+** FX note).
+
 ## 1.219.1 — 2026-03-25
 
 ### Fixed

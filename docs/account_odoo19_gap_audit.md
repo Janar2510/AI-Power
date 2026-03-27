@@ -28,8 +28,18 @@ Odoo CE `account` typically spreads across many models: move/posting pipeline, f
 | Reporting | Full reporting engine + optional `account_reports` | SQL TB / P&amp;L / BS helpers on `account.account` | **Deferred** full parity; keep subset documented |
 | Security / audit | Record rules, tax audit, lock | `_audit` on `account.move`; base ACLs | Align when security track prioritises |
 
+## Phase 733 — `payment.transaction` links: `account_move_id` vs `transaction_ids` M2M
+
+| Flow | Uses `account_move_id` on `payment.transaction` | Uses only `account.move.transaction_ids` M2M |
+|------|---------------------------------------------------|-----------------------------------------------|
+| **`account.move` residual** / **`paid`** sync (**Phase 731**) | Yes | No — extending M2M-only coverage needs explicit product scope + tests |
+| **`transaction_count` / `amount_paid`** (**Phase 730**) | Yes (direct link) | Yes — **`account_payment`** **`_get_linked_transactions`** falls back when M2M empty |
+
+Portal and checkout flows should set **`account_move_id`** on invoice payments so **731** behaviour applies.
+
 ## Related tests (ERP)
 
+- Payment bridge (DB smoke, **Phase 733**/**734**): `tests/test_payment_transaction_invoice_db_phase733.py`, `tests/test_payment_transaction_write_done_phase734.py`, `tests/test_portal_invoice_pay_phase199.py`, `tests/payment_test_bootstrap.py`
 - Posting: `tests/test_account_post_phase467.py`, `tests/test_account_post_phase535.py`
 - Taxes: `tests/test_account_tax_compute_phase536.py`
 - Bank / wizard: `tests/test_bank_statement_phase193.py`, `tests/test_reconcile_wizard_phase195.py`, `tests/test_bank_statement_action_reconcile_phase537.py`

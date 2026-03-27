@@ -1,4 +1,9 @@
-"""Phase 470: done payment transactions create durable account.payment records."""
+"""Phase 470 + 731: done payment transactions create durable account.payment records.
+
+Evidence for checklist row 35: idempotent ``account.payment`` via
+``(move_id, payment_reference)``; default reference ``TX-<invoice_id>``.
+Registry + fakes. Pending transactions skip creation.
+"""
 
 import unittest
 from pathlib import Path
@@ -168,4 +173,32 @@ class TestAccountPaymentRecordPhase470(unittest.TestCase):
 
         self.assertEqual(invoice.sync_calls, 1)
         self.assertEqual(payment_model.created, [])
+
+    def test_pending_transaction_does_not_create_account_payment(self):
+        tx_model = self.registry.get("payment.transaction")
+        payment_model = _FakePaymentModel()
+        invoice = _FakeInvoice()
+        recordset = _FakeTxRecordset(
+            _FakeEnv(payment_model, invoice),
+            [_FakeTxRecord(state="pending")],
+        )
+
+        tx_model._sync_linked_invoice_payment_state(recordset)
+
+        self.assertEqual(invoice.sync_calls, 0)
+        self.assertEqual(payment_model.created, [])
+
+    def test_default_payment_reference_uses_invoice_prefixed_id_when_tx_reference_missing(self):
+        tx_model = self.registry.get("payment.transaction")
+        payment_model = _FakePaymentModel()
+        invoice = _FakeInvoice()
+        recordset = _FakeTxRecordset(
+            _FakeEnv(payment_model, invoice),
+            [_FakeTxRecord(reference=None)],
+        )
+
+        tx_model._sync_linked_invoice_payment_state(recordset)
+
+        self.assertEqual(len(payment_model.created), 1)
+        self.assertEqual(payment_model.created[0]["payment_reference"], "TX-11")
 

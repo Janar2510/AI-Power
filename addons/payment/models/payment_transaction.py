@@ -66,10 +66,18 @@ class PaymentTransaction(Model):
             if invoice.ids and hasattr(invoice, "_sync_payment_state_from_transactions"):
                 invoice._sync_payment_state_from_transactions()
             if Payment and Journal and Company and invoice.ids:
-                PaymentTransaction._ensure_account_payment_record(tx, invoice, row, Payment, Journal, Company)
+                # Unbound call: `tx` may be a lightweight test double without Model methods.
+                PaymentTransaction._ensure_account_payment_record(
+                    tx, invoice, row, Payment, Journal, Company
+                )
 
     def _ensure_account_payment_record(self, invoice, tx_row, Payment, Journal, Company):
-        """Create a durable account.payment row for a completed transaction if missing."""
+        """Create a durable account.payment row for a completed transaction if missing.
+
+        ``self`` is the transaction record (or a test double); only ``invoice`` /
+        ``tx_row`` are read for business data. Call via class unbound form when
+        ``self`` may not be a full Model instance.
+        """
         move_id = invoice.ids[0] if getattr(invoice, "ids", None) else None
         if not move_id:
             return

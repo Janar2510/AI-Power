@@ -663,7 +663,7 @@ def portal_my_invoice_pay(request, move_id):
                 "state": "done" if providers[0].get("code") == "demo" else "pending",
             })
             if providers[0].get("code") == "demo":
-                Move.browse(move_id).write({"state": "paid"})
+                # Phase 732: Phase 731 sync runs on create when state is done; no direct paid write.
                 return redirect(f"/my/invoices/{move_id}")
             return redirect(f"/payment/status/{ref}")
         providers = Provider.search_read([("state", "in", ["enabled", "test"])], ["id", "code"])

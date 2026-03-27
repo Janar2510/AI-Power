@@ -89,9 +89,11 @@ def payment_status(request, reference):
             move_id = move_id[0]
         if state == "done":
             if move_id:
-                Move = env.get("account.move")
-                if Move:
-                    Move.browse(move_id).write({"state": "paid"})
+                # Phase 732: align with Phase 731 — refresh invoice + account.payment via tx hooks
+                # (do not bypass residual rules with a direct move.write paid).
+                tx_rs = Transaction.search([("reference", "=", reference)], limit=1)
+                if getattr(tx_rs, "ids", None) and hasattr(tx_rs, "_sync_linked_invoice_payment_state"):
+                    tx_rs._sync_linked_invoice_payment_state()
                 return redirect(f"/my/invoices/{move_id}")
             if order_id:
                 return redirect(f"/shop/confirmation?order={order_id}")

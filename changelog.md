@@ -1,5 +1,61 @@
 # Changelog
 
+## 1.233.0 — 2026-03-27
+
+### Added
+
+- **Phase 734 (tests):** **`tests.test_payment_transaction_write_done_phase734`** — **`payment.transaction`** created **`pending`** then **`write({state: done})`**; asserts **posted** → **`paid`** and **`account.payment`** (**731** sync on **write**). Shared bootstrap in **`tests/payment_test_bootstrap`** (**`ensure_minimal_sale_invoice_chart`**, **`ensure_demo_payment_provider`**, **`ensure_bank_journal_for_payment_record`**); **199** and **733** tests import from it.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**, **`DeploymentChecklist.md`**, **`docs/deferred_product_backlog.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — through **1.233.0** no **490–524** or D1/D2 implementation.
+
+## 1.232.0 — 2026-03-27
+
+### Added
+
+- **Phase 733 (tests + docs):** **`tests.test_portal_invoice_pay_phase199`** bootstraps minimal **`account.journal` (sale)** + **`account.account`** (income, receivable) when **`load_default_data`** lacks them, and ensures a **demo** **`payment.provider`**, so the **paid** assertion runs on fresh/CI DBs instead of **`skipTest`**. New **`tests.test_payment_transaction_invoice_db_phase733`** — DB smoke for **done** **`payment.transaction`** → **`paid`** invoice + **`account.payment`** row (creates a **bank** journal when missing so **`_ensure_account_payment_record`** can run). **`docs/account_odoo19_gap_audit.md`** — **`account_move_id`** vs **`transaction_ids`** M2M table (**731** residual vs **730** stats).
+
+### Documentation
+
+- **`DeploymentChecklist.md`**, **`docs/parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — unchanged in **1.232.0**.
+
+## 1.231.0 — 2026-03-24
+
+### Added
+
+- **Phase 732 (portal + payment — align with Phase 731):** **`/payment/status/<reference>`** no longer calls **`account.move.write({state: paid})`** when the linked **`payment.transaction`** is **`done`**; it reloads the transaction recordset and runs **`_sync_linked_invoice_payment_state`** so residual rules and idempotent **`account.payment`** creation stay consistent. **`portal_my_invoice_pay`** (demo provider) no longer writes **`paid`** after **`Transaction.create`** — **731** sync on **`create`** is sufficient. **`tests.test_portal_invoice_pay_phase199`** asserts **`paid`** without a direct invoice write after **`done`** transaction **`create`**.
+
+### Documentation
+
+- **`DeploymentChecklist.md`** (Phase **199** / **Post–230**), **`docs/parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — no **490–524** or D1/D2 work in **1.231.0**.
+
+## 1.230.0 — 2026-03-24
+
+### Added
+
+- **Phase 731 (BE + tests — checklist Q):** Closed **`payment.transaction` ↔ `account.move`** checklist rows **33** and **35** with extended evidence: **`account.move`** residual nets **`payment.transaction`** rows with **`state=done`** and **`account_move_id`** set; **`_sync_payment_state_from_transactions`** sets **`paid`** when residual is fully covered (including multiple transactions); **`payment.transaction`** **`create`** / **`write`** call **`_sync_linked_invoice_payment_state`**, which creates idempotent **`account.payment`** rows keyed by **`(move_id, payment_reference)`** (default reference **`TX-<invoice_id>`**). **`tests.test_account_payment_phase468`** (multi-tx partial/full, pending tx no-op); **`tests.test_account_payment_record_phase470`** (pending skip, default reference). **`payment_transaction`:** document unbound **`_ensure_account_payment_record`** call for test doubles.
+
+### Documentation
+
+- **`docs/ai-implementation-checklist.md`**, **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/deferred_product_backlog.md`**.
+
+### Notes
+
+- **647b** / **679:** Unchanged — still **product-gated** (no D1/D2; no **490–524** slice until product pick).
+
 ## 1.229.0 — 2026-03-24
 
 ### Added
@@ -22,7 +78,7 @@
 
 - **Phase 668 (slice):** List grid **Edit** link (**`a.o-list-action-link`** + **`data-edit-id`**) delegates **`click`** → **`dispatchListActWindowThenFormHash`** with **`source: 'listTableEditLink'`** (primary click; **`href`** kept for new-tab).
 - **Phase 728 (BE):** Checklist **`[x]`** for **`hr.expense.sheet`** / **`hr.payslip`** merge-safe **`create`**; **`tests.test_merge_safe_create_evidence_phase728`**.
-- **Phase 729 (BE + docs):** **`account.move.action_post`** checklist row closed with **`tests.test_account_post_phase467`** (**`test_action_post_rejects_non_draft_moves`**, **`test_action_post_rejects_line_missing_account`**); **`payment.transaction` ↔ `account.move`** integration rows remain open.
+- **Phase 729 (BE + docs):** **`account.move.action_post`** checklist row closed with **`tests.test_account_post_phase467`** (**`test_action_post_rejects_non_draft_moves`**, **`test_action_post_rejects_line_missing_account`**); remaining **`payment.transaction` ↔ `account.move`** checklist rows closed in **1.230.0** (**Phase 731**).
 - **ViewManager:** **`__ERP_lastLoadViews`** includes **`fieldsKeyCount`** and **`fieldsSampleKeys`**; **`window.__ERP_DEBUG_LOAD_VIEWS`** logs via **`console.debug`**.
 
 ### Documentation

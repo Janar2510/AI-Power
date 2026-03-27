@@ -1,4 +1,11 @@
-"""Phase 199: Customer portal - Pay button on invoice."""
+"""Phase 199 + 732 + 733: Customer portal - Pay button on invoice.
+
+Asserts invoice reaches **paid** via **payment.transaction** create (**Phase 731** sync),
+not a direct **account.move.write**.
+
+**Phase 733:** CoA bootstrap lives in **tests.payment_test_bootstrap** when **load_default_data**
+is thin.
+"""
 
 import unittest
 
@@ -7,15 +14,14 @@ from core.modules import clear_loaded_addon_modules, load_module_graph
 from core.orm import Registry, Environment
 from core.db import init_schema
 from core.db.init_data import load_default_data
-from core.sql_db import get_cursor, db_exists
-from core.http.auth import _get_registry
-from pathlib import Path
+from core.sql_db import get_cursor
 
-
-def _ensure_test_db(dbname: str) -> bool:
-    addons_path = (Path(__file__).resolve().parent.parent / "addons").resolve()
-    parse_config(["--addons-path=" + str(addons_path)])
-    return db_exists(dbname)
+from tests.payment_test_bootstrap import (
+    configure_addons_path,
+    ensure_demo_payment_provider,
+    ensure_minimal_sale_invoice_chart,
+    test_db_exists,
+)
 
 
 class TestPortalInvoicePayPhase199(unittest.TestCase):
@@ -23,11 +29,9 @@ class TestPortalInvoicePayPhase199(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        addons_path = (Path(__file__).resolve().parent.parent / "addons").resolve()
-        parse_config(["--addons-path=" + str(addons_path)])
+        cls._addons_path = configure_addons_path()
         cls.db = "_test_rpc_read"
-        cls._has_db = _ensure_test_db(cls.db)
-        cls._addons_path = str(addons_path)
+        cls._has_db = test_db_exists(cls.db)
 
     def test_invoice_pay_creates_transaction_and_marks_paid(self):
         """Portal invoice pay with demo provider creates tx and marks invoice paid."""
@@ -53,20 +57,21 @@ class TestPortalInvoicePayPhase199(unittest.TestCase):
             if not all([Move, MoveLine, Journal, Account, Partner, Transaction]):
                 self.skipTest("Models not loaded")
             partner = Partner.create({"name": "Phase199 Pay Test"})
-            journal = Journal.search([("type", "=", "sale")], limit=1)
-            income = Account.search([("account_type", "=", "income")], limit=1)
-            receivable = Account.search([("account_type", "=", "asset_receivable")], limit=1)
-            if not all([journal.ids, income.ids, receivable.ids]):
-                self.skipTest("Need journal and accounts")
+            jid, iid, rid = ensure_minimal_sale_invoice_chart(env)
+            if not all([jid, iid, rid]):
+                self.skipTest("Could not bootstrap sale journal and accounts")
+            provider_id = ensure_demo_payment_provider(env)
+            if not provider_id:
+                self.skipTest("payment.provider not available")
             inv = Move.create({
-                "journal_id": journal.ids[0],
+                "journal_id": jid,
                 "partner_id": partner.ids[0],
                 "move_type": "out_invoice",
                 "state": "draft",
             })
             MoveLine.create({
                 "move_id": inv.ids[0],
-                "account_id": income.ids[0],
+                "account_id": iid,
                 "name": "Test",
                 "debit": 0,
                 "credit": 50.0,
@@ -74,7 +79,7 @@ class TestPortalInvoicePayPhase199(unittest.TestCase):
             })
             MoveLine.create({
                 "move_id": inv.ids[0],
-                "account_id": receivable.ids[0],
+                "account_id": rid,
                 "name": "Receivable",
                 "debit": 50.0,
                 "credit": 0,
@@ -82,13 +87,13 @@ class TestPortalInvoicePayPhase199(unittest.TestCase):
             })
             inv.write({"state": "posted"})
             self.assertNotEqual(inv.read(["state"])[0].get("state"), "paid")
-            tx = Transaction.create({
-                "provider_id": env.get("payment.provider").search([], limit=1).ids[0],
+            Transaction.create({
+                "provider_id": provider_id,
                 "amount": 50.0,
                 "partner_id": partner.ids[0],
                 "account_move_id": inv.ids[0],
                 "reference": "INV-TEST199",
                 "state": "done",
             })
-            inv.write({"state": "paid"})
+            # Phase 731/732: done tx on create triggers _sync_linked_invoice_payment_state (no inv.write paid).
             self.assertEqual(inv.read(["state"])[0].get("state"), "paid")

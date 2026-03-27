@@ -1,5 +1,75 @@
 # Deployment Checklist
 
+## Post–232 — Phase 734 write→done test + release 1.233.0
+
+### Pre-Deployment
+
+- [ ] No **`npm run build:web`** for **734** (tests + docs only).
+
+### Verification
+
+- [ ] With DB: `python3 -m unittest tests.test_payment_transaction_write_done_phase734 tests.test_portal_invoice_pay_phase199 tests.test_payment_transaction_invoice_db_phase733 -v`
+- [ ] Optional: `python3 -m unittest tests.test_account_payment_phase468 tests.test_account_payment_record_phase470 -v`
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — unchanged by **1.233.0**.
+- Shared helpers: **`tests/payment_test_bootstrap.py`**.
+
+---
+
+## Post–231 — Phase 733 payment DB tests + release 1.232.0
+
+### Pre-Deployment
+
+- [ ] No **`npm run build:web`** for **733** (tests + docs only).
+
+### Verification
+
+- [ ] With DB: `python3 -m unittest tests.test_portal_invoice_pay_phase199 tests.test_payment_transaction_invoice_db_phase733 -v`
+- [ ] Optional: `python3 -m unittest tests.test_account_payment_phase468 tests.test_account_payment_record_phase470 -v`
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — unchanged by **1.232.0**.
+- **Phase 199** checklist (below): demo pay path uses **731** sync; **733** adds in-test CoA bootstrap when default data has no sale journal / income / receivable (**1.233.0**: bootstrap lives in **`tests/payment_test_bootstrap.py`**).
+
+---
+
+## Post–230 — Phase 732 portal pay + release 1.231.0
+
+### Pre-Deployment
+
+- [ ] No **`npm run build:web`** for **732** (controllers + tests only).
+
+### Verification
+
+- [ ] With DB (same pattern as Phase **199**): `python3 -m unittest tests.test_portal_invoice_pay_phase199 -v`
+- [ ] Optional: `python3 -m unittest tests.test_account_payment_phase468 tests.test_account_payment_record_phase470 -v`
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — unchanged by **1.231.0**.
+
+---
+
+## Post–229 — Phase 731 payment bridge + release 1.230.0
+
+### Pre-Deployment
+
+- [ ] No **`npm run build:web`** required for **731** (Python/tests/docs only) unless you also touch **`main.js`** / web assets in the same deploy.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_account_payment_phase468 tests.test_account_payment_record_phase470 tests.test_account_payment_stats_phase469 -v`
+- [ ] Optional regression bundle: `python3 -m unittest tests.test_account_post_phase467 tests.test_account_payment_phase468 tests.test_account_payment_record_phase470 -v`
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — unchanged by **1.230.0**.
+
+---
+
 ## Post–225 — Phases 693–694, 668 slice, 726, 647b doc + release 1.226.0
 
 ### Pre-Deployment
@@ -1322,7 +1392,7 @@ These are IDE-level Cursor rules and documentation. No DB migration, no `DEFAULT
 
 - [ ] Portal invoice detail: Pay Online button when state in (draft, posted)
 - [ ] /my/invoices/<id>/pay: provider selection, creates payment.transaction
-- [ ] Demo provider: marks invoice paid immediately; manual: pending page
+- [ ] Demo provider: invoice **`paid`** via **Phase 731** sync on **`payment.transaction`** **`create`** (**Phase 732** — no direct **`account.move.write(paid)`**); manual: pending **`/payment/status/<ref>`**, and when tx is **`done`**, status handler runs **`_sync_linked_invoice_payment_state`**
 - [ ] tests/test_portal_invoice_pay_phase199.py passes
 
 ## Phase 198 (Lot/Serial Number Tracking)

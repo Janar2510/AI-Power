@@ -27,6 +27,15 @@ class HrExpense(Model):
     )
     sheet_id = fields.Many2one("hr.expense.sheet", string="Expense Sheet", ondelete="set null")
 
+    @classmethod
+    def _create_hr_expense_record(cls, vals):
+        """ORM insert hook for `_inherit` merge-safe overrides (checklist)."""
+        return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_hr_expense_record(vals)
+
     @api.depends("unit_amount", "quantity")
     def _compute_total_amount(self):
         if not self:

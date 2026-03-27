@@ -82,3 +82,30 @@ class TestAccountPostPhase467(unittest.TestCase):
 
         self.assertEqual(writes, [{"state": "posted"}])
 
+    def test_action_post_rejects_non_draft_moves(self):
+        """Phase 729: checklist Q — only draft moves may post."""
+        move_model = self.registry.get("account.move")
+        self.assertIsNotNone(move_model)
+
+        move = move_model(_FakeEnv([
+            {"debit": 100.0, "credit": 0.0, "account_id": 1},
+            {"debit": 0.0, "credit": 100.0, "account_id": 2},
+        ]), [1])
+        move.read = lambda fields: [{"id": 1, "state": "posted"}]
+
+        with self.assertRaisesRegex(ValueError, "draft"):
+            move.action_post()
+
+    def test_action_post_rejects_line_missing_account(self):
+        """Phase 729: journal items must have account_id before post."""
+        move_model = self.registry.get("account.move")
+        self.assertIsNotNone(move_model)
+
+        move = move_model(_FakeEnv([
+            {"debit": 100.0, "credit": 0.0, "account_id": None},
+            {"debit": 0.0, "credit": 100.0, "account_id": 2},
+        ]), [1])
+
+        with self.assertRaisesRegex(ValueError, "account"):
+            move.action_post()
+

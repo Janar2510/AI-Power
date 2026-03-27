@@ -39,6 +39,9 @@ class TestModernActionContractPhase636(unittest.TestCase):
     def test_runtime_exposes_action(self):
         self.assertIn("action: env.services.action", self.main_app)
 
+    def test_runtime_exposes_view_phase691(self):
+        self.assertIn("view: env.services.view", self.main_app)
+
     def test_phase649_view_manager_open_from_act_window(self):
         self.assertIn("openFromActWindow(action, options)", self.view_manager)
         self.assertIn("env.services.action", self.view_manager)
@@ -76,6 +79,63 @@ class TestModernActionContractPhase636(unittest.TestCase):
     def test_phase680_set_view_reload_dispatches_list_action(self):
         self.assertIn("source: 'listViewSwitch'", self.legacy_main)
         self.assertIn("dispatchActWindowForListRoute(route, { source: 'listViewSwitch' })", self.legacy_main)
+
+    def test_phase681_list_breadcrumb_append_from_chrome(self):
+        self.assertIn("__ERP_PENDING_LIST_NAV_SOURCE", self.legacy_main)
+        self.assertIn("applyActionStackForList", self.legacy_main)
+        self.assertIn("window.__ERP_PENDING_LIST_NAV_SOURCE = opt.source", self.legacy_main)
+        self.assertIn('__ERP_PENDING_LIST_NAV_SOURCE = "navigateFromMenu"', self.services)
+
+    def test_phase691_view_service_registered(self):
+        self.assertRegex(self.services, r'category\("services"\)\.add\("view"')
+        self.assertIn("loadViews(", self.services)
+        self.assertIn("createViewService", self.services)
+
+    def test_phase693_view_manager_prefetches_load_views(self):
+        self.assertIn("viewSvc.loadViews(resModel", self.view_manager)
+        self.assertIn("__ERP_lastLoadViews", self.view_manager)
+
+    def test_phase694_breadcrumb_stack_sync_hash(self):
+        self.assertIn("function syncHashWithActionStackIfMulti", self.legacy_main)
+        self.assertIn("syncHashWithActionStackIfMulti(route)", self.legacy_main)
+
+    def test_phase668_form_object_action_act_window_uses_route(self):
+        idx = self.legacy_main.find("if (actRoute && resId)")
+        self.assertGreaterEqual(idx, 0)
+        chunk = self.legacy_main[idx : idx + 220]
+        self.assertIn("route();", chunk)
+        self.assertNotIn("renderContent()", chunk)
+
+    def test_phase695_load_views_fields_from_fields_meta(self):
+        self.assertIn("Phase 695:", self.services)
+        self.assertIn("getFieldsMeta(resModel)", self.services)
+
+    def test_phase668_list_kanban_form_hash_dispatches_act_window(self):
+        self.assertIn("function dispatchListActWindowThenFormHash", self.legacy_main)
+        self.assertIn("listToolbarNew", self.legacy_main)
+        self.assertIn("kanbanCardOpenForm", self.legacy_main)
+        self.assertIn("listKeyboardEnterForm", self.legacy_main)
+
+    def test_phase696_form_route_preserves_decoded_stack_leaf(self):
+        self.assertIn("Phase 696:", self.legacy_main)
+        self.assertIn("formLeaf", self.legacy_main)
+
+    def test_phase728_list_table_edit_link_dispatches_act_window(self):
+        self.assertIn("listTableEditLink", self.legacy_main)
+        self.assertIn("setupListTableEditLinkClicks", self.legacy_main)
+        self.assertIn("data-edit-id", self.legacy_main)
+
+    def test_phase728_view_manager_load_views_debug_fields_meta(self):
+        self.assertIn("fieldsKeyCount", self.view_manager)
+        self.assertIn("fieldsSampleKeys", self.view_manager)
+        self.assertIn("__ERP_DEBUG_LOAD_VIEWS", self.view_manager)
+
+    def test_phase730_gantt_activity_calendar_actwindow_delegation(self):
+        self.assertIn("function attachActWindowFormLinkDelegation", self.legacy_main)
+        self.assertIn("ganttNameEditLink", self.legacy_main)
+        self.assertIn("activityMatrixEditLink", self.legacy_main)
+        self.assertIn("calendarEventEditLink", self.legacy_main)
+        self.assertIn("o-erp-actwindow-form-link", self.legacy_main)
 
 
 if __name__ == "__main__":

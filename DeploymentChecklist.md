@@ -1,5 +1,37 @@
 # Deployment Checklist
 
+## Post–225 — Phases 693–694, 668 slice, 726, 647b doc + release 1.226.0
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat && npm run build:web`** after **`view_manager.js`**, **`main.js`**, or **`app/services.js`** changes (**693**–**694**).
+- [ ] No DB migration for **726** if ORM sync applies; otherwise upgrade **stock** / **hr_expense** modules after pull.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_modern_action_contract_phase636 tests.test_stock_picking_merge_safe_create_phase726 tests.test_hr_expense_merge_safe_create_phase726 tests.test_account_reconcile_allocation_phase577 -v`
+- [ ] Browser: navigate two lists via **sidebar** — URL may gain **`?stack=`** when breadcrumbs are multi-level; reload should keep crumbs.
+- [ ] **Staging / pilot — `ERP_WEBCLIENT_ESBUILD_PRIMARY=1`:** set env on the server process, restart, then smoke: login, open list + form, **Mod+K** command palette, confirm **`__erpFrontendBootstrap.esbuildPrimary`** is **true** in page source or bootstrap JSON. Compare asset load (per-file JS vs concat) against non-pilot host. Roll back by unsetting the variable. **CI** runs **`tests.test_http.TestHTTP`** esbuild + concat checks (**692**) and a **process-wide** env smoke (**727**: **`tests.test_esbuild_primary_process_env_phase727`** with **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** exported for the step).
+- [ ] **Phase 729 — Playwright / E2E:** On push to **main**/**master**, **CI** job **`e2e`** runs **`pytest tests/e2e/`** (see **`.github/workflows/ci.yml`**) including **`tests/e2e/test_login_list_form_tour.py`** (login → Contacts list → new contact form). Optional full asset matrix locally: **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1 python3 run_tests.py`** (longer run; same env as production pilot).
+- [ ] **Phase 730 — Esbuild stress (optional CI):** Full suite under **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** is **not** required in default **CI** (cost + flake risk). Use local **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1 python3 run_tests.py`** before promoting esbuild-primary to production templates; **CI** keeps **727** **`tests.test_esbuild_primary_process_env_phase727`** + **692** **`TestHTTP`** smokes.
+
+---
+
+## Post–224 — Phases 647+ partial, 681, 689–692 + release 1.225.0
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat && npm run build:web`** after **`main.js`**, **`app/services.js`**, or **`modern_webclient`**-affecting changes (**681**, **691**).
+- [ ] No DB migration required for new **`account.reconcile.allocation`** columns if your environment uses ORM/schema sync on upgrade; otherwise run module **account** update so **`amount_currency`** / **`currency_id`** exist.
+
+### Verification
+
+- [ ] No DB: `python3 -m unittest tests.test_modern_action_contract_phase636 tests.test_main_js_route_consistency_phase631 tests.test_account_reconcile_allocation_phase577 -v`
+- [ ] Browser: open a list from the **sidebar** twice from **different** routes with a non-empty breadcrumb stack — second route should **append** a crumb (unless same base slug).
+- [ ] Optional: `python3 -m unittest tests.test_http.TestHTTP.test_webclient_html_esbuild_primary_env_lists_per_file_js_phase584 tests.test_http.TestHTTP.test_web_service_worker_precache_per_file_js_when_esbuild_primary_phase590 -v`
+
+---
+
 ## Post–223 — Phases 680–688 + release 1.224.0
 
 ### Pre-Deployment

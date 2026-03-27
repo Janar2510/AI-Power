@@ -128,11 +128,79 @@
   }
 
   /**
+   * Phase 681: append breadcrumb when list opens from menu chrome (sidebar / app picker / navigateFromMenu).
+   * Cleared on read. Other entry points leave it null → single-crumb reset in renderList.
+   */
+  /** Phase 694: persist multi-crumb stack in hash (?stack=) for reload/share; pairs with ActionManager.decodeStackFromHash (670). */
+  function syncHashWithActionStackIfMulti(route) {
+    if (typeof window === 'undefined' || !actionStack || actionStack.length <= 1) return;
+    if (!window.ActionManager || typeof window.ActionManager.syncHashWithStack !== 'function') return;
+    var cur = window.location.hash.slice(1);
+    var routeBase = String(route || '').split('?')[0];
+    var curBase = cur.split('?')[0];
+    var baseWithQuery = curBase === routeBase ? cur : String(route || '');
+    var next = window.ActionManager.syncHashWithStack(baseWithQuery, actionStack);
+    if (!next || next === cur) return;
+    window.location.replace('#' + next);
+  }
+
+  function applyActionStackForList(route, title) {
+    var hashFull = typeof window !== 'undefined' ? String(window.location.hash || '').replace(/^#/, '') : '';
+    if (
+      hashFull.indexOf('stack=') >= 0 &&
+      window.ActionManager &&
+      typeof window.ActionManager.decodeStackFromHash === 'function'
+    ) {
+      var decPreserve = window.ActionManager.decodeStackFromHash(hashFull);
+      if (decPreserve && decPreserve.length > 1) {
+        var brP = String(route || '').split('?')[0];
+        var lastP = decPreserve[decPreserve.length - 1];
+        var lbP = String(lastP && lastP.hash ? lastP.hash : '').split('?')[0];
+        if (lbP === brP) {
+          actionStack = decPreserve.slice();
+          var leafP = actionStack[actionStack.length - 1];
+          leafP.label = title;
+          leafP.hash = route;
+          if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
+            window.ActionManager.saveToStorage(actionStack);
+          }
+          return;
+        }
+      }
+    }
+    var pending = typeof window !== 'undefined' ? window.__ERP_PENDING_LIST_NAV_SOURCE : null;
+    if (typeof window !== 'undefined') {
+      window.__ERP_PENDING_LIST_NAV_SOURCE = null;
+    }
+    var appendChrome = pending === 'sidebar' || pending === 'selectApp' || pending === 'navigateFromMenu';
+    var baseRoute = String(route || '').split('?')[0];
+    if (appendChrome && actionStack.length > 0) {
+      var last = actionStack[actionStack.length - 1];
+      var lastBase = String(last.hash || '').split('?')[0];
+      if (lastBase === baseRoute) {
+        last.label = title;
+        if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
+          window.ActionManager.saveToStorage(actionStack);
+        }
+        syncHashWithActionStackIfMulti(route);
+        return;
+      }
+      actionStack = actionStack.concat([{ label: title, hash: route }]);
+      if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
+        window.ActionManager.saveToStorage(actionStack);
+      }
+      syncHashWithActionStackIfMulti(route);
+      return;
+    }
+    actionStack = [{ label: title, hash: route }];
+  }
+
+  /**
    * Slugs used for list/new/edit routing (sidebar hash targets).
    * Keep in sync with routeApplyInternal, isFormRoute, and keyboard shortcuts below.
    */
   var DATA_ROUTES_SLUGS =
-    'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|fleet|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans|subscriptions|meetings|timesheets|applicants|contracts|account_reconcile_wizard|recruitment_stages|crm_stages|crm_tags|crm_lost_reasons|website|ecommerce';
+    'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|fleet|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans|subscriptions|meetings|timesheets|applicants|contracts|account_reconcile_wizard|recruitment_stages|crm_stages|crm_tags|crm_lost_reasons|pos_orders|pos_sessions|website|ecommerce';
 
   /** Opt-in: set window.__ERP_DEBUG_SIDEBAR_MENU = true to log menus with no resolvable route. */
   function _warnSidebarMenuDisabled(menu, actionRef, hasResolvedAction, route) {
@@ -232,6 +300,8 @@
     if (m === 'crm_tag') return 'crm_tags';
     if (m === 'crm_lost_reason') return 'crm_lost_reasons';
     if (m === 'fleet_vehicle') return 'fleet';
+    if (m === 'pos_order') return 'pos_orders';
+    if (m === 'pos_session') return 'pos_sessions';
     return m || null;
   }
 
@@ -279,6 +349,8 @@
     if (name === 'website') return 'website';
     if (name === 'ecommerce') return 'ecommerce';
     if (name === 'reports') return 'reports/trial-balance';
+    if (name === 'point of sale' || name === 'point-of-sale' || name === 'pos') return 'pos_orders';
+    if (name === 'pos sessions') return 'pos_sessions';
     if (name === 'stages') return 'crm_stages';
     if (name === 'tags') return 'crm_tags';
     if (name === 'lost reasons') return 'crm_lost_reasons';
@@ -379,7 +451,13 @@
     if (route === 'crm_stages') return 'crm.stage';
     if (route === 'crm_tags') return 'crm.tag';
     if (route === 'crm_lost_reasons') return 'crm.lost.reason';
+    if (route === 'pos_orders') return 'pos.order';
+    if (route === 'pos_sessions') return 'pos.session';
     return null;
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__ERP_getModelForRoute = getModelForRoute;
   }
 
   /** Parse action domain string to array (JSON or Python-like) */
@@ -659,6 +737,22 @@
       }
       return false;
     });
+    if (out != null) return out;
+    /* No menu row had the same resolved route string (common for nested menus); infer app from model. */
+    var model = getModelForRoute(route);
+    if (!model) return null;
+    (menus || []).some(function (m) {
+      var action = m.action && viewsSvc ? viewsSvc.getAction(m.action) : null;
+      if (!action) return false;
+      var t = action.type || '';
+      if (t !== 'ir.actions.act_window' && t !== 'window') return false;
+      var rm = action.res_model || action.resModel;
+      if (rm && rm === model) {
+        out = m.app_id || m.id || null;
+        return true;
+      }
+      return false;
+    });
     return out;
   }
 
@@ -667,6 +761,10 @@
    * (sidebar, app picker) instead of only assigning location.hash.
    */
   function navigateActWindowIfAvailable(action, targetRoute, options) {
+    var opt = options || {};
+    if (typeof window !== 'undefined' && (opt.source === 'sidebar' || opt.source === 'selectApp')) {
+      window.__ERP_PENDING_LIST_NAV_SOURCE = opt.source;
+    }
     var slug = targetRoute || 'home';
     var nextHash = '#' + slug;
     var VM = window.AppCore && window.AppCore.ViewManager;
@@ -676,7 +774,7 @@
         route();
         return true;
       }
-      VM.openFromActWindow(action, options || {});
+      VM.openFromActWindow(action, opt);
       return true;
     }
     return false;
@@ -698,6 +796,26 @@
     if (VM && typeof VM.openFromActWindow === 'function') {
       VM.openFromActWindow(action, options || { source: 'routeApplyList' });
     }
+  }
+
+  /** Phase 668: keep ViewManager / action stack aligned before list/kanban → form hash navigation (669: no pre-dispatch on bare form URLs from chrome). */
+  function dispatchListActWindowThenFormHash(route, formSuffix, source) {
+    dispatchActWindowForListRoute(route, { source: source || 'listOpenForm' });
+    window.location.hash = route + '/' + formSuffix;
+  }
+
+  /** Phase 730 / 668: gantt, activity matrix, calendar — delegated edit links (same idea as listTableEditLink). */
+  function attachActWindowFormLinkDelegation(rootSelector, route, source) {
+    var root = main.querySelector(rootSelector);
+    if (!root) return;
+    root.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a.o-erp-actwindow-form-link');
+      if (!a) return;
+      var id = a.getAttribute('data-edit-id');
+      if (!id) return;
+      e.preventDefault();
+      dispatchListActWindowThenFormHash(route, 'edit/' + id, source);
+    });
   }
 
   function getDefaultNavFromAppNode(node) {
@@ -1100,9 +1218,23 @@
     var tree = menus.length ? buildMenuTree(menus) : [];
     var appRoots = getAppRoots(tree, menus);
     var routeHash = (window.location.hash || '#home').replace(/^#/, '');
-    var autoAppId = getAppIdForRoute(routeHash, menus);
+    var routeBase = routeHash.split('?')[0];
+    /* Home / apps grid: do not use stored app or first-app fallback for chrome — hash drives main
+       content (#home) while stored erp_sidebar_app made sidebar/header show a different app (Phase nav fix). */
+    var atHome = routeBase === '' || routeBase === 'home';
+    var autoAppId = getAppIdForRoute(routeBase, menus);
     var storedAppId = typeof localStorage !== 'undefined' ? (localStorage.getItem('erp_sidebar_app') || '') : '';
-    var selectedAppId = autoAppId || storedAppId || (appRoots[0] && appRoots[0].menu && appRoots[0].menu.id) || '';
+    var selectedAppId = '';
+    if (atHome) {
+      selectedAppId = autoAppId || '';
+      if (typeof localStorage !== 'undefined' && !selectedAppId) {
+        try {
+          localStorage.removeItem('erp_sidebar_app');
+        } catch (e) { /* noop */ }
+      }
+    } else {
+      selectedAppId = autoAppId || storedAppId || (appRoots[0] && appRoots[0].menu && appRoots[0].menu.id) || '';
+    }
     var selectedRoot = appRoots.find(function (n) {
       return String((n.menu && n.menu.id) || '') === String(selectedAppId);
     }) || null;
@@ -1573,6 +1705,9 @@
     if (route === 'crm_stages') return 'CRM Stages';
     if (route === 'crm_tags') return 'CRM Tags';
     if (route === 'crm_lost_reasons') return 'Lost Reasons';
+    if (route === 'meetings') return 'Calendar';
+    if (route === 'pos_orders') return 'Point of Sale Orders';
+    if (route === 'pos_sessions') return 'POS Sessions';
     return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records';
   }
 
@@ -1938,7 +2073,7 @@
       }
     }
     if (ListViewCore && typeof ListViewCore.render === 'function') {
-      actionStack = [{ label: getTitle(route), hash: route }];
+      applyActionStackForList(route, getTitle(route));
       ListViewCore.render(main, {
         rpc: rpc,
         viewsSvc: viewsSvc,
@@ -1991,7 +2126,7 @@
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     const currentView = (currentListState.route === route && currentListState.viewType) || 'list';
     const order = (currentListState.route === route && currentListState.order) || null;
-    actionStack = [{ label: title, hash: route }];
+    applyActionStackForList(route, title);
     let html = '<h2>' + title + '</h2>';
     html += '<p class="o-list-fallback-toolbar">';
     html += renderViewSwitcher(route, currentView);
@@ -2124,7 +2259,7 @@
             }
             tbl += '<td role="gridcell" class="o-list-td">' + (val != null ? String(val) : '').replace(/</g, '&lt;') + '</td>';
           });
-          tbl += '<td role="gridcell" class="o-list-td o-list-td--actions"><a href="#' + route + '/edit/' + (r.id || '') + '" class="o-list-action-link">Edit</a>';
+          tbl += '<td role="gridcell" class="o-list-td o-list-td--actions"><a href="#' + route + '/edit/' + (r.id || '') + '" class="o-list-action-link" data-edit-id="' + (r.id || '') + '">Edit</a>';
           tbl += '<a href="#" class="btn-delete o-list-delete-link" data-id="' + (r.id || '') + '">Delete</a></td></tr>';
         }
         if (groups) {
@@ -2218,8 +2353,20 @@
               rows[idx - 1].focus();
             } else if (e.key === 'Enter') {
               const id = row.getAttribute('data-id');
-              if (id) { e.preventDefault(); window.location.hash = route + '/edit/' + id; }
+              if (id) { e.preventDefault(); dispatchListActWindowThenFormHash(route, 'edit/' + id, 'listKeyboardEnterForm'); }
             }
+          });
+        })();
+        (function setupListTableEditLinkClicks() {
+          const table = main.querySelector('table[role="grid"]');
+          if (!table) return;
+          table.addEventListener('click', function (e) {
+            var a = e.target.closest && e.target.closest('a.o-list-action-link');
+            if (!a || !a.getAttribute('data-edit-id')) return;
+            var id = a.getAttribute('data-edit-id');
+            if (!id) return;
+            e.preventDefault();
+            dispatchListActWindowThenFormHash(route, 'edit/' + id, 'listTableEditLink');
           });
         })();
       }
@@ -2249,7 +2396,7 @@
       }
     }
     const btn = document.getElementById('btn-add');
-    if (btn) btn.onclick = () => { window.location.hash = route + '/new'; };
+    if (btn) btn.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'listToolbarNew'); };
     const btnExportExcel = document.getElementById('btn-export-excel');
     if (btnExportExcel && records && records.length) {
       btnExportExcel.onclick = function () {
@@ -3093,9 +3240,19 @@
     const title = getTitle(route);
     const isNew = !id;
     const formTitle = isNew ? ('New ' + title.slice(0, -1)) : ('Edit ' + title.slice(0, -1));
-    if (actionStack.length === 0 || actionStack[actionStack.length - 1].hash !== route) {
-      if (actionStack.length === 0) pushBreadcrumb(title, route);
-      pushBreadcrumb(formTitle, isNew ? route + '/new' : route + '/edit/' + id);
+    var formLeaf = isNew ? route + '/new' : route + '/edit/' + id;
+    var lastEntry = actionStack.length ? actionStack[actionStack.length - 1] : null;
+    var lastH = lastEntry ? String(lastEntry.hash || '').split('?')[0] : '';
+    var routeBase = String(route || '').split('?')[0];
+    if (lastH === formLeaf) {
+      /* Phase 696: ?stack= decode already ends on this form — avoid duplicate crumbs. */
+    } else if (lastH === routeBase) {
+      pushBreadcrumb(formTitle, formLeaf);
+    } else if (actionStack.length === 0) {
+      pushBreadcrumb(title, route);
+      pushBreadcrumb(formTitle, formLeaf);
+    } else {
+      pushBreadcrumb(formTitle, formLeaf);
     }
     let html = renderBreadcrumbs();
     html += '<h2>' + formTitle + '</h2>';
@@ -3267,8 +3424,8 @@
               var actRoute = (result.res_model || '').replace(/\./g, '_');
               var resId = result.res_id;
               if (actRoute && resId) {
-                location.hash = '#' + actRoute + '/edit/' + resId;
-                renderContent();
+                window.location.hash = '#' + actRoute + '/edit/' + resId;
+                route();
                 return;
               }
             }
@@ -4470,7 +4627,7 @@
       const left = Math.max(0, Math.floor((startDate - rangeStart) / (24 * 60 * 60 * 1000)) * dayWidth);
       const width = Math.max(dayWidth, Math.ceil((stopDate - startDate) / (24 * 60 * 60 * 1000)) * dayWidth);
       const name = (r.name || '—').replace(/</g, '&lt;');
-      html += '<tr><td class="o-gantt-td o-gantt-td--name"><a href="#' + route + '/edit/' + (r.id || '') + '">' + name + '</a></td><td class="o-gantt-td o-gantt-td--timeline" style="min-width:' + timelineWidth + 'px"><div class="o-gantt-bar" style="left:' + left + 'px;width:' + width + 'px" title="' + String(startVal || '').replace(/"/g, '&quot;') + ' – ' + String(stopVal || '').replace(/"/g, '&quot;') + '"></div></td></tr>';
+      html += '<tr><td class="o-gantt-td o-gantt-td--name"><a href="#' + route + '/edit/' + (r.id || '') + '" class="o-erp-actwindow-form-link" data-edit-id="' + (r.id || '') + '">' + name + '</a></td><td class="o-gantt-td o-gantt-td--timeline" style="min-width:' + timelineWidth + 'px"><div class="o-gantt-bar" style="left:' + left + 'px;width:' + width + 'px" title="' + String(startVal || '').replace(/"/g, '&quot;') + ' – ' + String(stopVal || '').replace(/"/g, '&quot;') + '"></div></td></tr>';
     });
     html += '</tbody></table></div>';
     if (!records || !records.length) {
@@ -4482,7 +4639,7 @@
       btn.onclick = function () { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
     });
     const btnAdd = document.getElementById('btn-add');
-    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    if (btnAdd) btnAdd.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'viewChromeToolbarNew'); };
     const btnSearch = document.getElementById('btn-search');
     const searchInput = document.getElementById('list-search');
     if (btnSearch && searchInput) {
@@ -4490,6 +4647,7 @@
       btnSearch.onclick = doSearch;
       searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
     }
+    attachActWindowFormLinkDelegation('.o-gantt-scroll', route, 'ganttNameEditLink');
   }
 
   function renderActivityMatrix(model, route, records, activityTypes, activities, searchTerm, savedFiltersList, userId) {
@@ -4525,7 +4683,7 @@
     });
     html += '</tr></thead><tbody>';
     (records || []).forEach(function (r) {
-      html += '<tr role="row"><td role="gridcell" class="o-activity-matrix-td o-activity-matrix-td--record"><a href="#' + route + '/edit/' + (r.id || '') + '">' + (r.name || '—').replace(/</g, '&lt;') + '</a></td>';
+      html += '<tr role="row"><td role="gridcell" class="o-activity-matrix-td o-activity-matrix-td--record"><a href="#' + route + '/edit/' + (r.id || '') + '" class="o-erp-actwindow-form-link" data-edit-id="' + (r.id || '') + '">' + (r.name || '—').replace(/</g, '&lt;') + '</a></td>';
       (activityTypes || []).forEach(function (t) {
         const key = (r.id || '') + '_' + (t.id || 0);
         const cellActs = byRecordType[key] || [];
@@ -4533,7 +4691,7 @@
         cellActs.forEach(function (a) {
           const d = a.date_deadline || '';
           const summary = (a.summary || 'Activity').replace(/</g, '&lt;');
-          cellHtml += '<div class="o-activity-matrix-cell-line"><a href="#' + route + '/edit/' + (r.id || '') + '">' + summary + (d ? ' <span class="o-activity-matrix-cell-meta">' + String(d).replace(/</g, '&lt;') + '</span>' : '') + '</a></div>';
+          cellHtml += '<div class="o-activity-matrix-cell-line"><a href="#' + route + '/edit/' + (r.id || '') + '" class="o-erp-actwindow-form-link" data-edit-id="' + (r.id || '') + '">' + summary + (d ? ' <span class="o-activity-matrix-cell-meta">' + String(d).replace(/</g, '&lt;') + '</span>' : '') + '</a></div>';
         });
         cellHtml += '<button type="button" class="btn-schedule-activity o-activity-schedule-btn" data-record-id="' + (r.id || '') + '" data-type-id="' + (t.id || '') + '" data-type-name="' + (t.name || '').replace(/"/g, '&quot;') + '">+ Schedule</button>';
         html += '<td role="gridcell" class="o-activity-matrix-td">' + cellHtml + '</td>';
@@ -4550,7 +4708,7 @@
       btn.onclick = function () { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
     });
     const btnAdd = document.getElementById('btn-add');
-    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    if (btnAdd) btnAdd.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'viewChromeToolbarNew'); };
     const btnSearch = document.getElementById('btn-search');
     const searchInput = document.getElementById('list-search');
     if (btnSearch && searchInput) {
@@ -4558,6 +4716,7 @@
       btnSearch.onclick = doSearch;
       searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
     }
+    attachActWindowFormLinkDelegation('.o-activity-matrix-scroll', route, 'activityMatrixEditLink');
     main.querySelectorAll('.btn-schedule-activity').forEach(function (btn) {
       btn.onclick = function () {
         const recordId = parseInt(btn.getAttribute('data-record-id'), 10);
@@ -4701,7 +4860,7 @@
       };
     });
     const btnAdd = document.getElementById('btn-add');
-    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    if (btnAdd) btnAdd.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'viewChromeToolbarNew'); };
     const btnSearch = document.getElementById('btn-search');
     const searchInput = document.getElementById('list-search');
     if (btnSearch && searchInput) {
@@ -4910,7 +5069,7 @@
       btn.onclick = function () { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
     });
     const btnAdd = document.getElementById('btn-add');
-    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    if (btnAdd) btnAdd.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'viewChromeToolbarNew'); };
     const btnFlip = document.getElementById('btn-pivot-flip');
     if (btnFlip) {
       btnFlip.onclick = function () {
@@ -5038,7 +5197,7 @@
       let cellContent = isEmpty ? '' : '<span class="o-calendar-daynum">' + dayNum + '</span>';
       dayRecs.forEach(function (rec) {
         const label = (rec[stringField] || 'Untitled').replace(/</g, '&lt;').slice(0, 30);
-        cellContent += '<div class="o-calendar-event-wrap"><a href="#' + route + '/edit/' + (rec.id || '') + '" class="o-calendar-event-link">' + label + '</a></div>';
+        cellContent += '<div class="o-calendar-event-wrap"><a href="#' + route + '/edit/' + (rec.id || '') + '" class="o-calendar-event-link o-erp-actwindow-form-link" data-edit-id="' + (rec.id || '') + '">' + label + '</a></div>';
       });
       html += '<div class="o-calendar-cell' + (isEmpty ? ' o-calendar-cell--empty' : '') + '">' + cellContent + '</div>';
     }
@@ -5048,7 +5207,7 @@
       btn.onclick = function () { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
     });
     const btnAdd = document.getElementById('btn-add');
-    if (btnAdd) btnAdd.onclick = function () { window.location.hash = route + '/new'; };
+    if (btnAdd) btnAdd.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'viewChromeToolbarNew'); };
     const doReload = function () {
       const si = document.getElementById('list-search');
       loadRecords(model, route, si ? si.value.trim() : '', null, 'calendar', null, 0, null);
@@ -5079,6 +5238,7 @@
       btnSearch.onclick = doSearch;
       searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
     }
+    attachActWindowFormLinkDelegation('.o-calendar-grid', route, 'calendarEventEditLink');
   }
 
   function renderKanban(model, route, records, searchTerm) {
@@ -5120,7 +5280,7 @@
       btn.onclick = () => { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
     });
     const btn = document.getElementById('btn-add');
-    if (btn) btn.onclick = () => { window.location.hash = route + '/new'; };
+    if (btn) btn.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'kanbanToolbarNew'); };
     const btnSearch = document.getElementById('btn-search');
     const searchInput = document.getElementById('list-search');
     if (btnSearch && searchInput) {
@@ -5170,7 +5330,7 @@
       default_group_by: groupBy,
       fields: (kanbanView && kanbanView.fields) || ['name', 'expected_revenue', 'date_deadline'],
       stageNames: nameMap,
-      onCardClick: function (id) { window.location.hash = route + '/edit/' + id; },
+      onCardClick: function (id) { dispatchListActWindowThenFormHash(route, 'edit/' + id, 'kanbanCardOpenForm'); },
       onStageChange: function (recordId, newStageId) {
         const stageVal = newStageId || false;
         const writeVal = {};

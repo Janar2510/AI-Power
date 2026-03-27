@@ -46,9 +46,10 @@ class AccountMovePayment(Model):
             move.amount_paid = sum(r.get("amount") or 0.0 for r in rows if r.get("state") == "done")
 
     def _get_linked_transactions(self, move):
-        """Prefer explicit relation rows, but fall back to direct account_move_id links."""
-        if getattr(move, "transaction_ids", None):
-            return move.transaction_ids
+        """Prefer explicit relation rows, but fall back to direct account_move_id links (Phase 730 / checklist 34)."""
+        rel = getattr(move, "transaction_ids", None)
+        if rel is not None and getattr(rel, "ids", None):
+            return rel
         env = getattr(self, "env", None)
         Transaction = env.get("payment.transaction") if env else None
         if not Transaction or not getattr(move, "ids", None):

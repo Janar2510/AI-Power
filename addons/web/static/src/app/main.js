@@ -57,6 +57,8 @@ function bootModernWebClient() {
     menuUtils: MenuUtils,
     /** Phase 636: modular action entry (doAction, navigateFromMenu, doActionButton). */
     action: env.services.action,
+    /** Phase 691: Odoo-shaped view service (loadViews, getView). */
+    view: env.services.view,
   };
   window.__ERPModernWebClientRuntime = runtime;
   window.ERPFrontendRuntime = runtime;

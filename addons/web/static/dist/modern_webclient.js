@@ -197,7 +197,9 @@
       mailing_mailing: "marketing/mailings",
       crm_stage: "crm_stages",
       crm_tag: "crm_tags",
-      crm_lost_reason: "crm_lost_reasons"
+      crm_lost_reason: "crm_lost_reasons",
+      pos_order: "pos_orders",
+      pos_session: "pos_sessions"
     };
     return byModel[modelSlug] || modelSlug || null;
   }
@@ -252,7 +254,11 @@
       reports: "reports/trial-balance",
       stages: "crm_stages",
       tags: "crm_tags",
-      "lost reasons": "crm_lost_reasons"
+      "lost reasons": "crm_lost_reasons",
+      "point of sale": "pos_orders",
+      "point-of-sale": "pos_orders",
+      pos: "pos_orders",
+      "pos sessions": "pos_sessions"
     };
     if (known[name]) {
       return known[name];
@@ -311,10 +317,27 @@
   }
   function getAppIdForRoute(route, menus, viewsService) {
     let match = null;
+    const norm = route && String(route).split("?")[0];
     (menus || []).some(function(menu) {
       const action = menu.action && viewsService ? viewsService.getAction(menu.action) : null;
       const resolvedRoute = action ? actionToRoute(action) : menuToRoute(menu);
-      if (resolvedRoute && resolvedRoute === route) {
+      if (resolvedRoute && resolvedRoute === norm) {
+        match = menu.app_id || menu.id || null;
+        return true;
+      }
+      return false;
+    });
+    if (match != null) return match;
+    const gmf = typeof window !== "undefined" && typeof window.__ERP_getModelForRoute === "function" ? window.__ERP_getModelForRoute : null;
+    const model = gmf ? gmf(norm) : null;
+    if (!model) return null;
+    (menus || []).some(function(menu) {
+      const action = menu.action && viewsService ? viewsService.getAction(menu.action) : null;
+      if (!action) return false;
+      const rawType = action.type || "";
+      if (rawType !== "ir.actions.act_window" && rawType !== "window") return false;
+      const rm = action.res_model || action.resModel;
+      if (rm === model) {
         match = menu.app_id || menu.id || null;
         return true;
       }
@@ -392,6 +415,47 @@
         return list.find(function(view) {
           return view.type === type;
         }) || null;
+      },
+      getFieldsMeta(model) {
+        return cache && cache.fields_meta && cache.fields_meta[model] || null;
+      }
+    };
+  }
+  function createViewService(viewsService) {
+    return {
+      load(force) {
+        return viewsService.load(force);
+      },
+      getMenus() {
+        return viewsService.getMenus();
+      },
+      getAction(id) {
+        return viewsService.getAction(id);
+      },
+      getView(model, type) {
+        return viewsService.getView(model, type);
+      },
+      loadViews(resModel, requested) {
+        return viewsService.load().then(function() {
+          const modes = Array.isArray(requested) && requested.length ? requested.map(function(p) {
+            return Array.isArray(p) ? p[0] : p;
+          }) : ["list", "form"];
+          const seen = {};
+          const views = [];
+          modes.forEach(function(mode) {
+            const m = String(mode || "list");
+            if (seen[m]) {
+              return;
+            }
+            seen[m] = true;
+            const v = viewsService.getView(resModel, m);
+            if (v) {
+              views.push([m, v]);
+            }
+          });
+          const fieldsPayload = typeof viewsService.getFieldsMeta === "function" ? viewsService.getFieldsMeta(resModel) : null;
+          return { views, fields: fieldsPayload || {} };
+        });
       }
     };
   }
@@ -618,10 +682,14 @@
        * Phase 636: when legacy returns { type: 'window', action }, apply actionToRoute so the shell updates.
        */
       doAction(actionDef, options) {
+        const opt = options || {};
+        if (opt.fromMenu && typeof window !== "undefined") {
+          window.__ERP_PENDING_LIST_NAV_SOURCE = "navigateFromMenu";
+        }
         const rawType = actionDef && actionDef.type || "";
         const isWindowType = rawType === "ir.actions.act_window" || rawType === "window";
         if (legacyAction && typeof legacyAction.doAction === "function") {
-          return Promise.resolve(legacyAction.doAction(actionDef, options)).then(function(result) {
+          return Promise.resolve(legacyAction.doAction(actionDef, opt)).then(function(result) {
             const windowPayload = result && result.type === "window" ? result : null;
             if (isWindowType || windowPayload) {
               const act = windowPayload && windowPayload.action || actionDef;
@@ -828,6 +896,7 @@
     const bootstrap = env.bootstrap;
     const legacy = window.Services || {};
     const views = legacy.views || createFallbackViews(bootstrap);
+    const view = createViewService(views);
     const router = createRouterService();
     const services = {
       session: legacy.session || createFallbackSession(bootstrap),
@@ -836,6 +905,7 @@
       hotkey: legacy.hotkey || null,
       commandPalette: legacy.commandPalette || null,
       views,
+      view,
       menu: createMenuService(bootstrap, views),
       title: createTitleService(bootstrap),
       theme: createThemeService(bootstrap),
@@ -857,6 +927,7 @@
       env.registries.category("services").add("session", services.session, { sequence: 10 });
       env.registries.category("services").add("rpc", services.rpc, { sequence: 20 });
       env.registries.category("services").add("views", services.views, { sequence: 30 });
+      env.registries.category("services").add("view", services.view, { sequence: 31 });
       env.registries.category("services").add("menu", services.menu, { sequence: 40 });
       env.registries.category("services").add("router", services.router, { sequence: 50 });
       env.registries.category("services").add("action", services.action, { sequence: 60 });
@@ -1744,7 +1815,9 @@
       boot: bootModernWebClient,
       menuUtils: menu_utils_exports,
       /** Phase 636: modular action entry (doAction, navigateFromMenu, doActionButton). */
-      action: env.services.action
+      action: env.services.action,
+      /** Phase 691: Odoo-shaped view service (loadViews, getView). */
+      view: env.services.view
     };
     window.__ERPModernWebClientRuntime = runtime;
     window.ERPFrontendRuntime = runtime;

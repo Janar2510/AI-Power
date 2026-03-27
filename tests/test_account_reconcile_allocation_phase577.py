@@ -29,3 +29,13 @@ class TestAccountReconcileAllocationPhase577(unittest.TestCase):
         self.assertIsNotNone(WL)
         fields = WL.fields_get()
         self.assertIn("allocate_amount", fields)
+
+    def test_phase647_allocation_has_currency_audit_fields(self):
+        M = self.registry.get("account.reconcile.allocation")
+        fields = M.fields_get()
+        self.assertIn("amount_currency", fields)
+        self.assertIn("currency_id", fields)
+
+    @unittest.skip("647b: product gate — rates table / cross-ccy scope required (see account_partial_reconcile_design.md)")
+    def test_phase647b_gated_next_slice_placeholder(self):
+        self.fail("647b ungated: implement D1/D2 with behavioural tests")

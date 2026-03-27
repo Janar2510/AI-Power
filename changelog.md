@@ -1,5 +1,85 @@
 # Changelog
 
+## 1.229.0 — 2026-03-24
+
+### Added
+
+- **Phase 730 (FE — 668):** **`attachActWindowFormLinkDelegation`** — **gantt** name links, **activity** matrix record/cell links, and **calendar** event links use **`a.o-erp-actwindow-form-link`** with **`data-edit-id`**; primary click **`preventDefault`** + **`dispatchListActWindowThenFormHash`** (**`ganttNameEditLink`**, **`activityMatrixEditLink`**, **`calendarEventEditLink`**).
+- **Phase 730 (BE — checklist Q):** Documented closure of **`account.move.transaction_count`** / **`amount_paid`** fallback when **`transaction_ids`** is empty — implemented in **`addons/account_payment/models/account_move.py`** **`_get_linked_transactions`** (explicit **`ids`** check); **`tests.test_account_payment_stats_phase469`**.
+
+### Documentation
+
+- **`docs/frontend.md`**, **`docs/odoo19-webclient-gap-table.md`** (**full `view_service` scope** subsection), **`parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**, **`DeploymentChecklist.md`**.
+
+### Notes
+
+- **647b:** Still **product-gated**; no D1/D2 in **1.229.0**.
+- **Phase 679:** No **490–524** slice in **1.229.0** — product pick still required before implementation.
+
+## 1.228.0 — 2026-03-24
+
+### Added
+
+- **Phase 668 (slice):** List grid **Edit** link (**`a.o-list-action-link`** + **`data-edit-id`**) delegates **`click`** → **`dispatchListActWindowThenFormHash`** with **`source: 'listTableEditLink'`** (primary click; **`href`** kept for new-tab).
+- **Phase 728 (BE):** Checklist **`[x]`** for **`hr.expense.sheet`** / **`hr.payslip`** merge-safe **`create`**; **`tests.test_merge_safe_create_evidence_phase728`**.
+- **Phase 729 (BE + docs):** **`account.move.action_post`** checklist row closed with **`tests.test_account_post_phase467`** (**`test_action_post_rejects_non_draft_moves`**, **`test_action_post_rejects_line_missing_account`**); **`payment.transaction` ↔ `account.move`** integration rows remain open.
+- **ViewManager:** **`__ERP_lastLoadViews`** includes **`fieldsKeyCount`** and **`fieldsSampleKeys`**; **`window.__ERP_DEBUG_LOAD_VIEWS`** logs via **`console.debug`**.
+
+### Documentation
+
+- **`docs/frontend.md`**, **`docs/odoo19-webclient-gap-table.md`**, **`parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**, **`DeploymentChecklist.md`**.
+
+### Notes
+
+- **647b:** Still **product-gated**; no D1/D2 implementation in **1.228.0**.
+- **Ops:** CI **e2e** job (push **main**/**master**) already runs **`tests/e2e/`** Playwright, including login → list → form (**`test_login_list_form_tour`**). Optional local stress: **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1 python3 run_tests.py`**.
+
+## 1.227.0 — 2026-03-24
+
+### Added
+
+- **Phase 695 (FE):** **`env.services.view.loadViews`** returns **`fields`** from the existing **`/web/load_views`** payload (**`fields_meta[resModel]`**) when present; **`createFallbackViews`** exposes **`getFieldsMeta`** for the same cache. No new JSON-RPC.
+- **Phase 668 (slice):** **`dispatchListActWindowThenFormHash`** — list **Enter → edit**, **Add** (list + gantt/activity/pivot/calendar), **kanban Add** + **card open** call **`dispatchActWindowForListRoute`** with distinct **`source`** values before setting the form hash.
+- **Phase 696 (FE):** **`renderForm`** breadcrumb logic: decoded **`?stack=`** ending on the current **form leaf** does not duplicate crumbs; list slug tail gets a single **form** crumb appended.
+- **Phase 727 (BE + ops):** Checklist closure for merge-safe **`create`** on **`payment.transaction`**, **`product.template`**, **`mrp.production`**, **`mail.activity`** (**`tests.test_merge_safe_create_evidence_phase727`**). CI step runs **`tests.test_esbuild_primary_process_env_phase727`** with **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** exported for the process.
+
+### Documentation
+
+- **`docs/frontend.md`**, **`docs/odoo19-webclient-gap-table.md`**, **`parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**, **`DeploymentChecklist.md`**.
+
+### Notes
+
+- **647b (D1/D2):** Remains **product-gated** per **`docs/account_partial_reconcile_design.md`**; placeholder skip test unchanged — no behavioural implementation in **1.227.0**.
+
+## 1.226.0 — 2026-03-24
+
+### Added
+
+- **Phase 693:** **`ViewManager.openFromActWindow`** prefetches **`env.services.view.loadViews(resModel, [['list'], ['form']])`** before **`doAction`**; sets **`window.__ERP_lastLoadViews`** for debugging.
+- **Phase 694:** **`syncHashWithActionStackIfMulti`** — multi-crumb list navigation writes **`?stack=`** via **`ActionManager.syncHashWithStack`**; **`applyActionStackForList`** preserves stacks already in the hash when re-entering the same list slug.
+- **Phase 668 (726 slice):** Form **object** **`act_window`** navigation uses **`route()`** instead of undefined **`renderContent()`**.
+- **Phase 726 (BE):** Merge-safe **`create`** on **`stock.picking`** (**`_create_stock_picking_record`**, default name from **`ir.sequence`** when **`New`**) and **`hr.expense`** (**`_create_hr_expense_record`**); tests **`test_stock_picking_merge_safe_create_phase726`**, **`test_hr_expense_merge_safe_create_phase726`**.
+- **Phase 647b:** Design-only gate documented in **`docs/account_partial_reconcile_design.md`**; skipped placeholder test in **`tests/test_account_reconcile_allocation_phase577.py`**.
+- **Ops:** **Staging** smoke notes for **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** in **`DeploymentChecklist.md`**.
+
+### Documentation
+
+- **`docs/frontend.md`**, **`docs/odoo19-webclient-gap-table.md`**, **`parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**, **`DeploymentChecklist.md`**.
+
+## 1.225.0 — 2026-03-24
+
+### Added
+
+- **Phase 689:** Documented **`getAppIdForRoute`** **`res_model`** fallback, **`window.__ERP_getModelForRoute`**, and load-order notes in **`docs/frontend.md`**; **Menus** row in **`docs/odoo19-webclient-gap-table.md`**; contract assertions in **`tests/test_main_js_route_consistency_phase631.py`**.
+- **Phase 681:** **`applyActionStackForList`** — list breadcrumbs **append** when navigation is from **sidebar**, **app picker** (**`selectApp`**), or **`navigateFromMenu`** (**`__ERP_PENDING_LIST_NAV_SOURCE`**); **`tests/test_modern_action_contract_phase636.py`**.
+- **Phase 691:** **`createViewService`** — **`env.services.view`** with **`loadViews`** / **`getView`** delegation; registry sequence **31**; tests in **`test_modern_action_contract_phase636`**.
+- **Phase 647+ (partial):** Bank reconcile wizard converts statement-line amounts to **company currency** when the statement and move line share a **foreign currency** (move line **`amount_currency`** rate); **`account.reconcile.allocation`** gains **`amount_currency`** and **`currency_id`**; **`tests/test_account_reconcile_allocation_phase577.py`** **`test_phase647_allocation_has_currency_audit_fields`**.
+- **Phase 692:** CI workflow step runs **esbuild-primary** **`tests.test_http.TestHTTP`** shell tests explicitly (dual-path smoke).
+
+### Documentation
+
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/ai-implementation-checklist.md`**, **`docs/account_partial_reconcile_design.md`** (647+ slice note).
+
 ## 1.224.0 — 2026-03-26
 
 ### Added

@@ -38,24 +38,60 @@
     /**
      * Phase 649: single entry to open a list/form route from ir.actions.act_window metadata.
      * Prefer modular env.services.action (aligns with Odoo view_service + action pipeline).
+     * Phase 693: prefetch views via env.services.view.loadViews (warms cache; debug __ERP_lastLoadViews).
      */
     openFromActWindow(action, options) {
       const rt = window.__ERPModernWebClientRuntime;
+      const opts = options || {};
+      const viewSvc = rt && rt.env && rt.env.services && rt.env.services.view;
+      const resModel = action && (action.res_model || action.resModel);
       const svc = rt && rt.env && rt.env.services && rt.env.services.action;
-      if (svc && typeof svc.doAction === "function" && action) {
-        return Promise.resolve(svc.doAction(action, options || {}));
-      }
-      const mu =
-        (rt && rt.menuUtils) ||
-        (window.ERPFrontendRuntime && window.ERPFrontendRuntime.menuUtils);
-      if (mu && typeof mu.actionToRoute === "function") {
-        const route = mu.actionToRoute(action);
-        if (route) {
-          window.location.hash = "#" + route;
-          return Promise.resolve(route);
+      const runLegacyFallback = function () {
+        const mu =
+          (rt && rt.menuUtils) ||
+          (window.ERPFrontendRuntime && window.ERPFrontendRuntime.menuUtils);
+        if (mu && typeof mu.actionToRoute === "function") {
+          const route = mu.actionToRoute(action);
+          if (route) {
+            window.location.hash = "#" + route;
+            return Promise.resolve(route);
+          }
         }
+        return Promise.resolve(null);
+      };
+      const runDoAction = function () {
+        if (svc && typeof svc.doAction === "function" && action) {
+          return Promise.resolve(svc.doAction(action, opts));
+        }
+        return runLegacyFallback();
+      };
+      if (viewSvc && typeof viewSvc.loadViews === "function" && resModel) {
+        return Promise.resolve(viewSvc.loadViews(resModel, [["list"], ["form"]]))
+          .then(function (payload) {
+            if (typeof window !== "undefined") {
+              var fk =
+                payload && payload.fields && typeof payload.fields === "object"
+                  ? Object.keys(payload.fields)
+                  : [];
+              window.__ERP_lastLoadViews = {
+                resModel: String(resModel),
+                views: (payload && payload.views) || [],
+                fieldsKeyCount: fk.length,
+                fieldsSampleKeys: fk.slice(0, 8),
+                source: "openFromActWindow",
+                ts: Date.now(),
+              };
+              if (window.__ERP_DEBUG_LOAD_VIEWS && typeof console !== "undefined" && console.debug) {
+                console.debug("[ERP] loadViews", window.__ERP_lastLoadViews);
+              }
+            }
+            return runDoAction();
+          })
+          .catch(function () {
+            return runDoAction();
+          });
       }
-      return Promise.resolve(null);
+      return runDoAction();
     },
     /**
      * Phase 682: single entry for list-route act_window sync; main.js injects getActionForRoute.

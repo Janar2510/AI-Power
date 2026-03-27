@@ -65,6 +65,20 @@ class StockPicking(Model):
         default="draft",
     )
 
+    @classmethod
+    def _create_stock_picking_record(cls, vals):
+        """Name from sequence + ORM insert (merge-safe for `_inherit` create)."""
+        if vals.get("name") == "New" or not vals.get("name"):
+            env = getattr(cls._registry, "_env", None) if cls._registry else None
+            IrSequence = env.get("ir.sequence") if env else None
+            next_val = IrSequence.next_by_code("stock.picking") if IrSequence else None
+            vals = dict(vals, name=("OUT/%s" % next_val) if next_val is not None else "New")
+        return super().create(vals)
+
+    @classmethod
+    def create(cls, vals):
+        return cls._create_stock_picking_record(vals)
+
     def _picking_type_code(self):
         """Return 'incoming' / 'outgoing' / other from picking type."""
         env = getattr(self, "env", None)

@@ -25,8 +25,8 @@
 
 ## FX
 
-- **Deferred** in the first slice unless product mandates: document whether rates come from move date, statement date, or company default.
-- Gains/losses: optional draft `account.move` (type `entry`) tagged with `invoice_origin` like `FX-RECONCILE:…` for traceability (same pattern as `mrp_account` / Tier C stock stub).
+- **Phase 647+ (partial, 1.225.0):** when the **bank statement** and the **move line** use the **same foreign currency** (and the move line has **`amount_currency`**), the wizard converts statement-line amounts to **company currency** using that line’s **debit/credit ÷ amount_currency** rate; **`account.reconcile.allocation`** stores **`amount`** (company) plus **`amount_currency`** / **`currency_id`** for audit. **Still deferred:** `res.currency.rate` tables, cross-currency (statement currency ≠ move line currency), and automatic gain/loss moves.
+- Gains/losses: optional draft `account.move` (type `entry`) tagged with `invoice_origin` like `FX-RECONCILE:…` for traceability (same pattern as `mrp_account` / Tier C stock stub) — not implemented in the 647+ slice above.
 
 ## Test plan (when implemented)
 
@@ -43,6 +43,15 @@
 ## Known limitation — `statement_line.move_id`
 
 When allocations fully cover a statement line, the wizard sets **`account.bank.statement.line.move_id`** to **one** move (derived from the first allocation). Splits across **several** `account.move` records remain auditable via **`account.reconcile.allocation`** rows; `move_id` is a convenience pointer, not a full multi-move representation. A later phase can add an explicit relation or Odoo-style parity if product requires it.
+
+## Phase 647b — gated next slice (design only until product sign-off)
+
+- **D1 — Rates table:** Use **`res.currency`** (or equivalent) **dated rates** for conversion instead of relying solely on the move line’s **debit/credit ÷ `amount_currency`** implied rate when currencies align.
+- **D2 — Cross-currency:** Statement currency **≠** move line foreign currency; requires an explicit policy (rate date: statement vs move vs company default) and optional **gain/loss** `account.move` stub (see FX gains/losses note above).
+- **Implementation rule:** No code in this slice without product scope; add behavioural tests in **`tests/test_account_reconcile_allocation_phase577.py`** (or a dedicated module) when work starts. A skipped placeholder test documents the gate.
+- **Release 1.227.0:** **647b** remains **design-only** (no D1/D2 implementation); changelog notes the continued gate.
+- **Release 1.228.0:** **647b** unchanged — still awaiting product scope for D1/D2.
+- **Release 1.229.0:** **647b** unchanged — no code.
 
 ---
 

@@ -81,6 +81,8 @@ export function actionToRoute(action) {
     crm_stage: "crm_stages",
     crm_tag: "crm_tags",
     crm_lost_reason: "crm_lost_reasons",
+    pos_order: "pos_orders",
+    pos_session: "pos_sessions",
   };
   return byModel[modelSlug] || modelSlug || null;
 }
@@ -137,6 +139,10 @@ export function menuToRoute(menu) {
     stages: "crm_stages",
     tags: "crm_tags",
     "lost reasons": "crm_lost_reasons",
+    "point of sale": "pos_orders",
+    "point-of-sale": "pos_orders",
+    pos: "pos_orders",
+    "pos sessions": "pos_sessions",
   };
   if (known[name]) {
     return known[name];
@@ -198,10 +204,30 @@ export function getAppRoots(tree, menus) {
 
 export function getAppIdForRoute(route, menus, viewsService) {
   let match = null;
+  const norm = route && String(route).split("?")[0];
   (menus || []).some(function (menu) {
     const action = menu.action && viewsService ? viewsService.getAction(menu.action) : null;
     const resolvedRoute = action ? actionToRoute(action) : menuToRoute(menu);
-    if (resolvedRoute && resolvedRoute === route) {
+    if (resolvedRoute && resolvedRoute === norm) {
+      match = menu.app_id || menu.id || null;
+      return true;
+    }
+    return false;
+  });
+  if (match != null) return match;
+  const gmf =
+    typeof window !== "undefined" && typeof window.__ERP_getModelForRoute === "function"
+      ? window.__ERP_getModelForRoute
+      : null;
+  const model = gmf ? gmf(norm) : null;
+  if (!model) return null;
+  (menus || []).some(function (menu) {
+    const action = menu.action && viewsService ? viewsService.getAction(menu.action) : null;
+    if (!action) return false;
+    const rawType = action.type || "";
+    if (rawType !== "ir.actions.act_window" && rawType !== "window") return false;
+    const rm = action.res_model || action.resModel;
+    if (rm === model) {
       match = menu.app_id || menu.id || null;
       return true;
     }

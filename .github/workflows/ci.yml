@@ -80,6 +80,22 @@ jobs:
           PGPASSWORD: postgres
         run: python3 run_tests.py
 
+      # Phase 692: explicit dual-path smoke — esbuild-primary HTML + SW precache (also covered inside run_tests.py).
+      - name: Webclient esbuild-primary smoke (phase 692)
+        run: |
+          python3 -m unittest \
+            tests.test_http.TestHTTP.test_webclient_html_esbuild_primary_env_lists_per_file_js_phase584 \
+            tests.test_http.TestHTTP.test_web_service_worker_precache_per_file_js_when_esbuild_primary_phase590 \
+            tests.test_http.TestHTTP.test_web_service_worker_default_precache_includes_concat_js_phase590 \
+            -v
+
+      # Phase 727: same HTML contract with ERP_WEBCLIENT_ESBUILD_PRIMARY exported for the whole process (matrix-style smoke).
+      - name: Webclient esbuild-primary process env (phase 727)
+        env:
+          ERP_WEBCLIENT_ESBUILD_PRIMARY: "1"
+        run: |
+          python3 -m unittest tests.test_esbuild_primary_process_env_phase727 -v
+
       - name: Run unit tests with coverage
         env:
           PGHOST: localhost

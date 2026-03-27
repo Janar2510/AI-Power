@@ -58,6 +58,58 @@ function createFallbackViews(bootstrap) {
       const list = cache && cache.views ? (cache.views[model] || []) : [];
       return list.find(function (view) { return view.type === type; }) || null;
     },
+    getFieldsMeta(model) {
+      return (cache && cache.fields_meta && cache.fields_meta[model]) || null;
+    },
+  };
+}
+
+/**
+ * Phase 691: Odoo-shaped `view` service — delegates to legacy/cache `views`; adds `loadViews` for act_window flows.
+ */
+function createViewService(viewsService) {
+  return {
+    load(force) {
+      return viewsService.load(force);
+    },
+    getMenus() {
+      return viewsService.getMenus();
+    },
+    getAction(id) {
+      return viewsService.getAction(id);
+    },
+    getView(model, type) {
+      return viewsService.getView(model, type);
+    },
+    loadViews(resModel, requested) {
+      return viewsService.load().then(function () {
+        const modes =
+          Array.isArray(requested) && requested.length
+            ? requested.map(function (p) {
+                return Array.isArray(p) ? p[0] : p;
+              })
+            : ["list", "form"];
+        const seen = {};
+        const views = [];
+        modes.forEach(function (mode) {
+          const m = String(mode || "list");
+          if (seen[m]) {
+            return;
+          }
+          seen[m] = true;
+          const v = viewsService.getView(resModel, m);
+          if (v) {
+            views.push([m, v]);
+          }
+        });
+        /** Phase 695: fields from existing /web/load_views `fields_meta` only — no new RPC. */
+        const fieldsPayload =
+          typeof viewsService.getFieldsMeta === "function"
+            ? viewsService.getFieldsMeta(resModel)
+            : null;
+        return { views: views, fields: fieldsPayload || {} };
+      });
+    },
   };
 }
 
@@ -296,10 +348,14 @@ function createActionService(viewsService, menuService, routerService) {
      * Phase 636: when legacy returns { type: 'window', action }, apply actionToRoute so the shell updates.
      */
     doAction(actionDef, options) {
+      const opt = options || {};
+      if (opt.fromMenu && typeof window !== "undefined") {
+        window.__ERP_PENDING_LIST_NAV_SOURCE = "navigateFromMenu";
+      }
       const rawType = (actionDef && actionDef.type) || "";
       const isWindowType = rawType === "ir.actions.act_window" || rawType === "window";
       if (legacyAction && typeof legacyAction.doAction === "function") {
-        return Promise.resolve(legacyAction.doAction(actionDef, options)).then(function (result) {
+        return Promise.resolve(legacyAction.doAction(actionDef, opt)).then(function (result) {
           const windowPayload = result && result.type === "window" ? result : null;
           if (isWindowType || windowPayload) {
             const act = (windowPayload && windowPayload.action) || actionDef;
@@ -511,6 +567,7 @@ export function createModernServices(env) {
   const bootstrap = env.bootstrap;
   const legacy = window.Services || {};
   const views = legacy.views || createFallbackViews(bootstrap);
+  const view = createViewService(views);
   const router = createRouterService();
   const services = {
     session: legacy.session || createFallbackSession(bootstrap),
@@ -519,6 +576,7 @@ export function createModernServices(env) {
     hotkey: legacy.hotkey || null,
     commandPalette: legacy.commandPalette || null,
     views: views,
+    view: view,
     menu: createMenuService(bootstrap, views),
     title: createTitleService(bootstrap),
     theme: createThemeService(bootstrap),
@@ -541,6 +599,7 @@ export function createModernServices(env) {
     env.registries.category("services").add("session", services.session, { sequence: 10 });
     env.registries.category("services").add("rpc", services.rpc, { sequence: 20 });
     env.registries.category("services").add("views", services.views, { sequence: 30 });
+    env.registries.category("services").add("view", services.view, { sequence: 31 });
     env.registries.category("services").add("menu", services.menu, { sequence: 40 });
     env.registries.category("services").add("router", services.router, { sequence: 50 });
     env.registries.category("services").add("action", services.action, { sequence: 60 });

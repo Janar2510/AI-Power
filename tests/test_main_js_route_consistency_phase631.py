@@ -95,6 +95,12 @@ class TestMainJsRouteConsistencyPhase631(unittest.TestCase):
             self.js,
         )
 
+    def test_phase689_app_chrome_model_fallback_hook(self):
+        """Expose getModelForRoute for menu_utils getAppIdForRoute second pass."""
+        self.assertIn("window.__ERP_getModelForRoute = getModelForRoute", self.js)
+        self.assertIn("infer app from model", self.js)
+        self.assertIn("getModelForRoute(route)", self.js)
+
 
 if __name__ == "__main__":
     unittest.main()

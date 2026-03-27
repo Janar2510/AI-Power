@@ -124,6 +124,7 @@ class AccountReconcileWizard(TransientModel):
             return None
         env = getattr(self, "env", None)
         StmtLine = env.get("account.bank.statement.line") if env else None
+        Stmt = env.get("account.bank.statement") if env else None
         MoveLine = env.get("account.move.line") if env else None
         Move = env.get("account.move") if env else None
         Alloc = env.get("account.reconcile.allocation") if env else None
@@ -133,6 +134,50 @@ class AccountReconcileWizard(TransientModel):
         if not Alloc:
             return self._action_reconcile_legacy_full_match()
         recon_id = str(uuid.uuid4())
+
+        def _m2o_id(val):
+            if isinstance(val, (list, tuple)) and val:
+                return val[0]
+            return val
+
+        def _statement_currency_id_from_srow(srow):
+            if not Stmt:
+                return None
+            sid = srow.get("statement_id")
+            stmt_id = sid[0] if isinstance(sid, (list, tuple)) and sid else sid
+            if not stmt_id:
+                return None
+            crow = Stmt.browse(stmt_id).read(["currency_id"])[0].get("currency_id")
+            return _m2o_id(crow)
+
+        def _completion_stmt_target_company(sid_inner: int) -> float:
+            """Phase 647+: statement line open amount in company currency for full-match check."""
+            srow_inner = StmtLine.browse(sid_inner).read(["amount", "statement_id"])[0]
+            stmt_f = abs(float(srow_inner.get("amount") or 0))
+            stmt_ccy_id = _statement_currency_id_from_srow(srow_inner)
+            alloc_rows = Alloc.search_read(
+                [("statement_line_id", "=", sid_inner)], ["move_line_id"], limit=1
+            )
+            if not alloc_rows:
+                return stmt_f
+            mlid = _m2o_id(alloc_rows[0].get("move_line_id"))
+            if not mlid:
+                return stmt_f
+            mdata = MoveLine.browse(mlid).read(
+                ["currency_id", "amount_currency", "debit", "credit"]
+            )[0]
+            bal = abs(float(mdata.get("debit") or 0) - float(mdata.get("credit") or 0))
+            ml_ccy_id = _m2o_id(mdata.get("currency_id"))
+            ml_amt_curr = float(mdata.get("amount_currency") or 0)
+            if (
+                stmt_ccy_id
+                and ml_ccy_id
+                and int(stmt_ccy_id) == int(ml_ccy_id)
+                and abs(ml_amt_curr) > 1e-9
+            ):
+                rate = bal / abs(ml_amt_curr)
+                return stmt_f * rate
+            return stmt_f
 
         def _sum_alloc_stmt(sid: int) -> float:
             if not Alloc:
@@ -160,10 +205,23 @@ class AccountReconcileWizard(TransientModel):
                 move_line_id = move_val[0] if isinstance(move_val, (list, tuple)) and move_val else move_val
                 if not stmt_line_id or not move_line_id:
                     continue
-                srow = StmtLine.browse(stmt_line_id).read(["amount"])[0]
-                stmt_amt = abs(float(srow.get("amount") or 0))
-                ml_row = MoveLine.browse(move_line_id).read(["debit", "credit", "move_id"])[0]
+                srow = StmtLine.browse(stmt_line_id).read(["amount", "statement_id"])[0]
+                stmt_amt_f = abs(float(srow.get("amount") or 0))
+                ml_row = MoveLine.browse(move_line_id).read(
+                    ["debit", "credit", "move_id", "currency_id", "amount_currency"]
+                )[0]
                 bal = abs(float(ml_row.get("debit") or 0) - float(ml_row.get("credit") or 0))
+                ml_ccy_id = _m2o_id(ml_row.get("currency_id"))
+                ml_amt_curr = float(ml_row.get("amount_currency") or 0)
+                stmt_ccy_id = _statement_currency_id_from_srow(srow)
+                fx_same = (
+                    bool(ml_ccy_id)
+                    and bool(stmt_ccy_id)
+                    and int(ml_ccy_id) == int(stmt_ccy_id)
+                    and abs(ml_amt_curr) > 1e-9
+                )
+                rate = (bal / abs(ml_amt_curr)) if fx_same else 1.0
+                stmt_amt = stmt_amt_f * rate if fx_same else stmt_amt_f
                 user_amt = float(row.get("allocate_amount") or 0)
                 if user_amt > 0:
                     want = min(user_amt, stmt_amt, bal)
@@ -181,21 +239,23 @@ class AccountReconcileWizard(TransientModel):
                     crow = Move.browse(move_id).read(["company_id"])[0].get("company_id")
                     comp = crow[0] if isinstance(crow, (list, tuple)) and crow else crow
                 if Alloc:
-                    Alloc.create({
+                    vals = {
                         "statement_line_id": stmt_line_id,
                         "move_line_id": move_line_id,
                         "amount": alloc_amt,
                         "company_id": comp,
-                    })
+                    }
+                    if fx_same and rate > 1e-12:
+                        vals["currency_id"] = ml_ccy_id
+                        vals["amount_currency"] = alloc_amt / rate
+                    Alloc.create(vals)
                 touched_stmt.add(stmt_line_id)
                 touched_ml.add(move_line_id)
 
             if not Alloc:
                 continue
             for sid in touched_stmt:
-                stmt_amt = abs(
-                    float(StmtLine.browse(sid).read(["amount"])[0].get("amount") or 0)
-                )
+                stmt_amt = _completion_stmt_target_company(sid)
                 if _sum_alloc_stmt(sid) + 0.01 < stmt_amt:
                     continue
                 alloc_rows = Alloc.search_read([("statement_line_id", "=", sid)], ["move_line_id"])

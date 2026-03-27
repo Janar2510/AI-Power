@@ -20,24 +20,24 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] New `purchase.order` `create` overrides should delegate to `cls._create_purchase_order_record(vals)` (merge-safe), same as sale (**Phase 675** — **`tests.test_purchase_merge_safe_create_phase675`**).
 - [x] New `res.partner` `create` overrides should delegate to `cls._create_res_partner_record(vals)` (merge-safe) (**Phase 685** — **`addons/base/models/res_partner.py`**, **`tests.test_res_partner_merge_safe_create_phase685`**).
 - [x] New `account.move` `create` overrides should delegate to `cls._create_account_move_record(vals)` (merge-safe) (**Phase 686** — verified in **`addons/account/models/account_move.py`**).
-- [ ] New `payment.transaction` `create` overrides should delegate to `cls._create_payment_transaction_record(vals)` then run any post-create sync (merge-safe).
-- [ ] New `product.template` `create` overrides should delegate to `cls._create_product_template_record(vals)` then run `_create_variant_ids` when variants apply (merge-safe).
-- [ ] New `mrp.production` `create` overrides should delegate to `cls._create_mrp_production_record(vals)` (merge-safe).
-- [ ] New `mail.activity` `create` overrides should delegate to `cls._create_mail_activity_record(vals)` (merge-safe).
-- [ ] New `pos.order` / `pos.session` `create` overrides should delegate to `cls._create_pos_order_record(vals)` / `cls._create_pos_session_record(vals)` (merge-safe).
-- [ ] New `account.bank.statement` `create` overrides should delegate to `cls._create_account_bank_statement_record(vals)` (merge-safe).
-- [ ] New `hr.leave` `create` overrides should delegate to `cls._create_hr_leave_record(vals)` (merge-safe).
-- [ ] New `hr.expense.sheet` / `hr.payslip` `create` overrides should delegate to `cls._create_hr_expense_sheet_record(vals)` / `cls._create_hr_payslip_record(vals)` (merge-safe).
+- [x] New `payment.transaction` `create` overrides should delegate to `cls._create_payment_transaction_record(vals)` then run any post-create sync (merge-safe) (**Phase 727** — **`addons/payment/models/payment_transaction.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
+- [x] New `product.template` `create` overrides should delegate to `cls._create_product_template_record(vals)` then run `_create_variant_ids` when variants apply (merge-safe) (**Phase 727** — **`addons/product/models/product_template.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
+- [x] New `mrp.production` `create` overrides should delegate to `cls._create_mrp_production_record(vals)` (merge-safe) (**Phase 727** — **`addons/mrp/models/mrp_production.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
+- [x] New `mail.activity` `create` overrides should delegate to `cls._create_mail_activity_record(vals)` (merge-safe) (**Phase 727** — **`addons/mail/models/mail_activity.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
+- [x] New `pos.order` / `pos.session` `create` overrides should delegate to `cls._create_pos_order_record(vals)` / `cls._create_pos_session_record(vals)` (merge-safe) (**evidence:** **`addons/pos/models/pos_order.py`**, **`pos_session.py`**).
+- [x] New `account.bank.statement` `create` overrides should delegate to `cls._create_account_bank_statement_record(vals)` (merge-safe) (**evidence:** **`addons/account/models/account_bank_statement.py`**).
+- [x] New `hr.leave` `create` overrides should delegate to `cls._create_hr_leave_record(vals)` (merge-safe) (**evidence:** **`addons/hr/models/hr_leave.py`**).
+- [x] New `hr.expense.sheet` / `hr.payslip` `create` overrides should delegate to `cls._create_hr_expense_sheet_record(vals)` / `cls._create_hr_payslip_record(vals)` (merge-safe) (**Phase 728** — **`addons/hr_expense/models/hr_expense_sheet.py`**, **`addons/hr_payroll/models/hr_payslip.py`**, **`tests.test_merge_safe_create_evidence_phase728`**).
 - [x] `mrp.production.action_cancel()` cancels open production-linked `stock.move` rows (draft/assigned) before setting the MO to `cancel` (**Phase 676** — **`tests.test_mrp_phase153.TestMrpPhase153.test_mrp_cancel_cancels_open_moves`**).
-- [ ] `account.move.action_post()` rejects non-draft moves, lines without `account_id`, moves without journal lines, and unbalanced debit/credit totals.
+- [x] `account.move.action_post()` rejects non-draft moves, lines without `account_id`, moves without journal lines, and unbalanced debit/credit totals (**Phase 729** — **`account_move._validate_balanced_before_post`**, **`tests.test_account_post_phase467`** including **`test_action_post_rejects_non_draft_moves`**, **`test_action_post_rejects_line_missing_account`**).
 - [ ] Completed `payment.transaction` rows linked by `account_move_id` reduce `account.move.amount_residual` and auto-sync invoice state to `paid` when fully covered.
-- [ ] `account.move.transaction_count` and `account.move.amount_paid` include direct `payment.transaction.account_move_id` links when `transaction_ids` is empty.
+- [x] `account.move.transaction_count` and `account.move.amount_paid` include direct `payment.transaction.account_move_id` links when `transaction_ids` is empty (**Phase 730** — **`addons/account_payment/models/account_move.py`** **`_get_linked_transactions`**; **`tests.test_account_payment_stats_phase469`**).
 - [ ] Completed invoice-linked `payment.transaction` rows create idempotent `account.payment` records with invoice link, payment reference, company, and journal defaults.
 - [ ] Focused regressions pass: `tests.test_schema_audit_columns`, `tests.test_sale_confirm_phase465`, `tests.test_sale_invoice_phase466`, `tests.test_account_post_phase467`, `tests.test_account_payment_phase468`, `tests.test_account_payment_stats_phase469`, `tests.test_account_payment_record_phase470`, `tests.test_purchase_bill_phase471`, `tests.test_purchase_receipt_domain_phase473`, `tests.test_purchase_cancel_pickings_phase476`, `tests.test_sale_cancel_pickings_phase477`, (optional DB) `tests.test_confirm_draft_guard_phase478`, and (optional DB) `tests.test_mrp_phase153`.
 
 ## Phases 490–524 (business depth, frontend, AI, production)
 
-- [ ] **Phase 679 (optional):** no slice taken in **1.223.0** — product backlog; pick one row here when prioritised.
+- [ ] **Phase 679 (optional):** product must pick a **490–524** row before implementation — **1.229.0** remains **docs-only** (no slice); prior note **1.223.0** unchanged.
 - [ ] MRP: `mrp.workorder`, reservation + quant completion on MO done; SO-driven MO when `product.template.manufacture_on_order` and `sale_mrp` loaded.
 - [ ] HR: employee lifecycle + contract start + attendance promotion; leave approval note; payroll + attendance lines.
 - [ ] Web: `npm run build:web` succeeds when Node is available; `tsconfig.json` + `framework/component_base.js` present.
@@ -192,6 +192,27 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **633:** **`window.__ERP_STRICT_ROUTING`** — unknown list/form routes show **`EmptyState`** instead of silent **`renderHome()`**.
 - [x] **634:** Missing apps parity + working menu rows closed with evidence (**above**).
 - [x] **635:** Version **1.219.0** + changelog + matrix + DeploymentChecklist.
+
+## Phases 647+ partial, 681, 689–692 (post–1.224.0 + release 1.225.0)
+
+- [x] **647+ (partial):** **`account.reconcile.allocation`** **`amount_currency`** / **`currency_id`**; wizard converts statement amounts when statement and move line share foreign currency + **`amount_currency`** on the line (**evidence:** **`account_reconcile_wizard.py`**, **`tests/test_account_reconcile_allocation_phase577.py`** **`test_phase647_allocation_has_currency_audit_fields`**).
+- [x] **681:** **`applyActionStackForList`** + **`__ERP_PENDING_LIST_NAV_SOURCE`** (**sidebar** / **selectApp** / **navigateFromMenu**) — **`tests/test_modern_action_contract_phase636.py`** **`test_phase681_list_breadcrumb_append_from_chrome`**.
+- [x] **689:** **`window.__ERP_getModelForRoute`**, **`getAppIdForRoute`** model fallback documented (**evidence:** **`docs/frontend.md`**, **`tests/test_main_js_route_consistency_phase631.py`** **`test_phase689_app_chrome_model_fallback_hook`**).
+- [x] **691:** **`createViewService`**, registry **`view`**, **`loadViews`** (**evidence:** **`app/services.js`**, **`test_modern_action_contract_phase636`** **`test_phase691_view_service_registered`**).
+- [x] **692:** CI **Webclient esbuild-primary smoke** step (**evidence:** **`.github/workflows/ci.yml`**).
+
+## Phases 693–694, 668 slice, 726, 647b, ops staging (release 1.226.0)
+
+- [x] **693:** **`ViewManager.openFromActWindow`** calls **`view.loadViews`** + **`__ERP_lastLoadViews`** (**evidence:** **`view_manager.js`**, **`test_modern_action_contract_phase636`** **`test_phase693_view_manager_prefetches_load_views`**).
+- [x] **694:** **`syncHashWithActionStackIfMulti`** + stack preserve in **`applyActionStackForList`** (**evidence:** **`main.js`**, **`test_phase694_breadcrumb_stack_sync_hash`**).
+- [x] **668 (726):** Form object **`act_window`** → **`route()`** (**evidence:** **`test_phase668_form_object_action_act_window_uses_route`**).
+- [x] **726:** **`stock.picking`** / **`hr.expense`** merge-safe **`create`** (**evidence:** **`test_stock_picking_merge_safe_create_phase726`**, **`test_hr_expense_merge_safe_create_phase726`**).
+- [x] **727:** **`payment.transaction`**, **`product.template`**, **`mrp.production`**, **`mail.activity`** merge-safe **`create`** evidence (**`tests.test_merge_safe_create_evidence_phase727`**); process-env esbuild smoke (**`tests.test_esbuild_primary_process_env_phase727`** when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`**).
+- [x] **728:** **`hr.expense.sheet`** / **`hr.payslip`** merge-safe **`create`** evidence (**`tests.test_merge_safe_create_evidence_phase728`**).
+- [x] **729 (partial Q):** **`account.move.action_post`** guardrails documented in checklist + **`tests.test_account_post_phase467`** (non-draft, missing **`account_id`**).
+- [x] **730 (partial Q):** **`transaction_count`** / **`amount_paid`** fallback via **`account_move_id`** when **`transaction_ids`** empty (**`account_payment`** + **`tests.test_account_payment_stats_phase469`**); rows **33** and **35** remain open.
+- [x] **647b:** Design gate in **`account_partial_reconcile_design.md`** + skipped **`test_phase647b_gated_next_slice_placeholder`**.
+- [x] **Ops staging:** **`DeploymentChecklist.md`** — **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** pilot smoke.
 
 ## Phases 620–628 (kanban load-more + home layout + checklist audit + release 1.218.0)
 

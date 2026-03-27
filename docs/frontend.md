@@ -82,6 +82,19 @@ The active product direction is defined by the Foundry One brand system and the 
 
 - Set **`window.__ERP_DEBUG_SIDEBAR_MENU = true`** in the browser console, then **reload**. Menus that have no resolvable hash route log a warning (see `main.js` near `_warnSidebarMenuDisabled`). Use this to find stale or misconfigured `ir.ui.menu` / action targets after menu changes. Clear the flag when finished.
 
+## App chrome vs hash (navigation consistency)
+
+- **Main content** is driven by **`location.hash`** (`routeApplyInternal` → list / form / home / reports / …).
+- **Sidebar / “current app” in the navbar** used to fall back to **`localStorage`** (`erp_sidebar_app`) and the **first app** even when the hash was **`#home`**, so you could see **Invoicing** (or another app) in the chrome while the **home** dashboard was visible. **`renderNavbar`** now treats **`#home`** (and empty hash) as **neutral**: no stored-app sidebar filter unless the route itself implies an app; **`erp_sidebar_app`** is cleared when landing on home without a route-derived app.
+- Submenus that still **do nothing** usually have **`href="#"`** (no resolvable `actionToRoute` / `menuToRoute`); use the debug flag above and fix menu metadata, or accept as scaffolding until those actions exist.
+
+### App id when the hash does not match menu routes (Phase 689)
+
+- **`getAppIdForRoute(route, menus)`** in **`main.js`** first matches menus whose resolved route (**`actionToRoute`** / **`menuToRoute`**) **equals** the current list slug. Nested or differently named menus often **do not** produce the same string as the hash, so the first pass returns **`null`**.
+- **Second pass:** resolve the **ORM model** with **`getModelForRoute(route)`**, then scan menus for an **`ir.actions.act_window`** (or legacy **`window`**) whose **`res_model`** equals that model; use that menu’s **`app_id`** (or **`id`**) so the sidebar/header **app** matches Calendar, Helpdesk, Project, POS, HR, Knowledge, and similar deep links.
+- **`window.__ERP_getModelForRoute`** is assigned in **`main.js`** (same function as the legacy router). **`menu_utils.js`** **`getAppIdForRoute`** uses **`window.__ERP_getModelForRoute`** when present so the **modular shell** **`menu.getCurrentAppId`** stays aligned with the legacy hash client.
+- **Load order:** the legacy **`web.assets_web`** bundle must execute **`main.js`** (which defines **`getModelForRoute`** and the global hook) before any script that calls **`getAppIdForRoute`** from **`menu_utils`** without the hook; in practice **`main.js`** is the large legacy entry and runs in the same page load as **`modern_webclient.js`** after shell bootstrap.
+
 ## View open path (Phases 648–652)
 
 - Sidebar leaf clicks and the app picker (**`selectApp`**) that target an **`ir.actions.act_window`** should flow through **`navigateActWindowIfAvailable`** in **`main.js`**, which prefers **`AppCore.ViewManager.openFromActWindow`** (and thus **`env.services.action.doAction`** when the modular runtime is bootstrapped).
@@ -94,18 +107,21 @@ The active product direction is defined by the Foundry One brand system and the 
 
 ## Hash navigation audit + Alt+K (Phases 668–669)
 
-- **668:** Many code paths still assign **`window.location.hash`** directly (kanban **Add**, **Alt+N** to **`/new`**, generic links). **Alt+K** (list route → kanban view) now calls **`dispatchActWindowForListRoute(route, { source: 'shortcutAltK' })`** before **`loadRecords`**, keeping the action service aligned with the current list slug without changing the hash. **Alt+L** still sets the hash to the list slug; **`hashchange`** → **`routeApplyInternal`** runs the same list dispatch as other deep links (**658**).
-- **669:** **`#<route>/new`** and **`#<route>/edit/<id>`** are handled in **`routeApplyInternal`** via **`renderForm`**. We **do not** call **`dispatchActWindowForListRoute`** immediately before **`renderForm`**: **`openFromActWindow`** / **`doAction`** would rewrite the hash to the list action and fight the form URL. Parent list sync remains **list slug** entry and **form save → list** (**659**).
+- **668:** Some paths still use plain **`href="#…"`** only (**Alt+N**, notifications, form save redirects, etc.) — **`hashchange` → `routeApplyInternal`**. **1.227.0 slice:** **`dispatchListActWindowThenFormHash`** for **list** **Enter → edit**, **list** **Add**, **kanban** **Add** + **card → edit**, **gantt / activity / pivot / calendar** **Add** (**`listKeyboardEnterForm`**, **`listToolbarNew`**, **`kanbanToolbarNew`**, **`kanbanCardOpenForm`**, **`viewChromeToolbarNew`**). **1.228.0 slice:** **list** **Edit** (**`listTableEditLink`**). **1.229.0 slice:** **gantt** name cell, **activity** matrix record/cell links, **calendar** events — **`a.o-erp-actwindow-form-link`** + **`attachActWindowFormLinkDelegation`** (**`ganttNameEditLink`**, **`activityMatrixEditLink`**, **`calendarEventEditLink`**). **Alt+K** → **`shortcutAltK`**. **726:** Form **object** **`act_window`** + **`res_id`** → **`route()`**.
+- **Dev (post-695):** **`ViewManager.openFromActWindow`** sets **`window.__ERP_lastLoadViews`** with **`fieldsKeyCount`** and **`fieldsSampleKeys`**; set **`window.__ERP_DEBUG_LOAD_VIEWS = true`** before navigation to **`console.debug`** the payload.
+- **669:** **`routeApplyInternal`** must not call **`dispatchActWindowForListRoute`** immediately before **`renderForm`** for **bare** form URLs that **`doAction`** would rewrite away. The **668** slice above applies only where navigation **originates from list/kanban (and related) chrome** and the next hash is still a **form** URL. Parent list sync remains **list slug** entry and **form save → list** (**659**).
+- **696:** **`renderForm`** compares **`formLeaf`** (`**route/new**` or **`route/edit/id`**) to the decoded **`actionStack`** tail (**670**): if the stack already ends on that leaf, breadcrumbs are not duplicated; if the stack ends on the **list** slug for this **`route`**, only the **form** crumb is appended.
 
 ## Action stack query vs Odoo (Phase 670 — light)
 
 - **`ActionManager.decodeStackFromHash(hash)`** in **`action_manager.js`** reads a **`stack=`** query parameter (base64 JSON array) and returns the decoded stack or **`null`**. **`routeApplyInternal`** in **`main.js`** assigns the result to **`actionStack`** when non-empty so in-hash stack state is restored on navigation.
-- Full Odoo **breadcrumb / action stack** parity (every **`doAction`** push matching upstream) is **not** claimed here; this is **read path** alignment for hashes that already carry **`?stack=`**.
+- **Phase 694:** When **`applyActionStackForList`** builds a multi-crumb stack from menu chrome (**681**), **`syncHashWithActionStackIfMulti`** writes **`?stack=`** via **`ActionManager.syncHashWithStack`** (uses **`location.replace`** to avoid extra history entries). **`applyActionStackForList`** also **preserves** a decoded multi-crumb stack when the URL already carries **`stack=`** and the list **base slug** matches the current leaf, so **`hashchange`** re-entry does not collapse crumbs to a single row.
+- Full Odoo **breadcrumb / action stack** parity (every **`doAction`** push matching upstream) is **not** claimed here; **670** + **694** cover **read** + **write** for the legacy hash client when stacks are enabled.
 
 ## View switch + ViewManager list sync (Phases 680–682)
 
 - **680:** **`setViewAndReload`** (list ↔ kanban / graph / … via **`?view=`** on the same slug) calls **`dispatchActWindowForListRoute(route, { source: 'listViewSwitch' })`** before updating the hash so the action service stays aligned when switching modes.
-- **681:** Pushing **`ActionManager.doAction`** entries on every **sidebar** **`openFromActWindow`** is **deferred**: **`renderList`** currently resets **`actionStack`** to a single crumb, which would discard a multi-level stack. Until list render preserves stack depth, only **`?stack=`** restore + report routes build multi-step crumbs.
+- **681:** When navigation comes from the **sidebar**, **app picker** (**`selectApp`**), or **`navigateFromMenu`** (**`fromMenu`**), **`renderList`** **appends** a breadcrumb if the stack is non-empty and the new route differs from the current leaf (base slug, ignoring **`?`**). Otherwise it resets to a **single** crumb (deep links, **`dispatchActWindowForListRoute`**, view switcher). Multi-crumb hashes still use **`?stack=`** (**670**).
 - **682:** **`AppCore.ViewManager.syncListRouteFromMain(route, getActionForRoute, options)`** centralises list-route **`act_window`** dispatch; **`dispatchActWindowForListRoute`** in **`main.js`** delegates to it (fallback to inline **`openFromActWindow`** if the helper is missing).
 
 ## Website / eCommerce shell tiles (Phase 660 — product scope)

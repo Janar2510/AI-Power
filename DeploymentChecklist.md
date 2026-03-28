@@ -1,5 +1,36 @@
 # Deployment Checklist
 
+## Post–244 — Deep main.js extraction + webclient architecture + backend hardening (release 1.245.0)
+
+### Pre-Deployment
+
+- [ ] Verify `addons/web/__manifest__.py` asset order: `orm.js` after `rpc.js`; four `legacy_main_*.js` files before `main.js`; `domain_selector.js` with components.
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, and **`npm run build:web:legacy`** (new extraction modules + ORM service).
+- [ ] Python regressions: **`python3 -m unittest tests.test_sale_confirm_phase465 tests.test_account_post_phase467 tests.test_account_payment_phase468 -v`**.
+
+### Verification
+
+- [ ] JS: **`/web/static/tests/test_runner.html`** — form/list/chart/discuss views render via delegation to extraction modules.
+- [ ] Verify `Services.orm.read('res.partner', [1], ['name'])` returns data in browser console.
+- [ ] Verify `FieldWidgets.format('monetary', 1234.56, {currency: '€'})` returns formatted string.
+- [ ] Verify `DomainSelector.render(container, {fields: {...}})` renders filter UI.
+
+### New Files
+
+- `services/orm.js` — Client ORM wrapper (Odoo 19 parity).
+- `components/domain_selector.js` — Domain expression editor.
+- `legacy_main_form_views.js` — Form CRUD extraction (1971 lines).
+- `legacy_main_list_views.js` — List view extraction (618 lines).
+- `legacy_main_chart_views.js` — Chart view extraction (1145 lines).
+- `legacy_main_shell_routes.js` — Shell route extraction (830 lines).
+
+### Notes
+
+- **`main.js`** now 1847 lines (was 5378). All extracted functions accessible via `window.__ERP_FORM_VIEWS`, `__ERP_LIST_VIEWS`, `__ERP_CHART_VIEWS`, `__ERP_SHELL_ROUTES`.
+- `core/tools` now exports `json_log`, `sql_debug`, `translate` in addition to existing helpers.
+
+---
+
 ## Post–243 — Esbuild-primary default + legacy main split + gap docs (release 1.244.0)
 
 ### Pre-Deployment
@@ -2241,3 +2272,16 @@ These are IDE-level Cursor rules and documentation. No DB migration, no `DEFAULT
 - **570–571:** `res.company.stock_valuation_auto_account_move` on fresh `db init` / schema sync; FIFO layer consumption on outgoing; Tier C draft moves only when the company flag is set and `account` + expense/`asset_current` accounts exist.
 - **572:** Partial reconcile remains design-only (`docs/account_partial_reconcile_design.md`) until implementation is approved.
 - **573:** Prod asset default unchanged (concat + guard); document any esbuild-primary experiment in this checklist before switching templates.
+
+# Phase 1.245 Track D3 — Chart Views Extraction
+
+- Ensure `addons/web/static/src/legacy_main_chart_views.js` is loaded **before** `main.js` in `web.assets_web` bundle.
+- After deployment, verify `window.__ERP_CHART_VIEWS` exists and `install()` is callable.
+- Confirm graph, pivot, calendar, kanban, gantt, and activity views still render correctly after the extraction.
+- Chart.js must still be loaded for graph fallback rendering (no new dependency; existing `Chart.js` CDN/bundle reference unchanged).
+
+# Phase 1.245 Track D2 — Legacy List Views Extraction
+
+- Ensure `legacy_main_list_views.js` is loaded **before** `main.js` in the asset bundle (it sets `window.__ERP_LIST_VIEWS`).
+- After pull, verify `main.js` calls `window.__ERP_LIST_VIEWS.install(ctx)` to wire dependencies.
+- Chart view dispatches require `window.__ERP_CHART_VIEWS` (from the chart extraction) to be present for graph/pivot/activity/gantt views.

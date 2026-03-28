@@ -1,6 +1,6 @@
 # ERP Platform release info
 
-version_info = (1, 244, 0, "final", 0, "")
+version_info = (1, 245, 0, "final", 0, "")
 series = ".".join(str(x) for x in version_info[:2])
 version = series
 

@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.245.0 — 2026-03-28
+
+### Added
+
+- **Deep `main.js` extraction (Track D):** Four new IIFE modules split from the monolith:
+  - `legacy_main_form_views.js` (48 functions, ~1733 lines extracted)
+  - `legacy_main_list_views.js` (15 functions, ~319 lines extracted)
+  - `legacy_main_chart_views.js` (16 functions, ~989 lines extracted)
+  - `legacy_main_shell_routes.js` (24 functions, ~1172 lines extracted)
+  - **`main.js` reduced from 5378 → 1847 lines** (under the <2000 target).
+- **Client ORM service (E1):** `services/orm.js` — Odoo 19-compatible `read`, `searchRead`, `create`, `write`, `unlink`, `call`, `nameGet`, `nameSearch` wrappers over RPC; wired into `env.services.orm`.
+- **View service depth (E2):** `services/views.js` extended with `loadViews(model, viewTypes)` batch loader, `viewRegistry` with lazy component loading.
+- **Field registry formatters/parsers (E3):** `core/field_registry.js` extended with `registerFormatter`, `registerParser`, `format`, `parse`, `getFieldComponent(type)` returning `{ render, format, parse }` triple. Built-in formatters/parsers for all core types (integer, float, monetary, date, datetime, boolean, char, text, selection, many2one, float_time, percentage).
+- **Domain selector (E4):** `components/domain_selector.js` — visual domain expression editor for advanced filters with field picker, operator selector, value input. Produces Odoo-style domain arrays.
+
+### Changed
+
+- **`core/tools/__init__.py`:** Expanded exports to include `json_log`, `sql_debug`, `translate`.
+- **`app/services.js`:** Added `orm` to modern services registry (sequence 25).
+- **`addons/web/__manifest__.py`:** Added `orm.js`, `domain_selector.js`, and all four extraction modules to `web.assets_web` bundle.
+
+### Verified
+
+- **F1 ORM infrastructure:** `_register_hook`/`_unregister_hook`, `_log_access` audit columns, `_combine_domain_with_record_rules` (nested `&`), `core.tools` helpers — all verified present and working.
+- **F2 AI deployment hardening:** `ai_assistant` in `DEFAULT_SERVER_WIDE_MODULES`, auth guards on `/ai/tools` and `/ai/chat`, `ai.audit.log` model with `prompt_hash`/`tool_calls`/`user_id`/`outcome` fields, pgvector extension gate — all verified.
+- **F3 Focused regressions:** 31/32 tests pass (test_schema_audit_columns requires psycopg2/DB).
+- **F4 Module rollout:** All phases 284-389 modules verified in `DEFAULT_SERVER_WIDE_MODULES`; scaffold bridges importable; frontend widgets/components/core modules present.
+
+### Documentation
+
+- **`docs/main_js_extraction_catalog.md`:** Updated completed table with all four extraction modules; stretch candidates added.
+- **`docs/ai-implementation-checklist.md`:** 30+ items checked off with evidence across ORM infrastructure, AI deployment, security, and module rollout tracks.
+
 ## 1.244.0 — 2026-03-28
 
 ### Added
@@ -3378,3 +3411,19 @@ python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python 
 - Converted `addons/web/static/src/main.js` into a legacy boot adapter instead of the long-term shell entrypoint.
 - Added frontend migration ADR and architecture docs for the phases 1-5 re-architecture.
 - Added a CSP-safe shell mount fallback so modern navbar/sidebar rendering no longer depends on OWL runtime template compilation with `unsafe-eval`.
+
+## Phase 1.245 Track D3 — Chart Views Extraction
+
+- Extracted graph, pivot, calendar, kanban, gantt, and activity view functions from `main.js` into `addons/web/static/src/legacy_main_chart_views.js`.
+- New file creates `window.__ERP_CHART_VIEWS` namespace with `install(ctx)` dependency injection pattern.
+- 16 functions extracted: `loadActivityData`, `loadGanttData`, `renderGanttView`, `renderGanttViewFallback`, `renderActivityMatrix`, `renderActivityMatrixFallback`, `loadGraphData`, `renderGraph`, `renderGraphFallback`, `loadPivotData`, `renderPivot`, `renderPivotFallback`, `renderCalendar`, `renderCalendarFallback`, `renderKanban`, `renderKanbanFallback`.
+- All state access (currentListState, actionStack) routed through getter/setter functions from ctx.
+- AppCore view cores (GraphViewCore, PivotViewCore, etc.) resolved from `window.AppCore` at install time.
+
+# Phase 1.245 Track D2 — Legacy List Views Extraction
+
+- Extracted list view rendering, record loading, and saved filter functions from `main.js` into `addons/web/static/src/legacy_main_list_views.js`.
+- New module sets `window.__ERP_LIST_VIEWS` with `install(ctx)` pattern for dependency injection from main.js.
+- Contains: `getDisplayNames`, `getDisplayNamesForMany2many`, `renderViewSwitcher`, `renderList`, `deleteRecord`, `loadRecords`, `getHashViewParam`, `getAvailableViewModes`, `getPreferredViewType`, `setViewAndReload`, `getSavedFilters`, `saveSavedFilter`, `removeSavedFilter`, `getSavedFiltersFromStorage`.
+- `currentListState` exposed via `getCurrentListState()` / `setCurrentListState()` accessors.
+- Chart/special view dispatches (graph, pivot, activity, gantt, kanban, calendar) routed through `window.__ERP_CHART_VIEWS`.

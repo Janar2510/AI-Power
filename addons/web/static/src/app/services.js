@@ -569,9 +569,11 @@ export function createModernServices(env) {
   const views = legacy.views || createFallbackViews(bootstrap);
   const view = createViewService(views);
   const router = createRouterService();
+  const orm = legacy.orm || null;
   const services = {
     session: legacy.session || createFallbackSession(bootstrap),
     rpc: legacy.rpc || null,
+    orm: orm,
     i18n: legacy.i18n || null,
     hotkey: legacy.hotkey || null,
     commandPalette: legacy.commandPalette || null,
@@ -598,6 +600,7 @@ export function createModernServices(env) {
   if (!env.registries.category("services").has("session")) {
     env.registries.category("services").add("session", services.session, { sequence: 10 });
     env.registries.category("services").add("rpc", services.rpc, { sequence: 20 });
+    env.registries.category("services").add("orm", services.orm, { sequence: 25 });
     env.registries.category("services").add("views", services.views, { sequence: 30 });
     env.registries.category("services").add("view", services.view, { sequence: 31 });
     env.registries.category("services").add("menu", services.menu, { sequence: 40 });

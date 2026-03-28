@@ -87,9 +87,67 @@
       return meta ? (meta[fname] || null) : null;
     },
 
-    clearCache() { _cache = null; }
+    clearCache() { _cache = null; },
+
+    /**
+     * Batch loadViews — returns cached arch+fields for the requested view types in one call.
+     * Mirrors Odoo 19 view_service.loadViews(resModel, requestedViewTypes).
+     * @param {string} model
+     * @param {Array<string|[string,number]>} viewTypes — e.g. ['list','form'] or [['list',false],['form',false]]
+     * @returns {Promise<{views: Object, fields: Object}>}
+     */
+    loadViews(model, viewTypes) {
+      return this.load().then(function () {
+        var modes = (viewTypes || ['list', 'form']).map(function (v) {
+          return Array.isArray(v) ? v[0] : v;
+        });
+        var result = {};
+        modes.forEach(function (mode) {
+          var v = views.getView(model, mode);
+          if (v) result[mode] = v;
+        });
+        var fields = views.getFieldsMeta(model) || {};
+        return { views: result, fields: fields };
+      });
+    },
+  };
+
+  /**
+   * View type registry — maps view type strings to renderer/component references.
+   * Lazy loading: register({ type, loader }) and the actual component loads on first use.
+   */
+  var _viewRegistry = {};
+
+  var viewRegistry = {
+    add: function (type, entry) {
+      _viewRegistry[type] = entry;
+    },
+    get: function (type) {
+      return _viewRegistry[type] || null;
+    },
+    getAll: function () {
+      return Object.assign({}, _viewRegistry);
+    },
+    /**
+     * Lazy resolve — if entry has a `loader` function, call it once and cache the result.
+     * @param {string} type
+     * @returns {Promise<Object|null>}
+     */
+    resolve: function (type) {
+      var entry = _viewRegistry[type];
+      if (!entry) return Promise.resolve(null);
+      if (entry._resolved) return Promise.resolve(entry._resolved);
+      if (typeof entry.loader === 'function') {
+        return Promise.resolve(entry.loader()).then(function (resolved) {
+          entry._resolved = resolved;
+          return resolved;
+        });
+      }
+      return Promise.resolve(entry);
+    },
   };
 
   window.Services = window.Services || {};
   window.Services.views = views;
+  window.Services.viewRegistry = viewRegistry;
 })();

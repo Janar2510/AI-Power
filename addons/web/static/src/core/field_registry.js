@@ -473,5 +473,153 @@
     );
   });
 
-  window.FieldWidgets = { register: register, render: render };
+  /* ── Formatters & Parsers ── */
+  var _formatters = {};
+  var _parsers = {};
+
+  function registerFormatter(type, fn) {
+    if (type && typeof fn === 'function') _formatters[type] = fn;
+  }
+
+  function registerParser(type, fn) {
+    if (type && typeof fn === 'function') _parsers[type] = fn;
+  }
+
+  function format(type, value, options) {
+    var fn = _formatters[type];
+    return fn ? fn(value, options || {}) : (value == null ? '' : String(value));
+  }
+
+  function parse(type, str, options) {
+    var fn = _parsers[type];
+    return fn ? fn(str, options || {}) : str;
+  }
+
+  /**
+   * Odoo 19-style getFieldComponent: returns { render, format, parse } triple for a field type.
+   */
+  function getFieldComponent(type) {
+    var renderFn = registry[type] || null;
+    return {
+      render: renderFn,
+      format: _formatters[type] || null,
+      parse: _parsers[type] || null,
+    };
+  }
+
+  /* ── Built-in formatters ── */
+  registerFormatter('integer', function (v) {
+    if (v == null) return '';
+    var n = typeof v === 'number' ? v : parseInt(v, 10);
+    return isNaN(n) ? '' : n.toLocaleString();
+  });
+  registerFormatter('float', function (v, opts) {
+    if (v == null) return '';
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    if (isNaN(n)) return '';
+    var digits = (opts && opts.digits != null) ? opts.digits : 2;
+    return n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  });
+  registerFormatter('monetary', function (v, opts) {
+    if (v == null) return '';
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    if (isNaN(n)) return '';
+    var currency = (opts && opts.currency) || '';
+    var digits = (opts && opts.digits != null) ? opts.digits : 2;
+    var formatted = n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    return currency ? currency + '\u00A0' + formatted : formatted;
+  });
+  registerFormatter('date', function (v) {
+    if (!v) return '';
+    var d = v instanceof Date ? v : new Date(v);
+    return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+  });
+  registerFormatter('datetime', function (v) {
+    if (!v) return '';
+    var d = v instanceof Date ? v : new Date(v);
+    return isNaN(d.getTime()) ? String(v) : d.toLocaleString();
+  });
+  registerFormatter('boolean', function (v) { return v ? 'Yes' : 'No'; });
+  registerFormatter('char', function (v) { return v == null ? '' : String(v); });
+  registerFormatter('text', function (v) { return v == null ? '' : String(v); });
+  registerFormatter('selection', function (v, opts) {
+    if (v == null) return '';
+    var sel = (opts && opts.selection) || [];
+    for (var i = 0; i < sel.length; i++) {
+      if (String(sel[i][0]) === String(v)) return sel[i][1];
+    }
+    return String(v);
+  });
+  registerFormatter('many2one', function (v) {
+    if (!v) return '';
+    if (Array.isArray(v)) return v[1] || '';
+    return typeof v === 'object' ? (v.display_name || v.name || '') : String(v);
+  });
+  registerFormatter('float_time', function (v) {
+    if (v == null) return '';
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    if (isNaN(n)) return '';
+    var h = Math.floor(n);
+    var m = Math.round((n - h) * 60);
+    return h + ':' + (m < 10 ? '0' : '') + m;
+  });
+  registerFormatter('percentage', function (v) {
+    if (v == null) return '';
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    return isNaN(n) ? '' : n.toFixed(1) + '%';
+  });
+
+  /* ── Built-in parsers ── */
+  registerParser('integer', function (s) {
+    if (s == null || s === '') return false;
+    var n = parseInt(String(s).replace(/[^0-9\-]/g, ''), 10);
+    return isNaN(n) ? false : n;
+  });
+  registerParser('float', function (s) {
+    if (s == null || s === '') return false;
+    var n = parseFloat(String(s).replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? false : n;
+  });
+  registerParser('monetary', function (s) {
+    if (s == null || s === '') return false;
+    var n = parseFloat(String(s).replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? false : n;
+  });
+  registerParser('boolean', function (s) {
+    if (s === true || s === 'true' || s === '1' || s === 1) return true;
+    return false;
+  });
+  registerParser('date', function (s) {
+    if (!s) return false;
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return false;
+    return d.toISOString().slice(0, 10);
+  });
+  registerParser('datetime', function (s) {
+    if (!s) return false;
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return false;
+    return d.toISOString().replace('T', ' ').slice(0, 19);
+  });
+  registerParser('float_time', function (s) {
+    if (!s) return false;
+    if (s.indexOf(':') !== -1) {
+      var parts = s.split(':');
+      var h = parseInt(parts[0], 10) || 0;
+      var m = parseInt(parts[1], 10) || 0;
+      return h + m / 60;
+    }
+    var n = parseFloat(s);
+    return isNaN(n) ? false : n;
+  });
+
+  window.FieldWidgets = {
+    register: register,
+    render: render,
+    registerFormatter: registerFormatter,
+    registerParser: registerParser,
+    format: format,
+    parse: parse,
+    getFieldComponent: getFieldComponent,
+  };
 })();

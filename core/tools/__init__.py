@@ -1,4 +1,4 @@
-from . import config, date_utils, float_utils, image, mail, misc, safe_eval
+from . import config, date_utils, float_utils, image, json_log, mail, misc, safe_eval, sql_debug, translate
 
 __all__ = [
     "config",
@@ -6,6 +6,9 @@ __all__ = [
     "date_utils",
     "float_utils",
     "image",
-    "misc",
+    "json_log",
     "mail",
+    "misc",
+    "sql_debug",
+    "translate",
 ]

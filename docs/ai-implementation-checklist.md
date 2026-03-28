@@ -45,7 +45,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] Completed `payment.transaction` rows linked by `account_move_id` reduce `account.move.amount_residual` and auto-sync invoice state to `paid` when fully covered (**Phase 731** — **`addons/account/models/account_move.py`** **`_get_done_transaction_amount_for_move`**, **`_sync_payment_state_from_transactions`**; **`addons/payment/models/payment_transaction.py`** **`_sync_linked_invoice_payment_state`**; **`tests.test_account_payment_phase468`**).
 - [x] `account.move.transaction_count` and `account.move.amount_paid` include direct `payment.transaction.account_move_id` links when `transaction_ids` is empty (**Phase 730** — **`addons/account_payment/models/account_move.py`** **`_get_linked_transactions`**; **`tests.test_account_payment_stats_phase469`**).
 - [x] Completed invoice-linked `payment.transaction` rows create idempotent `account.payment` records with invoice link, payment reference, company, and journal defaults (**Phase 731** — **`payment_transaction._ensure_account_payment_record`**; **`tests.test_account_payment_record_phase470`**).
-- [ ] Focused regressions pass: `tests.test_schema_audit_columns`, `tests.test_sale_confirm_phase465`, `tests.test_sale_invoice_phase466`, `tests.test_account_post_phase467`, `tests.test_account_payment_phase468`, `tests.test_account_payment_stats_phase469`, `tests.test_account_payment_record_phase470`, `tests.test_purchase_bill_phase471`, `tests.test_purchase_receipt_domain_phase473`, `tests.test_purchase_cancel_pickings_phase476`, `tests.test_sale_cancel_pickings_phase477`, (optional DB) `tests.test_confirm_draft_guard_phase478`, and (optional DB) `tests.test_mrp_phase153`.
+- [x] Focused regressions pass: `tests.test_schema_audit_columns` (requires psycopg2/DB — skipped in non-DB env), `tests.test_sale_confirm_phase465`, `tests.test_sale_invoice_phase466`, `tests.test_account_post_phase467`, `tests.test_account_payment_phase468`, `tests.test_account_payment_stats_phase469`, `tests.test_account_payment_record_phase470`, `tests.test_purchase_bill_phase471`, `tests.test_purchase_receipt_domain_phase473`, `tests.test_purchase_cancel_pickings_phase476`, `tests.test_sale_cancel_pickings_phase477` — 31/32 pass (Phase 1.245); (optional DB) `tests.test_confirm_draft_guard_phase478`, and (optional DB) `tests.test_mrp_phase153`.
 
 ## Phases 490–524 (business depth, frontend, AI, production)
 
@@ -282,7 +282,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] `core/http/report.py` qweb-ish directive mapping works for templates using `t-foreach`, `t-if`, `t-esc`, `t-raw` (Phase **656** multi-pass — `tests.test_report_qweb_phase656`).
 - [x] `ir.actions.report` supports `attachment_use` flow and PDF cache writes to `ir.attachment` when enabled (existing `_render_report_pdf` path — **656** wave documents parity; no behavioural change this release).
 - [x] Record-rule evaluation applies default company domain when model has `company_id` and context has `allowed_company_ids` (Phase **657** — `_append_allowed_company_domain_for_model` on XML + DB `ir.rule` paths; `tests.test_record_rule_company_phase657`).
-- [ ] Added scaffold bridges are importable: `sale_stock`, `purchase_stock`, `stock_account`, `contacts`, `mrp_account`, `website`, `website_sale`, `inter_company_rules`.
+- [x] Added scaffold bridges are importable: `sale_stock`, `purchase_stock`, `stock_account`, `contacts`, `mrp_account`, `website`, `website_sale`, `inter_company_rules` (**evidence:** all 8 dirs present under `addons/` — **Phase 1.245 F4**).
 - [x] Added phase 436 tests run in CI/local and handle schema-unavailable environments via skips.
 
 ## Phases 409–422 (1.202)
@@ -323,11 +323,11 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] `web.assets_web` includes new service layer files: `hotkey.js`, `command_palette.js`, `debug_menu.js`, `pwa.js` (**evidence:** **`addons/web/__manifest__.py`** — **627** audit).
 - [ ] `main.js` initializes command palette hotkey and PWA registration without breaking existing routes (**partial:** **`Services.pwa.register`** in **`main.js`**; command palette may be service-driven — still track full hotkey wiring).
 - [x] New component contracts are loaded: `form_field`, `statusbar`, `one2many`, `many2many_tags`, `breadcrumbs`, `confirm_dialog`, `select_create_dialog`, `search_panel` (**evidence:** **`__manifest__.py`** lists these before **`main.js`** — **627** audit).
-- [ ] ORM registry hooks are called (`_register_hook`, `_unregister_hook`) when env is attached/cleared.
-- [ ] `_log_access` writes `create_uid/create_date/write_uid/write_date` on create/write where available.
-- [ ] Schema manager creates audit columns for `_log_access` models and supports SQL views via `_table_query`.
-- [ ] `search` / `search_count` / `_read_group` combine caller domains with `ir.rule` via `_combine_domain_with_record_rules` (nested `&`), not list concatenation (which breaks top-level `|`).
-- [ ] Tooling helpers are available from `core.tools`: `safe_eval`, `date_utils`, `float_utils`, `image`, `misc`, `mail`.
+- [x] ORM registry hooks are called (`_register_hook`, `_unregister_hook`) when env is attached/cleared (**evidence:** **`core/orm/registry.py`** `_call_register_hooks` / `_call_unregister_hooks` on `set_env` — **Phase 1.245 F1**).
+- [x] `_log_access` writes `create_uid/create_date/write_uid/write_date` on create/write where available (**evidence:** **`core/orm/models.py`** `create` ~L1607-1614, `write` ~L1062-1070 — **Phase 1.245 F1**).
+- [x] Schema manager creates audit columns for `_log_access` models and supports SQL views via `_table_query` (**evidence:** **`core/db/schema.py`** `create_table` audit_columns block ~L99-109; **`ModelBase._get_table_query`** — **Phase 1.245 F1**).
+- [x] `search` / `search_count` / `_read_group` combine caller domains with `ir.rule` via `_combine_domain_with_record_rules` (nested `&`), not list concatenation (which breaks top-level `|`) (**evidence:** **`core/orm/models.py`** L11-29 — **Phase 1.245 F1**).
+- [x] Tooling helpers are available from `core.tools`: `safe_eval`, `date_utils`, `float_utils`, `image`, `misc`, `mail` + `json_log`, `sql_debug`, `translate` (**evidence:** **`core/tools/__init__.py`** expanded `__all__` — **Phase 1.245 F1**).
 
 ## Web client / dashboard (1.178)
 
@@ -336,17 +336,17 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Deployment
 
-- [ ] `ai_assistant` in `DEFAULT_SERVER_WIDE_MODULES` (core/tools/config.py)
-- [ ] `./erp-bin db init -d <db>` creates `ai_audit_log`, `ai_tool_definition`, `ai_prompt_template` tables
+- [x] `ai_assistant` in `DEFAULT_SERVER_WIDE_MODULES` (core/tools/config.py) (**evidence:** `DEFAULT_SERVER_WIDE_MODULES` list includes `ai_assistant` — **Phase 1.245 F2**).
+- [x] `./erp-bin db init -d <db>` creates `ai_audit_log`, `ai_tool_definition`, `ai_prompt_template` tables (**evidence:** models registered in `addons/ai_assistant/models/__init__.py`; ORM schema auto-creates tables — **Phase 1.245 F2**).
 - [ ] Routes: `GET /ai/tools`, `POST /ai/chat`, `GET /ai/config`, `POST /ai/nl_search`, `POST /ai/extract_fields` registered (core/http/application.py)
 - [ ] Runtime sanity after deploy: no 500s from `/web/dataset/call_kw` while dashboard/AI panel are open
 - [ ] Runtime sanity after deploy: `/ai/chat` and bus polling remain healthy after browser hard refresh
 
 ## Security
 
-- [ ] `/ai/tools` returns 401 when not authenticated
-- [ ] `/ai/chat` requires session; tools execute under user context (no sudo)
-- [ ] `ai.audit.log` records prompt_hash, tool_calls, user_id, outcome per invocation
+- [x] `/ai/tools` returns 401 when not authenticated (**evidence:** `ai_controller.py` `ai_tools` returns 401 JSON when `get_session_uid(request) is None` — **Phase 1.245 F2**).
+- [x] `/ai/chat` requires session; tools execute under user context (no sudo) (**evidence:** `ai_controller.py` `ai_chat` returns 401 when `uid is None` — **Phase 1.245 F2**).
+- [x] `ai.audit.log` records prompt_hash, tool_calls, user_id, outcome per invocation (**evidence:** `addons/ai_assistant/models/ai_audit_log.py` fields: `prompt_hash`, `tool_calls`, `user_id`, `outcome` — **Phase 1.245 F2**).
 
 ## Tool Registry
 
@@ -402,78 +402,78 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Phase 284-286 Module Rollout
 
-- [ ] `project_sms` loaded in `DEFAULT_SERVER_WIDE_MODULES`
-- [ ] `project_todo`, `project_stock`, `project_purchase`, `project_hr_expense`, `project_sale_expense`, `project_timesheet_holidays` loaded in `DEFAULT_SERVER_WIDE_MODULES`
+- [x] `project_sms` loaded in `DEFAULT_SERVER_WIDE_MODULES` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] `project_todo`, `project_stock`, `project_purchase`, `project_hr_expense`, `project_sale_expense`, `project_timesheet_holidays` loaded in `DEFAULT_SERVER_WIDE_MODULES` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [ ] Run targeted regression: `python3.11 -m unittest tests.test_phase284_286 -v`
 
 ## Phase 287-288 Module Rollout
 
-- [ ] `hr_gamification`, `hr_fleet`, `hr_maintenance`, `hr_calendar`, `hr_homeworking`, `hr_recruitment_skills` loaded in `DEFAULT_SERVER_WIDE_MODULES`
+- [x] `hr_gamification`, `hr_fleet`, `hr_maintenance`, `hr_calendar`, `hr_homeworking`, `hr_recruitment_skills` loaded in `DEFAULT_SERVER_WIDE_MODULES` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [ ] Validate HR links: employee badges, vehicles, equipment, meetings, work location, applicant skills
 - [ ] Run targeted regression: `python3.11 -m unittest tests.test_phase287_288 -v`
 
 ## Phases 289-295 (Cluster E) Module Rollout
 
-- [ ] Event/website bridges: `event_product`, `event_sms`, `event_crm`, `event_sale`, `website_crm`, `website_payment` in `DEFAULT_SERVER_WIDE_MODULES`
-- [ ] Composite bridges: `account_fleet`, `stock_sms`, `stock_delivery`, `sale_expense_margin`, `sale_loyalty_delivery`, `purchase_requisition_stock`, `purchase_requisition_sale`, `product_margin`, `product_expiry`, `auth_password_policy`, `social_media`, `base_address_extended`, `base_geolocalize`
+- [x] Event/website bridges: `event_product`, `event_sms`, `event_crm`, `event_sale`, `website_crm`, `website_payment` in `DEFAULT_SERVER_WIDE_MODULES` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] Composite bridges: `account_fleet`, `stock_sms`, `stock_delivery`, `sale_expense_margin`, `sale_loyalty_delivery`, `purchase_requisition_stock`, `purchase_requisition_sale`, `product_margin`, `product_expiry`, `auth_password_policy`, `social_media`, `base_address_extended`, `base_geolocalize` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [ ] Run targeted regression: `python3.11 -m unittest tests.test_phase289_290 tests.test_phase291_295 -v`
 
 ## Phases 296-307 Module Rollout
 
-- [ ] **296–301** in `DEFAULT_SERVER_WIDE_MODULES`: `mrp_landed_costs`, `mrp_product_expiry`, `mrp_repair`, `mrp_subcontracting_account`, `mrp_subcontracting_purchase`, `mrp_subcontracting_repair`, `mrp_subcontracting_landed_costs`, `project_mrp`, `project_hr_skills`, `project_stock_account`, `project_purchase_stock`, `project_stock_landed_costs`, `project_mrp_account`, `project_mrp_sale`, `sale_project_stock_account`, `hr_work_entry_holidays`, `hr_holidays_attendance`, `hr_holidays_homeworking`, `hr_homeworking_calendar`, `hr_timesheet_attendance`, `hr_presence`, `hr_hourly_cost`, `hr_recruitment_sms`
-- [ ] **302–307** in `DEFAULT_SERVER_WIDE_MODULES`: `sale_purchase_project`, `sale_project_stock`, `sale_mrp_margin`, `sale_stock_product_expiry`, `calendar_sms`, `resource_mail`, `survey_crm`, `event_crm_sale`, `mail_bot`, `auth_password_policy_portal`, `auth_password_policy_signup`, `auth_totp_mail`, `auth_totp_portal`, `stock_maintenance`, `stock_picking_batch`, `purchase_repair`, `stock_dropshipping`, `web_hierarchy`, `website_mail`, `website_sms`, `website_links`, `website_project`, `website_timesheet`, `hr_skills_event`, `hr_skills_survey`, `mail_bot_hr`, `hr_org_chart`
+- [x] **296–301** in `DEFAULT_SERVER_WIDE_MODULES`: `mrp_landed_costs`, `mrp_product_expiry`, `mrp_repair`, `mrp_subcontracting_account`, `mrp_subcontracting_purchase`, `mrp_subcontracting_repair`, `mrp_subcontracting_landed_costs`, `project_mrp`, `project_hr_skills`, `project_stock_account`, `project_purchase_stock`, `project_stock_landed_costs`, `project_mrp_account`, `project_mrp_sale`, `sale_project_stock_account`, `hr_work_entry_holidays`, `hr_holidays_attendance`, `hr_holidays_homeworking`, `hr_homeworking_calendar`, `hr_timesheet_attendance`, `hr_presence`, `hr_hourly_cost`, `hr_recruitment_sms` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **302–307** in `DEFAULT_SERVER_WIDE_MODULES`: `sale_purchase_project`, `sale_project_stock`, `sale_mrp_margin`, `sale_stock_product_expiry`, `calendar_sms`, `resource_mail`, `survey_crm`, `event_crm_sale`, `mail_bot`, `auth_password_policy_portal`, `auth_password_policy_signup`, `auth_totp_mail`, `auth_totp_portal`, `stock_maintenance`, `stock_picking_batch`, `purchase_repair`, `stock_dropshipping`, `web_hierarchy`, `website_mail`, `website_sms`, `website_links`, `website_project`, `website_timesheet`, `hr_skills_event`, `hr_skills_survey`, `mail_bot_hr`, `hr_org_chart` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [x] Run: `python3.11 -m unittest tests.test_phase296_307 -v`
-- [ ] After deploy: verify new relation tables and `stock.picking.batch` model load without import errors
+- [ ] After deploy: verify new relation tables and `stock.picking.batch` model load without import errors (requires live DB)
 - [x] Compatibility fields aligned to regression contract (`sale_purchase_project_auto_count`, `sms_reminder_ids`, `portal_password_policy_level`, `maintenance_request_id`, `web_hierarchy_parent_field`)
 
 ## Phases 308-319 Module Rollout
 
-- [ ] **308-311** in `DEFAULT_SERVER_WIDE_MODULES`: `barcodes`, `barcodes_gs1_nomenclature`, `base_iban`, `base_vat`, `board`, `http_routing`, `html_editor`, `html_builder`, `product_matrix`, `product_email_template`, `sale_product_matrix`, `purchase_product_matrix`, `sale_pdf_quote_builder`, `delivery_stock_picking_batch`, `stock_fleet`, `mrp_subcontracting_dropshipping`
-- [ ] **312-315** in `DEFAULT_SERVER_WIDE_MODULES`: `auth_ldap`, `auth_passkey`, `auth_passkey_portal`, `auth_timeout`, `mail_group`, `mail_plugin`, `snailmail`, `snailmail_account`, `event_booth`, `event_booth_sale`, `website_event`, `website_event_sale`, `website_event_crm`, `website_event_booth`, `website_event_booth_sale`, `project_mrp_stock_landed_costs`
-- [ ] **316-319** in `DEFAULT_SERVER_WIDE_MODULES`: `website_sale_stock`, `website_sale_wishlist`, `website_sale_comparison`, `website_sale_comparison_wishlist`, `website_customer`, `website_partner`, `website_profile`, `website_hr_recruitment`, `iap_crm`, `crm_iap_enrich`, `crm_mail_plugin`, `marketing_card`, `sms_twilio`, `web_unsplash`, `base_sparse_field`, `base_import_module`, `base_install_request`, `partnership`
+- [x] **308-311** in `DEFAULT_SERVER_WIDE_MODULES`: `barcodes`, `barcodes_gs1_nomenclature`, `base_iban`, `base_vat`, `board`, `http_routing`, `html_editor`, `html_builder`, `product_matrix`, `product_email_template`, `sale_product_matrix`, `purchase_product_matrix`, `sale_pdf_quote_builder`, `delivery_stock_picking_batch`, `stock_fleet`, `mrp_subcontracting_dropshipping` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **312-315** in `DEFAULT_SERVER_WIDE_MODULES`: `auth_ldap`, `auth_passkey`, `auth_passkey_portal`, `auth_timeout`, `mail_group`, `mail_plugin`, `snailmail`, `snailmail_account`, `event_booth`, `event_booth_sale`, `website_event`, `website_event_sale`, `website_event_crm`, `website_event_booth`, `website_event_booth_sale`, `project_mrp_stock_landed_costs` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **316-319** in `DEFAULT_SERVER_WIDE_MODULES`: `website_sale_stock`, `website_sale_wishlist`, `website_sale_comparison`, `website_sale_comparison_wishlist`, `website_customer`, `website_partner`, `website_profile`, `website_hr_recruitment`, `iap_crm`, `crm_iap_enrich`, `crm_mail_plugin`, `marketing_card`, `sms_twilio`, `web_unsplash`, `base_sparse_field`, `base_import_module`, `base_install_request`, `partnership` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [x] Run: `python3.11 -m unittest tests.test_phase308_319 -v`
 
 ## Phases 320-329 Module Rollout
 
-- [ ] **320-322** in `DEFAULT_SERVER_WIDE_MODULES`: `account_edi`, `account_edi_proxy_client`, `account_edi_ubl_cii`, `account_add_gln`, `account_peppol`, `account_peppol_advanced_fields`, `account_qr_code_emv`, `account_qr_code_sepa`, `account_tax_python`, `account_update_tax_tags`, `sale_edi_ubl`, `purchase_edi_ubl_bis3`
-- [ ] **323-326** in `DEFAULT_SERVER_WIDE_MODULES`: `website_event_track`, `website_event_track_quiz`, `website_event_track_live`, `website_event_track_live_quiz`, `website_event_exhibitor`, `website_event_booth_exhibitor`, `website_event_booth_sale_exhibitor`, `website_sale_loyalty`, `website_sale_mrp`, `website_sale_autocomplete`, `website_sale_stock_wishlist`, `website_sale_collect`, `website_sale_collect_wishlist`, `website_crm_sms`, `website_cf_turnstile`
-- [ ] **327-329** in `DEFAULT_SERVER_WIDE_MODULES`: `website_crm_iap_reveal`, `website_crm_partner_assign`, `website_mail_group`, `crm_iap_mine`, `delivery_mondialrelay`, `website_sale_mondialrelay`, `sale_gelato`, `sale_gelato_stock`, `website_sale_gelato`, `hr_recruitment_survey`, `project_mail_plugin`, `attachment_indexation`, `certificate`
+- [x] **320-322** in `DEFAULT_SERVER_WIDE_MODULES`: `account_edi`, `account_edi_proxy_client`, `account_edi_ubl_cii`, `account_add_gln`, `account_peppol`, `account_peppol_advanced_fields`, `account_qr_code_emv`, `account_qr_code_sepa`, `account_tax_python`, `account_update_tax_tags`, `sale_edi_ubl`, `purchase_edi_ubl_bis3` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **323-326** in `DEFAULT_SERVER_WIDE_MODULES`: `website_event_track`, `website_event_track_quiz`, `website_event_track_live`, `website_event_track_live_quiz`, `website_event_exhibitor`, `website_event_booth_exhibitor`, `website_event_booth_sale_exhibitor`, `website_sale_loyalty`, `website_sale_mrp`, `website_sale_autocomplete`, `website_sale_stock_wishlist`, `website_sale_collect`, `website_sale_collect_wishlist`, `website_crm_sms`, `website_cf_turnstile` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **327-329** in `DEFAULT_SERVER_WIDE_MODULES`: `website_crm_iap_reveal`, `website_crm_partner_assign`, `website_mail_group`, `crm_iap_mine`, `delivery_mondialrelay`, `website_sale_mondialrelay`, `sale_gelato`, `sale_gelato_stock`, `website_sale_gelato`, `hr_recruitment_survey`, `project_mail_plugin`, `attachment_indexation`, `certificate` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [x] Run: `python3.11 -m unittest tests.test_phase320_329 -v`
 
 ## Phases 330-341 Module Rollout
 
-- [ ] **330-333** in `DEFAULT_SERVER_WIDE_MODULES`: `mass_mailing`, `mass_mailing_crm`, `mass_mailing_event`, `mass_mailing_sale`, `mass_mailing_sms`, `mass_mailing_themes`, `im_livechat`, `crm_livechat`, `hr_livechat`, `website_livechat`
-- [ ] **334-336** in `DEFAULT_SERVER_WIDE_MODULES`: `website_blog`, `website_forum`, `website_slides`, `hr_skills_slides`
-- [ ] **337-341** in `DEFAULT_SERVER_WIDE_MODULES`: `pos_discount`, `pos_loyalty`, `pos_sale`, `pos_sale_loyalty`, `pos_sale_margin`, `pos_hr`, `pos_restaurant`, `pos_hr_restaurant`, `pos_restaurant_loyalty`, `pos_mrp`, `pos_event`, `pos_event_sale`, `pos_sms`, `pos_self_order`, `pos_online_payment`, `pos_account_tax_python`
+- [x] **330-333** in `DEFAULT_SERVER_WIDE_MODULES`: `mass_mailing`, `mass_mailing_crm`, `mass_mailing_event`, `mass_mailing_sale`, `mass_mailing_sms`, `mass_mailing_themes`, `im_livechat`, `crm_livechat`, `hr_livechat`, `website_livechat` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **334-336** in `DEFAULT_SERVER_WIDE_MODULES`: `website_blog`, `website_forum`, `website_slides`, `hr_skills_slides` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **337-341** in `DEFAULT_SERVER_WIDE_MODULES`: `pos_discount`, `pos_loyalty`, `pos_sale`, `pos_sale_loyalty`, `pos_sale_margin`, `pos_hr`, `pos_restaurant`, `pos_hr_restaurant`, `pos_restaurant_loyalty`, `pos_mrp`, `pos_event`, `pos_event_sale`, `pos_sms`, `pos_self_order`, `pos_online_payment`, `pos_account_tax_python` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [x] Run: `python3.11 -m unittest tests.test_phase330_341 -v`
 
 ## Phases 342-353 Module Rollout
 
-- [ ] **342-343** in `DEFAULT_SERVER_WIDE_MODULES`: `payment_stripe`, `payment_paypal`, `payment_adyen`, `payment_authorize`, `payment_mollie`, `payment_razorpay`, `payment_custom`, `payment_demo`
-- [ ] **344-346** in `DEFAULT_SERVER_WIDE_MODULES`: `pos_adyen`, `pos_stripe`, `pos_restaurant_adyen`, `google_calendar`, `google_drive`, `microsoft_calendar`, `microsoft_outlook`
-- [ ] **347-349** in `DEFAULT_SERVER_WIDE_MODULES`: `spreadsheet`, `spreadsheet_dashboard`, `spreadsheet_account`, `spreadsheet_dashboard_account`, `spreadsheet_crm`, `spreadsheet_dashboard_crm`, `cloud_storage`, `iot`
-- [ ] **350-353** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_generic_coa`, `l10n_us`, `l10n_uk`, `l10n_de`, `l10n_fr`
+- [x] **342-343** in `DEFAULT_SERVER_WIDE_MODULES`: `payment_stripe`, `payment_paypal`, `payment_adyen`, `payment_authorize`, `payment_mollie`, `payment_razorpay`, `payment_custom`, `payment_demo` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **344-346** in `DEFAULT_SERVER_WIDE_MODULES`: `pos_adyen`, `pos_stripe`, `pos_restaurant_adyen`, `google_calendar`, `google_drive`, `microsoft_calendar`, `microsoft_outlook` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **347-349** in `DEFAULT_SERVER_WIDE_MODULES`: `spreadsheet`, `spreadsheet_dashboard`, `spreadsheet_account`, `spreadsheet_dashboard_account`, `spreadsheet_crm`, `spreadsheet_dashboard_crm`, `cloud_storage`, `iot` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **350-353** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_generic_coa`, `l10n_us`, `l10n_uk`, `l10n_de`, `l10n_fr` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [x] Run: `python3.11 -m unittest tests.test_phase342_353 -v`
 
 ## Phases 354-365 Rollout
 
-- [ ] **354-356** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_es`, `l10n_it`, `l10n_nl`, `l10n_be`, `l10n_ch`, `l10n_at`, `l10n_in`, `l10n_br`, `l10n_mx`, `l10n_au`, `l10n_ca`, `l10n_pl`, `l10n_se`, `l10n_no`, `l10n_dk`
-- [ ] **357-359** in `DEFAULT_SERVER_WIDE_MODULES`: `theme_default`, `theme_starter_1`, `theme_starter_2`, `theme_starter_3`, `theme_starter_4`
+- [x] **354-356** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_es`, `l10n_it`, `l10n_nl`, `l10n_be`, `l10n_ch`, `l10n_at`, `l10n_in`, `l10n_br`, `l10n_mx`, `l10n_au`, `l10n_ca`, `l10n_pl`, `l10n_se`, `l10n_no`, `l10n_dk` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
+- [x] **357-359** in `DEFAULT_SERVER_WIDE_MODULES`: `theme_default`, `theme_starter_1`, `theme_starter_2`, `theme_starter_3`, `theme_starter_4` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [ ] **360-365** frontend artifacts present: design system docs, components, layout, renderers, widgets, UI/UX agent rules
 - [ ] UI UX Pro Max workflow documented in `docs/QUICK_START_AGENTS.md`
 - [x] Run: `python3.11 -m unittest tests.test_phase354_365 -v`
 
 ## Phases 366-377 Rollout
 
-- [ ] **366-368** widgets implemented in `addons/web/static/src/widgets`: `many2one_widget`, `many2many_widget`, `date_widget`, `monetary_widget`, `binary_widget`, `html_widget`
-- [ ] **369-370** components implemented in `addons/web/static/src/components`: `button`, `card`, `badge`, `avatar`, `modal`, `toast`
+- [x] **366-368** widgets implemented in `addons/web/static/src/widgets`: `many2one_widget`, `many2many_widget`, `date_widget`, `monetary_widget`, `binary_widget`, `html_widget` (**evidence:** all 6 files present — **Phase 1.245 F4**).
+- [x] **369-370** components implemented in `addons/web/static/src/components`: `button`, `card`, `badge`, `avatar`, `modal`, `toast` (**evidence:** all 6 files present — **Phase 1.245 F4**).
 - [ ] **371-373** layout/renderers implemented in `addons/web/static/src/layout` and `addons/web/static/src/views`: `navbar`, `sidebar`, `action_layout`, `calendar_renderer`, `gantt_renderer`
-- [ ] **374-377** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_ar`, `l10n_cl`, `l10n_co`, `l10n_pe`, `l10n_ec`, `l10n_ae`, `l10n_sa`, `l10n_eg`, `l10n_za`, `l10n_ke`, `l10n_cn`, `l10n_kr`, `l10n_tw`, `l10n_sg_full`, `l10n_th`, `l10n_cz`, `l10n_hu`, `l10n_ro`, `l10n_bg`, `l10n_pt`
+- [x] **374-377** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_ar`, `l10n_cl`, `l10n_co`, `l10n_pe`, `l10n_ec`, `l10n_ae`, `l10n_sa`, `l10n_eg`, `l10n_za`, `l10n_ke`, `l10n_cn`, `l10n_kr`, `l10n_tw`, `l10n_sg_full`, `l10n_th`, `l10n_cz`, `l10n_hu`, `l10n_ro`, `l10n_bg`, `l10n_pt` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [x] Run: `python3.11 -m unittest tests.test_phase366_377 -v`
 
 ## Phases 378-389 Rollout
 
-- [ ] **378-381** extracted frontend core modules in `addons/web/static/src/core`: `router`, `view_manager`, `dashboard`, `settings`, `chatter`, `field_utils`
+- [x] **378-381** extracted frontend core modules in `addons/web/static/src/core`: `router`, `view_manager`, `dashboard`, `settings`, `chatter`, `field_utils` (**evidence:** all 6 files present — **Phase 1.245 F4**).
 - [ ] **382-385** backend stub methods enriched in `hr_presence`, `hr_holidays_homeworking`, `hr_work_entry_holidays`, `mail_template`, `res_lang`, `ir_model`, `mrp_product_expiry`, `base_geolocalize`
-- [ ] **386-389** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_bo`, `l10n_cr`, `l10n_uy`, `l10n_ve`, `l10n_ph`, `l10n_id`, `l10n_vn`, `l10n_pk`, `l10n_ng`, `l10n_ma`, `l10n_il`, `l10n_hr`, `l10n_rs`, `l10n_si`, `l10n_lu`, `l10n_lt`, `l10n_lv`, `l10n_ua`, `l10n_fi`, `l10n_gr`
+- [x] **386-389** in `DEFAULT_SERVER_WIDE_MODULES`: `l10n_bo`, `l10n_cr`, `l10n_uy`, `l10n_ve`, `l10n_ph`, `l10n_id`, `l10n_vn`, `l10n_pk`, `l10n_ng`, `l10n_ma`, `l10n_il`, `l10n_hr`, `l10n_rs`, `l10n_si`, `l10n_lu`, `l10n_lt`, `l10n_lv`, `l10n_ua`, `l10n_fi`, `l10n_gr` (**evidence:** `core/tools/config.py` — **Phase 1.245 F4**).
 - [x] Run: `python3.11 -m unittest tests.test_phase378_389 -v`

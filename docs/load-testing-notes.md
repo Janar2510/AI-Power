@@ -14,3 +14,7 @@
 ## Readiness
 
 - Use **`GET /readiness`** for orchestrator probes (503 when DB missing).
+
+## Quick smoke (Phase D1)
+
+When a dev server is already on port **8069**, optional: `bash scripts/smoke_public_routes.sh http://127.0.0.1:8069` — hits `/health` and `/metrics`.

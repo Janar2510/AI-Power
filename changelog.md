@@ -1,5 +1,197 @@
 # Changelog
 
+## 1.244.0 — 2026-03-28
+
+### Added
+
+- **Odoo 19 planning docs:** `docs/odoo19_core_gap_table.md`; business gap audits `docs/sale_odoo19_gap_audit.md`, `purchase_odoo19_gap_audit.md`, `mrp_odoo19_gap_audit.md`, `hr_odoo19_gap_audit.md`, `crm_odoo19_gap_audit.md`.
+- **Webclient gap table:** Extra rows for field widgets, action manager, command/hotkeys, debug/PWA; asset row notes **esbuild-primary default** (`docs/odoo19-webclient-gap-table.md`).
+- **Esbuild-primary default:** `erp_webclient_esbuild_primary_enabled()` in `core/http/routes.py` — per-manifest JS + SW precache when env unset; opt out with **`ERP_WEBCLIENT_ESBUILD_PRIMARY=0`** (or `false` / `no` / `off`). New HTTP tests **Phase 801**.
+- **Legacy `main.js` split (Phase 802):** `legacy_main_route_tables.js`, `legacy_main_route_resolve.js`, `legacy_main_parse_utils.js` (manifest before `main.js`); `app/router.js`, `app/home_module.js` registered from `app/main.js`.
+- **Design docs:** `docs/main_js_extraction_catalog.md`, `docs/design_spec_coverage_audit.md`, `docs/design_system_a11y_audit.md`.
+- **Import modal:** Token-only classes `.o-import-modal-*` in `webclient.css`; `showImportModal` uses `o-btn` / hidden class instead of inline colors.
+
+### Changed
+
+- **`services/action.js`:** JSDoc integration note for `ViewManager` + legacy `main.js`.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/ai-implementation-checklist.md`**, **`docs/frontend.md`** (esbuild default).
+
+### Notes
+
+- **`main.js`** reduced by ~316 lines; **&lt;2k** target remains incremental — see `docs/main_js_extraction_catalog.md`.
+
+## 1.243.0 — 2026-03-28
+
+### Added
+
+- **Parallel frontend plan (770–778):** **`main.js`** list fallback delegates to **`AppCore.ListViewModule`** (~527 lines removed); duplicate form HTML path removed (**`FormViewModule`** is canonical).
+- **Navigation facades:** **`services/erp_legacy_router_facade.js`**, **`services/erp_breadcrumb_facade.js`** — **`window.ErpLegacyRouter`**, **`window.ErpBreadcrumbFacade`** wired from **`main.js`** after route/breadcrumb helpers load.
+- **Action service depth:** **`services/action.js`** — **`ir.actions.report`**, client registry (**`registerClientAction`**, **`getClientAction`**), stack helpers (**`getStack`**, **`pushStackEntry`**), built-ins **`reload`**, **`home`**, **`import`**. JS tests extended (**`test_action_service.js`**).
+- **Field registry (774):** Odoo-style widgets **`char`**, **`text`**, **`integer`**, **`float`**, **`boolean`**, **`selection`**, **`date`**, **`datetime`**, **`monetary`**, **`html`**, **`many2one`**, **`one2many`**, **`many2many_tags`**, **`binary`**, **`image`**. **`test_field_registry.js`** expanded.
+- **Search panel (775):** **`SearchModel.getSearchPanelSections`**, **`ListControlPanel.buildSearchPanelAsideHtml`** (shim + ESM), **`list_view.js`** renders sidebar + filter clicks. **`test_search_model.js`**, **`test_list_control_panel_search_panel.js`**.
+- **View modules (776–778):** Real **`SettingsViewModule`** (searchable blocks), **`ImportViewModule`** (CSV drop + **`AppCore.Import`** preview/import), **`ReportViewModule`** (iframe + PDF links). **`test_placeholder_view_modules.js`** updated.
+
+### Documentation
+
+- **`DeploymentChecklist.md`**, **`docs/parity_matrix.md`**.
+
+### Notes
+
+- **`main.js`** slimming to &lt;2k lines is **incremental** (still ~5.6k); further extractions follow the facade + module pattern.
+- **647b** / **679:** Still **product-gated**.
+
+## 1.242.0 — 2026-03-28
+
+### Added
+
+- **Phase 758–759 (activity view module):** **`addons/web/static/src/app/activity_view_module.js`** — **`AppCore.ActivityViewModule.render()`**; **`main.js`** delegates after **`ActivityViewCore`** with **`renderActivityMatrixFallback`**. JS **`test_activity_view_module.js`**.
+- **Phase 760–761 (discuss view module):** **`discuss_view_module.js`** — RPC-first discuss UI + fetch fallback. JS **`test_discuss_view_module.js`**.
+- **Phase 762–764 (placeholder view modules):** **`settings_view_module.js`**, **`import_view_module.js`**, **`report_view_module.js`** + JS **`test_placeholder_view_modules.js`**.
+- **Phase B1 (stock move split/merge):** **`stock.move.action_split_by_qty`**, **`action_merge_with`**. Test **`tests.test_stock_move_split_merge_phase771`**.
+- **Phase B2 (manual payment register):** **`account.move.action_register_manual_payment`** on **`account_payment`** **`account.move`**.
+- **Phase B3 (MRP workorder actions):** **`action_start`**, **`action_done`**, **`action_cancel`** on **`mrp.workorder`**. Test **`tests.test_mrp_workorder_actions_phase781`**.
+- **Phase B4 (HR contract + attendance checkout):** **`hr.contract`** model; **`hr.attendance.action_check_out`**. Tests **`tests.test_hr_contract_phase786`**, **`tests.test_hr_attendance_checkout_phase786`**.
+- **Phase C1 (RAG long-text normalize):** **`addons/ai_assistant/tools/rag_text.py`** + use in **`index_record_for_rag`**. Test **`tests.test_ai_rag_normalize_phase791`**.
+- **Phase C3 (AI streaming stub):** **`GET`/`POST` `/ai/chat/stream`** → **501** JSON. Test **`tests.test_http.TestHTTP.test_ai_chat_stream_returns_501`**.
+- **Ops:** **`scripts/smoke_public_routes.sh`** — curl **`/health`** + **`/metrics`**. **`core/http/security.py`** — rate limits for **`/ai/chat`**, **`/ai/nl_search`**, **`/ai/extract_fields`**.
+
+### Documentation
+
+- **`docs/frontend.md`** (Phase A4 esbuild gate), **`docs/load-testing-notes.md`**, **`docs/ai-workflow-automation.md`**, **`docs/architecture.md`**, **`docs/security-compliance-checklist.md`**, **`docs/deferred_product_backlog.md`**, **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/ai-implementation-checklist.md`**.
+
+### Fixed
+
+- **`hr.attendance.action_check_out`:** Use **`datetime.now(timezone.utc)`** instead of deprecated **`utcnow()`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated**; execution log in **`docs/deferred_product_backlog.md`**.
+
+## 1.241.0 — 2026-03-27
+
+### Added
+
+- **Phase 756 (pivot view module):** **`addons/web/static/src/app/pivot_view_module.js`** — **`AppCore.PivotViewModule.render()`**; **`main.js`** delegates **`renderPivot`** with **`renderPivotFallback`**. JS test **`test_pivot_view_module.js`**.
+- **Phase 757 (calendar view module + CSS tokens):** **`calendar_view_module.js`** + **`renderCalendarFallback`**; design tokens split to **`addons/web/static/src/scss/_tokens.css`** and **`_dark.css`** loaded before **`webclient.css`** in **`web.assets_web`**. JS test **`test_calendar_view_module.js`**.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`design-system/specs/activity-view.md`** (activity matrix spec).
+
+### Notes
+
+- **647b** / **679:** Still **product-gated**.
+
+## 1.240.0 — 2026-03-27
+
+### Added
+
+- **Phase 753 (gantt view module):** **`gantt_view_module.js`** + **`renderGanttViewFallback`**; JS **`test_gantt_view_module.js`**.
+- **Phase 754 (graph view module):** **`graph_view_module.js`** + **`renderGraphFallback`**; Chart.js path unchanged; JS **`test_graph_view_module.js`**.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`design-system/specs/gantt-view.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated**.
+
+## 1.239.0 — 2026-03-27
+
+### Added
+
+- **Phase 750 (sale ↔ product.template):** **`addons/sale/models/product_template.py`** — `_inherit` adds **`sale_ok`**, **`invoice_policy`**, **`service_type`**, **`expense_policy`**. Tests **`tests.test_sale_product_integration_phase750`**.
+- **Phase 751 (hr.expense ↔ account.move):** **`action_sheet_move_create()`** and shared **`_create_account_move_for_sheet()`** on **`hr.expense.sheet`**; **`addons/hr_expense/models/account_move.py`** adds **`hr_expense_sheet_id`** on **`account.move`**; **`action_done`** reuses the same posting path. Tests **`tests.test_hr_expense_posting_phase751`**.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/ai-implementation-checklist.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated**.
+
+## 1.238.0 — 2026-03-27
+
+### Added
+
+- **Phase 747 (kanban view module):** **`addons/web/static/src/app/kanban_view_module.js`** — **`AppCore.KanbanViewModule.render()`** builds kanban chrome and wires **`ViewRenderers.kanban`**; legacy **`main.js`** delegates via **`renderKanban()`** with **`renderKanbanFallback()`** when the module is absent. JS test **`test_kanban_view_module.js`**, manifest + **`test_runner.html`**, side-effect import in **`app/main.js`**, rebuilt **`modern_webclient.js`** / **`web.bundle.js`**.
+- **Phase 748 (stock.scrap):** model **`stock.scrap`** with **`action_validate()`** creating a **`stock.move`** (source → scrap location), **`scrap_id`** inverse on **`stock.move`**, ACL row, tests **`tests.test_stock_scrap_phase748`**.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/stock_odoo19_gap_audit.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated**.
+
+## 1.237.0 — 2026-03-27
+
+### Added
+
+- **Phase 744 (account bank statement line):** extended **`account.bank.statement.line`** with **`sequence`**, **`amount_currency`**, **`foreign_currency_id`**, **`payment_ref`**, **`transaction_type`**, and computed **`is_reconciled`** (true when **`move_id`** is set). Tests: **`tests.test_account_bank_statement_line_phase744`**.
+- **Phase 745 (AI RAG retrieval):** **`pgvector_extension_installed()`** in **`addons/ai_assistant/embeddings/pipeline.py`**; **`retrieve_chunks`** now requires both the **`vector`** extension and a native **`vector`** embedding column before issuing **`<=>`** queries (otherwise ILIKE). Tests: **`tests.test_ai_vector_search_phase745`**, **`tests.test_pgvector_extension_installed_phase745`**.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**, **`docs/account_odoo19_gap_audit.md`**, **`docs/ai-implementation-checklist.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated**.
+
+## 1.236.0 — 2026-03-27
+
+### Added
+
+- **Phase 741 (HTTP registry):** regression coverage for empty cached registry recovery (**`tests.test_auth_registry_recovery_phase739`**) verified against **`core/http/auth.py`**.
+- **Phase 742 (form view module):** **`addons/web/static/src/app/form_view_module.js`** builds the form shell + footer; legacy **`main.js`** delegates via **`AppCore.FormViewModule.render()`** with **`wireFormViewAfterPaint`** for DOM wiring; fallback path preserved. JS test **`test_form_view_module.js`**, manifest + **`test_runner.html`** wiring, side-effect import in **`app/main.js`**, rebuilt **`modern_webclient.js`**.
+- **Phase 743 (stock.move.line):** new model **`stock.move.line`** with move/picking linkage, locations, quantities, lot, related **`state`**, and **`@api.constrains`** forbidding negative **`quantity`** when the parent move is **`done`**. **`stock.move.line_ids`** One2many inverse. Access row + tests **`tests.test_stock_move_line_phase743`**.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated**.
+
+## 1.235.0 — 2026-03-27
+
+### Added
+
+- **Phase 738 (frontend list extraction):** extracted legacy fallback list rendering into **`addons/web/static/src/app/list_view_module.js`** and made **`main.js`** delegate to it when available while keeping the inline path as a compatibility fallback. Added focused JS regression **`addons/web/static/tests/test_list_view_module.js`**, wired the asset list, and rebuilt **`addons/web/static/dist/modern_webclient.js`**.
+- **Phase 739 (portal payment E2E + fixes):** added browser tour **`tests/e2e/test_portal_invoice_payment_tour_phase739.py`** covering login → invoice → pay → paid verification. In support of that flow, fixed **`PORTAL_MY_HTML`** CSS formatting under `str.format`, enabled typed HTTP route matching for **`<int:...>`** paths, included invoice ids in `/my/invoices` links, and added provider-resolution + CSRF handling on the portal pay form.
+- **CI:** added PR-only smoke job **`e2e-pr-smoke`** that runs the new portal payment Playwright test while keeping the full E2E suite on main/master pushes.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`DeploymentChecklist.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — unchanged in **1.235.0**.
+
+## 1.234.0 — 2026-03-27
+
+### Added
+
+- **Phase 735 (AI chat + checklist):** **`addons/web/static/src/chat_panel.js`** now persists **`conversation_id`** returned by **`/ai/chat`**, so LLM chat reuses prior turns instead of starting a fresh conversation on every prompt. Added focused browser regression **`tests/e2e/test_ai_chat_panel_conversation_phase735.py`**. Synced AI checklist rows for tool registry, retrieval, embeddings fallback, LLM chat, NL search, AI-assisted field extraction, and conversation memory to reflect shipped code.
+- **Phase 736 (account payment state):** **`account.move.payment_state`** now computes **`not_paid`** / **`in_payment`** / **`partial`** / **`paid`** from residual amount plus linked **`payment.transaction`** states. **`_sync_payment_state_from_transactions`** now derives legacy **`state`** transitions from the richer payment-state helper, preserving existing **`state == "paid"`** compatibility. Added **`tests.test_account_move_payment_state_phase736`**.
+
+### Documentation
+
+- **`docs/parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**, **`DeploymentChecklist.md`**, **`docs/account_odoo19_gap_audit.md`**.
+
+### Notes
+
+- **647b** / **679:** Still **product-gated** — unchanged in **1.234.0**.
+
 ## 1.233.0 — 2026-03-27
 
 ### Added

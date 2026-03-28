@@ -80,6 +80,9 @@ RATE_LIMITS = {
     "/web/login": (5, 60),
     "/web/login/totp": (5, 60),
     "/web/signup": (3, 60),
+    "/ai/chat": (30, 60),  # Phase D2: LLM-heavy endpoint
+    "/ai/nl_search": (40, 60),
+    "/ai/extract_fields": (40, 60),
     "default": (120, 60),  # 120 req/min for general API
 }
 

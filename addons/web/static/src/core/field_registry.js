@@ -204,5 +204,274 @@
     return '<p class="attr-field" data-fname="' + esc(fname) + '"><label>' + esc(label) + '</label><div class="o-m2m-checkboxes" style="margin-top:var(--space-sm);display:grid;gap:var(--space-xs)"><label><input type="checkbox" name="' + esc(fname) + '" value="1"> Option 1</label><label><input type="checkbox" name="' + esc(fname) + '" value="2"> Option 2</label><label><input type="checkbox" name="' + esc(fname) + '" value="3"> Option 3</label></div></p>';
   });
 
+  /** Phase 774: core field-type widgets (Odoo-style names) for registry-driven forms. */
+  function baseInputStyle(extra) {
+    return (
+      "margin-top:var(--space-sm);padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1);color:var(--color-text)" +
+      (extra ? ";" + extra : ";width:100%")
+    );
+  }
+  register("char", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    var req = api.getFieldMeta && api.getFieldMeta(model, fname) && api.getFieldMeta(model, fname).required;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      (req ? " *" : "") +
+      '</label><input type="text" name="' +
+      esc(fname) +
+      '" ' +
+      (req ? "required " : "") +
+      'style="' +
+      baseInputStyle("") +
+      '"></p>'
+    );
+  });
+  register("text", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><textarea name="' +
+      esc(fname) +
+      '" rows="4" style="' +
+      baseInputStyle("resize:vertical") +
+      '"></textarea></p>'
+    );
+  });
+  register("integer", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><input type="number" step="1" name="' +
+      esc(fname) +
+      '" style="max-width:12rem;' +
+      baseInputStyle("width:auto") +
+      '"></p>'
+    );
+  });
+  register("float", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><input type="number" step="any" name="' +
+      esc(fname) +
+      '" style="max-width:12rem;' +
+      baseInputStyle("width:auto") +
+      '"></p>'
+    );
+  });
+  register("boolean", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label><input type="checkbox" name="' +
+      esc(fname) +
+      '" value="1" style="margin-right:var(--space-xs)">' +
+      esc(label) +
+      "</label></p>"
+    );
+  });
+  register("selection", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    var options = (api.getSelectionOptions && api.getSelectionOptions(model, fname)) || [];
+    var html = '<p class="attr-field" data-fname="' + esc(fname) + '"><label>' + esc(label) + '</label><select name="' + esc(fname) + '" style="' + baseInputStyle("") + '"><option value="">—</option>';
+    options.forEach(function (opt) {
+      html += '<option value="' + esc(opt[0]) + '">' + esc(opt[1]) + "</option>";
+    });
+    html += "</select></p>";
+    return html;
+  });
+  register("date", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><input type="date" name="' +
+      esc(fname) +
+      '" style="max-width:12rem;' +
+      baseInputStyle("width:auto") +
+      '"></p>'
+    );
+  });
+  register("datetime", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><input type="datetime-local" name="' +
+      esc(fname) +
+      '" style="max-width:16rem;' +
+      baseInputStyle("width:auto") +
+      '"></p>'
+    );
+  });
+  register("monetary", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><input type="number" step="0.01" name="' +
+      esc(fname) +
+      '" style="max-width:12rem;' +
+      baseInputStyle("width:auto") +
+      '"></p>'
+    );
+  });
+  register("html", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><div class="html-widget" id="html-' +
+      esc(fname) +
+      '" data-fname="' +
+      esc(fname) +
+      '" contenteditable="true" style="min-height:6rem;margin-top:var(--space-sm);padding:var(--space-sm);border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)"></div>' +
+      '<input type="hidden" name="' +
+      esc(fname) +
+      '" id="hidden-html-' +
+      esc(fname) +
+      '" value=""></p>'
+    );
+  });
+  register("many2one", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    var meta = api.getFieldMeta && api.getFieldMeta(model, fname);
+    var comodel = (meta && meta.comodel) || (f && f.comodel) || "";
+    var wid = "m2o-reg-" + fname + "-" + Math.random().toString(36).slice(2);
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><div class="m2one-widget" id="' +
+      esc(wid) +
+      '" data-comodel="' +
+      esc(comodel) +
+      '" data-fname="' +
+      esc(fname) +
+      '" style="margin-top:var(--space-sm);position:relative">' +
+      '<input type="text" class="m2one-input" placeholder="Search..." autocomplete="off" style="' +
+      baseInputStyle("") +
+      '">' +
+      '<input type="hidden" name="' +
+      esc(fname) +
+      '" class="m2one-value">' +
+      '<div class="m2one-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--color-surface-1);border:1px solid var(--border-color);border-radius:var(--radius-sm);max-height:200px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.08)"></div></div></p>'
+    );
+  });
+  register("one2many", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><div id="o2m-' +
+      esc(fname) +
+      '" data-fname="' +
+      esc(fname) +
+      '" class="o-one2many-placeholder" style="margin-top:var(--space-sm);padding:var(--space-md);border:1px dashed var(--border-color);border-radius:var(--radius-sm);color:var(--text-muted)">One2many lines load in full form view.</div></p>'
+    );
+  });
+  register("many2many_tags", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    var meta = api.getFieldMeta && api.getFieldMeta(model, fname);
+    var comodel = (meta && meta.comodel) || (f && f.comodel) || "";
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><div id="m2m-' +
+      esc(fname) +
+      '" data-widget="many2many_tags" data-comodel="' +
+      esc(comodel) +
+      '" style="margin-top:var(--space-sm);min-height:2rem"></div></p>'
+    );
+  });
+  register("binary", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><input type="file" id="file-' +
+      esc(fname) +
+      '" data-field="' +
+      esc(fname) +
+      '" style="margin-top:var(--space-sm)"><input type="hidden" name="' +
+      esc(fname) +
+      '" id="hidden-' +
+      esc(fname) +
+      '"><span id="bin-status-' +
+      esc(fname) +
+      '" style="font-size:0.85rem;color:var(--text-muted);margin-left:var(--space-xs)"></span></p>'
+    );
+  });
+  register("image", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    return (
+      '<p class="attr-field" data-fname="' +
+      esc(fname) +
+      '"><label>' +
+      esc(label) +
+      '</label><div id="image-' +
+      esc(fname) +
+      '" class="image-widget" data-fname="' +
+      esc(fname) +
+      '" style="margin-top:var(--space-sm)">' +
+      '<img id="img-preview-' +
+      esc(fname) +
+      '" src="" alt="" style="max-width:200px;max-height:150px;display:none;border-radius:var(--radius-sm);border:1px solid var(--border-color)">' +
+      '<input type="file" id="file-' +
+      esc(fname) +
+      '" data-field="' +
+      esc(fname) +
+      '" accept="image/*" style="margin-top:var(--space-sm)">' +
+      '<input type="hidden" name="' +
+      esc(fname) +
+      '" id="hidden-' +
+      esc(fname) +
+      '"></div></p>'
+    );
+  });
+
   window.FieldWidgets = { register: register, render: render };
 })();

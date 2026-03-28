@@ -90,6 +90,25 @@
       H.assertTrue(JSON.stringify(dom).indexOf("in") >= 0);
     });
 
+    test("getSearchPanelSections groups filters by category", function () {
+      var viewsPanel = {
+        getView: function () {
+          return {
+            filters: [
+              { name: "a", string: "A", category: "Status" },
+              { name: "b", string: "B", category: "Status" },
+              { name: "c", string: "C" },
+            ],
+            fields: [],
+          };
+        },
+      };
+      var smp = new SearchModel("x.test", viewsPanel, {});
+      var secs = smp.getSearchPanelSections();
+      H.assertTrue(secs.length >= 2);
+      H.assertTrue(secs.some(function (s) { return s.title === "Status" && s.items.length === 2; }));
+    });
+
     test("renderFacets and subscribe on change", function () {
       var st4 = { facets: [] };
       var sm4 = new SearchModel("res.partner", viewsSvc, st4);

@@ -1,6 +1,6 @@
-"""Bank statement and lines (Phase 193)."""
+"""Bank statement and lines (Phase 193). Extended Phase 744 (extra fields + is_reconciled)."""
 
-from core.orm import Model, fields
+from core.orm import Model, api, fields
 
 
 class AccountBankStatement(Model):
@@ -87,8 +87,31 @@ class AccountBankStatementLine(Model):
         required=True,
         ondelete="cascade",
     )
+    sequence = fields.Integer(string="Sequence", default=10)
     name = fields.Char(string="Label", required=True)
     date = fields.Date(string="Date", required=True)
     amount = fields.Float(string="Amount", required=True)
+    amount_currency = fields.Float(string="Amount in Currency")
+    foreign_currency_id = fields.Many2one("res.currency", string="Foreign Currency", ondelete="set null")
     partner_id = fields.Many2one("res.partner", string="Partner")
+    payment_ref = fields.Char(string="Payment Reference")
+    transaction_type = fields.Char(string="Transaction Type")
     move_id = fields.Many2one("account.move", string="Journal Entry")
+    is_reconciled = fields.Computed(
+        compute="_compute_is_reconciled",
+        store=False,
+        string="Is Reconciled",
+        depends=["move_id"],
+    )
+
+    @api.depends("move_id")
+    def _compute_is_reconciled(self):
+        if not self:
+            return []
+        rows = self.read(["move_id"])
+        out = []
+        for row in rows:
+            mid = row.get("move_id")
+            has_move = bool(mid and (mid[0] if isinstance(mid, (list, tuple)) else mid))
+            out.append({"id": row["id"], "is_reconciled": has_move})
+        return out

@@ -165,6 +165,16 @@ def ai_process_document(request: Request) -> Response:
         )
 
 
+@route("/ai/chat/stream", auth="public", methods=["GET", "POST"])
+def ai_chat_stream(request: Request) -> Response:
+    """Phase C3: streaming hook — not enabled; returns 501 until SSE/WebSocket product scope."""
+    return Response(
+        json.dumps({"error": "streaming_not_enabled", "hint": "Use POST /ai/chat"}),
+        status=501,
+        content_type="application/json",
+    )
+
+
 @route("/ai/chat", auth="public", methods=["POST"])
 def ai_chat(request: Request) -> Response:
     """Handle AI chat - tool calls or LLM execute as requesting user."""

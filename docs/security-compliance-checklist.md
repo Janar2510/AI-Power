@@ -6,6 +6,7 @@
 |------|-----------------|
 | Injection | ORM-only data access; parameterized SQL in core. |
 | Broken auth | Session cookies; TOTP path; rate limits on `/web/login` (see `core/http/security.py`). |
+| AI abuse | Stricter sliding limits on **`/ai/chat`**, **`/ai/nl_search`**, **`/ai/extract_fields`** (Phase D2 — `RATE_LIMITS` in `core/http/security.py`). |
 | Sensitive data | TLS at reverse proxy; secrets in env not repo. |
 | XSS | Escape user HTML in views; sanitize rich text server-side. |
 | CSRF | Token validation on mutating requests (`security.py` exemptions documented). |

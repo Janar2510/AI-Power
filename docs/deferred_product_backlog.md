@@ -16,3 +16,8 @@ Large **behavioural** work that is structurally scaffolded in the parity matrix 
 - **679 / phases 490–524:** **`docs/ai-implementation-checklist.md`** — product must **name one row** (e.g. MRP workorders, HR depth, web bundle hardening, AI/embeddings ops, readiness) before coding; through **1.233.0** there is still no **490–524** implementation without that pick.
 
 When a row is chosen, add a short **acceptance paragraph** (models touched, tests, rollout risk) to this file or the relevant gap audit, then schedule a phase number in the matrix.
+
+## Plan execution log (2026-03)
+
+- **F1 / 647b** — FX partial reconcile: still **no implementation**; design gate unchanged in `docs/account_partial_reconcile_design.md`.
+- **F2 / 679** — Phases **490–524** depth rows: still require **one named product row** before coding; no new row picked in this release.

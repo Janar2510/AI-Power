@@ -1,0 +1,88 @@
+/* Phase 757: light theme design tokens (split from webclient.css) */
+:root {
+  /* Colors */
+  --color-bg: #f5f5f5;
+  --color-surface-0: #fafafa;
+  --color-navbar: #1a1a2e;
+  --color-text: #333;
+  --color-primary: #1a1a2e;
+  --color-success: #2e7d32;
+  --color-danger: #c62828;
+  --color-on-danger: #ffffff;
+  --color-warning: #f9a825;
+  --text-muted: #666;
+  --border-color: #ddd;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #f8f9fc;
+  --color-info: #2563eb;
+  --color-accent: #7c3aed;
+  --color-link: var(--color-info);
+  --color-row-hover: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  --color-group-header: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  --color-border-subtle: color-mix(in srgb, var(--border-color) 70%, transparent);
+  --color-warning-surface: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  --color-backdrop: color-mix(in srgb, var(--color-text) 35%, transparent);
+  --color-text-on-primary: #f6f7fb;
+  --color-input-bg: var(--color-surface-1);
+  --color-divider: var(--border-color);
+  --color-glass: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-blur: 10px;
+  --surface-noise: none;
+  --shell-surface: linear-gradient(180deg, rgba(243, 246, 251, 0.96), rgba(230, 236, 245, 0.88));
+  --shell-surface-strong: linear-gradient(180deg, rgba(34, 43, 58, 0.96), rgba(18, 24, 36, 0.94));
+  --shell-panel-bg: rgba(255, 255, 255, 0.82);
+  --shell-panel-bg-strong: rgba(247, 250, 254, 0.88);
+  --shell-inset-bg: rgba(214, 222, 233, 0.48);
+  --shell-border-sheen: rgba(255, 255, 255, 0.72);
+  --shell-shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.56), inset 0 -1px 0 rgba(90, 104, 124, 0.08);
+  --shell-shadow-raised: 0 8px 24px rgba(17, 24, 39, 0.12), 0 2px 6px rgba(17, 24, 39, 0.08);
+  --focus-ring-color: color-mix(in srgb, var(--color-primary) 70%, white);
+  --status-unread: #c64e2f;
+  --status-notification-bg: rgba(255, 247, 242, 0.92);
+  --motion-shell-fast: 120ms;
+  --motion-shell-base: 220ms;
+  --motion-shell-slow: 360ms;
+
+  /* Spacing tokens */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --card-gap: var(--space-md);
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+
+  /* Motion/elevation */
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 320ms;
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 6px 18px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 16px 34px rgba(15, 23, 42, 0.18);
+
+  /* Typography */
+  --font-sans: "Inter", "Manrope", system-ui, -apple-system, sans-serif;
+  --font-display: "Inter", "Outfit", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --leading-tight: 1.2;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.65;
+  --tracking-tight: -0.02em;
+}

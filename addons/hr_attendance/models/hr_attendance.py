@@ -1,6 +1,6 @@
 """Phase 217: HR Attendance - check-in/out, worked_hours computed."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.orm import Model, fields
 
@@ -34,6 +34,15 @@ class HrAttendance(Model):
             else:
                 result.append(0.0)
         return result
+
+    def action_check_out(self):
+        """Set check_out to UTC now when missing (Phase B4)."""
+        now = datetime.now(timezone.utc).isoformat()
+        for rec in self:
+            row = rec.read(["check_out"])[0]
+            if not row.get("check_out"):
+                rec.write({"check_out": now})
+        return True
 
     @classmethod
     def create(cls, vals):

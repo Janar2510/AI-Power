@@ -69,6 +69,11 @@ flowchart TB
 - Each database has its own registry and module set
 - `--no-database-list` recommended for multi-tenant hosting
 
+### Multi-company (Phase D3 ops note)
+
+- Session may carry **`allowed_company_ids`**; ORM record rules append company domains when models define **`company_id`** (`_append_allowed_company_domain_for_model`).
+- Full **company switcher UX** in the web shell is incremental; backend scoping for `account.move` / `ir.sequence` / taxes is documented in `docs/account_odoo19_gap_audit.md`.
+
 ## Deployment Topology
 
 - **Single process**: Default; HTTP on port 8069

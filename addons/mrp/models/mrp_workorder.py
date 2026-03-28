@@ -32,3 +32,26 @@ class MrpWorkorder(Model):
         string="Status",
         default="pending",
     )
+
+    def action_start(self):
+        """Mark work order in progress (Phase B3)."""
+        for wo in self:
+            if wo.read(["state"])[0].get("state") == "pending":
+                wo.write({"state": "progress"})
+        return True
+
+    def action_done(self):
+        """Mark work order done (Phase B3)."""
+        for wo in self:
+            st = wo.read(["state"])[0].get("state")
+            if st in ("pending", "progress"):
+                wo.write({"state": "done"})
+        return True
+
+    def action_cancel(self):
+        """Cancel work order (Phase B3)."""
+        for wo in self:
+            st = wo.read(["state"])[0].get("state")
+            if st != "done":
+                wo.write({"state": "cancel"})
+        return True

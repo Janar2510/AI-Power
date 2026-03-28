@@ -190,6 +190,11 @@ def verify_password(plain: str, stored: str) -> bool:
 
 def _get_registry(dbname: str) -> Registry:
     """Get or create registry for database."""
+    cached = _registries.get(dbname)
+    if cached is not None and cached.keys():
+        return cached
+    if cached is not None and not cached.keys():
+        _registries.pop(dbname, None)
     if dbname not in _registries:
         # Do NOT call parse_config(["--addons-path=addons"]) here: it replaces the
         # entire global config and resolves "addons" relative to cwd. Wrong cwd

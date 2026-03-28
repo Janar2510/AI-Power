@@ -1,132 +1,4 @@
-/* Web client base styles - Phase 78 design system */
-:root {
-  /* Colors */
-  --color-bg: #f5f5f5;
-  --color-surface-0: #fafafa;
-  --color-navbar: #1a1a2e;
-  --color-text: #333;
-  --color-primary: #1a1a2e;
-  --color-success: #2e7d32;
-  --color-danger: #c62828;
-  --color-on-danger: #ffffff;
-  --color-warning: #f9a825;
-  --text-muted: #666;
-  --border-color: #ddd;
-  --color-surface-1: #ffffff;
-  --color-surface-2: #f8f9fc;
-  --color-info: #2563eb;
-  --color-accent: #7c3aed;
-  --color-link: var(--color-info);
-  --color-row-hover: color-mix(in srgb, var(--color-primary) 8%, transparent);
-  --color-group-header: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  --color-border-subtle: color-mix(in srgb, var(--border-color) 70%, transparent);
-  --color-warning-surface: color-mix(in srgb, var(--color-warning) 18%, transparent);
-  --color-backdrop: color-mix(in srgb, var(--color-text) 35%, transparent);
-  --color-text-on-primary: #f6f7fb;
-  --color-input-bg: var(--color-surface-1);
-  --color-divider: var(--border-color);
-  --color-glass: rgba(255, 255, 255, 0.08);
-  --glass-border: rgba(255, 255, 255, 0.25);
-  --glass-blur: 10px;
-  --surface-noise: none;
-  --shell-surface: linear-gradient(180deg, rgba(243, 246, 251, 0.96), rgba(230, 236, 245, 0.88));
-  --shell-surface-strong: linear-gradient(180deg, rgba(34, 43, 58, 0.96), rgba(18, 24, 36, 0.94));
-  --shell-panel-bg: rgba(255, 255, 255, 0.82);
-  --shell-panel-bg-strong: rgba(247, 250, 254, 0.88);
-  --shell-inset-bg: rgba(214, 222, 233, 0.48);
-  --shell-border-sheen: rgba(255, 255, 255, 0.72);
-  --shell-shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.56), inset 0 -1px 0 rgba(90, 104, 124, 0.08);
-  --shell-shadow-raised: 0 8px 24px rgba(17, 24, 39, 0.12), 0 2px 6px rgba(17, 24, 39, 0.08);
-  --focus-ring-color: color-mix(in srgb, var(--color-primary) 70%, white);
-  --status-unread: #c64e2f;
-  --status-notification-bg: rgba(255, 247, 242, 0.92);
-  --motion-shell-fast: 120ms;
-  --motion-shell-base: 220ms;
-  --motion-shell-slow: 360ms;
-
-  /* Spacing tokens */
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 0.75rem;
-  --space-lg: 1rem;
-  --space-xl: 1.5rem;
-  --card-gap: var(--space-md);
-
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
-
-  /* Motion/elevation */
-  --duration-fast: 150ms;
-  --duration-base: 220ms;
-  --duration-slow: 320ms;
-  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.08);
-  --shadow-md: 0 6px 18px rgba(15, 23, 42, 0.12);
-  --shadow-lg: 0 16px 34px rgba(15, 23, 42, 0.18);
-
-  /* Typography */
-  --font-sans: "Inter", "Manrope", system-ui, -apple-system, sans-serif;
-  --font-display: "Inter", "Outfit", system-ui, -apple-system, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-md: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
-  --text-4xl: 2.25rem;
-  --leading-tight: 1.2;
-  --leading-normal: 1.45;
-  --leading-relaxed: 1.65;
-  --tracking-tight: -0.02em;
-}
-
-/* Phase 133: Dark mode */
-:root[data-theme="dark"] {
-  --color-bg: #1a1a2e;
-  --color-surface-0: #0f1320;
-  --color-navbar: #0f0f1a;
-  --color-text: #e0e0e0;
-  --color-primary: #4a9eff;
-  --color-success: #4caf50;
-  --color-danger: #f44336;
-  --color-on-danger: #ffffff;
-  --color-warning: #ff9800;
-  --text-muted: #9e9e9e;
-  --border-color: #333;
-  --color-surface-1: #1f2430;
-  --color-surface-2: #262d3d;
-  --color-info: #60a5fa;
-  --color-accent: #a78bfa;
-  --color-link: #93c5fd;
-  --color-row-hover: color-mix(in srgb, var(--color-text) 10%, transparent);
-  --color-group-header: color-mix(in srgb, var(--color-text) 14%, transparent);
-  --color-border-subtle: color-mix(in srgb, var(--border-color) 82%, transparent);
-  --color-warning-surface: color-mix(in srgb, var(--color-warning) 22%, transparent);
-  --color-backdrop: color-mix(in srgb, var(--color-text) 45%, transparent);
-  --color-text-on-primary: #f6f7fb;
-  --color-input-bg: #1f2430;
-  --color-glass: rgba(15, 18, 30, 0.6);
-  --glass-border: rgba(170, 180, 210, 0.2);
-  --glass-blur: 14px;
-  --shell-surface: linear-gradient(180deg, rgba(17, 22, 33, 0.96), rgba(10, 14, 24, 0.94));
-  --shell-surface-strong: linear-gradient(180deg, rgba(26, 34, 48, 0.96), rgba(14, 19, 30, 0.96));
-  --shell-panel-bg: rgba(24, 30, 43, 0.86);
-  --shell-panel-bg-strong: rgba(32, 40, 56, 0.9);
-  --shell-inset-bg: rgba(8, 12, 20, 0.56);
-  --shell-border-sheen: rgba(176, 191, 214, 0.16);
-  --shell-shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(7, 10, 16, 0.48);
-  --shell-shadow-raised: 0 14px 32px rgba(0, 0, 0, 0.28), 0 4px 10px rgba(0, 0, 0, 0.2);
-  --focus-ring-color: color-mix(in srgb, var(--color-primary) 82%, white 12%);
-  --status-unread: #ff8f6b;
-  --status-notification-bg: rgba(73, 39, 30, 0.42);
-}
+/* Web client base styles - Phase 78 design system; Phase 757: :root tokens in _tokens.css + _dark.css (manifest order). */
 
 @media (prefers-contrast: more) {
   :root {
@@ -3786,4 +3658,75 @@ textarea:focus-visible {
   background: var(--color-surface-1);
   color: var(--color-text);
   min-width: 10rem;
+}
+
+/* Phase 802: import modal — tokens only (no inline visual styles) */
+.o-import-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.o-import-modal-panel {
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-lg);
+}
+
+.o-import-modal-title {
+  margin-top: 0;
+  font-family: var(--font-display);
+}
+
+.o-import-modal-hidden {
+  display: none !important;
+}
+
+.o-import-modal-file {
+  padding: var(--space-sm);
+}
+
+.o-import-modal-actions {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.o-import-modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.o-import-modal-table th,
+.o-import-modal-table td {
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.o-import-modal-error {
+  color: var(--color-danger);
+}
+
+.o-import-modal-map-select {
+  width: 100%;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+  color: var(--color-text);
 }

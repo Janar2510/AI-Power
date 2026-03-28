@@ -1,0 +1,40 @@
+/* Phase 757: dark theme token overrides */
+:root[data-theme="dark"] {
+  --color-bg: #1a1a2e;
+  --color-surface-0: #0f1320;
+  --color-navbar: #0f0f1a;
+  --color-text: #e0e0e0;
+  --color-primary: #4a9eff;
+  --color-success: #4caf50;
+  --color-danger: #f44336;
+  --color-on-danger: #ffffff;
+  --color-warning: #ff9800;
+  --text-muted: #9e9e9e;
+  --border-color: #333;
+  --color-surface-1: #1f2430;
+  --color-surface-2: #262d3d;
+  --color-info: #60a5fa;
+  --color-accent: #a78bfa;
+  --color-link: #93c5fd;
+  --color-row-hover: color-mix(in srgb, var(--color-text) 10%, transparent);
+  --color-group-header: color-mix(in srgb, var(--color-text) 14%, transparent);
+  --color-border-subtle: color-mix(in srgb, var(--border-color) 82%, transparent);
+  --color-warning-surface: color-mix(in srgb, var(--color-warning) 22%, transparent);
+  --color-backdrop: color-mix(in srgb, var(--color-text) 45%, transparent);
+  --color-text-on-primary: #f6f7fb;
+  --color-input-bg: #1f2430;
+  --color-glass: rgba(15, 18, 30, 0.6);
+  --glass-border: rgba(170, 180, 210, 0.2);
+  --glass-blur: 14px;
+  --shell-surface: linear-gradient(180deg, rgba(17, 22, 33, 0.96), rgba(10, 14, 24, 0.94));
+  --shell-surface-strong: linear-gradient(180deg, rgba(26, 34, 48, 0.96), rgba(14, 19, 30, 0.96));
+  --shell-panel-bg: rgba(24, 30, 43, 0.86);
+  --shell-panel-bg-strong: rgba(32, 40, 56, 0.9);
+  --shell-inset-bg: rgba(8, 12, 20, 0.56);
+  --shell-border-sheen: rgba(176, 191, 214, 0.16);
+  --shell-shadow-inner: inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 -1px 0 rgba(7, 10, 16, 0.48);
+  --shell-shadow-raised: 0 14px 32px rgba(0, 0, 0, 0.28), 0 4px 10px rgba(0, 0, 0, 0.2);
+  --focus-ring-color: color-mix(in srgb, var(--color-primary) 82%, white 12%);
+  --status-unread: #ff8f6b;
+  --status-notification-bg: rgba(73, 39, 30, 0.42);
+}

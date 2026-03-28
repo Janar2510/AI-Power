@@ -114,6 +114,14 @@ export function buildQuickFiltersHtml(options) {
   return filtersHtml;
 }
 
+export function buildSearchPanelAsideHtml(options) {
+  var sections = (options && options.sections) || [];
+  if (!sections.length) return "";
+  var SP = typeof window !== "undefined" && window.UIComponents && window.UIComponents.SearchPanel;
+  if (!SP || typeof SP.renderHTML !== "function") return "";
+  return SP.renderHTML(sections);
+}
+
 export function buildListActionsHtml(options) {
   var addLabel = options.addLabel || "Add";
   var reportName = options.reportName;

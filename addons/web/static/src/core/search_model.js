@@ -149,6 +149,23 @@
    * Build domain the same way as main.loadRecords (without saved filter merge — caller passes that).
    * @param {object} ctx — actionDomain, searchTerm, stageFilter, model, savedFilterDomain, parseFilterDomain(uid), buildSearchDomain(model, term), uid, skipSearchDomain
    */
+  /**
+   * Phase 775: derive sidebar sections from search view filters (category string or "Filters").
+   */
+  SearchModel.prototype.getSearchPanelSections = function () {
+    var sv = this.getSearchView();
+    var filters = (sv && sv.filters) || [];
+    var byCat = {};
+    filters.forEach(function (f) {
+      var cat = f.category || f.panel || "Filters";
+      if (!byCat[cat]) byCat[cat] = [];
+      byCat[cat].push({ label: f.string || f.name || "", value: f.name || "" });
+    });
+    return Object.keys(byCat).map(function (title) {
+      return { title: title, items: byCat[title] };
+    });
+  };
+
   SearchModel.prototype.buildDomain = function (ctx) {
     ctx = ctx || {};
     var domain = (ctx.actionDomain || []).slice();

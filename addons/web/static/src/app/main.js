@@ -2,9 +2,22 @@
 import { createBootstrap, createEnv, registerTemplates, startServices } from "./env.js";
 import { WebClient } from "./webclient.js";
 import * as ListControlPanel from "./list_control_panel.js";
+import * as ListViewModule from "./list_view_module.js";
+import "./form_view_module.js";
+import "./kanban_view_module.js";
+import "./gantt_view_module.js";
+import "./graph_view_module.js";
+import "./pivot_view_module.js";
+import "./calendar_view_module.js";
+import "./activity_view_module.js";
+import "./discuss_view_module.js";
+import "./settings_view_module.js";
+import "./import_view_module.js";
+import "./report_view_module.js";
 import * as FormFooterActions from "./form_footer_actions.js";
 import { registerNavbarContract } from "./navbar_contract.js";
 import { registerNavbarFacade } from "./navbar_facade.js";
+import { registerHomeModule } from "./home_module.js";
 import * as BreadcrumbStrip from "./breadcrumb_strip.js";
 import * as KanbanControlStrip from "./kanban_control_strip.js";
 import * as MenuUtils from "./menu_utils.js";
@@ -18,6 +31,7 @@ function registerModernViewFacades() {
   window.AppCore = window.AppCore || {};
   // Navbar HTML builder: core/navbar_chrome.js → AppCore.NavbarChrome. Home KPI: core/dashboard_kpi_strip.js + wireHomeKpiStrip from legacy main.js.
   window.AppCore.ListControlPanel = ListControlPanel;
+  window.AppCore.ListViewModule = ListViewModule;
   window.AppCore.FormFooterActions = FormFooterActions;
   window.AppCore.BreadcrumbStrip = BreadcrumbStrip;
   window.AppCore.KanbanControlStrip = KanbanControlStrip;
@@ -33,6 +47,7 @@ function bootModernWebClient() {
 
   registerNavbarContract();
   registerNavbarFacade();
+  registerHomeModule();
   registerModernViewFacades();
 
   const bootstrap = createBootstrap();

@@ -154,6 +154,7 @@ def _add_security_headers(start_response: Callable, environ: dict) -> Callable:
 STATIC_RE = re.compile(r"^/([a-z0-9_]+)/static/(.+)$")
 # Asset bundle: /web/assets/<bundle_id>.<css|js>
 ASSET_RE = re.compile(r"^/web/assets/([a-z0-9_.]+)\.(css|js)$")
+ROUTE_PARAM_RE = re.compile(r"<(?:(int|string):)?([a-zA-Z_][a-zA-Z0-9_]*)>")
 
 
 def _serve_asset_bundle(bundle_id: str, ext: str) -> Optional[Response]:
@@ -199,6 +200,24 @@ def _guess_mimetype(path: str) -> str:
     return mime.get(ext, "application/octet-stream")
 
 
+def _compile_route_pattern(route_path: str) -> tuple[Optional[re.Pattern], dict[str, str]]:
+    """Compile route decorator syntax into a regex and converter map."""
+    converters: dict[str, str] = {}
+    if "<" not in route_path:
+        return None, converters
+
+    def replace(match: re.Match) -> str:
+        converter = match.group(1) or "string"
+        name = match.group(2)
+        converters[name] = converter
+        if converter == "int":
+            return rf"(?P<{name}>\d+)"
+        return rf"(?P<{name}>[^/]+)"
+
+    pattern = "^" + ROUTE_PARAM_RE.sub(replace, route_path) + "$"
+    return re.compile(pattern), converters
+
+
 def _match_route(path: str, method: str) -> Optional[tuple]:
     """Match path and method to a route. Returns (endpoint, kwargs) or None."""
     for route_path, route_info in _ROUTES.items():
@@ -207,6 +226,17 @@ def _match_route(path: str, method: str) -> Optional[tuple]:
         # Simple exact match for MVP
         if route_path == path:
             return (route_info["endpoint"], {})
+        pattern, converters = _compile_route_pattern(route_path)
+        if not pattern:
+            continue
+        match = pattern.match(path)
+        if not match:
+            continue
+        kwargs = match.groupdict()
+        for key, converter in converters.items():
+            if converter == "int" and kwargs.get(key) is not None:
+                kwargs[key] = int(kwargs[key])
+        return (route_info["endpoint"], kwargs)
     return None
 
 

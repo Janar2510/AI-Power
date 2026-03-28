@@ -145,6 +145,7 @@ The active product direction is defined by the Foundry One brand system and the 
 ## Asset delivery (Phase 527)
 
 - **Default (Odoo-like):** `core/modules/assets.py` **concatenates** manifest-listed files into `web.assets_web.js`. Files in that bundle must be **classic scripts** — no top-level `export` / ESM (browsers load one concatenated file).
+- **Phase 757:** **`web.assets_web`** lists **`_tokens.css`**, **`_dark.css`**, then **`webclient.css`** so design tokens concatenate before component rules.
 - **Guard:** `npm run check:assets-concat` scans `addons/web/__manifest__.py` `web.assets_web` entries and fails on `export` at line start. Run in CI and locally before merging UI changes.
 - **Modern build path:** `npm run build:web` targets `addons/web/static/src/app/main.js` and emits `addons/web/static/dist/modern_webclient.js` for the modular runtime. `npm run build:web:legacy` remains available for the legacy adapter entry.
 
@@ -200,18 +201,22 @@ When planning web changes, compare **read-only** `odoo-19.0/addons/web/__manifes
 | ESM | Supported inside upstream bundler | **Forbidden** top-level `export` in concat entries; use `npm run check:assets-concat` |
 | Modular runtime bundle | N/A for ERP | `npm run build:web` → IIFE `dist/modern_webclient.js`; legacy adapter remains behind `main.js` |
 
-**Decision:** Keep **concat + guard** as the supported production default until product approves esbuild-primary and CI/regression covers the shell. Document any switch in `DeploymentChecklist.md`.
+**Decision (v1.244.0 / Phase 801):** **`erp_webclient_esbuild_primary_enabled()`** defaults to **per-manifest JS** (no single **`web.assets_web.js`** tag) when **`ERP_WEBCLIENT_ESBUILD_PRIMARY`** is unset. Set **`ERP_WEBCLIENT_ESBUILD_PRIMARY=0`** (or **`false`** / **`no`** / **`off`**) to force the legacy **concat** tag — document host-specific choice in `DeploymentChecklist.md`.
 
-**Milestone (Phase 573 / Wave U, v1.208.0):** Production default remains **concat + guard**; **esbuild-primary** templates are **not** piloted in CI. After each `npm run build:web`, smoke: login, list filters/control panel, form save/cancel, shell markers (`data-erp-shell-owner`, `data-erp-navbar-contract` when modern bundle loads).
+**Phase A4 (v1.242.0) — esbuild-primary switchover gate:** All **AppCore `*ViewModule`** shells (`list`, `form`, `kanban`, `gantt`, `graph`, `pivot`, `calendar`, **`activity`**, plus **`DiscussViewModule`** and placeholder **`settings` / `import` / `report`**) are included in **`app/main.js`** so **`npm run build:web`** bundles them. CI runs **esbuild-primary** HTTP/SW unittests (**Phase 692 / 727 / 801**). **Default HTML** uses per-file JS unless concat is explicitly opted in via env (above).
 
-**Pilot hook (Phase 576 / v1.209.0; executed as Phase 586 in v1.210.0):** Set **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** in the server environment: **`_webclient_html`** serves **per-manifest JS `<script>` URLs** (same order as `get_bundle_urls("web.assets_web")`) instead of the single concat **`/web/assets/web.assets_web.js`** tag; CSS remains **`/web/assets/web.assets_web.css`**. `window.__erpFrontendBootstrap` includes **`"esbuildPrimary": true`**. Run full shell regression (DeploymentChecklist **1.210.0**) before production; default remains concat + additive **`modern_webclient.js`** when the env var is unset. Covered by **`tests/test_http.py`** `test_webclient_html_esbuild_primary_env_lists_per_file_js_phase584`.
+**Phase 770–772 (v1.243.0) — migration facades:** **`services/erp_legacy_router_facade.js`** seeds **`window.ErpLegacyRouter`**; **`services/erp_breadcrumb_facade.js`** seeds **`window.ErpBreadcrumbFacade`**; **`main.js`** assigns **`route`**, **`routeApply`**, **`routeApplyInternal`**, **`routeInternal`**, **`pushBreadcrumb`**, **`popBreadcrumbTo`**, **`syncHashWithActionStackIfMulti`**, **`applyActionStackForList`**, **`renderBreadcrumbs`**, **`attachBreadcrumbHandlers`** after the legacy IIFE defines them. List fallback rendering duplicates were removed in favour of **`AppCore.ListViewModule.render`**.
+
+**Milestone (Phase 573 / Wave U, v1.208.0 — superseded for HTML default):** CI still enforces **concat guard** on source (`npm run check:assets-concat`). After each `npm run build:web`, smoke: login, list filters/control panel, form save/cancel, shell markers (`data-erp-shell-owner`, `data-erp-navbar-contract` when modern bundle loads).
+
+**Esbuild-primary (Phase 576 / 586; default Phase 801):** **`_webclient_html`** serves **per-manifest JS `<script>` URLs** (same order as `get_bundle_urls("web.assets_web")`) when esbuild-primary is enabled (default); CSS remains **`/web/assets/web.assets_web.css`**. `window.__erpFrontendBootstrap` includes **`"esbuildPrimary": true`**. Explicit **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** remains supported; **`=0`** forces concat. Covered by **`tests/test_http.py`** (`test_webclient_html_esbuild_primary_env_lists_per_file_js_phase584`, **801** default/disabled tests).
 
 ## PWA manifest stub (Phase 548) + service worker stub (Phase 553)
 
 - **Public** `GET /web/manifest.webmanifest` returns minimal Web App Manifest JSON (`name`, `start_url`, `display`, theme colours).
 - The webclient shell HTML includes `<link rel="manifest" href="/web/manifest.webmanifest"/>`.
 - **Phase 553:** **Public** `GET /web/sw.js` serves a minimal service worker (`install` → `skipWaiting`, `activate` → `clients.claim`). The shell registers it with `navigator.serviceWorker.register("/web/sw.js")` when supported.
-- **Phase 556 / 593:** The worker **pre-caches** shell URLs with **cache-first** `fetch` (**`CACHE`:** `erp-web-shell-v2` in `web_service_worker_stub`): default **concat** CSS + `web.assets_web.js`; when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`**, precache is **CSS + each manifest JS file** from `get_bundle_urls("web.assets_web")`. Bump **`CACHE`** in [core/http/routes.py](core/http/routes.py) when the precache set changes materially, or unregister the SW during development to avoid stale CSS/JS.
+- **Phase 556 / 593 / 801:** The worker **pre-caches** shell URLs with **cache-first** `fetch` (**`CACHE`:** `erp-web-shell-v2` in `web_service_worker_stub`): by default **CSS + each manifest JS file** when esbuild-primary is on; **concat** CSS + **`web.assets_web.js`** when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=0`**. Bump **`CACHE`** in [core/http/routes.py](core/http/routes.py) when the precache set changes materially, or unregister the SW during development to avoid stale CSS/JS.
 - **Limitation:** **No offline RPC** or full app cache — shell static files only; CRUD and JSON-RPC require network.
 
 ## Modular action service (Phases 636–639)

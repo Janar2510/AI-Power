@@ -42,6 +42,11 @@ Generated for the ERP platform with UI UX Pro Max guidance and aligned to the ex
 - List view: [specs/list-view.md](specs/list-view.md)
 - Form view: [specs/form-view.md](specs/form-view.md)
 - Kanban view: [specs/kanban-view.md](specs/kanban-view.md)
+- Graph view: [specs/graph-view.md](specs/graph-view.md)
+- Pivot view: [specs/pivot-view.md](specs/pivot-view.md)
+- Calendar view: [specs/calendar-view.md](specs/calendar-view.md)
+- Gantt view: [specs/gantt-view.md](specs/gantt-view.md)
+- Activity matrix: [specs/activity-view.md](specs/activity-view.md)
 - Settings: [specs/settings.md](specs/settings.md)
 
 ## Shell Surfaces

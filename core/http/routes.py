@@ -47,6 +47,20 @@ from core.http.auth import (
 from core.sql_db import db_exists, get_cursor
 
 
+def erp_webclient_esbuild_primary_enabled() -> bool:
+    """Return True when the web shell should load per-manifest JS (no concat bundle tag).
+
+    **Default: True** (post–1.244). Set ``ERP_WEBCLIENT_ESBUILD_PRIMARY`` to ``0``,
+    ``false``, ``no``, or ``off`` to force the legacy single ``web.assets_web.js`` tag.
+    """
+    raw = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return True
+
+
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -326,11 +340,7 @@ def web_service_worker_stub(_request: Request):
     """Service worker: Phase 556 cache-first shell; Phase 590 precache matches concat vs per-file JS pilot."""
     import json
 
-    esbuild_primary = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    esbuild_primary = erp_webclient_esbuild_primary_enabled()
     shell_urls: list[str] = ["/web/assets/web.assets_web.css"]
     if esbuild_primary:
         shell_urls.extend(get_bundle_urls("web.assets_web").get("js", []))
@@ -1135,11 +1145,7 @@ def _webclient_html(debug_assets: bool = False, session_bootstrap: dict | None =
     """Web client shell HTML. Use debug_assets=True for individual files (no minification)."""
     import json
 
-    esbuild_primary = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY", "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
+    esbuild_primary = erp_webclient_esbuild_primary_enabled()
 
     if debug_assets:
         urls = get_bundle_urls("web.assets_web")

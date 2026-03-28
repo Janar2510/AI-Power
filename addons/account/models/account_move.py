@@ -104,6 +104,12 @@ class AccountMove(Model):
         string="Residual",
         depends=["state", "line_ids.debit", "line_ids.credit", "line_ids.amount_currency", "line_ids.account_id"],
     )  # Phase 200
+    payment_state = fields.Computed(
+        compute="_compute_payment_state",
+        store=True,
+        string="Payment Status",
+        depends=["state", "move_type", "line_ids.debit", "line_ids.credit", "line_ids.amount_currency", "line_ids.account_id"],
+    )  # Phase 736
 
     @api.depends("payment_term_id", "date", "line_ids.debit", "line_ids.credit")
     def _compute_invoice_date_due(self):
@@ -146,6 +152,12 @@ class AccountMove(Model):
         if not self:
             return []
         return [AccountMove._compute_amount_residual_for_move(self, move) for move in self]
+
+    def _compute_payment_state(self):
+        """Richer invoice payment status compatible with Odoo-style payment_state."""
+        if not self:
+            return []
+        return [AccountMove._compute_payment_state_for_move(self, move) for move in self]
 
     def _compute_amount_residual_for_move(self, move):
         """Compute residual amount for a single invoice, net of completed transactions."""
@@ -208,18 +220,50 @@ class AccountMove(Model):
         total += sum(float(row.get("amount") or 0.0) for row in rows if row.get("state") == "done")
         return total
 
+    def _has_transaction_state_for_move(self, move, states):
+        """Return True when any linked payment.transaction matches one of the given states."""
+        env = getattr(self, "env", None)
+        Transaction = env.get("payment.transaction") if env else None
+        if not Transaction or not move.ids:
+            return False
+        for state in states:
+            txs = Transaction.search([("account_move_id", "=", move.ids[0]), ("state", "=", state)])
+            if getattr(txs, "ids", []):
+                return True
+        return False
+
+    def _compute_payment_state_for_move(self, move):
+        """Compute payment_state from residual and linked transactions."""
+        row = move.read(["state", "move_type"])[0]
+        state = row.get("state") or "draft"
+        move_type = row.get("move_type") or "entry"
+        if move_type not in ("out_invoice", "in_invoice"):
+            return "not_paid"
+        if state == "cancel":
+            return "reversed"
+        residual = float(AccountMove._compute_amount_residual_for_move(self, move))
+        if residual <= 0.0001:
+            return "paid"
+        if AccountMove._has_transaction_state_for_move(self, move, ("pending", "authorized")):
+            return "in_payment"
+        done_amount = float(AccountMove._get_done_transaction_amount_for_move(self, move))
+        total_amount = residual + done_amount
+        if done_amount > 0.0001 and total_amount > residual + 0.0001:
+            return "partial"
+        return "not_paid"
+
     def _sync_payment_state_from_transactions(self):
-        """Mark invoices paid when done transactions fully cover the residual."""
+        """Sync legacy state field from computed payment_state for linked transactions."""
         for move in self:
             if not move.ids:
                 continue
             state = move.read(["state"])[0].get("state")
             if state not in ("posted", "paid"):
                 continue
-            residual = float(AccountMove._compute_amount_residual_for_move(self, move))
-            if residual <= 0.0001 and state != "paid":
+            payment_state = AccountMove._compute_payment_state_for_move(self, move)
+            if payment_state == "paid" and state != "paid":
                 move.write({"state": "paid"})
-            elif residual > 0.0001 and state == "paid":
+            elif payment_state in ("not_paid", "partial", "in_payment") and state == "paid":
                 move.write({"state": "posted"})
 
     line_ids = fields.One2many(

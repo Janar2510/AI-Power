@@ -2,6 +2,16 @@
 
 Verification checklist for AI assistant module deployment and feature additions.
 
+## Master plan 799–802 (v1.244.0)
+
+- [x] **`docs/odoo19_core_gap_table.md`** — Odoo `odoo/` vs `core/` mapping.
+- [x] Business gap audits: **`sale`**, **`purchase`**, **`MRP`**, **`HR`**, **`CRM`** (`docs/*_odoo19_gap_audit.md`).
+- [x] **`docs/odoo19-webclient-gap-table.md`** — field widget / action / hotkey rows; asset default note.
+- [x] **`erp_webclient_esbuild_primary_enabled()`** default on; **`ERP_WEBCLIENT_ESBUILD_PRIMARY=0`** → concat (`core/http/routes.py`, **`tests/test_http.py`**).
+- [x] **`legacy_main_route_tables.js`**, **`legacy_main_route_resolve.js`**, **`legacy_main_parse_utils.js`** + **`app/router.js`**, **`app/home_module.js`**.
+- [x] Import modal token classes (**`webclient.css`**); **`docs/main_js_extraction_catalog.md`**, **`docs/design_spec_coverage_audit.md`**, **`docs/design_system_a11y_audit.md`**.
+- [x] **`docs/parity_matrix.md`** rows **799–802**.
+
 ## Sale confirmation helper chain + schema bootstrap (Unreleased)
 
 - [x] `core/db/schema.py` allows explicit `create_date` / `write_date` model fields without emitting duplicate access-log columns during `init_schema()` / `add_missing_columns()` (Phase **653** — `tests.test_schema_audit_columns`).
@@ -22,12 +32,14 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] New `account.move` `create` overrides should delegate to `cls._create_account_move_record(vals)` (merge-safe) (**Phase 686** — verified in **`addons/account/models/account_move.py`**).
 - [x] New `payment.transaction` `create` overrides should delegate to `cls._create_payment_transaction_record(vals)` then run any post-create sync (merge-safe) (**Phase 727** — **`addons/payment/models/payment_transaction.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
 - [x] New `product.template` `create` overrides should delegate to `cls._create_product_template_record(vals)` then run `_create_variant_ids` when variants apply (merge-safe) (**Phase 727** — **`addons/product/models/product_template.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
+- [x] **`sale`** extends **`product.template`** with **`sale_ok`**, **`invoice_policy`**, **`service_type`**, **`expense_policy`** (**Phase 750** — **`addons/sale/models/product_template.py`**, **`tests.test_sale_product_integration_phase750`**).
 - [x] New `mrp.production` `create` overrides should delegate to `cls._create_mrp_production_record(vals)` (merge-safe) (**Phase 727** — **`addons/mrp/models/mrp_production.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
 - [x] New `mail.activity` `create` overrides should delegate to `cls._create_mail_activity_record(vals)` (merge-safe) (**Phase 727** — **`addons/mail/models/mail_activity.py`**, **`tests.test_merge_safe_create_evidence_phase727`**).
 - [x] New `pos.order` / `pos.session` `create` overrides should delegate to `cls._create_pos_order_record(vals)` / `cls._create_pos_session_record(vals)` (merge-safe) (**evidence:** **`addons/pos/models/pos_order.py`**, **`pos_session.py`**).
 - [x] New `account.bank.statement` `create` overrides should delegate to `cls._create_account_bank_statement_record(vals)` (merge-safe) (**evidence:** **`addons/account/models/account_bank_statement.py`**).
 - [x] New `hr.leave` `create` overrides should delegate to `cls._create_hr_leave_record(vals)` (merge-safe) (**evidence:** **`addons/hr/models/hr_leave.py`**).
 - [x] New `hr.expense.sheet` / `hr.payslip` `create` overrides should delegate to `cls._create_hr_expense_sheet_record(vals)` / `cls._create_hr_payslip_record(vals)` (merge-safe) (**Phase 728** — **`addons/hr_expense/models/hr_expense_sheet.py`**, **`addons/hr_payroll/models/hr_payslip.py`**, **`tests.test_merge_safe_create_evidence_phase728`**).
+- [x] **`hr.expense.sheet.action_sheet_move_create()`** / **`_create_account_move_for_sheet()`** build a posted **`account.move`** (`entry`) with expense debits + payable credit; **`account.move.hr_expense_sheet_id`** links back to the sheet (**Phase 751** — **`addons/hr_expense/models/hr_expense_sheet.py`**, **`addons/hr_expense/models/account_move.py`**, **`tests.test_hr_expense_posting_phase751`**).
 - [x] `mrp.production.action_cancel()` cancels open production-linked `stock.move` rows (draft/assigned) before setting the MO to `cancel` (**Phase 676** — **`tests.test_mrp_phase153.TestMrpPhase153.test_mrp_cancel_cancels_open_moves`**).
 - [x] `account.move.action_post()` rejects non-draft moves, lines without `account_id`, moves without journal lines, and unbalanced debit/credit totals (**Phase 729** — **`account_move._validate_balanced_before_post`**, **`tests.test_account_post_phase467`** including **`test_action_post_rejects_non_draft_moves`**, **`test_action_post_rejects_line_missing_account`**).
 - [x] Completed `payment.transaction` rows linked by `account_move_id` reduce `account.move.amount_residual` and auto-sync invoice state to `paid` when fully covered (**Phase 731** — **`addons/account/models/account_move.py`** **`_get_done_transaction_amount_for_move`**, **`_sync_payment_state_from_transactions`**; **`addons/payment/models/payment_transaction.py`** **`_sync_linked_invoice_payment_state`**; **`tests.test_account_payment_phase468`**).
@@ -41,7 +53,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [ ] MRP: `mrp.workorder`, reservation + quant completion on MO done; SO-driven MO when `product.template.manufacture_on_order` and `sale_mrp` loaded.
 - [ ] HR: employee lifecycle + contract start + attendance promotion; leave approval note; payroll + attendance lines.
 - [ ] Web: `npm run build:web` succeeds when Node is available; `tsconfig.json` + `framework/component_base.js` present.
-- [ ] AI: `ai_assistant.embeddings.pipeline` documents pgvector; `retrieve_chunks` still falls back to ILIKE without vectors.
+- [x] AI: `ai_assistant.embeddings.pipeline` documents pgvector; `retrieve_chunks` uses **`<=>`** only when **`pg_extension.vector`** is installed **and** the embedding column is native **`vector`**; otherwise ILIKE (**Phase 745**).
 - [ ] Ops: `/readiness` for probes; `json_log.format_json_log` available; security checklist doc reviewed.
 
 ## Phases 525–529 (reference roadmap: stock/MRP depth, assets, RAG, hardening)
@@ -338,46 +350,47 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Tool Registry
 
-- [ ] `addons/ai_assistant/tools/registry.py`: get_tools(), execute_tool(), log_audit()
-- [ ] Tools use ORM (search_read, read) under env with user uid
-- [ ] Available tools: search_records, summarise_recordset, nl_search (extend as needed)
+- [x] `addons/ai_assistant/tools/registry.py`: get_tools(), execute_tool(), log_audit()
+- [x] Tools use ORM (search_read, read) under env with user uid
+- [x] Available tools: search_records, summarise_recordset, nl_search (extend as needed)
 
 ## RAG Retrieval
 
-- [ ] ai.document.chunk model indexed (manual or on-write)
-- [ ] GET /ai/retrieve?q=query&limit=10 returns chunks (record rules applied)
-- [ ] /ai/chat with retrieve=true passes retrieved_doc_ids to audit
+- [x] ai.document.chunk model indexed (manual or on-write)
+- [x] GET /ai/retrieve?q=query&limit=10 returns chunks (record rules applied)
+- [x] /ai/chat with retrieve=true passes retrieved_doc_ids to audit
 
 ## Phase 136 (Vector embeddings)
 
 - [ ] pgvector extension; ai.document.chunk.embedding (vector 1536)
 - [x] index_record_for_rag: embeds via OpenAI text-embedding-3-small on write
 - [x] Chunk rows: `_inherit` refreshes embedding when `text` changes (Phase 528)
-- [ ] retrieve_chunks: cosine similarity when embeddings exist; ilike fallback
+- [x] **Phase 791:** Long-field RAG text normalized before embed (`addons/ai_assistant/tools/rag_text.py`); test `tests.test_ai_rag_normalize_phase791`
+- [x] retrieve_chunks: cosine similarity when embeddings exist; ilike fallback
 
 ## LLM Integration (Phase 88)
 
-- [ ] addons/ai_assistant/llm.py: call_llm() with OpenAI function-calling; tool_calls loop
-- [ ] ir.config_parameter: ai.openai_api_key, ai.llm_enabled, ai.llm_model
-- [ ] When ai.llm_enabled=1: /ai/chat accepts prompt without tool; uses call_llm with RAG context
-- [ ] Settings > AI Configuration: API key input, enable toggle, model selector
-- [ ] Chat panel: fetch /ai/config; prompt-only mode when LLM enabled; loading indicator
+- [x] addons/ai_assistant/llm.py: call_llm() with OpenAI function-calling; tool_calls loop
+- [x] ir.config_parameter: ai.openai_api_key, ai.llm_enabled, ai.llm_model
+- [x] When ai.llm_enabled=1: /ai/chat accepts prompt without tool; uses call_llm with RAG context
+- [x] Settings > AI Configuration: API key input, enable toggle, model selector
+- [x] Chat panel: fetch /ai/config; prompt-only mode when LLM enabled; loading indicator
 
 ## Phase 122 (AI Natural Language Search)
 
-- [ ] nl_search(model, query) in registry: LLM converts NL to domain when enabled; fallback ilike on name/email/description
-- [ ] POST /ai/nl_search returns {domain, results}; used by AI Search button in list views
+- [x] nl_search(model, query) in registry: LLM converts NL to domain when enabled; fallback ilike on name/email/description
+- [x] POST /ai/nl_search returns {domain, results}; used by AI Search button in list views
 
 ## Phase 123 (AI-Assisted Data Entry)
 
-- [ ] extract_fields(model, text) in registry: LLM extracts structured fields when enabled; fallback regex for email/phone
-- [ ] POST /ai/extract_fields returns {fields}; used by AI Fill button on lead/partner forms
+- [x] extract_fields(model, text) in registry: LLM extracts structured fields when enabled; fallback regex for email/phone
+- [x] POST /ai/extract_fields returns {fields}; used by AI Fill button on lead/partner forms
 
 ## Phase 124 (AI Conversation Memory)
 
-- [ ] ai.conversation model: user_id, messages (JSON), model_context, active_id
-- [ ] /ai/chat: conversation_id, model_context, active_id; loads prior messages; injects view context into system prompt
-- [ ] Chat panel: maintains conversation_id; "New" button; window.chatContext from main.js
+- [x] ai.conversation model: user_id, messages (JSON), model_context, active_id
+- [x] /ai/chat: conversation_id, model_context, active_id; loads prior messages; injects view context into system prompt
+- [x] Chat panel: maintains conversation_id; "New" button; window.chatContext from main.js
 
 ## Adding New Tools
 

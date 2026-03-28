@@ -1,5 +1,212 @@
 # Deployment Checklist
 
+## Post–243 — Esbuild-primary default + legacy main split + gap docs (release 1.244.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, and **`npm run build:web:legacy`** (**`legacy_main_route_*.js`**, **`legacy_main_parse_utils.js`**, **`app/home_module.js`** / **`app/router.js`**).
+- [ ] If the host must keep the **single concat** **`web.assets_web.js`** tag, set **`ERP_WEBCLIENT_ESBUILD_PRIMARY=0`** on the server process (see **`docs/frontend.md`** Phase 801).
+
+### Verification
+
+- [ ] Python: **`python3 -m unittest tests.test_http.TestHTTP -v`** (esbuild default + **`=0`** concat + SW precache).
+- [ ] JS: **`/web/static/tests/test_runner.html`** — spot-check list/form after route-table split.
+
+### Notes
+
+- **`docs/odoo19_core_gap_table.md`**, **`docs/*_odoo19_gap_audit.md`**, **`docs/main_js_extraction_catalog.md`**, **`docs/design_spec_coverage_audit.md`**, **`docs/design_system_a11y_audit.md`**.
+
+---
+
+## Post–242 — Parallel frontend (770–778) + action/report + search panel (release 1.243.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, and **`npm run build:web:legacy`** (new **`erp_*_facade.js`**, **`list_view.js`** layout, view modules).
+
+### Verification
+
+- [ ] JS: **`/web/static/tests/test_runner.html`** — confirm **`field_registry`**, **`action_service`**, **`search_model`**, **`list_control_panel_search_panel`**, **`placeholder_view_modules`** pass.
+
+### Notes
+
+- **`ErpLegacyRouter`** / **`ErpBreadcrumbFacade`** expose legacy **`route`** / breadcrumb helpers for tooling; **`Services.action`** supports **`ir.actions.report`** and client registry.
+- **647b** / **679:** Still **product-gated**.
+
+---
+
+## Post–241 — Phases 758–764 + B1–B4 + C1/C3 + ops smoke (release 1.242.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, and **`npm run build:web:legacy`** (activity/discuss + placeholder view modules in **`app/main.js`**).
+- [ ] Optional: **`bash scripts/smoke_public_routes.sh`** against a running server (expects **`/health`** + **`/metrics`**).
+
+### Verification
+
+- [ ] JS: **`/web/static/tests/test_runner.html`** — **`activity_view_module`**, **`discuss_view_module`**, **`placeholder_view_modules`** pass.
+- [ ] Python: **`python3 -m unittest tests.test_stock_move_split_merge_phase771 tests.test_mrp_workorder_actions_phase781 tests.test_hr_contract_phase786 tests.test_hr_attendance_checkout_phase786 tests.test_ai_rag_normalize_phase791 tests.test_http.TestHTTP.test_ai_chat_stream_returns_501 -v`**
+
+### Notes
+
+- **758–764:** Activity/discuss extraction + settings/import/report shells; **`ERP_WEBCLIENT_ESBUILD_PRIMARY`** path unchanged (see **`docs/frontend.md`** Phase A4 gate).
+- **B1–B4:** Stock split/merge; manual payment register; MRP workorder actions; **`hr.contract`** + **`hr.attendance.action_check_out`**.
+- **C1/C3:** RAG long-text normalize; **`/ai/chat/stream`** returns **501** until streaming is implemented.
+- **647b** / **679:** Still **product-gated** (see **`docs/deferred_product_backlog.md`** execution log).
+
+---
+
+## Post–240 — Phases 756–757 pivot + calendar modules + CSS token partials (release 1.241.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, and **`npm run build:web:legacy`** (new view modules + **`_tokens.css`** / **`_dark.css`** in **`web.assets_web`**).
+
+### Verification
+
+- [ ] JS: **`/web/static/tests/test_runner.html`** — confirm **`pivot_view_module`** and **`calendar_view_module`** pass; spot-check light/dark theme and **`prefers-contrast: more`** after CSS split.
+
+### Notes
+
+- **757:** Token variables load from partials before component rules in **`webclient.css`**; no behaviour change intended.
+- **647b** / **679:** Still **product-gated**.
+
+---
+
+## Post–239 — Phases 753–754 gantt + graph view modules (release 1.240.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, and **`npm run build:web:legacy`**.
+
+### Verification
+
+- [ ] JS: **`test_runner.html`** — **`gantt_view_module`** and **`graph_view_module`** suites pass.
+
+### Notes
+
+- **753–754:** Analytical views delegate to **`AppCore.*ViewModule.render()`**; inline fallbacks preserved.
+- **647b** / **679:** Still **product-gated**.
+
+---
+
+## Post–238 — Phases 750–751 sale product fields + HR expense posting bridge (release 1.239.0)
+
+### Pre-Deployment
+
+- [ ] **751:** New column **`account_move.hr_expense_sheet_id`** — run **`db init`** / migration where schema sync is required.
+
+### Verification
+
+- [ ] Unit: `python3 -m unittest tests.test_sale_product_integration_phase750 tests.test_hr_expense_posting_phase751 -v`
+
+### Notes
+
+- **750:** Sale module adds Odoo-style sale flags on **`product.template`** (no separate **`npm run build:web`**).
+- **751:** **`action_sheet_move_create`** shares logic with **`action_done`**; idempotent when **`account_move_id`** is already set.
+- **647b** / **679:** Still **product-gated**.
+
+---
+
+## Post–237 — Phases 747–748 kanban module + stock.scrap (release 1.238.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, and **`npm run build:web:legacy`** for **747** (**`kanban_view_module.js`** + bundles).
+- [ ] **748:** New **`stock_scrap`** table / **`stock_move.scrap_id`** column — run **`db init`** or migration on environments that need schema sync.
+
+### Verification
+
+- [ ] Unit: `python3 -m unittest tests.test_stock_scrap_phase748 -v`
+- [ ] JS: open **`/web/static/tests/test_runner.html`** and confirm **`kanban_view_module`** suite passes.
+
+### Notes
+
+- **747:** Kanban list view delegates to **`AppCore.KanbanViewModule.render()`** when **`ViewRenderers.kanban`** exists; inline fallback preserved.
+- **748:** **`stock.scrap.action_validate`** creates a **`done`** **`stock.move`** so existing quant update hooks run on the source location.
+- **647b** / **679:** Still **product-gated**.
+
+---
+
+## Post–236 — Phases 744–745 bank statement line + RAG pgvector gate (release 1.237.0)
+
+### Pre-Deployment
+
+- [ ] No **`npm run build:web`** required for **744–745** (Python + docs only).
+
+### Verification
+
+- [ ] Unit: `python3 -m unittest tests.test_account_bank_statement_line_phase744 tests.test_ai_vector_search_phase745 tests.test_pgvector_extension_installed_phase745 -v`
+
+### Notes
+
+- **744:** Statement lines gain optional multi-currency / reference fields and **`is_reconciled`** (computed from **`move_id`**).
+- **745:** Semantic search uses **`<=>`** only when **`pg_extension.vector`** is installed **and** the chunk **`embedding`** column is native **`vector`**.
+- **647b** / **679:** Still **product-gated**.
+
+---
+
+## Post–235 — Phases 741–743 registry verify + form module + stock.move.line (release 1.236.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`** and **`npm run build:web`** for **742** (**`form_view_module.js`** + **`modern_webclient.js`**).
+
+### Verification
+
+- [ ] Unit: `python3 -m unittest tests.test_auth_registry_recovery_phase739 tests.test_stock_move_line_phase743 -v`
+- [ ] JS: open **`/web/static/tests/test_runner.html`** and confirm **`form_view_module`** suite passes (or run Playwright/CLI harness used for **`list_view_module`**).
+
+### Notes
+
+- **741:** Confirms **`_get_registry`** drops an empty cached registry and rebuilds (see **`test_auth_registry_recovery_phase739`**).
+- **742:** Form rendering delegates to **`AppCore.FormViewModule.render()`** when present; **`wireFormViewAfterPaint`** keeps behaviour identical to the prior inline block.
+- **743:** New **`stock.move.line`** table and ACL; run **`db init`** / migration on environments that need the column set.
+- **647b** / **679:** Still **product-gated**.
+
+---
+
+## Post–234 — Phases 738–739 list module extraction + portal payment E2E (release 1.235.0)
+
+### Pre-Deployment
+
+- [ ] Run **`npm run check:assets-concat`** and **`npm run build:web`** for **738** (new list-view module asset + modern bundle import).
+- [ ] Ensure portal/payment DB has at least one enabled provider; **739** pay-form route now falls back to SQL provider lookup if ORM provider reads come back empty.
+
+### Verification
+
+- [ ] JS target: `python scripts/with_server.py --server ".venv/bin/python erp-bin" --port 8069 -- .venv/bin/python3.14 -c "from playwright.sync_api import sync_playwright; import sys; pw=sync_playwright().start(); browser=pw.chromium.launch(headless=True); page=browser.new_page(); page.goto('http://localhost:8069/web/static/tests/test_runner.html'); page.wait_for_load_state('networkidle'); result=page.evaluate('window.Tests.list_view_module()'); print(result); browser.close(); pw.stop(); sys.exit(1 if result.get('fail') else 0)"`
+- [ ] E2E: `python scripts/with_server.py --server ".venv/bin/python erp-bin" --port 8069 -- .venv/bin/python3.14 -m pytest tests/e2e/test_portal_invoice_payment_tour_phase739.py -q --e2e-db erp`
+
+### Notes
+
+- **Phase 738:** **`main.js`** delegates legacy fallback list rendering to **`AppCore.ListViewModule.render()`** when the extracted module is present; the inline fallback remains underneath for compatibility.
+- **Phase 739:** Portal payment flow now has typed-route support for **`/my/invoices/<id>`** and **`/my/invoices/<id>/pay`**, fixed invoice detail links, and a CSRF token on the pay form.
+- **CI:** **`e2e-pr-smoke`** runs the portal payment browser test on pull requests; the full **`tests/e2e/`** suite remains gated to main/master pushes.
+- **647b** / **679:** Still **product-gated** — unchanged by **1.235.0**.
+
+---
+
+## Post–233 — Phases 735–736 AI conversation memory + account payment_state (release 1.234.0)
+
+### Pre-Deployment
+
+- [ ] No **`npm run build:web`** required for **735–736** (AI chat panel source + account model + docs only).
+
+### Verification
+
+- [ ] E2E: `python scripts/with_server.py --server ".venv/bin/python erp-bin" --port 8069 -- .venv/bin/python3.14 -m pytest tests/e2e/test_ai_chat_panel_conversation_phase735.py -q`
+- [ ] Unit: `python3 -m unittest tests.test_account_move_payment_state_phase736 tests.test_account_payment_phase468 -v`
+
+### Notes
+
+- **Phase 735:** **`chat_panel.js`** now persists **`conversation_id`** from **`/ai/chat`** responses, so follow-up LLM prompts reuse prior conversation history.
+- **AI checklist sync:** **`docs/ai-implementation-checklist.md`** now marks the shipped tool registry, retrieval, LLM chat, NL search, AI Fill, and conversation-memory rows as done.
+- **Phase 736:** **`account.move.payment_state`** now computes **`not_paid`** / **`in_payment`** / **`partial`** / **`paid`** from residual + linked **`payment.transaction`** rows while keeping legacy **`state == "paid"`** behavior for compatibility.
+- **647b** / **679:** Still **product-gated** — unchanged by **1.234.0**.
+
+---
+
 ## Post–232 — Phase 734 write→done test + release 1.233.0
 
 ### Pre-Deployment
@@ -1588,10 +1795,10 @@ These are IDE-level Cursor rules and documentation. No DB migration, no `DEFAULT
 
 ## Phase 124 (AI Conversation Memory)
 
-- [ ] ai.conversation model stores user_id, messages JSON, model_context, active_id
-- [ ] /ai/chat accepts conversation_id; loads prior messages; returns conversation_id
-- [ ] Chat panel: "New" button clears conversation; sends model_context/active_id from current view
-- [ ] window.chatContext set by main.js when viewing form/list
+- [x] ai.conversation model stores user_id, messages JSON, model_context, active_id
+- [x] /ai/chat accepts conversation_id; loads prior messages; returns conversation_id
+- [x] Chat panel: "New" button clears conversation; sends model_context/active_id from current view
+- [x] window.chatContext set by main.js when viewing form/list
 
 ## Phase 123 (AI-Assisted Data Entry)
 

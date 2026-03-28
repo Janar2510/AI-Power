@@ -195,342 +195,57 @@
     actionStack = [{ label: title, hash: route }];
   }
 
-  /**
-   * Slugs used for list/new/edit routing (sidebar hash targets).
-   * Keep in sync with routeApplyInternal, isFormRoute, and keyboard shortcuts below.
-   */
-  var DATA_ROUTES_SLUGS =
-    'contacts|pipeline|crm/activities|leads|tickets|orders|products|pricelists|tasks|articles|knowledge_categories|attachments|settings/users|settings/approval_rules|settings/approval_requests|leaves|leave_types|allocations|cron|server_actions|sequences|audit_log|marketing/mailing_lists|marketing/mailings|manufacturing|boms|workcenters|transfers|warehouses|lots|reordering_rules|purchase_orders|invoices|bank_statements|journals|accounts|taxes|payment_terms|employees|departments|jobs|projects|fleet|attendances|recruitment|time_off|expenses|repair_orders|surveys|lunch_orders|livechat_channels|project_todos|recycle_models|skills|elearning|analytic_accounts|analytic_plans|subscriptions|meetings|timesheets|applicants|contracts|account_reconcile_wizard|recruitment_stages|crm_stages|crm_tags|crm_lost_reasons|pos_orders|pos_sessions|website|ecommerce';
-
-  /** Opt-in: set window.__ERP_DEBUG_SIDEBAR_MENU = true to log menus with no resolvable route. */
-  function _warnSidebarMenuDisabled(menu, actionRef, hasResolvedAction, route) {
-    if (!route && window.__ERP_DEBUG_SIDEBAR_MENU) {
-      try {
-        console.warn('[sidebar] menu without route', {
-          id: menu && menu.id,
-          name: menu && menu.name,
-          action: actionRef || '',
-          resolvedAction: !!hasResolvedAction,
-        });
-      } catch (e) { /* noop */ }
-    }
-  }
-
-  /** Map act_window res_model to hash route (convention: res.partner -> contacts) */
+  var RL = window.__ERP_ROUTE_LEGACY || {};
+  var DATA_ROUTES_SLUGS = RL.DATA_ROUTES_SLUGS || '';
   function actionToRoute(action) {
-    if (!action) return null;
-    if (action.type === 'ir.actions.act_url') {
-      var rawUrl = String(action.url || '').trim();
-      if (!rawUrl) return null;
-      // Support hash-only routes ("#reports/trial-balance") and full URLs containing hash.
-      var hashIdx = rawUrl.indexOf('#');
-      if (hashIdx >= 0) {
-        var frag = rawUrl.slice(hashIdx + 1).split('?')[0].trim();
-        return frag || null;
-      }
-      // Fallback: allow direct route-like URLs without '#'.
-      if (/^[a-z0-9_\-/]+$/i.test(rawUrl)) return rawUrl;
-      return null;
-    }
-    if (action.type !== 'ir.actions.act_window') return null;
-    const m = (action.res_model || '').replace(/\./g, '_');
-    if (m === 'res_partner') return 'contacts';
-    if (m === 'crm_lead') {
-      const name = (action.name || '').toLowerCase();
-      if (name.indexOf('pipeline') >= 0) return 'pipeline';
-      if (name.indexOf('activit') >= 0) return 'crm/activities';
-      return 'leads';
-    }
-    if (m === 'project_task') return 'tasks';
-    if (m === 'knowledge_article') return 'articles';
-    if (m === 'knowledge_category') return 'knowledge_categories';
-    if (m === 'sale_order') return 'orders';
-    if (m === 'sale_subscription') return 'subscriptions';
-    if (m === 'product_product') return 'products';
-    if (m === 'ir_attachment') return 'attachments';
-    if (m === 'res_users') return 'settings/users';
-    if (m === 'approval_rule') return 'settings/approval_rules';
-    if (m === 'approval_request') return 'settings/approval_requests';
-    if (m === 'hr_leave') return 'leaves';
-    if (m === 'hr_leave_type') return 'leave_types';
-    if (m === 'hr_leave_allocation') return 'allocations';
-    if (m === 'ir_cron') return 'cron';
-    if (m === 'ir_actions_server') return 'server_actions';
-    if (m === 'ir_sequence') return 'sequences';
-    if (m === 'mrp_production') return 'manufacturing';
-    if (m === 'mrp_bom') return 'boms';
-    if (m === 'mrp_workcenter') return 'workcenters';
-    if (m === 'stock_picking') return 'transfers';
-    if (m === 'stock_warehouse') return 'warehouses';
-    if (m === 'stock_lot') return 'lots';
-    if (m === 'purchase_order') return 'purchase_orders';
-    if (m === 'account_move') return 'invoices';
-    if (m === 'account_bank_statement') return 'bank_statements';
-    if (m === 'account_reconcile_wizard') return 'account_reconcile_wizard';
-    if (m === 'account_journal') return 'journals';
-    if (m === 'account_account') return 'accounts';
-    if (m === 'account_tax') return 'taxes';
-    if (m === 'account_payment_term') return 'payment_terms';
-    if (m === 'hr_employee') return 'employees';
-    if (m === 'hr_department') return 'departments';
-    if (m === 'hr_job') return 'jobs';
-    if (m === 'hr_attendance') return 'attendances';
-    if (m === 'hr_applicant') return 'applicants';
-    if (m === 'hr_contract') return 'contracts';
-    if (m === 'project_project') return 'projects';
-    if (m === 'calendar_event') return 'meetings';
-    if (m === 'helpdesk_ticket') return 'tickets';
-    if (m === 'analytic_line') return 'timesheets';
-    if (m === 'analytic_account') return 'analytic_accounts';
-    if (m === 'analytic_plan') return 'analytic_plans';
-    if (m === 'product_pricelist') return 'pricelists';
-    if (m === 'stock_warehouse_orderpoint') return 'reordering_rules';
-    if (m === 'hr_expense') return 'expenses';
-    if (m === 'repair_order') return 'repair_orders';
-    if (m === 'survey_survey') return 'surveys';
-    if (m === 'lunch_order') return 'lunch_orders';
-    if (m === 'im_livechat_channel') return 'livechat_channels';
-    if (m === 'data_recycle_model') return 'recycle_models';
-    if (m === 'hr_skill') return 'skills';
-    if (m === 'slide_channel') return 'elearning';
-    if (m === 'audit_log') return 'audit_log';
-    if (m === 'mailing_list') return 'marketing/mailing_lists';
-    if (m === 'mailing_mailing') return 'marketing/mailings';
-    if (m === 'crm_stage') return 'crm_stages';
-    if (m === 'crm_tag') return 'crm_tags';
-    if (m === 'crm_lost_reason') return 'crm_lost_reasons';
-    if (m === 'fleet_vehicle') return 'fleet';
-    if (m === 'pos_order') return 'pos_orders';
-    if (m === 'pos_session') return 'pos_sessions';
-    return m || null;
+    return RL.actionToRoute ? RL.actionToRoute(action) : null;
   }
-
-  /** Map menu to hash route when no action (e.g. Settings, API Keys) */
   function menuToRoute(m) {
-    if (!m) return null;
-    const name = (m.name || '').toLowerCase();
-    if (name === 'home') return 'home';
-    if (name === 'settings') return 'settings';
-    if (name === 'api keys') return 'settings/apikeys';
-    if (name === 'contacts') return 'contacts';
-    if (name === 'crm') return 'pipeline';
-    if (name === 'leads') return 'leads';
-    if (name === 'my pipeline') return 'pipeline';
-    if (name === 'my activities') return 'crm/activities';
-    if (name === 'discuss' || name === 'messaging') return 'discuss';
-    if (name === 'orders') return 'orders';
-    if (name === 'products') return 'products';
-    if (name === 'tasks') return 'tasks';
-    if (name === 'invoicing') return 'invoices';
-    if (name === 'inventory') return 'transfers';
-    if (name === 'sales') return 'orders';
-    if (name === 'hr') return 'employees';
-    if (name === 'employees') return 'employees';
-    if (name === 'departments') return 'departments';
-    if (name === 'job positions' || name === 'jobs') return 'jobs';
-    if (name === 'expenses' || name === 'my expenses') return 'expenses';
-    if (name === 'attendances' || name === 'attendance') return 'attendances';
-    if (name === 'recruitment' || name === 'applicants') return 'recruitment';
-    if (name === 'time off') return 'time_off';
-    if (name === 'repairs') return 'repair_orders';
-    if (name === 'surveys') return 'surveys';
-    if (name === 'lunch') return 'lunch_orders';
-    if (name === 'live chat') return 'livechat_channels';
-    if (name === 'to-do') return 'project_todos';
-    if (name === 'data recycle') return 'recycle_models';
-    if (name === 'skills') return 'skills';
-    if (name === 'elearning') return 'elearning';
-    if (name === 'analytic plans' || name === 'analytic plan') return 'analytic_plans';
-    if (name === 'subscriptions' || name === 'subscription') return 'subscriptions';
-    if (name === 'meetings' || name === 'meeting') return 'meetings';
-    if (name === 'applicants' || name === 'applicant') return 'applicants';
-    if (name === 'recruitment stages') return 'recruitment_stages';
-    if (name === 'valuation' || name === 'valuations' || name === 'stock valuation report') return 'reports/stock-valuation';
-    if (name === 'website') return 'website';
-    if (name === 'ecommerce') return 'ecommerce';
-    if (name === 'reports') return 'reports/trial-balance';
-    if (name === 'point of sale' || name === 'point-of-sale' || name === 'pos') return 'pos_orders';
-    if (name === 'pos sessions') return 'pos_sessions';
-    if (name === 'stages') return 'crm_stages';
-    if (name === 'tags') return 'crm_tags';
-    if (name === 'lost reasons') return 'crm_lost_reasons';
-    var slug = (m.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-    if (slug && slug.length >= 2 && /^[a-z][a-z0-9_]*$/.test(slug)) {
-      var sectionOnly = { configuration: 1, reporting: 1, operations: 1, sales: 1, technical: 1 };
-      if (!sectionOnly[slug]) return slug;
-    }
-    return null;
+    return RL.menuToRoute ? RL.menuToRoute(m) : null;
   }
-
-  /** Get action for route (from menu) */
+  function _warnSidebarMenuDisabled(menu, actionRef, hasResolvedAction, route) {
+    if (RL._warnSidebarMenuDisabled) RL._warnSidebarMenuDisabled(menu, actionRef, hasResolvedAction, route);
+  }
   function getActionForRoute(route) {
-    if (!viewsSvc) return null;
-    const menus = viewsSvc.getMenus() || [];
-    const stack = [].concat(menus);
-    while (stack.length) {
-      const menu = stack.shift();
-      if (!menu) continue;
-      const action = menu.action ? viewsSvc.getAction(menu.action) : null;
-      if (action && actionToRoute(action) === route) return action;
-      const children = menu.children || menu.child_id || [];
-      if (Array.isArray(children) && children.length) {
-        for (let i = 0; i < children.length; i++) stack.push(children[i]);
-      }
-    }
-    return null;
+    return RL.getActionForRoute ? RL.getActionForRoute(route) : null;
   }
-
-  /** Get model name for route slug (inverse of actionToRoute) */
   function getModelForRoute(route) {
-    const action = getActionForRoute(route);
-    if (action) return action.res_model || action.resModel;
-    if (route === 'contacts') return 'res.partner';
-    if (route === 'pipeline') return 'crm.lead';
-    if (route === 'crm/activities') return 'crm.lead';
-    if (route === 'leads') return 'crm.lead';
-    if (route === 'tasks') return 'project.task';
-    if (route === 'articles') return 'knowledge.article';
-    if (route === 'knowledge_categories') return 'knowledge.category';
-    if (route === 'orders') return 'sale.order';
-    if (route === 'subscriptions') return 'sale.subscription';
-    if (route === 'products') return 'product.product';
-    if (route === 'attachments') return 'ir.attachment';
-    if (route === 'settings/users') return 'res.users';
-    if (route === 'settings/approval_rules') return 'approval.rule';
-    if (route === 'settings/approval_requests') return 'approval.request';
-    if (route === 'leaves') return 'hr.leave';
-    if (route === 'leave_types') return 'hr.leave.type';
-    if (route === 'allocations') return 'hr.leave.allocation';
-    if (route === 'cron') return 'ir.cron';
-    if (route === 'server_actions') return 'ir.actions.server';
-    if (route === 'sequences') return 'ir.sequence';
-    if (route === 'audit_log') return 'audit.log';
-    if (route === 'marketing/mailing_lists') return 'mailing.list';
-    if (route === 'marketing/mailings') return 'mailing.mailing';
-    if (route === 'manufacturing') return 'mrp.production';
-    if (route === 'boms') return 'mrp.bom';
-    if (route === 'workcenters') return 'mrp.workcenter';
-    if (route === 'transfers') return 'stock.picking';
-    if (route === 'warehouses') return 'stock.warehouse';
-    if (route === 'lots') return 'stock.lot';
-    if (route === 'purchase_orders') return 'purchase.order';
-    if (route === 'invoices') return 'account.move';
-    if (route === 'bank_statements') return 'account.bank.statement';
-    if (route === 'account_reconcile_wizard') return 'account.reconcile.wizard';
-    if (route === 'journals') return 'account.journal';
-    if (route === 'accounts') return 'account.account';
-    if (route === 'taxes') return 'account.tax';
-    if (route === 'payment_terms') return 'account.payment.term';
-    if (route === 'employees') return 'hr.employee';
-    if (route === 'departments') return 'hr.department';
-    if (route === 'jobs') return 'hr.job';
-    if (route === 'attendances') return 'hr.attendance';
-    if (route === 'applicants') return 'hr.applicant';
-    if (route === 'recruitment') return 'hr.applicant';
-    if (route === 'recruitment_stages') return 'hr.recruitment.stage';
-    if (route === 'contracts') return 'hr.contract';
-    if (route === 'time_off') return 'hr.leave';
-    if (route === 'expenses') return 'hr.expense';
-    if (route === 'fleet') return 'fleet.vehicle';
-    if (route === 'projects') return 'project.project';
-    if (route === 'timesheets') return 'analytic.line';
-    if (route === 'project_todos') return 'project.task';
-    if (route === 'recycle_models') return 'data.recycle.model';
-    if (route === 'repair_orders') return 'repair.order';
-    if (route === 'surveys') return 'survey.survey';
-    if (route === 'lunch_orders') return 'lunch.order';
-    if (route === 'livechat_channels') return 'im_livechat.channel';
-    if (route === 'skills') return 'hr.skill';
-    if (route === 'elearning') return 'slide.channel';
-    if (route === 'analytic_accounts') return 'analytic.account';
-    if (route === 'analytic_plans') return 'analytic.plan';
-    if (route === 'pricelists') return 'product.pricelist';
-    if (route === 'reordering_rules') return 'stock.warehouse.orderpoint';
-    if (route === 'meetings') return 'calendar.event';
-    if (route === 'tickets') return 'helpdesk.ticket';
-    if (route === 'crm_stages') return 'crm.stage';
-    if (route === 'crm_tags') return 'crm.tag';
-    if (route === 'crm_lost_reasons') return 'crm.lost.reason';
-    if (route === 'pos_orders') return 'pos.order';
-    if (route === 'pos_sessions') return 'pos.session';
-    return null;
+    return RL.getModelForRoute ? RL.getModelForRoute(route) : null;
   }
-
   if (typeof window !== 'undefined') {
     window.__ERP_getModelForRoute = getModelForRoute;
   }
 
-  /** Parse action domain string to array (JSON or Python-like) */
+  var PU = window.__ERP_PARSE_UTILS || {};
   function parseActionDomain(s) {
-    if (!s || typeof s !== 'string') return [];
-    const t = s.trim();
-    if (!t) return [];
-    try {
-      const parsed = JSON.parse(t.replace(/'/g, '"'));
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {}
-    return [];
+    return PU.parseActionDomain ? PU.parseActionDomain(s) : [];
   }
-
-  /** Phase 211: parseFilterDomain with optional uid substitution for domains like [('user_id','=',uid)]. */
   function parseFilterDomain(s, uid) {
-    if (!s || typeof s !== 'string') return [];
-    let t = s.trim();
-    if (!t) return [];
-    if (uid != null && typeof uid === 'number') {
-      t = t.replace(/\buid\b/g, String(uid));
-    }
-    try {
-      const json = t.replace(/\(/g, '[').replace(/\)/g, ']').replace(/'/g, '"');
-      const parsed = JSON.parse(json);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {}
-    return [];
+    return PU.parseFilterDomain ? PU.parseFilterDomain(s, uid) : [];
+  }
+  function parseCSV(text) {
+    return PU.parseCSV ? PU.parseCSV(text) : [];
   }
 
-  function parseCSV(text) {
-    const rows = [];
-    const lines = text.split(/\r?\n/);
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const row = [];
-      let cur = '';
-      let inQuotes = false;
-      for (let j = 0; j < line.length; j++) {
-        const c = line[j];
-        if (c === '"') {
-          inQuotes = !inQuotes;
-        } else if ((c === ',' && !inQuotes) || (c === '\n' && !inQuotes)) {
-          row.push(cur.trim());
-          cur = '';
-        } else {
-          cur += c;
-        }
-      }
-      row.push(cur.trim());
-      if (row.some(function (c) { return c; })) rows.push(row);
-    }
-    return rows;
-  }
 
   function showImportModal(model, route) {
     const cols = getListColumns(model);
     const modelFields = ['id'].concat(cols.map(function (c) { return typeof c === 'object' ? c.name : c; }));
     const overlay = document.createElement('div');
     overlay.id = 'import-modal-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999';
-    let html = '<div id="import-modal" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" style="background:white;border-radius:8px;padding:var(--space-lg);max-width:600px;width:90%;max-height:90vh;overflow:auto">';
-    html += '<h3 id="import-modal-title" style="margin-top:0">Import CSV / Excel</h3>';
-    html += '<p><input type="file" id="import-file" accept=".csv,.xlsx" style="padding:0.5rem"></p>';
-    html += '<div id="import-preview" style="display:none;margin:1rem 0">';
+    overlay.className = 'o-import-modal-overlay';
+    let html = '<div id="import-modal" class="o-import-modal-panel" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">';
+    html += '<h3 id="import-modal-title" class="o-import-modal-title">Import CSV / Excel</h3>';
+    html += '<p><input type="file" id="import-file" class="o-import-modal-file" accept=".csv,.xlsx"></p>';
+    html += '<div id="import-preview" class="o-import-modal-hidden">';
     html += '<p><strong>Preview (first 5 rows)</strong></p>';
     html += '<div id="import-preview-table"></div>';
     html += '<p><strong>Column mapping</strong></p>';
     html += '<div id="import-mapping"></div>';
-    html += '<p style="margin-top:1rem"><button type="button" id="import-do-btn" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Import</button>';
-    html += ' <button type="button" id="import-cancel-btn" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;background:#fff">Cancel</button></p>';
+    html += '<p class="o-import-modal-actions"><button type="button" id="import-do-btn" class="o-btn o-btn-primary">Import</button>';
+    html += ' <button type="button" id="import-cancel-btn" class="o-btn o-btn-secondary">Cancel</button></p>';
     html += '</div>';
-    html += '<div id="import-result" style="display:none"></div>';
+    html += '<div id="import-result" class="o-import-modal-hidden"></div>';
     html += '</div>';
     overlay.innerHTML = html;
     document.body.appendChild(overlay);
@@ -600,24 +315,24 @@
         if (previewHtml && previewHtml.table && previewHtml.mapping) {
           document.getElementById('import-preview-table').innerHTML = previewHtml.table;
           document.getElementById('import-mapping').innerHTML = previewHtml.mapping;
-          document.getElementById('import-preview').style.display = 'block';
+          document.getElementById('import-preview').classList.remove('o-import-modal-hidden');
           return;
         }
       }
       const preview = csvRows.slice(0, 5);
-      let tbl = '<table style="width:100%;border-collapse:collapse;font-size:0.9rem"><tr>';
-      csvHeaders.forEach(function (h) { tbl += '<th style="padding:0.35rem;border:1px solid #ddd;text-align:left">' + String(h).replace(/</g, '&lt;') + '</th>'; });
+      let tbl = '<table class="o-import-modal-table"><tr>';
+      csvHeaders.forEach(function (h) { tbl += '<th>' + String(h).replace(/</g, '&lt;') + '</th>'; });
       tbl += '</tr>';
       preview.forEach(function (row) {
         tbl += '<tr>';
-        csvHeaders.forEach(function (_, i) { tbl += '<td style="padding:0.35rem;border:1px solid #eee">' + String((row && row[i]) || '').replace(/</g, '&lt;') + '</td>'; });
+        csvHeaders.forEach(function (_, i) { tbl += '<td>' + String((row && row[i]) || '').replace(/</g, '&lt;') + '</td>'; });
         tbl += '</tr>';
       });
       tbl += '</table>';
       document.getElementById('import-preview-table').innerHTML = tbl;
-      let mapHtml = '<table style="width:100%"><tr><th>Column</th><th>Map to field</th></tr>';
+      let mapHtml = '<table class="o-import-modal-table"><tr><th>Column</th><th>Map to field</th></tr>';
       csvHeaders.forEach(function (h, i) {
-        mapHtml += '<tr><td style="padding:0.35rem">' + String(h).replace(/</g, '&lt;') + '</td><td><select class="import-map-select" data-csv-idx="' + i + '" style="width:100%;padding:0.35rem">';
+        mapHtml += '<tr><td>' + String(h).replace(/</g, '&lt;') + '</td><td><select class="import-map-select o-import-modal-map-select" data-csv-idx="' + i + '">';
         mapHtml += '<option value="">-- Skip --</option>';
         const autoMatch = modelFields.find(function (mf) { return mf.toLowerCase() === String(h).toLowerCase().replace(/\s/g, '_'); });
         modelFields.forEach(function (mf) {
@@ -628,7 +343,7 @@
       });
       mapHtml += '</table>';
       document.getElementById('import-mapping').innerHTML = mapHtml;
-      document.getElementById('import-preview').style.display = 'block';
+      document.getElementById('import-preview').classList.remove('o-import-modal-hidden');
     }
     document.getElementById('import-do-btn').onclick = function () {
       const selects = overlay.querySelectorAll('.import-map-select');
@@ -664,18 +379,18 @@
         .catch(function (err) { showToast(err.message || 'Import failed', 'error'); });
     };
     function handleImportResult(res) {
-      document.getElementById('import-preview').style.display = 'none';
+      document.getElementById('import-preview').classList.add('o-import-modal-hidden');
       const r = document.getElementById('import-result');
-      r.style.display = 'block';
+      r.classList.remove('o-import-modal-hidden');
       r.innerHTML = '<p><strong>Import complete</strong></p><p>Created: ' + (res.created || 0) + ', Updated: ' + (res.updated || 0) + '</p>';
       if (res.errors && res.errors.length) {
-        r.innerHTML += '<p style="color:#c00">Errors:</p><table style="width:100%;font-size:0.9rem"><tr><th>Row</th><th>Field</th><th>Message</th></tr>';
+        r.innerHTML += '<p class="o-import-modal-error">Errors:</p><table class="o-import-modal-table"><tr><th>Row</th><th>Field</th><th>Message</th></tr>';
         res.errors.forEach(function (e) {
           r.innerHTML += '<tr><td>' + (e.row || '') + '</td><td>' + (e.field || '').replace(/</g, '&lt;') + '</td><td>' + (e.message || '').replace(/</g, '&lt;') + '</td></tr>';
         });
         r.innerHTML += '</table>';
       }
-      r.innerHTML += '<p><button type="button" id="import-close-btn" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Close</button></p>';
+      r.innerHTML += '<p class="o-import-modal-actions"><button type="button" id="import-close-btn" class="o-btn o-btn-primary">Close</button></p>';
       document.getElementById('import-close-btn').onclick = function () {
         closeModal();
         loadRecords(model, route, currentListState.searchTerm);
@@ -1718,6 +1433,20 @@
   };
 
   function renderDiscuss(channelId) {
+    const dmod = window.AppCore && window.AppCore.DiscussViewModule;
+    if (dmod && typeof dmod.render === 'function') {
+      const ok = dmod.render(main, {
+        channelId: channelId,
+        rpc: rpc,
+        showToast: showToast,
+        bus: window.Services && window.Services.bus,
+        session: window.Services && window.Services.session,
+      });
+      if (ok) {
+        actionStack = [];
+        return;
+      }
+    }
     if (DiscussViewCore && typeof DiscussViewCore.render === "function") {
       var coreHandled = DiscussViewCore.render(main, {
         channelId: channelId,
@@ -1726,6 +1455,10 @@
       });
       if (coreHandled) return;
     }
+    renderDiscussFallback(channelId);
+  }
+
+  function renderDiscussFallback(channelId) {
     actionStack = [];
     const container = document.createElement('div');
     container.id = 'discuss-container';
@@ -2119,531 +1852,57 @@
       });
       return;
     }
-    if (typeof window !== 'undefined') window.chatContext = { model: model, active_id: null };
-    const cols = getListColumns(model);
-    const title = getTitle(route);
-    const addLabel = route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add';
-    const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
-    const currentView = (currentListState.route === route && currentListState.viewType) || 'list';
-    const order = (currentListState.route === route && currentListState.order) || null;
-    applyActionStackForList(route, title);
-    let html = '<h2>' + title + '</h2>';
-    html += '<p class="o-list-fallback-toolbar">';
-    html += renderViewSwitcher(route, currentView);
-    html += '<div role="search" class="o-list-fallback-search"><input type="text" id="list-search" placeholder="Search..." aria-label="Search records" class="o-list-search-field" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-    html += '<button type="button" id="btn-search" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">Search</button>';
-    html += '<button type="button" id="btn-ai-search" title="Natural language search" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--accent">AI Search</button></div>';
-    const searchView = viewsSvc && viewsSvc.getView(model, 'search');
-    const searchFilters = (searchView && searchView.filters) || [];
-    const searchGroupBys = (searchView && searchView.group_bys) || [];
-    const activeFilters = currentListState.activeSearchFilters || [];
-    const currentGroupBy = currentListState.groupBy || null;
-    searchFilters.forEach(function (f) {
-      const active = activeFilters.indexOf(f.name) >= 0;
-      html += '<button type="button" class="btn-search-filter' + (active ? ' active' : '') + '" data-filter="' + (f.name || '').replace(/"/g, '&quot;') + '">' + (f.string || f.name || '').replace(/</g, '&lt;') + '</button>';
-    });
-    if (searchGroupBys.length) {
-      html += '<select id="list-group-by" class="o-list-toolbar-select"><option value="">Group by</option>';
-      searchGroupBys.forEach(function (g) {
-        html += '<option value="' + (g.group_by || '').replace(/"/g, '&quot;') + '"' + (currentGroupBy === g.group_by ? ' selected' : '') + '>' + (g.string || g.name || '').replace(/</g, '&lt;') + '</option>';
+    var _lvm = window.AppCore && window.AppCore.ListViewModule;
+    if (_lvm && typeof _lvm.render === "function") {
+      _lvm.render(main, {
+        rpc: rpc,
+        viewsSvc: viewsSvc,
+        showToast: showToast,
+        model: model,
+        route: route,
+        records: records,
+        searchTerm: searchTerm,
+        totalCount: totalCount,
+        offset: offset,
+        limit: limit,
+        savedFiltersList: savedFiltersList,
+        currentListState: currentListState,
+        searchModel: currentListState.__searchModel,
+        helpers: {
+          getAvailableViewModes: getAvailableViewModes,
+          getListColumns: getListColumns,
+          getTitle: getTitle,
+          getReportName: getReportName,
+          loadRecords: loadRecords,
+          setViewAndReload: setViewAndReload,
+          deleteRecord: deleteRecord,
+          getMany2oneComodel: getMany2oneComodel,
+          getMany2manyInfo: getMany2manyInfo,
+          isMonetaryField: isMonetaryField,
+          getMonetaryCurrencyField: getMonetaryCurrencyField,
+          getSelectionLabel: getSelectionLabel,
+          getDisplayNames: getDisplayNames,
+          getDisplayNamesForMany2many: getDisplayNamesForMany2many,
+          getActionForRoute: getActionForRoute,
+          parseActionDomain: parseActionDomain,
+          buildSearchDomain: buildSearchDomain,
+          parseFilterDomain: parseFilterDomain,
+          saveSavedFilter: saveSavedFilter,
+          showImportModal: showImportModal,
+          getHashDomainParam: getHashDomainParam,
+          confirmModal: confirmModal,
+          applyActionStackForList: applyActionStackForList,
+          renderViewSwitcher: renderViewSwitcher,
+          dispatchListActWindowThenFormHash: dispatchListActWindowThenFormHash,
+          getFieldMeta: getFieldMeta,
+          getSelectionOptions: getSelectionOptions,
+          saveListState: window.ActionManager && window.ActionManager.saveListState ? window.ActionManager.saveListState : null,
+          restoreListState: window.ActionManager && window.ActionManager.restoreListState ? window.ActionManager.restoreListState : null,
+        },
       });
-      html += '</select>';
+      return;
     }
-    html += '<select id="list-saved-filter" class="o-list-toolbar-select"><option value="">Saved filters</option>';
-    savedFiltersList.forEach(function (f) {
-      html += '<option value="' + (f.id != null ? String(f.id) : '').replace(/"/g, '&quot;') + '"' + (currentListState.savedFilterId == f.id ? ' selected' : '') + '>' + (f.name || 'Filter').replace(/</g, '&lt;') + '</option>';
-    });
-    html += '</select>';
-    html += '<button type="button" id="btn-save-filter" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Save</button>';
-    if (model === 'crm.lead') {
-      html += '<select id="list-stage-filter" class="o-list-toolbar-select"><option value="">All stages</option></select>';
-    }
-    html += '<button type="button" id="btn-export" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Export CSV</button>';
-    html += '<button type="button" id="btn-export-excel" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Export Excel</button>';
-    html += '<button type="button" id="btn-import" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Import</button>';
-    const reportName = getReportName(model);
-    if (reportName) html += '<button type="button" id="btn-print" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Print</button>';
-    html += '<button type="button" id="btn-add" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--primary">' + addLabel + '</button></p>';
-    const hasFacets = (activeFilters.length > 0 || currentGroupBy);
-    if (hasFacets) {
-      html += '<p class="facet-chips o-list-facet-row">';
-      activeFilters.forEach(function (fname) {
-        const f = searchFilters.find(function (x) { return x.name === fname; });
-        html += '<span class="facet-chip o-list-facet-chip" data-type="filter" data-name="' + (fname || '').replace(/"/g, '&quot;') + '">' + (f ? (f.string || fname) : fname).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove o-list-facet-remove" aria-label="Remove">&times;</button></span>';
-      });
-      if (currentGroupBy) {
-        const g = searchGroupBys.find(function (x) { return x.group_by === currentGroupBy; });
-        html += '<span class="facet-chip o-list-facet-chip" data-type="groupby" data-name="' + (currentGroupBy || '').replace(/"/g, '&quot;') + '">Group: ' + (g ? (g.string || currentGroupBy) : currentGroupBy).replace(/</g, '&lt;') + ' <button type="button" class="facet-remove o-list-facet-remove" aria-label="Remove">&times;</button></span>';
-      }
-      html += '</p>';
-    }
-    if (!records || !records.length) {
-      main.innerHTML = html + '<p>No records yet.</p>';
-    } else {
-      const m2oCols = cols.filter(function (c) {
-        const f = typeof c === 'object' ? c.name : c;
-        return getMany2oneComodel(model, f);
-      });
-      const m2mCols = cols.filter(function (c) {
-        const f = typeof c === 'object' ? c.name : c;
-        return getMany2manyInfo(model, f);
-      });
-      const numericCols = ['expected_revenue', 'revenue', 'amount', 'quantity'];
-      function renderTable(nameMap) {
-        let tbl = '<div id="bulk-action-bar" class="o-bulk-action-bar"><span id="bulk-selected-count" class="o-bulk-selected-count"></span><button type="button" id="bulk-delete" class="o-btn o-bulk-delete-btn">Delete Selected</button><button type="button" id="bulk-clear" class="o-btn o-list-toolbar-btn o-list-toolbar-btn--muted">Clear</button></div>';
-        tbl += '<table role="grid" aria-label="Records" class="o-list-fallback-table"><thead><tr role="row">';
-        tbl += '<th role="columnheader" class="o-list-th o-list-th--checkbox"><input type="checkbox" id="list-select-all" aria-label="Select all" title="Select all"></th>';
-        cols.forEach(c => {
-          const f = typeof c === 'object' ? c.name : c;
-          const label = (typeof c === 'object' ? c.name || c : c);
-          const isSorted = order && (order.startsWith(f + ' ') || order.startsWith(f + ','));
-          const dir = isSorted && order.indexOf('desc') >= 0 ? 'desc' : 'asc';
-          const arrow = isSorted ? (dir === 'asc' ? ' \u25b2' : ' \u25bc') : '';
-          tbl += '<th role="columnheader" class="sortable-col o-list-th o-list-th--sortable" data-field="' + (f || '').replace(/"/g, '&quot;') + '">' + (label || '').replace(/</g, '&lt;') + arrow + '</th>';
-        });
-        tbl += '<th role="columnheader" class="o-list-th o-list-th--actions"></th></tr></thead><tbody>';
-        const groupByField = currentListState.groupBy;
-        const groups = groupByField ? (function () {
-          const g = {};
-          (records || []).forEach(function (r) {
-            const k = r[groupByField] != null ? r[groupByField] : '__false__';
-            if (!g[k]) g[k] = [];
-            g[k].push(r);
-          });
-          return Object.keys(g).map(function (k) { return { key: k === '__false__' ? false : k, rows: g[k] }; });
-        })() : null;
-        function renderRow(r, isGroupHeader, isSubtotal) {
-          if (isGroupHeader) {
-            const gval = r;
-            const label = (nameMap && nameMap[groupByField] && gval != null) ? (nameMap[groupByField][gval] || gval) : (gval != null ? String(gval) : '(No value)');
-            tbl += '<tr role="row" class="group-header o-list-group-header"><td role="gridcell" class="o-list-td o-list-group-cell" colspan="' + (cols.length + 2) + '">' + String(label).replace(/</g, '&lt;') + '</td></tr>';
-            return;
-          }
-          if (isSubtotal) {
-            tbl += '<tr role="row" class="group-subtotal o-list-subtotal-row"><td class="o-list-td o-list-td--checkbox"></td>';
-            cols.forEach(c => {
-              const f = typeof c === 'object' ? c.name : c;
-              const sum = r[f];
-              const isNum = numericCols.indexOf(f) >= 0;
-              tbl += '<td role="gridcell" class="o-list-td">' + (isNum && sum != null ? Number(sum).toLocaleString() : '').replace(/</g, '&lt;') + '</td>';
-            });
-            tbl += '<td role="gridcell" class="o-list-td o-list-td--actions"></td></tr>';
-            return;
-          }
-          tbl += '<tr role="row" tabindex="0" data-id="' + (r.id || '') + '" class="list-data-row">';
-          tbl += '<td role="gridcell" class="o-list-td o-list-td--checkbox"><input type="checkbox" class="list-row-select" data-id="' + (r.id || '') + '" aria-label="Select row"></td>';
-          cols.forEach(c => {
-            const f = typeof c === 'object' ? c.name : c;
-            let val = r[f];
-            if (nameMap && nameMap[f] && val != null) {
-              if (Array.isArray(val)) {
-                val = val.map(function (id) { return nameMap[f][id] || id; }).join(', ');
-              } else {
-                val = nameMap[f][val] || val;
-              }
-            } else if (val != null) {
-              if (typeof val === 'boolean') val = val ? 'Yes' : 'No';
-              else if (isMonetaryField(model, f)) {
-                const n = Number(val);
-                let formatted = !isNaN(n) ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : val;
-                const currField = getMonetaryCurrencyField(model, f);
-                if (currField && r[currField] && nameMap && nameMap[currField]) {
-                  const sym = nameMap[currField][r[currField]];
-                  if (sym) formatted = (sym + ' ' + formatted).trim();
-                }
-                val = formatted;
-              } else {
-                const selLabel = getSelectionLabel(model, f, val);
-                if (selLabel !== val) val = selLabel;
-              }
-            }
-            tbl += '<td role="gridcell" class="o-list-td">' + (val != null ? String(val) : '').replace(/</g, '&lt;') + '</td>';
-          });
-          tbl += '<td role="gridcell" class="o-list-td o-list-td--actions"><a href="#' + route + '/edit/' + (r.id || '') + '" class="o-list-action-link" data-edit-id="' + (r.id || '') + '">Edit</a>';
-          tbl += '<a href="#" class="btn-delete o-list-delete-link" data-id="' + (r.id || '') + '">Delete</a></td></tr>';
-        }
-        if (groups) {
-          groups.forEach(function (grp) {
-            renderRow(grp.key, true);
-            grp.rows.forEach(function (r) { renderRow(r, false); });
-            const subtotal = {};
-            numericCols.forEach(function (f) {
-              if (cols.some(function (c) { return (typeof c === 'object' ? c.name : c) === f; })) {
-                subtotal[f] = grp.rows.reduce(function (s, r) { return s + (Number(r[f]) || 0); }, 0);
-              }
-            });
-            if (Object.keys(subtotal).length) renderRow(subtotal, false, true);
-          });
-        } else {
-          records.forEach(r => { renderRow(r, false); });
-        }
-        tbl += '</tbody></table>';
-        const total = totalCount != null ? totalCount : (records ? records.length : 0);
-        const off = offset != null ? offset : 0;
-        const lim = limit != null ? limit : 80;
-        let pager = '';
-        if (total > 0 && records && records.length) {
-          const from = off + 1;
-          const to = Math.min(off + lim, total);
-          pager = '<p class="list-pager o-list-pager">';
-          pager += from + '-' + to + ' of ' + total + ' ';
-          pager += '<button type="button" class="btn-pager-prev o-list-pager-btn" ' + (off <= 0 ? 'disabled' : '') + '>Prev</button>';
-          pager += ' <button type="button" class="btn-pager-next o-list-pager-btn" ' + (off + lim >= total ? 'disabled' : '') + '>Next</button>';
-          pager += '</p>';
-        }
-        main.innerHTML = html + tbl + pager;
-        (function setupBulkActions() {
-          const bar = document.getElementById('bulk-action-bar');
-          const countEl = document.getElementById('bulk-selected-count');
-          const selectAll = document.getElementById('list-select-all');
-          const bulkDelete = document.getElementById('bulk-delete');
-          const bulkClear = document.getElementById('bulk-clear');
-          function getSelectedIds() {
-            return Array.prototype.map.call(main.querySelectorAll('.list-row-select:checked'), function (cb) { return parseInt(cb.dataset.id, 10); }).filter(function (x) { return !isNaN(x); });
-          }
-          function updateBar() {
-            const ids = getSelectedIds();
-            if (bar) {
-              bar.style.display = ids.length ? 'flex' : 'none';
-              bar.style.flexDirection = 'row';
-            }
-            if (countEl) countEl.textContent = ids.length ? ids.length + ' selected' : '';
-            if (selectAll) selectAll.checked = ids.length && main.querySelectorAll('.list-row-select').length === ids.length;
-          }
-          if (selectAll) {
-            selectAll.onclick = function () {
-              main.querySelectorAll('.list-row-select').forEach(function (cb) { cb.checked = selectAll.checked; });
-              updateBar();
-            };
-          }
-          main.querySelectorAll('.list-row-select').forEach(function (cb) {
-            cb.onclick = updateBar;
-          });
-          if (bulkDelete) {
-            bulkDelete.onclick = function () {
-              const ids = getSelectedIds();
-              if (!ids.length) return;
-              confirmModal({ title: 'Delete records', message: 'Delete ' + ids.length + ' record(s)?', confirmLabel: 'Delete', cancelLabel: 'Cancel' }).then(function (ok) {
-                if (!ok) return;
-                rpc.callKw(model, 'unlink', [ids], {})
-                .then(function () {
-                  showToast('Deleted', 'success');
-                  loadRecords(model, route, currentListState.searchTerm, stageFilter, undefined, currentListState.savedFilterId, offset, limit, getHashDomainParam());
-                })
-                .catch(function (err) { showToast(err.message || 'Delete failed', 'error'); });
-              });
-            };
-          }
-          if (bulkClear) bulkClear.onclick = function () { main.querySelectorAll('.list-row-select').forEach(function (cb) { cb.checked = false; }); if (selectAll) selectAll.checked = false; updateBar(); };
-        })();
-        (function setupListKeyboardNav() {
-          const table = main.querySelector('table[role="grid"]');
-          if (!table) return;
-          table.addEventListener('keydown', function (e) {
-            const row = e.target.closest && e.target.closest('tr.list-data-row');
-            if (!row) return;
-            const rows = Array.prototype.slice.call(table.querySelectorAll('tr.list-data-row'));
-            const idx = rows.indexOf(row);
-            if (idx < 0) return;
-            if (e.key === 'ArrowDown' && idx < rows.length - 1) {
-              e.preventDefault();
-              rows[idx + 1].focus();
-            } else if (e.key === 'ArrowUp' && idx > 0) {
-              e.preventDefault();
-              rows[idx - 1].focus();
-            } else if (e.key === 'Enter') {
-              const id = row.getAttribute('data-id');
-              if (id) { e.preventDefault(); dispatchListActWindowThenFormHash(route, 'edit/' + id, 'listKeyboardEnterForm'); }
-            }
-          });
-        })();
-        (function setupListTableEditLinkClicks() {
-          const table = main.querySelector('table[role="grid"]');
-          if (!table) return;
-          table.addEventListener('click', function (e) {
-            var a = e.target.closest && e.target.closest('a.o-list-action-link');
-            if (!a || !a.getAttribute('data-edit-id')) return;
-            var id = a.getAttribute('data-edit-id');
-            if (!id) return;
-            e.preventDefault();
-            dispatchListActWindowThenFormHash(route, 'edit/' + id, 'listTableEditLink');
-          });
-        })();
-      }
-      const monetaryCurrCols = cols.filter(function (c) {
-        const f = typeof c === 'object' ? c.name : c;
-        return isMonetaryField(model, f) && getMonetaryCurrencyField(model, f);
-      }).map(function (c) { return getMonetaryCurrencyField(model, typeof c === 'object' ? c.name : c); }).filter(Boolean);
-      const currCols = monetaryCurrCols.filter(function (f, i, a) { return a.indexOf(f) === i; });
-      const allCols = m2oCols.length || m2mCols.length || currCols.length;
-      if (allCols) {
-        const promises = m2oCols.map(function (c) {
-          const f = typeof c === 'object' ? c.name : c;
-          return getDisplayNames(model, f, records).then(function (m) { return { f: f, m: m }; });
-        }).concat(m2mCols.map(function (c) {
-          const f = typeof c === 'object' ? c.name : c;
-          return getDisplayNamesForMany2many(model, f, records).then(function (m) { return { f: f, m: m }; });
-        })).concat(currCols.map(function (f) {
-          return getDisplayNames(model, f, records).then(function (m) { return { f: f, m: m }; });
-        }));
-        Promise.all(promises).then(function (maps) {
-          const nameMap = {};
-          maps.forEach(function (x) { nameMap[x.f] = x.m; });
-          renderTable(nameMap);
-        }).catch(function () { renderTable({}); });
-      } else {
-        renderTable(null);
-      }
-    }
-    const btn = document.getElementById('btn-add');
-    if (btn) btn.onclick = function () { dispatchListActWindowThenFormHash(route, 'new', 'listToolbarNew'); };
-    const btnExportExcel = document.getElementById('btn-export-excel');
-    if (btnExportExcel && records && records.length) {
-      btnExportExcel.onclick = function () {
-        const cols = getListColumns(model);
-        const fields = ['id'].concat(cols.map(function (c) { return typeof c === 'object' ? c.name : c; }));
-        let domain = [];
-        const action = getActionForRoute(route);
-        if (action && action.domain) {
-          const parsed = parseActionDomain(action.domain);
-          if (parsed && parsed.length) domain = parsed;
-        }
-        const searchDom = buildSearchDomain(model, (document.getElementById('list-search') && document.getElementById('list-search').value) || '');
-        if (searchDom && searchDom.length) domain = domain.concat(searchDom);
-        const stageEl = document.getElementById('list-stage-filter');
-        if ((model === 'crm.lead' || model === 'helpdesk.ticket') && stageEl && stageEl.value) domain = domain.concat([['stage_id', '=', parseInt(stageEl.value, 10)]]);
-        (currentListState.activeSearchFilters || []).forEach(function (fname) {
-          const searchView = viewsSvc && viewsSvc.getView(model, 'search');
-          const filters = (searchView && searchView.filters) || [];
-          const f = filters.find(function (x) { return x.name === fname && x.domain; });
-          if (f && f.domain) {
-            const fd = parseFilterDomain(f.domain);
-            if (fd.length) domain = domain.concat(fd);
-          }
-        });
-        fetch('/web/export/xlsx', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: model, fields: fields, domain: domain })
-        }).then(function (r) {
-          if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'Export failed'); });
-          return r.blob();
-        }).then(function (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = (route || 'export') + '.xlsx';
-          a.click();
-          URL.revokeObjectURL(url);
-        }).catch(function (err) { showToast(err.message || 'Failed to export', 'error'); });
-      };
-    }
-    const btnExport = document.getElementById('btn-export');
-    if (btnExport && records && records.length) {
-      btnExport.onclick = function () {
-        const tbl = main.querySelector('table');
-        if (!tbl) return;
-        const rows = tbl.querySelectorAll('tr');
-        const lines = [];
-        rows.forEach(function (tr) {
-          const cells = tr.querySelectorAll('td, th');
-          const vals = [];
-          cells.forEach(function (cell) {
-            const txt = (cell.textContent || '').trim().replace(/"/g, '""');
-            vals.push(txt.indexOf(',') >= 0 || txt.indexOf('"') >= 0 || txt.indexOf('\n') >= 0 ? '"' + txt + '"' : txt);
-          });
-          if (vals.length) lines.push(vals.join(','));
-        });
-        const csv = lines.join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = (route || 'export') + '.csv';
-        a.click();
-        URL.revokeObjectURL(url);
-      };
-    }
-    const btnImport = document.getElementById('btn-import');
-    if (btnImport) {
-      btnImport.onclick = function () { showImportModal(model, route); };
-    }
-    const btnPrint = document.getElementById('btn-print');
-    if (btnPrint && reportName && records && records.length) {
-      btnPrint.onclick = function () {
-        const ids = records.map(function (r) { return r.id; }).filter(function (x) { return x; });
-        if (!ids.length) return;
-        const pdfUrl = '/report/pdf/' + reportName + '/' + ids.join(',');
-        if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === 'function') {
-          window.UIComponents.PdfViewer.open(pdfUrl, 'List print preview');
-        } else {
-          window.open('/report/html/' + reportName + '/' + ids.join(','), '_blank', 'noopener');
-        }
-      };
-    }
-    const btnSearch = document.getElementById('btn-search');
-    const searchInput = document.getElementById('list-search');
-    if (btnSearch && searchInput) {
-      const doSearch = function () {
-        const sf = document.getElementById('list-saved-filter');
-        const stageEl = document.getElementById('list-stage-filter');
-        const stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
-        loadRecords(model, route, searchInput.value.trim(), stageVal, null, sf && sf.value ? sf.value : null, 0, null);
-      };
-      btnSearch.onclick = doSearch;
-      searchInput.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } };
-    }
-    const btnAiSearch = document.getElementById('btn-ai-search');
-    if (btnAiSearch && searchInput) {
-      btnAiSearch.onclick = function () {
-        const query = searchInput.value.trim();
-        if (!query) {
-          const sf = document.getElementById('list-saved-filter');
-          const stageEl = document.getElementById('list-stage-filter');
-          const stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
-          loadRecords(model, route, '', stageVal, null, sf && sf.value ? sf.value : null, 0, null);
-          return;
-        }
-        btnAiSearch.disabled = true;
-        btnAiSearch.textContent = '...';
-        fetch('/ai/nl_search', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: model, query: query, limit: 80 })
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.error) { showToast(data.error || 'AI search failed', 'error'); return; }
-            const action = getActionForRoute(route);
-            const actionDomain = action ? parseActionDomain(action.domain || '') : [];
-            const nlDomain = (data.domain && data.domain.length) ? data.domain : [];
-            const domainOverride = actionDomain.concat(nlDomain);
-            const sf = document.getElementById('list-saved-filter');
-            const stageEl = document.getElementById('list-stage-filter');
-            const stageVal = stageEl && stageEl.value ? parseInt(stageEl.value, 10) : null;
-            loadRecords(model, route, query, stageVal, null, sf && sf.value ? sf.value : null, 0, null, domainOverride.length ? domainOverride : undefined);
-          })
-          .catch(function (err) { showToast(err.message || 'AI search failed', 'error'); })
-          .finally(function () { btnAiSearch.disabled = false; btnAiSearch.textContent = 'AI Search'; });
-      };
-    }
-      main.querySelectorAll('.btn-delete').forEach(a => {
-      a.onclick = (e) => {
-        e.preventDefault();
-        confirmModal({ title: 'Delete record', message: 'Delete this record?', confirmLabel: 'Delete', cancelLabel: 'Cancel' }).then(function (ok) {
-          if (ok) deleteRecord(model, route, a.dataset.id);
-        });
-      };
-    });
-    main.querySelectorAll('.btn-view').forEach(btn => {
-      btn.onclick = () => { const v = btn.dataset.view; if (v) setViewAndReload(route, v); };
-    });
-    main.querySelectorAll('.btn-search-filter').forEach(btn => {
-      btn.onclick = function () {
-        const fname = btn.dataset.filter;
-        if (!fname) return;
-        const cur = currentListState.activeSearchFilters || [];
-        const idx = cur.indexOf(fname);
-        const next = idx >= 0 ? cur.filter(function (_, i) { return i !== idx; }) : cur.concat(fname);
-        currentListState.activeSearchFilters = next;
-        const si = document.getElementById('list-search');
-        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, currentListState.savedFilterId, 0, null);
-      };
-    });
-    const groupByEl = document.getElementById('list-group-by');
-    if (groupByEl) {
-      groupByEl.onchange = function () {
-        currentListState.groupBy = groupByEl.value || null;
-        const si = document.getElementById('list-search');
-        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, currentListState.savedFilterId, 0, null);
-      };
-    }
-    main.querySelectorAll('.facet-chip .facet-remove').forEach(btn => {
-      btn.onclick = function (e) {
-        e.preventDefault();
-        const chip = btn.closest('.facet-chip');
-        if (!chip) return;
-        const typ = chip.dataset.type;
-        const name = chip.dataset.name;
-        if (typ === 'filter') {
-          currentListState.activeSearchFilters = (currentListState.activeSearchFilters || []).filter(function (f) { return f !== name; });
-        } else if (typ === 'groupby') {
-          currentListState.groupBy = null;
-        }
-        const si = document.getElementById('list-search');
-        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, currentListState.savedFilterId, 0, null);
-      };
-    });
-    main.querySelectorAll('.sortable-col').forEach(th => {
-      th.onclick = function () {
-        const f = th.dataset.field;
-        if (!f) return;
-        const cur = (currentListState.route === route && currentListState.order) || '';
-        const nextDir = (cur.startsWith(f + ' ') && cur.indexOf('desc') < 0) ? 'desc' : 'asc';
-        loadRecords(model, route, searchTerm, stageFilter, null, currentListState.savedFilterId, 0, f + ' ' + nextDir);
-      };
-    });
-    main.querySelectorAll('.btn-pager-prev').forEach(btn => {
-      btn.onclick = function () {
-        if (btn.disabled) return;
-        const off = (currentListState.offset || 0) - (currentListState.limit || 80);
-        loadRecords(model, route, searchTerm, stageFilter, null, currentListState.savedFilterId, Math.max(0, off), null);
-      };
-    });
-    main.querySelectorAll('.btn-pager-next').forEach(btn => {
-      btn.onclick = function () {
-        if (btn.disabled) return;
-        const off = (currentListState.offset || 0) + (currentListState.limit || 80);
-        loadRecords(model, route, searchTerm, stageFilter, null, currentListState.savedFilterId, off, null);
-      };
-    });
-    if (model === 'crm.lead') {
-      const filterEl = document.getElementById('list-stage-filter');
-      if (filterEl) {
-        rpc.callKw('crm.stage', 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence' })
-          .then(function (stages) {
-            stages.forEach(function (s) {
-              const opt = document.createElement('option');
-              opt.value = s.id;
-              opt.textContent = s.name || '';
-              if (s.id === stageFilter) opt.selected = true;
-              filterEl.appendChild(opt);
-            });
-            filterEl.onchange = function () {
-              const val = filterEl.value ? parseInt(filterEl.value, 10) : null;
-              loadRecords(model, route, document.getElementById('list-search').value.trim(), val, null, null, 0, null);
-            };
-          });
-      }
-    }
-    const savedFilterEl = document.getElementById('list-saved-filter');
-    if (savedFilterEl) {
-      savedFilterEl.onchange = function () {
-        const fid = savedFilterEl.value || null;
-        const si = document.getElementById('list-search');
-        loadRecords(model, route, si ? si.value.trim() : '', stageFilter, null, fid, 0, null);
-      };
-    }
-    const btnSaveFilter = document.getElementById('btn-save-filter');
-    if (btnSaveFilter) {
-      btnSaveFilter.onclick = function () {
-        const name = prompt('Filter name:');
-        if (!name || !name.trim()) return;
-        const si = document.getElementById('list-search');
-        const st = si ? si.value.trim() : '';
-        const action = getActionForRoute(route);
-        const actionDomain = action ? parseActionDomain(action.domain || '') : [];
-        let domain = actionDomain.slice();
-        const searchDom = buildSearchDomain(model, st);
-        if (searchDom.length) domain = domain.concat(searchDom);
-        if (model === 'crm.lead' && stageFilter) domain = domain.concat([['stage_id', '=', stageFilter]]);
-        saveSavedFilter(model, name.trim(), domain).then(function () {
-          loadRecords(model, route, st, stageFilter, null, null, 0, null);
-        });
-      };
-    }
+    main.innerHTML = '<p class="o-empty">List view unavailable.</p>';
   }
 
   let currentListState = { model: null, route: null, searchTerm: '', stageFilter: null, viewType: null, savedFilterId: null, offset: 0, limit: 80, order: null, totalCount: 0, activeSearchFilters: [], groupBy: null };
@@ -3254,895 +2513,878 @@
     } else {
       pushBreadcrumb(formTitle, formLeaf);
     }
-    let html = renderBreadcrumbs();
-    html += '<h2>' + formTitle + '</h2>';
-    html += '<div id="form-dirty-banner" class="form-dirty-banner" style="display:none">You have unsaved changes</div>';
-    html += '<div class="form-with-sidebar" style="display:flex;gap:var(--space-xl);align-items:flex-start;flex-wrap:wrap">';
-    html += '<form id="record-form" style="max-width:600px;flex:1;min-width:280px">';
-    if (children && children.length) {
-      html += renderFormTreeToHtml(model, children, { recordId: id, route: route, isNew: isNew });
-    } else {
-      fields.forEach(function (f) {
-        var fname = typeof f === 'object' ? f.name : f;
-        html += '<div class="attr-field" data-fname="' + (fname || '') + '">' + renderFieldHtml(model, f) + '</div>';
+    function wireFormViewAfterPaint(hostMain) {
+      var main = hostMain;
+      const form = document.getElementById('record-form');
+      main.querySelectorAll(".o-shortcut-target[data-shortcut]").forEach(function (el) {
+        var k = el.getAttribute("data-shortcut");
+        if (k) el.title = (el.title ? el.title + " " : "") + "(" + k + ")";
       });
-    }
-    var FFA = window.AppCore && window.AppCore.FormFooterActions;
-    if (FFA && typeof FFA.buildFormFooterActionsHtml === 'function') {
-      html += FFA.buildFormFooterActionsHtml({
-        route: route,
-        isNew: isNew,
-        model: model,
-        reportName: !isNew ? getReportName(model) : null,
-        recordId: id,
-      });
-    } else {
-      html += '<p><button type="submit" id="btn-save" class="o-btn o-btn-primary o-shortcut-target" data-shortcut="Alt+S">Save</button> ';
-      html += '<a href="#' + route + '" id="form-cancel" style="margin-left:0.5rem">Cancel</a>';
-      if (isNew && (model === 'crm.lead' || model === 'res.partner')) {
-        html += ' <button type="button" id="btn-ai-fill" title="Extract fields from pasted text" style="margin-left:0.5rem;padding:0.5rem 1rem;background:var(--color-accent,#6366f1);color:white;border:none;border-radius:4px;cursor:pointer">AI Fill</button>';
+      var previewBtn = document.getElementById("btn-preview-form");
+      if (previewBtn) {
+        previewBtn.onclick = function () {
+          var reportName = getReportName(model);
+          if (!reportName || !id) return;
+          var url = "/report/pdf/" + reportName + "/" + id;
+          if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === "function") {
+            window.UIComponents.PdfViewer.open(url, "Record Preview");
+          } else {
+            window.open(url, "_blank", "noopener");
+          }
+        };
       }
-      if (!isNew) {
-        html += ' <button type="button" id="btn-duplicate" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Duplicate</button>';
-        const reportName = getReportName(model);
-        if (reportName) {
-          html += ' <a href="/report/html/' + reportName + '/' + id + '" target="_blank" rel="noopener" id="btn-print-form" class="o-btn o-btn-secondary o-shortcut-target" data-shortcut="Alt+P" style="margin-left:0.5rem;text-decoration:none">Print</a>';
-          html += ' <button type="button" id="btn-preview-form" class="o-btn o-btn-secondary" style="margin-left:0.5rem">Preview</button>';
-        }
-        html += ' <a href="#" id="btn-delete-form" style="margin-left:0.5rem;font-size:0.9rem;color:#c00">Delete</a>';
+      var printFormA = document.getElementById("btn-print-form");
+      if (printFormA && getReportName(model) && id) {
+        printFormA.addEventListener("click", function (e) {
+          e.preventDefault();
+          var rn = getReportName(model);
+          if (!rn || !id) return;
+          var pdfUrl = "/report/pdf/" + rn + "/" + id;
+          if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === "function") {
+            window.UIComponents.PdfViewer.open(pdfUrl, "Print preview");
+          } else {
+            window.open(printFormA.getAttribute("href") || "#", "_blank", "noopener");
+          }
+        });
       }
-      html += '</p>';
-    }
-    html += '</form>';
-    if (!isNew && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
-      html += '<aside id="form-ai-sidebar" class="form-ai-sidebar" style="min-width:240px;max-width:280px;padding:var(--space-lg);background:var(--color-bg);border:1px solid var(--border-color);border-radius:var(--radius-md)">';
-      html += '<h3 style="margin:0 0 var(--space-md);font-size:1rem">AI Suggestions</h3>';
-      html += '<div id="ai-suggestions-list" style="font-size:0.9rem;color:var(--text-muted)">' + skeletonHtml(3, true) + '</div>';
-      html += '</aside>';
-    }
-    html += '</div>';
-    main.innerHTML = html;
-    const form = document.getElementById('record-form');
-    main.querySelectorAll(".o-shortcut-target[data-shortcut]").forEach(function (el) {
-      var k = el.getAttribute("data-shortcut");
-      if (k) el.title = (el.title ? el.title + " " : "") + "(" + k + ")";
-    });
-    var previewBtn = document.getElementById("btn-preview-form");
-    if (previewBtn) {
-      previewBtn.onclick = function () {
-        var reportName = getReportName(model);
-        if (!reportName || !id) return;
-        var url = "/report/pdf/" + reportName + "/" + id;
-        if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === "function") {
-          window.UIComponents.PdfViewer.open(url, "Record Preview");
-        } else {
-          window.open(url, "_blank", "noopener");
+      fields.forEach(f => {
+        const fn = typeof f === 'object' ? f.name : f;
+        if (isHtmlField(model, fn)) {
+          const htmlDiv = document.getElementById('html-' + fn);
+          const hiddenIn = document.getElementById('hidden-html-' + fn);
+          if (htmlDiv && hiddenIn) {
+            const syncHtml = function () { hiddenIn.value = htmlDiv.innerHTML || ''; };
+            htmlDiv.addEventListener('input', syncHtml);
+            htmlDiv.addEventListener('blur', syncHtml);
+          }
         }
-      };
-    }
-    var printFormA = document.getElementById("btn-print-form");
-    if (printFormA && getReportName(model) && id) {
-      printFormA.addEventListener("click", function (e) {
-        e.preventDefault();
-        var rn = getReportName(model);
-        if (!rn || !id) return;
-        var pdfUrl = "/report/pdf/" + rn + "/" + id;
-        if (window.UIComponents && window.UIComponents.PdfViewer && typeof window.UIComponents.PdfViewer.open === "function") {
-          window.UIComponents.PdfViewer.open(pdfUrl, "Print preview");
-        } else {
-          window.open(printFormA.getAttribute("href") || "#", "_blank", "noopener");
-        }
-      });
-    }
-    fields.forEach(f => {
-      const fn = typeof f === 'object' ? f.name : f;
-      if (isHtmlField(model, fn)) {
-        const htmlDiv = document.getElementById('html-' + fn);
-        const hiddenIn = document.getElementById('hidden-html-' + fn);
-        if (htmlDiv && hiddenIn) {
-          const syncHtml = function () { hiddenIn.value = htmlDiv.innerHTML || ''; };
-          htmlDiv.addEventListener('input', syncHtml);
-          htmlDiv.addEventListener('blur', syncHtml);
-        }
-      }
-      if (isBinaryField(model, fn) || isImageField(model, fn)) {
-        const fileIn = document.getElementById('file-' + fn);
-        const hiddenIn = document.getElementById('hidden-' + fn);
-        const statusSpan = document.getElementById('bin-status-' + fn);
-        const imgPreview = document.getElementById('img-preview-' + fn);
-        if (fileIn && hiddenIn) {
-          fileIn.onchange = function () {
-            const file = fileIn.files && fileIn.files[0];
-            if (!file) { hiddenIn.value = ''; if (statusSpan) statusSpan.textContent = ''; if (imgPreview) { imgPreview.src = ''; imgPreview.style.display = 'none'; } return; }
-            const r = new FileReader();
-            r.onload = function () {
-              const dataUrl = r.result;
-              const base64 = (dataUrl && dataUrl.indexOf(',') >= 0) ? dataUrl.split(',')[1] : '';
-              hiddenIn.value = base64;
-              if (statusSpan) statusSpan.textContent = file.name + ' (' + (file.size < 1024 ? file.size + ' B' : (file.size / 1024).toFixed(1) + ' KB') + ')';
-              if (imgPreview && file.type && file.type.startsWith('image/')) {
-                imgPreview.src = dataUrl;
-                imgPreview.style.display = 'block';
+        if (isBinaryField(model, fn) || isImageField(model, fn)) {
+          const fileIn = document.getElementById('file-' + fn);
+          const hiddenIn = document.getElementById('hidden-' + fn);
+          const statusSpan = document.getElementById('bin-status-' + fn);
+          const imgPreview = document.getElementById('img-preview-' + fn);
+          if (fileIn && hiddenIn) {
+            fileIn.onchange = function () {
+              const file = fileIn.files && fileIn.files[0];
+              if (!file) { hiddenIn.value = ''; if (statusSpan) statusSpan.textContent = ''; if (imgPreview) { imgPreview.src = ''; imgPreview.style.display = 'none'; } return; }
+              const r = new FileReader();
+              r.onload = function () {
+                const dataUrl = r.result;
+                const base64 = (dataUrl && dataUrl.indexOf(',') >= 0) ? dataUrl.split(',')[1] : '';
+                hiddenIn.value = base64;
+                if (statusSpan) statusSpan.textContent = file.name + ' (' + (file.size < 1024 ? file.size + ' B' : (file.size / 1024).toFixed(1) + ' KB') + ')';
+                if (imgPreview && file.type && file.type.startsWith('image/')) {
+                  imgPreview.src = dataUrl;
+                  imgPreview.style.display = 'block';
+                }
+              };
+              r.readAsDataURL(file);
+            };
+          }
+          if (imgPreview) {
+            imgPreview.onclick = function () {
+              if (!imgPreview.src) return;
+              if (window.UIComponents && window.UIComponents.AttachmentViewer && typeof window.UIComponents.AttachmentViewer.open === "function") {
+                window.UIComponents.AttachmentViewer.open([
+                  { name: fn, url: imgPreview.src, mimetype: "image/*" },
+                ], 0);
+              } else {
+                window.open(imgPreview.src, "_blank", "noopener");
               }
             };
-            r.readAsDataURL(file);
-          };
+            imgPreview.style.cursor = "zoom-in";
+          }
         }
-        if (imgPreview) {
-          imgPreview.onclick = function () {
-            if (!imgPreview.src) return;
-            if (window.UIComponents && window.UIComponents.AttachmentViewer && typeof window.UIComponents.AttachmentViewer.open === "function") {
-              window.UIComponents.AttachmentViewer.open([
-                { name: fn, url: imgPreview.src, mimetype: "image/*" },
-              ], 0);
-            } else {
-              window.open(imgPreview.src, "_blank", "noopener");
-            }
-          };
-          imgPreview.style.cursor = "zoom-in";
-        }
-      }
-    });
-    main.querySelectorAll('[data-btn-type]').forEach(function (btn) {
-      var actionName = btn.getAttribute('data-action');
-      var buttonType = btn.getAttribute('data-btn-type') || 'object';
-      if (!actionName || isNew) return;
-      btn.onclick = function () {
-        btn.disabled = true;
-        var runner = (window.ActionManager && typeof window.ActionManager.doActionButton === 'function')
-          ? window.ActionManager.doActionButton({
-              rpc: rpc,
-              buttonType: buttonType,
-              actionId: actionName,
-              model: model,
-              method: actionName,
-              resId: parseInt(id, 10),
-              context: { active_model: model, active_id: parseInt(id, 10), active_ids: [parseInt(id, 10)] },
-            })
-          : rpc.callKw(model, actionName, [[parseInt(id, 10)]], {});
-        runner
-          .then(function (result) {
-            btn.disabled = false;
-            if (result && typeof result === 'object' && result.type === 'ir.actions.act_window' && result.res_model) {
-              if (result.target === 'new' && window.UIComponents && window.UIComponents.ConfirmDialog && typeof window.UIComponents.ConfirmDialog.openModal === 'function') {
-                var wizardTrail = ['Wizard'];
-                var current = result;
-                var modal = window.UIComponents.ConfirmDialog.openModal({
-                  title: result.name || 'Wizard',
-                  breadcrumbs: wizardTrail,
-                  bodyHtml: '<p style="margin:0 0 var(--space-sm)">Wizard action returned <code>' + String(result.res_model || '').replace(/</g, '&lt;') + '</code>.</p><p style="color:var(--text-muted);margin:0">Complete the wizard and close to refresh parent view.</p>',
-                  onClose: function () { renderForm(model, route, id); },
-                });
-                // Simple multi-step chain support: if action payload carries `next_action`
-                while (current && current.next_action) {
-                  current = current.next_action;
-                  wizardTrail.push(current.name || 'Step');
+      });
+      main.querySelectorAll('[data-btn-type]').forEach(function (btn) {
+        var actionName = btn.getAttribute('data-action');
+        var buttonType = btn.getAttribute('data-btn-type') || 'object';
+        if (!actionName || isNew) return;
+        btn.onclick = function () {
+          btn.disabled = true;
+          var runner = (window.ActionManager && typeof window.ActionManager.doActionButton === 'function')
+            ? window.ActionManager.doActionButton({
+                rpc: rpc,
+                buttonType: buttonType,
+                actionId: actionName,
+                model: model,
+                method: actionName,
+                resId: parseInt(id, 10),
+                context: { active_model: model, active_id: parseInt(id, 10), active_ids: [parseInt(id, 10)] },
+              })
+            : rpc.callKw(model, actionName, [[parseInt(id, 10)]], {});
+          runner
+            .then(function (result) {
+              btn.disabled = false;
+              if (result && typeof result === 'object' && result.type === 'ir.actions.act_window' && result.res_model) {
+                if (result.target === 'new' && window.UIComponents && window.UIComponents.ConfirmDialog && typeof window.UIComponents.ConfirmDialog.openModal === 'function') {
+                  var wizardTrail = ['Wizard'];
+                  var current = result;
+                  var modal = window.UIComponents.ConfirmDialog.openModal({
+                    title: result.name || 'Wizard',
+                    breadcrumbs: wizardTrail,
+                    bodyHtml: '<p style="margin:0 0 var(--space-sm)">Wizard action returned <code>' + String(result.res_model || '').replace(/</g, '&lt;') + '</code>.</p><p style="color:var(--text-muted);margin:0">Complete the wizard and close to refresh parent view.</p>',
+                    onClose: function () { renderForm(model, route, id); },
+                  });
+                  // Simple multi-step chain support: if action payload carries `next_action`
+                  while (current && current.next_action) {
+                    current = current.next_action;
+                    wizardTrail.push(current.name || 'Step');
+                  }
+                  if (modal && modal.setBreadcrumbs) modal.setBreadcrumbs(wizardTrail);
+                  return;
                 }
-                if (modal && modal.setBreadcrumbs) modal.setBreadcrumbs(wizardTrail);
-                return;
+                var actRoute = (result.res_model || '').replace(/\./g, '_');
+                var resId = result.res_id;
+                if (actRoute && resId) {
+                  window.location.hash = '#' + actRoute + '/edit/' + resId;
+                  route();
+                  return;
+                }
               }
-              var actRoute = (result.res_model || '').replace(/\./g, '_');
-              var resId = result.res_id;
-              if (actRoute && resId) {
-                window.location.hash = '#' + actRoute + '/edit/' + resId;
-                route();
-                return;
-              }
-            }
-            showToast('Action completed', 'success');
-            renderForm(model, route, id);
-          })
-          .catch(function (err) {
-            btn.disabled = false;
-            showToast(err.message || 'Action failed', 'error');
-          });
-      };
-    });
-    main.querySelectorAll('.form-notebook').forEach(function (nb) {
-      const tabs = nb.querySelectorAll('.notebook-tab');
-      const pages = nb.querySelectorAll('.notebook-page');
-      tabs.forEach(function (tab, i) {
-        tab.onclick = function () {
-          tabs.forEach(function (t) { t.classList.remove('active'); });
-          pages.forEach(function (p) { p.classList.remove('active'); });
-          tab.classList.add('active');
-          const page = nb.querySelector('.notebook-page[data-page="' + i + '"]');
-          if (page) page.classList.add('active');
+              showToast('Action completed', 'success');
+              renderForm(model, route, id);
+            })
+            .catch(function (err) {
+              btn.disabled = false;
+              showToast(err.message || 'Action failed', 'error');
+            });
         };
       });
-    });
-    const selects = form.querySelectorAll('select[data-comodel]');
-    const m2oneWidgets = form.querySelectorAll('.m2one-widget');
-    const m2mDivs = form.querySelectorAll('[id^="m2m-"]');
-    const m2oneSearchDebounce = {};
-    const setupM2oneWidget = function (widget) {
-      const comodel = widget.dataset.comodel;
-      const fname = widget.dataset.fname;
-      if (!comodel) return;
-      const inputEl = widget.querySelector('.m2one-input');
-      const valueEl = widget.querySelector('.m2one-value');
-      const dropdownEl = widget.querySelector('.m2one-dropdown');
-      if (!inputEl || !valueEl || !dropdownEl) return;
-      const getDomain = function () {
-        try {
-          const d = widget.dataset.domain;
-          if (!d) return [];
-          const info = JSON.parse(decodeURIComponent(d));
-          const depVal = getFormFieldVal(info.depField);
-          return depVal ? [[info.depField, '=', depVal]] : [[info.depField, '=', 0]];
-        } catch (e) { return []; }
-      };
-      const doSearch = function () {
-        const term = (inputEl.value || '').trim();
-        const domain = getDomain();
-        rpc.callKw(comodel, 'name_search', [term, domain, 'ilike', 8], {})
-          .then(function (results) {
-            dropdownEl.innerHTML = '';
-            dropdownEl.style.display = results.length ? 'block' : 'none';
-            results.forEach(function (r) {
-              const id = r[0], name = r[1] || String(id);
-              const item = document.createElement('div');
-              item.className = 'm2one-dropdown-item';
-              item.style.cssText = 'padding:0.5rem;cursor:pointer';
-              item.textContent = name;
-              item.dataset.id = id;
-              item.dataset.name = name;
-              item.onmouseover = function () { item.style.background = '#f0f0f0'; };
-              item.onmouseout = function () { item.style.background = ''; };
-              item.onclick = function () {
-                valueEl.value = id;
-                inputEl.value = name;
-                dropdownEl.style.display = 'none';
-                inputEl.dataset.display = name;
-                form.querySelectorAll('.m2one-widget[data-depends-on="' + fname + '"]').forEach(function (w) {
-                  const v = w.querySelector('.m2one-value');
-                  const i = w.querySelector('.m2one-input');
-                  if (v) v.value = '';
-                  if (i) { i.value = ''; delete i.dataset.display; }
-                });
-                runServerOnchange(fname);
-              };
-              dropdownEl.appendChild(item);
-            });
-          })
-          .catch(function () { dropdownEl.style.display = 'none'; });
-      };
-      inputEl.onfocus = function () {
-        if (valueEl.value && inputEl.dataset.display) return;
-        if ((inputEl.value || '').trim().length >= 2) doSearch();
-        else if (!valueEl.value) {
-          rpc.callKw(comodel, 'name_search', ['', getDomain(), 'ilike', 8], {}).then(function (results) {
-            dropdownEl.innerHTML = '';
-            dropdownEl.style.display = results.length ? 'block' : 'none';
-            results.forEach(function (r) {
-              const item = document.createElement('div');
-              item.className = 'm2one-dropdown-item';
-              item.style.cssText = 'padding:0.5rem;cursor:pointer';
-              item.textContent = r[1] || String(r[0]);
-              item.dataset.id = r[0];
-              item.dataset.name = r[1] || String(r[0]);
-              item.onclick = function () {
-                valueEl.value = item.dataset.id;
-                inputEl.value = item.dataset.name;
-                inputEl.dataset.display = item.dataset.name;
-                dropdownEl.style.display = 'none';
-                runServerOnchange(fname);
-              };
-              dropdownEl.appendChild(item);
-            });
-          });
-        }
-      };
-      inputEl.oninput = function () {
-        const key = fname;
-        if (m2oneSearchDebounce[key]) clearTimeout(m2oneSearchDebounce[key]);
-        valueEl.value = '';
-        delete inputEl.dataset.display;
-        m2oneSearchDebounce[key] = setTimeout(function () {
-          m2oneSearchDebounce[key] = null;
+      main.querySelectorAll('.form-notebook').forEach(function (nb) {
+        const tabs = nb.querySelectorAll('.notebook-tab');
+        const pages = nb.querySelectorAll('.notebook-page');
+        tabs.forEach(function (tab, i) {
+          tab.onclick = function () {
+            tabs.forEach(function (t) { t.classList.remove('active'); });
+            pages.forEach(function (p) { p.classList.remove('active'); });
+            tab.classList.add('active');
+            const page = nb.querySelector('.notebook-page[data-page="' + i + '"]');
+            if (page) page.classList.add('active');
+          };
+        });
+      });
+      const selects = form.querySelectorAll('select[data-comodel]');
+      const m2oneWidgets = form.querySelectorAll('.m2one-widget');
+      const m2mDivs = form.querySelectorAll('[id^="m2m-"]');
+      const m2oneSearchDebounce = {};
+      const setupM2oneWidget = function (widget) {
+        const comodel = widget.dataset.comodel;
+        const fname = widget.dataset.fname;
+        if (!comodel) return;
+        const inputEl = widget.querySelector('.m2one-input');
+        const valueEl = widget.querySelector('.m2one-value');
+        const dropdownEl = widget.querySelector('.m2one-dropdown');
+        if (!inputEl || !valueEl || !dropdownEl) return;
+        const getDomain = function () {
+          try {
+            const d = widget.dataset.domain;
+            if (!d) return [];
+            const info = JSON.parse(decodeURIComponent(d));
+            const depVal = getFormFieldVal(info.depField);
+            return depVal ? [[info.depField, '=', depVal]] : [[info.depField, '=', 0]];
+          } catch (e) { return []; }
+        };
+        const doSearch = function () {
+          const term = (inputEl.value || '').trim();
+          const domain = getDomain();
+          rpc.callKw(comodel, 'name_search', [term, domain, 'ilike', 8], {})
+            .then(function (results) {
+              dropdownEl.innerHTML = '';
+              dropdownEl.style.display = results.length ? 'block' : 'none';
+              results.forEach(function (r) {
+                const id = r[0], name = r[1] || String(id);
+                const item = document.createElement('div');
+                item.className = 'm2one-dropdown-item';
+                item.style.cssText = 'padding:0.5rem;cursor:pointer';
+                item.textContent = name;
+                item.dataset.id = id;
+                item.dataset.name = name;
+                item.onmouseover = function () { item.style.background = '#f0f0f0'; };
+                item.onmouseout = function () { item.style.background = ''; };
+                item.onclick = function () {
+                  valueEl.value = id;
+                  inputEl.value = name;
+                  dropdownEl.style.display = 'none';
+                  inputEl.dataset.display = name;
+                  form.querySelectorAll('.m2one-widget[data-depends-on="' + fname + '"]').forEach(function (w) {
+                    const v = w.querySelector('.m2one-value');
+                    const i = w.querySelector('.m2one-input');
+                    if (v) v.value = '';
+                    if (i) { i.value = ''; delete i.dataset.display; }
+                  });
+                  runServerOnchange(fname);
+                };
+                dropdownEl.appendChild(item);
+              });
+            })
+            .catch(function () { dropdownEl.style.display = 'none'; });
+        };
+        inputEl.onfocus = function () {
+          if (valueEl.value && inputEl.dataset.display) return;
           if ((inputEl.value || '').trim().length >= 2) doSearch();
-          else dropdownEl.style.display = 'none';
-        }, 300);
-      };
-      inputEl.onblur = function () {
-        setTimeout(function () {
-          dropdownEl.style.display = 'none';
-          if (valueEl.value && !inputEl.dataset.display) {
-            rpc.callKw(comodel, 'name_get', [[parseInt(valueEl.value, 10)]], {}).then(function (res) {
-              if (res && res[0]) inputEl.dataset.display = res[0][1];
+          else if (!valueEl.value) {
+            rpc.callKw(comodel, 'name_search', ['', getDomain(), 'ilike', 8], {}).then(function (results) {
+              dropdownEl.innerHTML = '';
+              dropdownEl.style.display = results.length ? 'block' : 'none';
+              results.forEach(function (r) {
+                const item = document.createElement('div');
+                item.className = 'm2one-dropdown-item';
+                item.style.cssText = 'padding:0.5rem;cursor:pointer';
+                item.textContent = r[1] || String(r[0]);
+                item.dataset.id = r[0];
+                item.dataset.name = r[1] || String(r[0]);
+                item.onclick = function () {
+                  valueEl.value = item.dataset.id;
+                  inputEl.value = item.dataset.name;
+                  inputEl.dataset.display = item.dataset.name;
+                  dropdownEl.style.display = 'none';
+                  runServerOnchange(fname);
+                };
+                dropdownEl.appendChild(item);
+              });
             });
           }
-        }, 200);
-      };
-      var depAttr = widget.getAttribute('data-depends-on');
-      if (depAttr) {
-        const depWidget = form.querySelector('.m2one-widget[data-fname="' + depAttr + '"]');
-        const depInput = depWidget ? depWidget.querySelector('.m2one-input') : form.querySelector('[name="' + depAttr + '"]');
-        if (depInput) {
-          depInput.addEventListener('input', function () {
-            valueEl.value = '';
-            inputEl.value = '';
-            delete inputEl.dataset.display;
-          });
-          depInput.addEventListener('change', function () {
-            valueEl.value = '';
-            inputEl.value = '';
-            delete inputEl.dataset.display;
-          });
-        }
-      }
-    };
-    const getFormFieldVal = function (name) {
-      const el = form.querySelector('[name="' + name + '"]');
-      return el ? (el.value ? parseInt(el.value, 10) || el.value : null) : null;
-    };
-    const loadSelectOptions = function (sel, domain) {
-      const comodel = sel.dataset.comodel;
-      if (!comodel) return Promise.resolve();
-      const d = domain || [];
-      return rpc.callKw(comodel, 'search_read', [d], { fields: ['id', 'name'], limit: 200 })
-        .then(function (opts) {
-          sel.innerHTML = '<option value="">--</option>';
-          opts.forEach(function (o) {
-            sel.appendChild(document.createElement('option')).value = o.id;
-            sel.lastChild.textContent = o.name || o.id;
-          });
-        });
-    };
-    m2oneWidgets.forEach(function (w) { setupM2oneWidget(w); });
-    const statusbars = form.querySelectorAll('.o-statusbar');
-    const setupStatusbar = function (sb, options, currentVal, isNew) {
-      sb.innerHTML = '';
-      var clickable = sb.getAttribute('data-clickable') !== '0';
-      var fname = sb.dataset.fname;
-      var hiddenInput = form.querySelector('input[name="' + fname + '"]');
-      if (!hiddenInput) return;
-      var currentId = currentVal != null ? currentVal : null;
-      if (currentId != null) hiddenInput.value = currentId;
-      var currentIdx = -1;
-      if (currentId != null) {
-        for (var i = 0; i < options.length; i++) {
-          var oid = options[i].id != null ? options[i].id : options[i][0];
-          if (String(oid) === String(currentId)) { currentIdx = i; break; }
-        }
-      }
-      options.forEach(function (opt, idx) {
-        var item = document.createElement('span');
-        item.className = 'o-statusbar-item';
-        var optId = opt.id != null ? opt.id : opt[0];
-        var optName = opt.name != null ? opt.name : (opt[1] || opt[0]);
-        item.textContent = optName;
-        item.dataset.value = String(optId);
-        if (String(optId) === String(currentId) || (currentId == null && idx === 0)) item.classList.add('o-statusbar-item--active');
-        if (currentIdx >= 0 && idx < currentIdx) item.classList.add('o-statusbar-item--done');
-        if (clickable) {
-          item.style.cursor = 'pointer';
-          item.onclick = function () {
-            const raw = item.dataset.value;
-            const val = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
-            hiddenInput.value = raw;
-            if (isNew) {
-              statusbars.forEach(function (s) {
-                if (s.dataset.fname === fname) {
-                  s.querySelectorAll('.o-statusbar-item').forEach(function (i) { i.classList.remove('o-statusbar-item--active'); });
-                  item.classList.add('o-statusbar-item--active');
-                }
+        };
+        inputEl.oninput = function () {
+          const key = fname;
+          if (m2oneSearchDebounce[key]) clearTimeout(m2oneSearchDebounce[key]);
+          valueEl.value = '';
+          delete inputEl.dataset.display;
+          m2oneSearchDebounce[key] = setTimeout(function () {
+            m2oneSearchDebounce[key] = null;
+            if ((inputEl.value || '').trim().length >= 2) doSearch();
+            else dropdownEl.style.display = 'none';
+          }, 300);
+        };
+        inputEl.onblur = function () {
+          setTimeout(function () {
+            dropdownEl.style.display = 'none';
+            if (valueEl.value && !inputEl.dataset.display) {
+              rpc.callKw(comodel, 'name_get', [[parseInt(valueEl.value, 10)]], {}).then(function (res) {
+                if (res && res[0]) inputEl.dataset.display = res[0][1];
               });
-            } else {
-              rpc.callKw(model, 'write', [[parseInt(id, 10)], { [fname]: val }], {})
-                .then(function () {
-                  showToast('Stage updated', 'success');
-                  loadRecord(model, id).then(function (r) {
-                    if (r && r[0]) {
-                      var rec = r[0];
-                      var newCurrent = rec[fname];
-                      statusbars.forEach(function (s) {
-                        if (s.dataset.fname === fname) {
-                          var items = s.querySelectorAll('.o-statusbar-item');
-                          var newIdx = -1;
-                          for (var j = 0; j < items.length; j++) {
-                            if (String(items[j].dataset.value) === String(newCurrent)) { newIdx = j; break; }
-                          }
-                          items.forEach(function (i, j) {
-                            i.classList.remove('o-statusbar-item--active', 'o-statusbar-item--done');
-                            if (j === newIdx) i.classList.add('o-statusbar-item--active');
-                            else if (newIdx >= 0 && j < newIdx) i.classList.add('o-statusbar-item--done');
-                          });
-                        }
-                      });
-                    }
-                  });
-                })
-                .catch(function (err) { showToast(err.message || 'Failed to update', 'error'); });
             }
-          };
+          }, 200);
+        };
+        var depAttr = widget.getAttribute('data-depends-on');
+        if (depAttr) {
+          const depWidget = form.querySelector('.m2one-widget[data-fname="' + depAttr + '"]');
+          const depInput = depWidget ? depWidget.querySelector('.m2one-input') : form.querySelector('[name="' + depAttr + '"]');
+          if (depInput) {
+            depInput.addEventListener('input', function () {
+              valueEl.value = '';
+              inputEl.value = '';
+              delete inputEl.dataset.display;
+            });
+            depInput.addEventListener('change', function () {
+              valueEl.value = '';
+              inputEl.value = '';
+              delete inputEl.dataset.display;
+            });
+          }
         }
-        sb.appendChild(item);
-        if (idx < options.length - 1) {
-          var sep = document.createElement('span');
-          sep.className = 'o-statusbar-sep';
-          sep.textContent = '>';
-          sep.style.margin = '0 0.25rem';
-          sb.appendChild(sep);
+      };
+      const getFormFieldVal = function (name) {
+        const el = form.querySelector('[name="' + name + '"]');
+        return el ? (el.value ? parseInt(el.value, 10) || el.value : null) : null;
+      };
+      const loadSelectOptions = function (sel, domain) {
+        const comodel = sel.dataset.comodel;
+        if (!comodel) return Promise.resolve();
+        const d = domain || [];
+        return rpc.callKw(comodel, 'search_read', [d], { fields: ['id', 'name'], limit: 200 })
+          .then(function (opts) {
+            sel.innerHTML = '<option value="">--</option>';
+            opts.forEach(function (o) {
+              sel.appendChild(document.createElement('option')).value = o.id;
+              sel.lastChild.textContent = o.name || o.id;
+            });
+          });
+      };
+      m2oneWidgets.forEach(function (w) { setupM2oneWidget(w); });
+      const statusbars = form.querySelectorAll('.o-statusbar');
+      const setupStatusbar = function (sb, options, currentVal, isNew) {
+        sb.innerHTML = '';
+        var clickable = sb.getAttribute('data-clickable') !== '0';
+        var fname = sb.dataset.fname;
+        var hiddenInput = form.querySelector('input[name="' + fname + '"]');
+        if (!hiddenInput) return;
+        var currentId = currentVal != null ? currentVal : null;
+        if (currentId != null) hiddenInput.value = currentId;
+        var currentIdx = -1;
+        if (currentId != null) {
+          for (var i = 0; i < options.length; i++) {
+            var oid = options[i].id != null ? options[i].id : options[i][0];
+            if (String(oid) === String(currentId)) { currentIdx = i; break; }
+          }
         }
-      });
-    };
-    const renderM2mTags = function (div, fname, opts, selectedIds, nameMap, onchange) {
-      const idSet = (selectedIds || []).map(function (x) { return String(x); });
-      let html = '';
-      (selectedIds || []).forEach(function (id) {
-        const name = nameMap[id] || ('#' + id);
-        html += '<span class="m2m-tag-chip" data-id="' + id + '" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--color-primary,#1a1a2e);color:white;border-radius:999px;font-size:0.85rem">' + String(name).replace(/</g, '&lt;') + ' <span class="m2m-tag-remove" style="cursor:pointer;opacity:0.8">×</span></span>';
-      });
-      const unselected = opts.filter(function (o) { return idSet.indexOf(String(o.id)) < 0; });
-      html += '<select class="m2m-tag-add" data-fname="' + fname + '" style="min-width:8rem;padding:0.2rem 0.5rem;font-size:0.85rem;border:1px dashed #999;border-radius:4px;background:transparent"><option value="">+ Add</option>';
-      unselected.forEach(function (o) {
-        html += '<option value="' + o.id + '">' + String(o.name || o.id).replace(/</g, '&lt;') + '</option>';
-      });
-      html += '</select>';
-      div.innerHTML = html;
-      div.querySelectorAll('.m2m-tag-chip').forEach(function (chip) {
-        const remove = chip.querySelector('.m2m-tag-remove');
-        if (remove) {
-          remove.onclick = function () {
-            const id = parseInt(chip.dataset.id, 10);
+        options.forEach(function (opt, idx) {
+          var item = document.createElement('span');
+          item.className = 'o-statusbar-item';
+          var optId = opt.id != null ? opt.id : opt[0];
+          var optName = opt.name != null ? opt.name : (opt[1] || opt[0]);
+          item.textContent = optName;
+          item.dataset.value = String(optId);
+          if (String(optId) === String(currentId) || (currentId == null && idx === 0)) item.classList.add('o-statusbar-item--active');
+          if (currentIdx >= 0 && idx < currentIdx) item.classList.add('o-statusbar-item--done');
+          if (clickable) {
+            item.style.cursor = 'pointer';
+            item.onclick = function () {
+              const raw = item.dataset.value;
+              const val = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+              hiddenInput.value = raw;
+              if (isNew) {
+                statusbars.forEach(function (s) {
+                  if (s.dataset.fname === fname) {
+                    s.querySelectorAll('.o-statusbar-item').forEach(function (i) { i.classList.remove('o-statusbar-item--active'); });
+                    item.classList.add('o-statusbar-item--active');
+                  }
+                });
+              } else {
+                rpc.callKw(model, 'write', [[parseInt(id, 10)], { [fname]: val }], {})
+                  .then(function () {
+                    showToast('Stage updated', 'success');
+                    loadRecord(model, id).then(function (r) {
+                      if (r && r[0]) {
+                        var rec = r[0];
+                        var newCurrent = rec[fname];
+                        statusbars.forEach(function (s) {
+                          if (s.dataset.fname === fname) {
+                            var items = s.querySelectorAll('.o-statusbar-item');
+                            var newIdx = -1;
+                            for (var j = 0; j < items.length; j++) {
+                              if (String(items[j].dataset.value) === String(newCurrent)) { newIdx = j; break; }
+                            }
+                            items.forEach(function (i, j) {
+                              i.classList.remove('o-statusbar-item--active', 'o-statusbar-item--done');
+                              if (j === newIdx) i.classList.add('o-statusbar-item--active');
+                              else if (newIdx >= 0 && j < newIdx) i.classList.add('o-statusbar-item--done');
+                            });
+                          }
+                        });
+                      }
+                    });
+                  })
+                  .catch(function (err) { showToast(err.message || 'Failed to update', 'error'); });
+              }
+            };
+          }
+          sb.appendChild(item);
+          if (idx < options.length - 1) {
+            var sep = document.createElement('span');
+            sep.className = 'o-statusbar-sep';
+            sep.textContent = '>';
+            sep.style.margin = '0 0.25rem';
+            sb.appendChild(sep);
+          }
+        });
+      };
+      const renderM2mTags = function (div, fname, opts, selectedIds, nameMap, onchange) {
+        const idSet = (selectedIds || []).map(function (x) { return String(x); });
+        let html = '';
+        (selectedIds || []).forEach(function (id) {
+          const name = nameMap[id] || ('#' + id);
+          html += '<span class="m2m-tag-chip" data-id="' + id + '" style="display:inline-flex;align-items:center;gap:0.25rem;padding:0.2rem 0.5rem;background:var(--color-primary,#1a1a2e);color:white;border-radius:999px;font-size:0.85rem">' + String(name).replace(/</g, '&lt;') + ' <span class="m2m-tag-remove" style="cursor:pointer;opacity:0.8">×</span></span>';
+        });
+        const unselected = opts.filter(function (o) { return idSet.indexOf(String(o.id)) < 0; });
+        html += '<select class="m2m-tag-add" data-fname="' + fname + '" style="min-width:8rem;padding:0.2rem 0.5rem;font-size:0.85rem;border:1px dashed #999;border-radius:4px;background:transparent"><option value="">+ Add</option>';
+        unselected.forEach(function (o) {
+          html += '<option value="' + o.id + '">' + String(o.name || o.id).replace(/</g, '&lt;') + '</option>';
+        });
+        html += '</select>';
+        div.innerHTML = html;
+        div.querySelectorAll('.m2m-tag-chip').forEach(function (chip) {
+          const remove = chip.querySelector('.m2m-tag-remove');
+          if (remove) {
+            remove.onclick = function () {
+              const id = parseInt(chip.dataset.id, 10);
+              let ids = [];
+              try { ids = JSON.parse(div.dataset.selected || '[]'); } catch (e) {}
+              ids = ids.filter(function (x) { return x !== id; });
+              div.dataset.selected = JSON.stringify(ids);
+              renderM2mTags(div, fname, opts, ids, nameMap, onchange);
+              if (onchange) onchange(fname);
+            };
+          }
+        });
+        const addSel = div.querySelector('.m2m-tag-add');
+        if (addSel) {
+          addSel.onchange = function () {
+            const val = addSel.value;
+            if (!val) return;
+            const id = parseInt(val, 10);
             let ids = [];
             try { ids = JSON.parse(div.dataset.selected || '[]'); } catch (e) {}
-            ids = ids.filter(function (x) { return x !== id; });
+            if (ids.indexOf(id) >= 0) return;
+            ids.push(id);
             div.dataset.selected = JSON.stringify(ids);
+            const o = opts.filter(function (x) { return x.id === id; })[0];
+            const nm = o ? (o.name || String(id)) : String(id);
+            if (!nameMap[id]) nameMap[id] = nm;
             renderM2mTags(div, fname, opts, ids, nameMap, onchange);
+            addSel.value = '';
             if (onchange) onchange(fname);
           };
         }
-      });
-      const addSel = div.querySelector('.m2m-tag-add');
-      if (addSel) {
-        addSel.onchange = function () {
-          const val = addSel.value;
-          if (!val) return;
-          const id = parseInt(val, 10);
-          let ids = [];
-          try { ids = JSON.parse(div.dataset.selected || '[]'); } catch (e) {}
-          if (ids.indexOf(id) >= 0) return;
-          ids.push(id);
-          div.dataset.selected = JSON.stringify(ids);
-          const o = opts.filter(function (x) { return x.id === id; })[0];
-          const nm = o ? (o.name || String(id)) : String(id);
-          if (!nameMap[id]) nameMap[id] = nm;
-          renderM2mTags(div, fname, opts, ids, nameMap, onchange);
-          addSel.value = '';
-          if (onchange) onchange(fname);
-        };
-      }
-    };
-    const loadOptions = function (formVals) {
-      const promises = [];
-      selects.forEach(function (sel) {
-        const comodel = sel.dataset.comodel;
-        const fname = sel.getAttribute('name');
-        if (!comodel) return;
-        const domainInfo = getMany2oneDomain(model, fname);
-        let domain = [];
-        if (domainInfo) {
-          const depVal = formVals ? formVals[domainInfo.depField] : getFormFieldVal(domainInfo.depField);
-          if (depVal) domain = [[domainInfo.depField, '=', depVal]];
-          else domain = [[domainInfo.depField, '=', 0]];
-        }
-        promises.push(loadSelectOptions(sel, domain));
-      });
-      m2mDivs.forEach(function (div) {
-        const comodel = div.dataset.comodel;
-        const fname = (div.id || '').replace('m2m-', '');
-        const isTags = div.dataset.widget === 'many2many_tags';
-        const selectedIds = (formVals && formVals[fname]) ? (Array.isArray(formVals[fname]) ? formVals[fname] : [formVals[fname]]) : [];
-        if (!comodel) return;
-        promises.push(
-          rpc.callKw(comodel, 'search_read', [[]], { fields: ['id', 'name'], limit: 200 })
-            .then(function (opts) {
-              const nameMap = {};
-              opts.forEach(function (o) { nameMap[o.id] = o.name || String(o.id); });
-              if (isTags) {
-                div.dataset.opts = JSON.stringify(opts);
-                div.dataset.selected = JSON.stringify(selectedIds);
-                renderM2mTags(div, fname, opts, selectedIds, nameMap, runServerOnchange);
-              } else {
-                let inner = '';
-                const idSet = selectedIds.map(function (x) { return String(x); });
-                opts.forEach(function (o) {
-                  const checked = idSet.indexOf(String(o.id)) >= 0 ? ' checked' : '';
-                  inner += '<label style="display:inline-block;margin-right:1rem;margin-bottom:0.25rem"><input type="checkbox" name="' + fname + '_cb" value="' + o.id + '"' + checked + '> ' + (o.name || o.id).replace(/</g, '&lt;') + '</label>';
-                });
-                div.innerHTML = inner || 'No options';
-              }
-            })
-        );
-      });
-      statusbars.forEach(function (sb) {
-        var comodel = sb.dataset.comodel;
-        var fname = sb.dataset.fname;
-        var currentVal = formVals ? formVals[fname] : getFormFieldVal(fname);
-        if (comodel) {
+      };
+      const loadOptions = function (formVals) {
+        const promises = [];
+        selects.forEach(function (sel) {
+          const comodel = sel.dataset.comodel;
+          const fname = sel.getAttribute('name');
+          if (!comodel) return;
+          const domainInfo = getMany2oneDomain(model, fname);
+          let domain = [];
+          if (domainInfo) {
+            const depVal = formVals ? formVals[domainInfo.depField] : getFormFieldVal(domainInfo.depField);
+            if (depVal) domain = [[domainInfo.depField, '=', depVal]];
+            else domain = [[domainInfo.depField, '=', 0]];
+          }
+          promises.push(loadSelectOptions(sel, domain));
+        });
+        m2mDivs.forEach(function (div) {
+          const comodel = div.dataset.comodel;
+          const fname = (div.id || '').replace('m2m-', '');
+          const isTags = div.dataset.widget === 'many2many_tags';
+          const selectedIds = (formVals && formVals[fname]) ? (Array.isArray(formVals[fname]) ? formVals[fname] : [formVals[fname]]) : [];
+          if (!comodel) return;
           promises.push(
-            rpc.callKw(comodel, 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence', limit: 50 })
+            rpc.callKw(comodel, 'search_read', [[]], { fields: ['id', 'name'], limit: 200 })
               .then(function (opts) {
-                setupStatusbar(sb, opts, currentVal, isNew);
+                const nameMap = {};
+                opts.forEach(function (o) { nameMap[o.id] = o.name || String(o.id); });
+                if (isTags) {
+                  div.dataset.opts = JSON.stringify(opts);
+                  div.dataset.selected = JSON.stringify(selectedIds);
+                  renderM2mTags(div, fname, opts, selectedIds, nameMap, runServerOnchange);
+                } else {
+                  let inner = '';
+                  const idSet = selectedIds.map(function (x) { return String(x); });
+                  opts.forEach(function (o) {
+                    const checked = idSet.indexOf(String(o.id)) >= 0 ? ' checked' : '';
+                    inner += '<label style="display:inline-block;margin-right:1rem;margin-bottom:0.25rem"><input type="checkbox" name="' + fname + '_cb" value="' + o.id + '"' + checked + '> ' + (o.name || o.id).replace(/</g, '&lt;') + '</label>';
+                  });
+                  div.innerHTML = inner || 'No options';
+                }
               })
           );
-        } else {
-          var selOpts = getSelectionOptions(model, fname);
-          if (selOpts) {
-            setupStatusbar(sb, selOpts, currentVal, isNew);
-          }
-        }
-      });
-      return Promise.all(promises);
-    };
-    const onchangeDebounce = {};
-    const runServerOnchange = function (fieldName) {
-      const key = fieldName || '';
-      if (onchangeDebounce[key]) clearTimeout(onchangeDebounce[key]);
-      onchangeDebounce[key] = setTimeout(function () {
-        onchangeDebounce[key] = null;
-        const vals = getFormVals(form, model);
-        rpc.callKw(model, 'onchange', [fieldName, vals], {}).then(function (updates) {
-          if (!updates || typeof updates !== 'object') return;
-          Object.keys(updates).forEach(function (n) {
-            const v = updates[n];
-            const el = form.querySelector('[name="' + n + '"]');
-            if (!el) return;
-            if (el.type === 'checkbox') {
-              el.checked = !!v;
-            } else {
-              el.value = v != null ? v : '';
-            }
-          });
-          applyAttrsToForm(form, model);
-        }).catch(function () {});
-      }, 300);
-    };
-    const setupDependsOnHandlers = function () {
-      selects.forEach(function (sel) {
-        const fname = sel.getAttribute('name');
-        const domainInfo = getMany2oneDomain(model, fname);
-        if (!domainInfo) return;
-        const depEl = form.querySelector('[name="' + domainInfo.depField + '"]');
-        if (depEl) {
-          depEl.onchange = function () {
-            runServerOnchange(domainInfo.depField);
-            const depVal = getFormFieldVal(domainInfo.depField);
-            loadSelectOptions(sel, depVal ? [[domainInfo.depField, '=', depVal]] : [[domainInfo.depField, '=', 0]])
-              .then(function () {
-                const stateEl = form.querySelector('[name="' + fname + '"]');
-                if (stateEl) stateEl.value = '';
-              });
-          };
-        }
-      });
-    };
-    const setupOnchangeHandlers = function () {
-      form.querySelectorAll('input[name], select[name], textarea[name]').forEach(function (el) {
-        if (el.type === 'file' || (el.name || '').indexOf('_cb') >= 0) return;
-        const fieldName = el.getAttribute('name');
-        if (!fieldName) return;
-        const ev = el.tagName === 'TEXTAREA' || (el.type === 'text' || el.type === 'email') ? 'blur' : 'change';
-        el.addEventListener(ev, function () { runServerOnchange(fieldName); });
-      });
-    };
-    var o2mOnchangeDebounce = {};
-    const setupO2mOnchangeHandlers = function () {
-      form.querySelectorAll('[id^="o2m-"]').forEach(function (div) {
-        var fname = div.dataset.fname;
-        var o2m = getOne2manyInfo(model, fname);
-        if (!o2m || !o2m.comodel) return;
-        var lineFields = getOne2manyLineFields(model, fname);
-        if (lineFields.indexOf('product_id') < 0) return;
-        var tbody = div.querySelector('tbody');
-        if (!tbody) return;
-        var runLineOnchange = function (tr, fieldName) {
-          var key = fname + '-' + fieldName;
-          if (o2mOnchangeDebounce[key]) clearTimeout(o2mOnchangeDebounce[key]);
-          o2mOnchangeDebounce[key] = setTimeout(function () {
-            o2mOnchangeDebounce[key] = null;
-            var rowVals = {};
-            lineFields.forEach(function (lf) {
-              var inp = tr.querySelector('[data-o2m-field="' + lf + '"]');
-              if (inp) {
-                var v = inp.value;
-                if (lf === 'product_id' && /^\d+$/.test(String(v))) v = parseInt(v, 10);
-                else if (['product_uom_qty', 'price_unit', 'price_subtotal', 'product_qty', 'unit_amount', 'quantity', 'total_amount'].indexOf(lf) >= 0 && v !== '') v = parseFloat(v) || 0;
-                rowVals[lf] = v;
-              }
-            });
-            rpc.callKw(o2m.comodel, 'onchange', [fieldName, rowVals], {}).then(function (updates) {
-              if (!updates || typeof updates !== 'object') return;
-              Object.keys(updates).forEach(function (n) {
-                var inp = tr.querySelector('[data-o2m-field="' + n + '"]');
-                if (inp) inp.value = updates[n] != null ? updates[n] : '';
-              });
-            }).catch(function () {});
-          }, 300);
-        };
-        tbody.querySelectorAll('tr').forEach(function (tr) {
-          var prodInp = tr.querySelector('[data-o2m-field="product_id"]');
-          if (prodInp) prodInp.addEventListener('change', function () { runLineOnchange(tr, 'product_id'); });
         });
-        var obs = new MutationObserver(function (mutations) {
-          mutations.forEach(function (m) {
-            m.addedNodes.forEach(function (node) {
-              if (node.nodeType === 1 && node.tagName === 'TR') {
-                var prodInp = node.querySelector('[data-o2m-field="product_id"]');
-                if (prodInp) prodInp.addEventListener('change', function () { runLineOnchange(node, 'product_id'); });
-              }
-            });
-          });
-        });
-        obs.observe(tbody, { childList: true });
-      });
-    };
-    const setM2mChecked = function (fname, ids) {
-      const div = form.querySelector('#m2m-' + fname);
-      if (div && div.dataset.widget === 'many2many_tags') {
-        let opts = [];
-        try { opts = JSON.parse(div.dataset.opts || '[]'); } catch (e) {}
-        const nameMap = {};
-        opts.forEach(function (o) { nameMap[o.id] = o.name || String(o.id); });
-        div.dataset.selected = JSON.stringify(ids || []);
-        renderM2mTags(div, fname, opts, ids || [], nameMap, runServerOnchange);
-        return;
-      }
-      const idSet = (ids || []).map(function (x) { return String(x); });
-      form.querySelectorAll('input[name="' + fname + '_cb"]').forEach(function (cb) {
-        cb.checked = idSet.indexOf(String(cb.value)) >= 0;
-      });
-    };
-    if (isNew) {
-      const action = getActionForRoute(route);
-      const context = (action && action.context) ? (typeof action.context === 'string' ? {} : action.context) : {};
-      const fieldNames = fields.map(function (f) { return typeof f === 'object' ? f.name : f; });
-      const applyDefaults = function (defaults) {
-        if (!defaults || typeof defaults !== 'object') return;
-        Object.keys(defaults).forEach(function (n) {
-          const m2m = getMany2manyInfo(model, n);
-          const m2oComodel = getMany2oneComodel(model, n);
-          if (m2m) {
-            setM2mChecked(n, Array.isArray(defaults[n]) ? defaults[n] : (defaults[n] ? [defaults[n]] : []));
-          } else if (m2oComodel) {
-            const widget = form.querySelector('.m2one-widget[data-fname="' + n + '"]');
-            if (widget) {
-              const vEl = widget.querySelector('.m2one-value');
-              const iEl = widget.querySelector('.m2one-input');
-              const id = defaults[n];
-              if (vEl) vEl.value = id != null ? String(id) : '';
-              if (iEl) {
-                if (id) {
-                  rpc.callKw(m2oComodel, 'name_get', [[parseInt(id, 10)]], {}).then(function (res) {
-                    if (res && res[0]) { iEl.value = res[0][1]; iEl.dataset.display = res[0][1]; }
-                  });
-                } else iEl.value = '';
-              }
-            }
+        statusbars.forEach(function (sb) {
+          var comodel = sb.dataset.comodel;
+          var fname = sb.dataset.fname;
+          var currentVal = formVals ? formVals[fname] : getFormFieldVal(fname);
+          if (comodel) {
+            promises.push(
+              rpc.callKw(comodel, 'search_read', [[]], { fields: ['id', 'name'], order: 'sequence', limit: 50 })
+                .then(function (opts) {
+                  setupStatusbar(sb, opts, currentVal, isNew);
+                })
+            );
           } else {
-            const el = form.querySelector('[name="' + n + '"]');
-            if (el) {
-              if (el.type === 'checkbox') el.checked = !!defaults[n];
-              else {
-                const metaD = getFieldMeta(model, n);
-                const dv = defaults[n];
-                if (metaD && metaD.type === 'date') el.value = serverValueToDateInput(dv);
-                else if (metaD && metaD.type === 'datetime') el.value = serverValueToDatetimeLocal(dv);
-                else el.value = dv != null ? String(dv) : '';
-              }
+            var selOpts = getSelectionOptions(model, fname);
+            if (selOpts) {
+              setupStatusbar(sb, selOpts, currentVal, isNew);
             }
+          }
+        });
+        return Promise.all(promises);
+      };
+      const onchangeDebounce = {};
+      const runServerOnchange = function (fieldName) {
+        const key = fieldName || '';
+        if (onchangeDebounce[key]) clearTimeout(onchangeDebounce[key]);
+        onchangeDebounce[key] = setTimeout(function () {
+          onchangeDebounce[key] = null;
+          const vals = getFormVals(form, model);
+          rpc.callKw(model, 'onchange', [fieldName, vals], {}).then(function (updates) {
+            if (!updates || typeof updates !== 'object') return;
+            Object.keys(updates).forEach(function (n) {
+              const v = updates[n];
+              const el = form.querySelector('[name="' + n + '"]');
+              if (!el) return;
+              if (el.type === 'checkbox') {
+                el.checked = !!v;
+              } else {
+                el.value = v != null ? v : '';
+              }
+            });
+            applyAttrsToForm(form, model);
+          }).catch(function () {});
+        }, 300);
+      };
+      const setupDependsOnHandlers = function () {
+        selects.forEach(function (sel) {
+          const fname = sel.getAttribute('name');
+          const domainInfo = getMany2oneDomain(model, fname);
+          if (!domainInfo) return;
+          const depEl = form.querySelector('[name="' + domainInfo.depField + '"]');
+          if (depEl) {
+            depEl.onchange = function () {
+              runServerOnchange(domainInfo.depField);
+              const depVal = getFormFieldVal(domainInfo.depField);
+              loadSelectOptions(sel, depVal ? [[domainInfo.depField, '=', depVal]] : [[domainInfo.depField, '=', 0]])
+                .then(function () {
+                  const stateEl = form.querySelector('[name="' + fname + '"]');
+                  if (stateEl) stateEl.value = '';
+                });
+            };
           }
         });
       };
-      rpc.callKw(model, 'default_get', [fieldNames], { context: context })
-        .then(function (defaults) {
-          applyDefaults(defaults);
-          return loadOptions(defaults || {});
-        })
-        .then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); })
-        .catch(function () { loadOptions({}).then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); }); });
-      setupOne2manyAddButtons(form, model);
-      setupOne2manyComputedFields(form, model);
-      setupO2mOnchangeHandlers();
-      form.onsubmit = (e) => { e.preventDefault(); createRecord(model, route, form); return false; };
-    } else {
-      loadRecord(model, id).then(function (r) {
-        if (r && r[0]) {
-          const rec = r[0];
-          try {
-            const key = 'erp_recent_items';
-            const name = (rec.name || rec.display_name || 'Item').toString();
-            let arr = [];
-            try { arr = JSON.parse(sessionStorage.getItem(key) || '[]'); } catch (e) {}
-            arr = arr.filter(function (x) { return !(x.route === route && x.id == id); });
-            arr.unshift({ id: rec.id, name: name, route: route });
-            sessionStorage.setItem(key, JSON.stringify(arr.slice(0, 20)));
-          } catch (e) {}
-          if (rec.name && actionStack.length > 0) {
-            actionStack[actionStack.length - 1].label = rec.name;
-            var bcNav = main.querySelector('.breadcrumbs');
-            if (bcNav) bcNav.outerHTML = renderBreadcrumbs();
-            attachBreadcrumbHandlers();
-          }
-          return loadOptions(rec).then(function () {
-            setupDependsOnHandlers();
-            setupOnchangeHandlers();
-            applyAttrsToForm(form, model);
-            const set = (n, v) => {
-              const el = form.querySelector('[name="' + n + '"]');
-              if (!el) return;
-              const metaEl = getFieldMeta(model, n);
-              if (metaEl && metaEl.type === 'date') { el.value = serverValueToDateInput(v); return; }
-              if (metaEl && metaEl.type === 'datetime') { el.value = serverValueToDatetimeLocal(v); return; }
-              el.value = v != null ? String(v) : '';
-            };
-            fields.forEach(f => {
-            const n = typeof f === 'object' ? f.name : f;
-            const o2m = getOne2manyInfo(model, n);
+      const setupOnchangeHandlers = function () {
+        form.querySelectorAll('input[name], select[name], textarea[name]').forEach(function (el) {
+          if (el.type === 'file' || (el.name || '').indexOf('_cb') >= 0) return;
+          const fieldName = el.getAttribute('name');
+          if (!fieldName) return;
+          const ev = el.tagName === 'TEXTAREA' || (el.type === 'text' || el.type === 'email') ? 'blur' : 'change';
+          el.addEventListener(ev, function () { runServerOnchange(fieldName); });
+        });
+      };
+      var o2mOnchangeDebounce = {};
+      const setupO2mOnchangeHandlers = function () {
+        form.querySelectorAll('[id^="o2m-"]').forEach(function (div) {
+          var fname = div.dataset.fname;
+          var o2m = getOne2manyInfo(model, fname);
+          if (!o2m || !o2m.comodel) return;
+          var lineFields = getOne2manyLineFields(model, fname);
+          if (lineFields.indexOf('product_id') < 0) return;
+          var tbody = div.querySelector('tbody');
+          if (!tbody) return;
+          var runLineOnchange = function (tr, fieldName) {
+            var key = fname + '-' + fieldName;
+            if (o2mOnchangeDebounce[key]) clearTimeout(o2mOnchangeDebounce[key]);
+            o2mOnchangeDebounce[key] = setTimeout(function () {
+              o2mOnchangeDebounce[key] = null;
+              var rowVals = {};
+              lineFields.forEach(function (lf) {
+                var inp = tr.querySelector('[data-o2m-field="' + lf + '"]');
+                if (inp) {
+                  var v = inp.value;
+                  if (lf === 'product_id' && /^\d+$/.test(String(v))) v = parseInt(v, 10);
+                  else if (['product_uom_qty', 'price_unit', 'price_subtotal', 'product_qty', 'unit_amount', 'quantity', 'total_amount'].indexOf(lf) >= 0 && v !== '') v = parseFloat(v) || 0;
+                  rowVals[lf] = v;
+                }
+              });
+              rpc.callKw(o2m.comodel, 'onchange', [fieldName, rowVals], {}).then(function (updates) {
+                if (!updates || typeof updates !== 'object') return;
+                Object.keys(updates).forEach(function (n) {
+                  var inp = tr.querySelector('[data-o2m-field="' + n + '"]');
+                  if (inp) inp.value = updates[n] != null ? updates[n] : '';
+                });
+              }).catch(function () {});
+            }, 300);
+          };
+          tbody.querySelectorAll('tr').forEach(function (tr) {
+            var prodInp = tr.querySelector('[data-o2m-field="product_id"]');
+            if (prodInp) prodInp.addEventListener('change', function () { runLineOnchange(tr, 'product_id'); });
+          });
+          var obs = new MutationObserver(function (mutations) {
+            mutations.forEach(function (m) {
+              m.addedNodes.forEach(function (node) {
+                if (node.nodeType === 1 && node.tagName === 'TR') {
+                  var prodInp = node.querySelector('[data-o2m-field="product_id"]');
+                  if (prodInp) prodInp.addEventListener('change', function () { runLineOnchange(node, 'product_id'); });
+                }
+              });
+            });
+          });
+          obs.observe(tbody, { childList: true });
+        });
+      };
+      const setM2mChecked = function (fname, ids) {
+        const div = form.querySelector('#m2m-' + fname);
+        if (div && div.dataset.widget === 'many2many_tags') {
+          let opts = [];
+          try { opts = JSON.parse(div.dataset.opts || '[]'); } catch (e) {}
+          const nameMap = {};
+          opts.forEach(function (o) { nameMap[o.id] = o.name || String(o.id); });
+          div.dataset.selected = JSON.stringify(ids || []);
+          renderM2mTags(div, fname, opts, ids || [], nameMap, runServerOnchange);
+          return;
+        }
+        const idSet = (ids || []).map(function (x) { return String(x); });
+        form.querySelectorAll('input[name="' + fname + '_cb"]').forEach(function (cb) {
+          cb.checked = idSet.indexOf(String(cb.value)) >= 0;
+        });
+      };
+      if (isNew) {
+        const action = getActionForRoute(route);
+        const context = (action && action.context) ? (typeof action.context === 'string' ? {} : action.context) : {};
+        const fieldNames = fields.map(function (f) { return typeof f === 'object' ? f.name : f; });
+        const applyDefaults = function (defaults) {
+          if (!defaults || typeof defaults !== 'object') return;
+          Object.keys(defaults).forEach(function (n) {
             const m2m = getMany2manyInfo(model, n);
+            const m2oComodel = getMany2oneComodel(model, n);
             if (m2m) {
-              setM2mChecked(n, rec[n]);
-            } else if (n === 'message_ids' && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
-              loadChatter(model, id, rec[n]);
-              setupChatter(form, model, id);
-            } else if (o2m) {
-              const div = form.querySelector('#o2m-' + n);
-              const tbody = div && div.querySelector('#o2m-tbody-' + n);
-              if (tbody && rec[n] && Array.isArray(rec[n]) && rec[n].length) {
-                var lineFields = getOne2manyLineFields(model, n);
-                var o2mFields = ['id'].concat(lineFields);
-                rpc.callKw(o2m.comodel, 'search_read', [[['id', 'in', rec[n]]]], { fields: o2mFields })
-                  .then(function (rows) {
-                    var lineFields = getOne2manyLineFields(model, n);
-                    rows.forEach(function (row) {
-                      tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(model, n, lineFields, row, 0));
-                    });
-                    setupOne2manyAddButtons(form, model);
-      setupOne2manyComputedFields(form, model);
-      setupO2mOnchangeHandlers();
-                  })
-                  .catch(function () { if (tbody) tbody.innerHTML = '<tr><td colspan="4">—</td></tr>'; });
-              } else if (div) {
-                setupOne2manyAddButtons(form, model);
-      setupOne2manyComputedFields(form, model);
-      setupO2mOnchangeHandlers();
-              }
-            } else if (isBooleanField(model, n)) {
-              const cb = form.querySelector('[name="' + n + '"][type="checkbox"]');
-              if (cb) cb.checked = !!rec[n];
-            } else if (isHtmlField(model, n)) {
-              const htmlDiv = document.getElementById('html-' + n);
-              const hiddenIn = document.getElementById('hidden-html-' + n);
-              const val = rec[n] || '';
-              if (htmlDiv) htmlDiv.innerHTML = val;
-              if (hiddenIn) hiddenIn.value = val;
-            } else if (isImageField(model, n)) {
-              const imgPreview = document.getElementById('img-preview-' + n);
-              const statusSpan = document.getElementById('bin-status-' + n);
-              const hiddenIn = form.querySelector('[name="' + n + '"]');
-              if (rec[n] && imgPreview) {
-                imgPreview.src = 'data:image/png;base64,' + rec[n];
-                imgPreview.style.display = 'block';
-              }
-              if (statusSpan && rec[n]) statusSpan.textContent = 'Image attached';
-            } else if (isBinaryField(model, n)) {
-              const statusSpan = document.getElementById('bin-status-' + n);
-              if (statusSpan && rec[n]) statusSpan.textContent = 'File attached';
-            } else if (getMany2oneComodel(model, n)) {
+              setM2mChecked(n, Array.isArray(defaults[n]) ? defaults[n] : (defaults[n] ? [defaults[n]] : []));
+            } else if (m2oComodel) {
               const widget = form.querySelector('.m2one-widget[data-fname="' + n + '"]');
               if (widget) {
                 const vEl = widget.querySelector('.m2one-value');
                 const iEl = widget.querySelector('.m2one-input');
-                const id = rec[n];
+                const id = defaults[n];
                 if (vEl) vEl.value = id != null ? String(id) : '';
                 if (iEl) {
-                  const display = rec[n + '_display'];
-                  if (display) {
-                    iEl.value = display;
-                    iEl.dataset.display = display;
-                  } else if (id) {
-                    rpc.callKw(getMany2oneComodel(model, n), 'name_get', [[parseInt(id, 10)]], {}).then(function (res) {
+                  if (id) {
+                    rpc.callKw(m2oComodel, 'name_get', [[parseInt(id, 10)]], {}).then(function (res) {
                       if (res && res[0]) { iEl.value = res[0][1]; iEl.dataset.display = res[0][1]; }
                     });
                   } else iEl.value = '';
                 }
               }
             } else {
-              set(n, rec[n]);
+              const el = form.querySelector('[name="' + n + '"]');
+              if (el) {
+                if (el.type === 'checkbox') el.checked = !!defaults[n];
+                else {
+                  const metaD = getFieldMeta(model, n);
+                  const dv = defaults[n];
+                  if (metaD && metaD.type === 'date') el.value = serverValueToDateInput(dv);
+                  else if (metaD && metaD.type === 'datetime') el.value = serverValueToDatetimeLocal(dv);
+                  else el.value = dv != null ? String(dv) : '';
+                }
+              }
             }
           });
-          });
-        }
-      }).catch(function () {});
-      form.onsubmit = (e) => { e.preventDefault(); updateRecord(model, route, id, form); return false; };
-      var btnDup = document.getElementById('btn-duplicate');
-      var btnDel = document.getElementById('btn-delete-form');
-      if (btnDup) btnDup.onclick = function () {
-        rpc.callKw(model, 'copy', [[parseInt(id, 10)]], {})
-          .then(function (newRec) {
-            var newId = typeof newRec === 'number' ? newRec : ((newRec && newRec.ids && newRec.ids[0]) || (newRec && newRec.id));
-            if (newId) {
-              showToast('Record duplicated', 'success');
-              window.location.hash = route + '/edit/' + newId;
-            }
+        };
+        rpc.callKw(model, 'default_get', [fieldNames], { context: context })
+          .then(function (defaults) {
+            applyDefaults(defaults);
+            return loadOptions(defaults || {});
           })
-          .catch(function (err) { showToast(err.message || 'Failed to duplicate', 'error'); });
-      };
-      if (btnDel) btnDel.onclick = function (e) {
-        e.preventDefault();
-        confirmModal({ title: 'Delete record', message: 'Delete this record?', confirmLabel: 'Delete', cancelLabel: 'Cancel' }).then(function (ok) {
-          if (ok) deleteRecord(model, route, id);
-        });
-      };
-      var suggestionsEl = document.getElementById('ai-suggestions-list');
-      if (suggestionsEl) {
-        fetch('/ai/chat', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tool: 'suggest_next_actions', kwargs: { model: model, record_id: parseInt(id, 10) } })
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.error) { suggestionsEl.innerHTML = '<span style="color:var(--text-muted)">' + (data.error || 'Unable to load').replace(/</g, '&lt;') + '</span>'; return; }
-            var suggestions = data.result || [];
-            if (!Array.isArray(suggestions)) suggestions = [];
-            if (!suggestions.length) { suggestionsEl.innerHTML = '<span style="color:var(--text-muted)">No suggestions</span>'; return; }
-            var html = '<ul style="list-style:none;padding:0;margin:0">';
-            suggestions.forEach(function (s) {
-              html += '<li style="padding:0.35rem 0;border-bottom:1px solid var(--border-color)">' + (s.label || s.action || '').replace(/</g, '&lt;') + '</li>';
+          .then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); })
+          .catch(function () { loadOptions({}).then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); }); });
+        setupOne2manyAddButtons(form, model);
+        setupOne2manyComputedFields(form, model);
+        setupO2mOnchangeHandlers();
+        form.onsubmit = (e) => { e.preventDefault(); createRecord(model, route, form); return false; };
+      } else {
+        loadRecord(model, id).then(function (r) {
+          if (r && r[0]) {
+            const rec = r[0];
+            try {
+              const key = 'erp_recent_items';
+              const name = (rec.name || rec.display_name || 'Item').toString();
+              let arr = [];
+              try { arr = JSON.parse(sessionStorage.getItem(key) || '[]'); } catch (e) {}
+              arr = arr.filter(function (x) { return !(x.route === route && x.id == id); });
+              arr.unshift({ id: rec.id, name: name, route: route });
+              sessionStorage.setItem(key, JSON.stringify(arr.slice(0, 20)));
+            } catch (e) {}
+            if (rec.name && actionStack.length > 0) {
+              actionStack[actionStack.length - 1].label = rec.name;
+              var bcNav = main.querySelector('.breadcrumbs');
+              if (bcNav) bcNav.outerHTML = renderBreadcrumbs();
+              attachBreadcrumbHandlers();
+            }
+            return loadOptions(rec).then(function () {
+              setupDependsOnHandlers();
+              setupOnchangeHandlers();
+              applyAttrsToForm(form, model);
+              const set = (n, v) => {
+                const el = form.querySelector('[name="' + n + '"]');
+                if (!el) return;
+                const metaEl = getFieldMeta(model, n);
+                if (metaEl && metaEl.type === 'date') { el.value = serverValueToDateInput(v); return; }
+                if (metaEl && metaEl.type === 'datetime') { el.value = serverValueToDatetimeLocal(v); return; }
+                el.value = v != null ? String(v) : '';
+              };
+              fields.forEach(f => {
+              const n = typeof f === 'object' ? f.name : f;
+              const o2m = getOne2manyInfo(model, n);
+              const m2m = getMany2manyInfo(model, n);
+              if (m2m) {
+                setM2mChecked(n, rec[n]);
+              } else if (n === 'message_ids' && (model === 'crm.lead' || model === 'project.task' || model === 'helpdesk.ticket')) {
+                loadChatter(model, id, rec[n]);
+                setupChatter(form, model, id);
+              } else if (o2m) {
+                const div = form.querySelector('#o2m-' + n);
+                const tbody = div && div.querySelector('#o2m-tbody-' + n);
+                if (tbody && rec[n] && Array.isArray(rec[n]) && rec[n].length) {
+                  var lineFields = getOne2manyLineFields(model, n);
+                  var o2mFields = ['id'].concat(lineFields);
+                  rpc.callKw(o2m.comodel, 'search_read', [[['id', 'in', rec[n]]]], { fields: o2mFields })
+                    .then(function (rows) {
+                      var lineFields = getOne2manyLineFields(model, n);
+                      rows.forEach(function (row) {
+                        tbody.insertAdjacentHTML('beforeend', renderOne2manyRow(model, n, lineFields, row, 0));
+                      });
+                      setupOne2manyAddButtons(form, model);
+        setupOne2manyComputedFields(form, model);
+        setupO2mOnchangeHandlers();
+                    })
+                    .catch(function () { if (tbody) tbody.innerHTML = '<tr><td colspan="4">—</td></tr>'; });
+                } else if (div) {
+                  setupOne2manyAddButtons(form, model);
+        setupOne2manyComputedFields(form, model);
+        setupO2mOnchangeHandlers();
+                }
+              } else if (isBooleanField(model, n)) {
+                const cb = form.querySelector('[name="' + n + '"][type="checkbox"]');
+                if (cb) cb.checked = !!rec[n];
+              } else if (isHtmlField(model, n)) {
+                const htmlDiv = document.getElementById('html-' + n);
+                const hiddenIn = document.getElementById('hidden-html-' + n);
+                const val = rec[n] || '';
+                if (htmlDiv) htmlDiv.innerHTML = val;
+                if (hiddenIn) hiddenIn.value = val;
+              } else if (isImageField(model, n)) {
+                const imgPreview = document.getElementById('img-preview-' + n);
+                const statusSpan = document.getElementById('bin-status-' + n);
+                const hiddenIn = form.querySelector('[name="' + n + '"]');
+                if (rec[n] && imgPreview) {
+                  imgPreview.src = 'data:image/png;base64,' + rec[n];
+                  imgPreview.style.display = 'block';
+                }
+                if (statusSpan && rec[n]) statusSpan.textContent = 'Image attached';
+              } else if (isBinaryField(model, n)) {
+                const statusSpan = document.getElementById('bin-status-' + n);
+                if (statusSpan && rec[n]) statusSpan.textContent = 'File attached';
+              } else if (getMany2oneComodel(model, n)) {
+                const widget = form.querySelector('.m2one-widget[data-fname="' + n + '"]');
+                if (widget) {
+                  const vEl = widget.querySelector('.m2one-value');
+                  const iEl = widget.querySelector('.m2one-input');
+                  const id = rec[n];
+                  if (vEl) vEl.value = id != null ? String(id) : '';
+                  if (iEl) {
+                    const display = rec[n + '_display'];
+                    if (display) {
+                      iEl.value = display;
+                      iEl.dataset.display = display;
+                    } else if (id) {
+                      rpc.callKw(getMany2oneComodel(model, n), 'name_get', [[parseInt(id, 10)]], {}).then(function (res) {
+                        if (res && res[0]) { iEl.value = res[0][1]; iEl.dataset.display = res[0][1]; }
+                      });
+                    } else iEl.value = '';
+                  }
+                }
+              } else {
+                set(n, rec[n]);
+              }
             });
-            html += '</ul>';
-            suggestionsEl.innerHTML = html;
+            });
+          }
+        }).catch(function () {});
+        form.onsubmit = (e) => { e.preventDefault(); updateRecord(model, route, id, form); return false; };
+        var btnDup = document.getElementById('btn-duplicate');
+        var btnDel = document.getElementById('btn-delete-form');
+        if (btnDup) btnDup.onclick = function () {
+          rpc.callKw(model, 'copy', [[parseInt(id, 10)]], {})
+            .then(function (newRec) {
+              var newId = typeof newRec === 'number' ? newRec : ((newRec && newRec.ids && newRec.ids[0]) || (newRec && newRec.id));
+              if (newId) {
+                showToast('Record duplicated', 'success');
+                window.location.hash = route + '/edit/' + newId;
+              }
+            })
+            .catch(function (err) { showToast(err.message || 'Failed to duplicate', 'error'); });
+        };
+        if (btnDel) btnDel.onclick = function (e) {
+          e.preventDefault();
+          confirmModal({ title: 'Delete record', message: 'Delete this record?', confirmLabel: 'Delete', cancelLabel: 'Cancel' }).then(function (ok) {
+            if (ok) deleteRecord(model, route, id);
+          });
+        };
+        var suggestionsEl = document.getElementById('ai-suggestions-list');
+        if (suggestionsEl) {
+          fetch('/ai/chat', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tool: 'suggest_next_actions', kwargs: { model: model, record_id: parseInt(id, 10) } })
           })
-          .catch(function () { var el = document.getElementById('ai-suggestions-list'); if (el) el.innerHTML = '<span style="color:var(--text-muted)">Could not load</span>'; });
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.error) { suggestionsEl.innerHTML = '<span style="color:var(--text-muted)">' + (data.error || 'Unable to load').replace(/</g, '&lt;') + '</span>'; return; }
+              var suggestions = data.result || [];
+              if (!Array.isArray(suggestions)) suggestions = [];
+              if (!suggestions.length) { suggestionsEl.innerHTML = '<span style="color:var(--text-muted)">No suggestions</span>'; return; }
+              var html = '<ul style="list-style:none;padding:0;margin:0">';
+              suggestions.forEach(function (s) {
+                html += '<li style="padding:0.35rem 0;border-bottom:1px solid var(--border-color)">' + (s.label || s.action || '').replace(/</g, '&lt;') + '</li>';
+              });
+              html += '</ul>';
+              suggestionsEl.innerHTML = html;
+            })
+            .catch(function () { var el = document.getElementById('ai-suggestions-list'); if (el) el.innerHTML = '<span style="color:var(--text-muted)">Could not load</span>'; });
+        }
+      }
+      const btnAiFill = document.getElementById('btn-ai-fill');
+      if (btnAiFill) {
+        btnAiFill.onclick = function () {
+          const text = prompt('Paste text (email, signature, lead description, etc.) to extract fields:');
+          if (!text || !text.trim()) return;
+          btnAiFill.disabled = true;
+          btnAiFill.textContent = '...';
+          fetch('/ai/extract_fields', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: model, text: text.trim() })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.error) { showToast(data.error || 'AI extract failed', 'error'); return; }
+              const fields = data.fields || {};
+              const form = document.getElementById('record-form');
+              if (!form) return;
+              Object.keys(fields).forEach(function (fname) {
+                const val = fields[fname];
+                if (val == null) return;
+                const strVal = String(val);
+                const el = form.querySelector('[name="' + fname + '"]');
+                if (el) {
+                  if (el.tagName === 'TEXTAREA') el.value = strVal;
+                  else if (el.type === 'checkbox') el.checked = !!val;
+                  else el.value = strVal;
+                }
+                const htmlDiv = document.getElementById('html-' + fname);
+                const hiddenHtml = document.getElementById('hidden-html-' + fname);
+                if (htmlDiv && hiddenHtml) { htmlDiv.innerHTML = strVal; hiddenHtml.value = strVal; }
+              });
+              formDirty = true;
+              if (typeof updateDirtyBanner === 'function') updateDirtyBanner();
+              showToast('Fields filled from AI extraction', 'success');
+            })
+            .catch(function (err) { showToast(err.message || 'AI extract failed', 'error'); })
+            .finally(function () { btnAiFill.disabled = false; btnAiFill.textContent = 'AI Fill'; });
+        };
+      }
+      setupSignatureWidgets(form);
+      attachBreadcrumbHandlers();
+    }
+    if (window.AppCore && window.AppCore.FormViewModule && typeof window.AppCore.FormViewModule.render === 'function') {
+      if (window.AppCore.FormViewModule.render(main, {
+        model: model,
+        route: route,
+        id: id,
+        isNew: isNew,
+        renderBreadcrumbs: renderBreadcrumbs,
+        getTitle: getTitle,
+        getReportName: getReportName,
+        skeletonHtml: skeletonHtml,
+        buildInnerHtml: function () {
+          var inner = '';
+          if (children && children.length) {
+            inner += renderFormTreeToHtml(model, children, { recordId: id, route: route, isNew: isNew });
+          } else {
+            fields.forEach(function (f) {
+              var fname = typeof f === 'object' ? f.name : f;
+              inner += '<div class="attr-field" data-fname="' + (fname || '') + '">' + renderFieldHtml(model, f) + '</div>';
+            });
+          }
+          return inner;
+        },
+        wireForm: wireFormViewAfterPaint,
+      })) {
+        return;
       }
     }
-    const btnAiFill = document.getElementById('btn-ai-fill');
-    if (btnAiFill) {
-      btnAiFill.onclick = function () {
-        const text = prompt('Paste text (email, signature, lead description, etc.) to extract fields:');
-        if (!text || !text.trim()) return;
-        btnAiFill.disabled = true;
-        btnAiFill.textContent = '...';
-        fetch('/ai/extract_fields', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: model, text: text.trim() })
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.error) { showToast(data.error || 'AI extract failed', 'error'); return; }
-            const fields = data.fields || {};
-            const form = document.getElementById('record-form');
-            if (!form) return;
-            Object.keys(fields).forEach(function (fname) {
-              const val = fields[fname];
-              if (val == null) return;
-              const strVal = String(val);
-              const el = form.querySelector('[name="' + fname + '"]');
-              if (el) {
-                if (el.tagName === 'TEXTAREA') el.value = strVal;
-                else if (el.type === 'checkbox') el.checked = !!val;
-                else el.value = strVal;
-              }
-              const htmlDiv = document.getElementById('html-' + fname);
-              const hiddenHtml = document.getElementById('hidden-html-' + fname);
-              if (htmlDiv && hiddenHtml) { htmlDiv.innerHTML = strVal; hiddenHtml.value = strVal; }
-            });
-            formDirty = true;
-            if (typeof updateDirtyBanner === 'function') updateDirtyBanner();
-            showToast('Fields filled from AI extraction', 'success');
-          })
-          .catch(function (err) { showToast(err.message || 'AI extract failed', 'error'); })
-          .finally(function () { btnAiFill.disabled = false; btnAiFill.textContent = 'AI Fill'; });
-      };
-    }
-    setupSignatureWidgets(form);
-    attachBreadcrumbHandlers();
+    main.innerHTML = '<p class="o-empty">Form view unavailable.</p>';
   }
 
   function getFormVals(form, model) {
@@ -4602,6 +3844,30 @@
       });
       if (coreHandled) return;
     }
+    const mod = window.AppCore && window.AppCore.GanttViewModule;
+    if (mod && typeof mod.render === 'function') {
+      const ok = mod.render(main, {
+        model: model,
+        route: route,
+        records: records,
+        searchTerm: searchTerm,
+        dateStart: dateStart,
+        dateStop: dateStop,
+        getTitle: getTitle,
+        renderViewSwitcher: renderViewSwitcher,
+        loadRecords: loadRecords,
+        dispatchListActWindowThenFormHash: dispatchListActWindowThenFormHash,
+        setViewAndReload: setViewAndReload,
+        setListState: function (s) { currentListState = s; },
+        setActionStack: function (stack) { actionStack = stack; },
+        attachActWindowFormLinkDelegation: attachActWindowFormLinkDelegation,
+      });
+      if (ok) return;
+    }
+    renderGanttViewFallback(model, route, records, searchTerm, savedFiltersList, dateStart, dateStop, groupBy);
+  }
+
+  function renderGanttViewFallback(model, route, records, searchTerm, savedFiltersList, dateStart, dateStop, groupBy) {
     const title = getTitle(route);
     const currentView = 'gantt';
     const addLabel = route === 'tasks' ? 'Add task' : route === 'manufacturing' ? 'Add MO' : 'Add';
@@ -4660,6 +3926,34 @@
       });
       if (coreHandled) return;
     }
+    const amod = window.AppCore && window.AppCore.ActivityViewModule;
+    if (amod && typeof amod.render === 'function') {
+      const ok = amod.render(main, {
+        model: model,
+        route: route,
+        records: records,
+        activityTypes: activityTypes,
+        activities: activities,
+        searchTerm: searchTerm,
+        userId: userId,
+        getTitle: getTitle,
+        renderViewSwitcher: renderViewSwitcher,
+        loadRecords: loadRecords,
+        dispatchListActWindowThenFormHash: dispatchListActWindowThenFormHash,
+        setViewAndReload: setViewAndReload,
+        getListState: function () { return currentListState; },
+        setListState: function (s) { currentListState = s; },
+        setActionStack: function (stack) { actionStack = stack; },
+        rpc: rpc,
+        showToast: showToast,
+        attachActWindowFormLinkDelegation: attachActWindowFormLinkDelegation,
+      });
+      if (ok) return;
+    }
+    renderActivityMatrixFallback(model, route, records, activityTypes, activities, searchTerm, savedFiltersList, userId);
+  }
+
+  function renderActivityMatrixFallback(model, route, records, activityTypes, activities, searchTerm, savedFiltersList, userId) {
     const title = getTitle(route);
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
     const currentView = 'activity';
@@ -4800,6 +4094,35 @@
       });
       if (coreHandled) return;
     }
+    const gmod = window.AppCore && window.AppCore.GraphViewModule;
+    if (gmod && typeof gmod.render === 'function') {
+      const ok = gmod.render(main, {
+        model: model,
+        route: route,
+        graphView: graphView,
+        rows: rows,
+        groupbyField: groupbyField,
+        measureFields: measureFields,
+        labelMap: labelMap,
+        searchTerm: searchTerm,
+        savedFiltersList: savedFiltersList,
+        getTitle: getTitle,
+        renderViewSwitcher: renderViewSwitcher,
+        loadRecords: loadRecords,
+        dispatchListActWindowThenFormHash: dispatchListActWindowThenFormHash,
+        setViewAndReload: setViewAndReload,
+        getListState: function () { return currentListState; },
+        setListState: function (s) { currentListState = s; },
+        setActionStack: function (stack) { actionStack = stack; },
+        rpc: rpc,
+        rerenderGraph: renderGraph,
+      });
+      if (ok) return;
+    }
+    renderGraphFallback(model, route, graphView, rows, groupbyField, measureFields, labelMap, searchTerm, savedFiltersList);
+  }
+
+  function renderGraphFallback(model, route, graphView, rows, groupbyField, measureFields, labelMap, searchTerm, savedFiltersList) {
     savedFiltersList = savedFiltersList || [];
     const title = getTitle(route);
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
@@ -4984,6 +4307,37 @@
       });
       if (coreHandled) return;
     }
+    const pmod = window.AppCore && window.AppCore.PivotViewModule;
+    if (pmod && typeof pmod.render === 'function') {
+      const ok = pmod.render(main, {
+        model: model,
+        route: route,
+        pivotView: pivotView,
+        rows: rows,
+        rowNames: rowNames,
+        colNames: colNames,
+        measures: measures,
+        rowLabelMap: rowLabelMap,
+        colLabelMap: colLabelMap,
+        searchTerm: searchTerm,
+        savedFiltersList: savedFiltersList,
+        getTitle: getTitle,
+        renderViewSwitcher: renderViewSwitcher,
+        loadRecords: loadRecords,
+        dispatchListActWindowThenFormHash: dispatchListActWindowThenFormHash,
+        setViewAndReload: setViewAndReload,
+        getListState: function () { return currentListState; },
+        setListState: function (s) { currentListState = s; },
+        setActionStack: function (stack) { actionStack = stack; },
+        rpc: rpc,
+        rerenderPivot: renderPivot,
+      });
+      if (ok) return;
+    }
+    renderPivotFallback(model, route, pivotView, rows, rowNames, colNames, measures, rowLabelMap, colLabelMap, searchTerm, savedFiltersList);
+  }
+
+  function renderPivotFallback(model, route, pivotView, rows, rowNames, colNames, measures, rowLabelMap, colLabelMap, searchTerm, savedFiltersList) {
     savedFiltersList = savedFiltersList || [];
     const title = getTitle(route);
     const stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
@@ -5140,6 +4494,30 @@
       });
       if (coreHandled) return;
     }
+    const cmod = window.AppCore && window.AppCore.CalendarViewModule;
+    if (cmod && typeof cmod.render === 'function') {
+      const ok = cmod.render(main, {
+        model: model,
+        route: route,
+        records: records,
+        searchTerm: searchTerm,
+        viewsSvc: viewsSvc,
+        getTitle: getTitle,
+        renderViewSwitcher: renderViewSwitcher,
+        loadRecords: loadRecords,
+        dispatchListActWindowThenFormHash: dispatchListActWindowThenFormHash,
+        setViewAndReload: setViewAndReload,
+        getListState: function () { return currentListState; },
+        setListState: function (s) { currentListState = s; },
+        setActionStack: function (stack) { actionStack = stack; },
+        attachActWindowFormLinkDelegation: attachActWindowFormLinkDelegation,
+      });
+      if (ok) return;
+    }
+    renderCalendarFallback(model, route, records, searchTerm);
+  }
+
+  function renderCalendarFallback(model, route, records, searchTerm) {
     const calendarView = viewsSvc && viewsSvc.getView(model, 'calendar');
     const dateField = (calendarView && calendarView.date_start) || 'date_deadline';
     const stringField = (calendarView && calendarView.string) || 'name';
@@ -5242,6 +4620,31 @@
   }
 
   function renderKanban(model, route, records, searchTerm) {
+    const mod = window.AppCore && window.AppCore.KanbanViewModule;
+    if (mod && typeof mod.render === 'function') {
+      const ok = mod.render(main, {
+        model: model,
+        route: route,
+        records: records,
+        searchTerm: searchTerm,
+        viewsSvc: viewsSvc,
+        rpc: rpc,
+        showToast: showToast,
+        getTitle: getTitle,
+        renderViewSwitcher: renderViewSwitcher,
+        dispatchListActWindowThenFormHash: dispatchListActWindowThenFormHash,
+        loadRecords: loadRecords,
+        setViewAndReload: setViewAndReload,
+        getListState: function () { return currentListState; },
+        setListState: function (s) { currentListState = s; },
+        setActionStack: function (stack) { actionStack = stack; },
+      });
+      if (ok) return;
+    }
+    renderKanbanFallback(model, route, records, searchTerm);
+  }
+
+  function renderKanbanFallback(model, route, records, searchTerm) {
     const title = getTitle(route);
     actionStack = [{ label: title, hash: route }];
     const addLabel = route === 'leads' ? 'Add lead' : route === 'tickets' ? 'Add ticket' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add';
@@ -5884,6 +5287,7 @@
         return false;
       });
     }
+    /* List: core/list_view.js is primary; renderList else-branch uses AppCore.ListViewModule. */
     if (AppCore.ListView && typeof AppCore.ListView.setImpl === "function") {
       AppCore.ListView.setImpl(function () {
         return false;
@@ -5953,6 +5357,21 @@
   window.__erpLegacyRuntime.start = bootLegacyWebClient;
   window.__erpLegacyRuntime.booted = false;
   window.__erpLegacyRuntime.renderSystrayMount = renderSystrayMount;
+
+  /* Phase 771–772: facades for RouterService / BreadcrumbService migration (see services/erp_*_facade.js). */
+  window.ErpLegacyRouter = window.ErpLegacyRouter || {};
+  window.ErpLegacyRouter.routeApplyInternal = routeApplyInternal;
+  window.ErpLegacyRouter.routeInternal = routeInternal;
+  window.ErpLegacyRouter.routeApply = routeApply;
+  window.ErpLegacyRouter.route = route;
+  window.ErpBreadcrumbFacade = window.ErpBreadcrumbFacade || {};
+  window.ErpBreadcrumbFacade.pushBreadcrumb = pushBreadcrumb;
+  window.ErpBreadcrumbFacade.popBreadcrumbTo = popBreadcrumbTo;
+  window.ErpBreadcrumbFacade.syncHashWithActionStackIfMulti = syncHashWithActionStackIfMulti;
+  window.ErpBreadcrumbFacade.applyActionStackForList = applyActionStackForList;
+  window.ErpBreadcrumbFacade.renderBreadcrumbs = renderBreadcrumbs;
+  window.ErpBreadcrumbFacade.attachBreadcrumbHandlers = attachBreadcrumbHandlers;
+
   if (frontendBootstrap.runtime !== 'modern') {
     bootLegacyWebClient();
   }

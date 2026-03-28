@@ -24,6 +24,10 @@ If `odoo-19.0` is missing locally, clone Odoo 19 CE into `AI Power/odoo-19.0` an
 | MRP costing | `addons/mrp_account/` | `addons/mrp_account/` |
 | Web assets | `addons/web/__manifest__.py`, static pipeline | `addons/web/`, `core/modules/assets.py` |
 
+## Core framework
+
+- ORM / HTTP / modules / tools mapping: [odoo19_core_gap_table.md](odoo19_core_gap_table.md)
+
 ## Workflow
 
 1. Identify trigger and state transitions in Odoo (read-only).

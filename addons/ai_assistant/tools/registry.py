@@ -4,6 +4,8 @@ import json
 import hashlib
 from typing import Any, Callable, Dict, List, Optional
 
+from .rag_text import normalize_rag_index_text as _normalize_rag_index_text
+
 # Tool implementations: name -> (handler, description)
 # All handlers receive (env, **kwargs) and return result
 TOOL_REGISTRY: Dict[str, tuple[Callable, str]] = {}
@@ -250,6 +252,7 @@ def index_record_for_rag(env, model: str, res_id: int) -> None:
     text = " ".join(p for p in parts if p).strip()
     if not text:
         text = str(res_id)
+    text = _normalize_rag_index_text(text)
     embedding = _get_embedding(env, text)
     vals = {"model": model, "res_id": res_id, "text": text}
     if embedding is not None:
@@ -424,11 +427,15 @@ def retrieve_chunks(env, query: str, limit: int = 10) -> List[Dict]:
     embedding = _get_embedding(env, q)
     cr = getattr(env, "cr", None) if env else None
     table = getattr(Chunk, "_table", "ai_document_chunk")
-    from addons.ai_assistant.embeddings.pipeline import embedding_column_is_pgvector_type
+    from addons.ai_assistant.embeddings.pipeline import (
+        embedding_column_is_pgvector_type,
+        pgvector_extension_installed,
+    )
 
     use_vector = (
         embedding is not None
         and cr is not None
+        and pgvector_extension_installed(cr)
         and embedding_column_is_pgvector_type(cr, table, "embedding")
     )
     if use_vector:

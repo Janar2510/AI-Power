@@ -115,6 +115,14 @@
     return filtersHtml;
   }
 
+  function buildSearchPanelAsideHtml(options) {
+    var sections = (options && options.sections) || [];
+    if (!sections.length) return "";
+    var SP = typeof window !== "undefined" && window.UIComponents && window.UIComponents.SearchPanel;
+    if (!SP || typeof SP.renderHTML !== "function") return "";
+    return SP.renderHTML(sections);
+  }
+
   function buildListActionsHtml(options) {
     var addLabel = options.addLabel || "Add";
     var reportName = options.reportName;
@@ -132,6 +140,7 @@
   window.AppCore.ListControlPanel = {
     buildSearchDropdownsHtml: buildSearchDropdownsHtml,
     buildQuickFiltersHtml: buildQuickFiltersHtml,
+    buildSearchPanelAsideHtml: buildSearchPanelAsideHtml,
     buildListActionsHtml: buildListActionsHtml,
   };
 })();

@@ -76,6 +76,17 @@ def embedding_column_supported(cr: Any) -> Optional[bool]:
         return False
 
 
+def pgvector_extension_installed(cr: Any) -> bool:
+    """True if ``vector`` extension is present in ``pg_extension`` (Phase 745)."""
+    if cr is None:
+        return False
+    try:
+        cr.execute("SELECT 1 FROM pg_extension WHERE extname = 'vector' LIMIT 1")
+        return cr.fetchone() is not None
+    except Exception:
+        return False
+
+
 def embedding_column_is_pgvector_type(
     cr: Any, table: str = "ai_document_chunk", column: str = "embedding"
 ) -> bool:

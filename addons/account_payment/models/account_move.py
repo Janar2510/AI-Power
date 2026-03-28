@@ -1,5 +1,7 @@
 """Extend account.move with payment_ids and transaction bridge for portal payment."""
 
+from datetime import date
+
 from core.orm import Model, api, fields
 
 
@@ -55,3 +57,66 @@ class AccountMovePayment(Model):
         if not Transaction or not getattr(move, "ids", None):
             return []
         return Transaction.search([("account_move_id", "=", move.ids[0])])
+
+    def action_register_manual_payment(self, amount: float = None, journal_id: int = None):
+        """Create draft ``account.payment`` for posted customer invoice residual (Phase B2 subset)."""
+        env = getattr(self, "env", None)
+        if not env or not self.ids:
+            return []
+        Payment = env.get("account.payment")
+        Journal = env.get("account.journal")
+        if not Payment or not Journal:
+            return []
+        created = []
+        for move in self:
+            row = move.read(
+                [
+                    "move_type",
+                    "state",
+                    "partner_id",
+                    "currency_id",
+                    "company_id",
+                    "amount_residual",
+                ]
+            )[0]
+            if row.get("state") != "posted" or row.get("move_type") != "out_invoice":
+                continue
+            residual = float(amount if amount is not None else row.get("amount_residual") or 0)
+            if residual <= 0:
+                continue
+            cid = row.get("company_id")
+            cid = cid[0] if isinstance(cid, (list, tuple)) and cid else cid
+            if not cid:
+                continue
+            jid = journal_id
+            if not jid:
+                j = Journal.search([("type", "=", "bank"), ("company_id", "=", cid)], limit=1)
+                if not j.ids:
+                    j = Journal.search([("company_id", "=", cid)], limit=1)
+                if not j.ids:
+                    continue
+                jid = j.ids[0]
+            partner = row.get("partner_id")
+            pid = partner[0] if isinstance(partner, (list, tuple)) and partner else partner
+            cur = row.get("currency_id")
+            cur_id = cur[0] if isinstance(cur, (list, tuple)) and cur else cur
+            pay = Payment.create(
+                {
+                    "name": "Pay",
+                    "date": date.today().isoformat(),
+                    "journal_id": jid,
+                    "company_id": cid,
+                    "state": "draft",
+                    "amount": residual,
+                    "currency_id": cur_id,
+                    "partner_id": pid,
+                    "payment_type": "inbound",
+                    "partner_type": "customer",
+                    "move_id": move.ids[0],
+                    "memo": "Manual register",
+                }
+            )
+            pid_val = pay.ids[0] if getattr(pay, "ids", None) else getattr(pay, "id", None)
+            if pid_val:
+                created.append(pid_val)
+        return created

@@ -17,6 +17,7 @@ class StockMove(Model):
     )
     lot_id = fields.Many2one("stock.lot", string="Lot/Serial", ondelete="set null")  # Phase 198
     picking_id = fields.Many2one("stock.picking", string="Transfer", ondelete="cascade")
+    line_ids = fields.One2many("stock.move.line", "move_id", string="Move Lines")
     location_id = fields.Many2one("stock.location", string="Source Location", required=True)
     location_dest_id = fields.Many2one("stock.location", string="Destination Location", required=True)
     state = fields.Selection(
@@ -112,3 +113,96 @@ class StockMove(Model):
             "debit": 0.0,
             "credit": cogs_value,
         })
+
+    def action_split_by_qty(self, split_qty: float):
+        """Split demand across two draft moves: self keeps (qty - split), new move gets split_qty (Phase B1)."""
+        sq = float(split_qty or 0)
+        if sq <= 0:
+            return False
+        env = getattr(self, "env", None)
+        if not env or not self.ids:
+            return False
+        for rec in self:
+            row = rec.read(
+                [
+                    "state",
+                    "product_uom_qty",
+                    "product_id",
+                    "picking_id",
+                    "location_id",
+                    "location_dest_id",
+                    "name",
+                    "lot_id",
+                ]
+            )[0]
+            if row.get("state") not in ("draft",):
+                continue
+            total = float(row.get("product_uom_qty") or 0)
+            if sq >= total or total - sq <= 0:
+                continue
+            rec.write({"product_uom_qty": total - sq})
+            Move = env.get("stock.move")
+            if not Move:
+                continue
+            Move.create(
+                {
+                    "name": row.get("name") or "Split",
+                    "product_id": row.get("product_id"),
+                    "product_uom_qty": sq,
+                    "picking_id": row.get("picking_id"),
+                    "location_id": row.get("location_id"),
+                    "location_dest_id": row.get("location_dest_id"),
+                    "state": "draft",
+                    "lot_id": row.get("lot_id"),
+                }
+            )
+        return True
+
+    def action_merge_with(self, other_move_id: int):
+        """Merge other draft move into first record of self when same product, picking, locations (Phase B1)."""
+        env = getattr(self, "env", None)
+        if not env or not self.ids or not other_move_id:
+            return False
+        Move = env.get("stock.move")
+        if not Move:
+            return False
+        rid = self.ids[0]
+        if rid == other_move_id:
+            return False
+        other = Move.browse(other_move_id)
+        if not other.ids:
+            return False
+        rec = Move.browse(rid)
+        a = rec.read(
+            [
+                "state",
+                "product_uom_qty",
+                "product_id",
+                "picking_id",
+                "location_id",
+                "location_dest_id",
+            ]
+        )[0]
+        b = other.read(
+            [
+                "state",
+                "product_uom_qty",
+                "product_id",
+                "picking_id",
+                "location_id",
+                "location_dest_id",
+            ]
+        )[0]
+        if a.get("state") != "draft" or b.get("state") != "draft":
+            return False
+        if (
+            a.get("product_id") != b.get("product_id")
+            or a.get("picking_id") != b.get("picking_id")
+            or a.get("location_id") != b.get("location_id")
+            or a.get("location_dest_id") != b.get("location_dest_id")
+        ):
+            return False
+        new_qty = float(a.get("product_uom_qty") or 0) + float(b.get("product_uom_qty") or 0)
+        rec.write({"product_uom_qty": new_qty})
+        other.unlink()
+        return True

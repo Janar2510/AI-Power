@@ -240,6 +240,9 @@
           appendMessage('assistant', data.error, true);
           return;
         }
+        if (llmEnabled && data.conversation_id != null) {
+          conversationId = data.conversation_id;
+        }
         const result = data.result;
         const text = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
         appendMessage('assistant', text);

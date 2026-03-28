@@ -86,6 +86,32 @@ class TestHTTP(unittest.TestCase):
             else:
                 os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
 
+    def test_webclient_html_esbuild_primary_default_when_unset_phase801(self):
+        """Unset ERP_WEBCLIENT_ESBUILD_PRIMARY defaults to per-file JS + esbuildPrimary true."""
+        old = os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)
+        try:
+            html = _webclient_html(debug_assets=False)
+            self.assertIn('"esbuildPrimary": true', html)
+            self.assertNotIn("/web/assets/web.assets_web.js", html)
+            self.assertIn("/web/static/src/services/rpc.js", html)
+        finally:
+            if old is not None:
+                os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
+
+    def test_webclient_html_concat_when_esbuild_primary_disabled_phase801(self):
+        """ERP_WEBCLIENT_ESBUILD_PRIMARY=0 serves single concat bundle + esbuildPrimary false."""
+        old = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY")
+        try:
+            os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = "0"
+            html = _webclient_html(debug_assets=False)
+            self.assertIn('"esbuildPrimary": false', html)
+            self.assertIn("/web/assets/web.assets_web.js", html)
+        finally:
+            if old is None:
+                os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)
+            else:
+                os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
+
     def test_web_service_worker_precache_per_file_js_when_esbuild_primary_phase590(self):
         """SW SHELL_URLS lists manifest JS entries when ERP_WEBCLIENT_ESBUILD_PRIMARY=1."""
         old = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY")
@@ -103,16 +129,32 @@ class TestHTTP(unittest.TestCase):
             else:
                 os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
 
-    def test_web_service_worker_default_precache_includes_concat_js_phase590(self):
-        """Default SW precache still includes bundled web.assets_web.js (concat path)."""
+    def test_web_service_worker_default_precache_lists_manifest_js_phase801(self):
+        """Default SW precache lists per-manifest JS (esbuild-primary default when env unset)."""
         old = os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)
         try:
+            r = self.client.get("/web/sw.js")
+            text = r.get_data(as_text=True)
+            self.assertIn("erp-web-shell-v2", text)
+            self.assertNotIn("/web/assets/web.assets_web.js", text)
+            self.assertIn("/web/static/src/services/rpc.js", text)
+        finally:
+            if old is not None:
+                os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
+
+    def test_web_service_worker_precache_concat_when_esbuild_primary_disabled_phase801(self):
+        """Explicit ERP_WEBCLIENT_ESBUILD_PRIMARY=0 restores single concat JS precache."""
+        old = os.environ.get("ERP_WEBCLIENT_ESBUILD_PRIMARY")
+        try:
+            os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = "0"
             r = self.client.get("/web/sw.js")
             text = r.get_data(as_text=True)
             self.assertIn("/web/assets/web.assets_web.js", text)
             self.assertIn("erp-web-shell-v2", text)
         finally:
-            if old is not None:
+            if old is None:
+                os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)
+            else:
                 os.environ["ERP_WEBCLIENT_ESBUILD_PRIMARY"] = old
 
     def test_webclient_load_menus_requires_auth_phase1(self):
@@ -238,6 +280,13 @@ class TestHTTP(unittest.TestCase):
         self.assertEqual(data["status"], "ok")
         self.assertIn("db", data)
         self.assertIsInstance(data["db"], bool)
+
+    def test_ai_chat_stream_returns_501(self):
+        """Phase C3: streaming hook is reserved."""
+        r = self.client.get("/ai/chat/stream")
+        self.assertEqual(r.status_code, 501)
+        data = json.loads(r.get_data(as_text=True))
+        self.assertIn("streaming_not_enabled", data.get("error", ""))
 
     def test_security_headers_present(self):
         """Responses include X-Frame-Options and X-Content-Type-Options (Phase 99)."""

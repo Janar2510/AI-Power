@@ -9,6 +9,7 @@ from werkzeug.utils import redirect
 
 from core.http.controller import route
 from core.http.auth import get_session_uid, get_session_db, _get_registry
+from core.http.session import ensure_session_csrf
 from core.sql_db import get_cursor
 
 
@@ -45,15 +46,15 @@ PORTAL_MY_HTML = """<!DOCTYPE html>
 <title>My Portal</title>
 <link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
 <style>
-  body { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }
-  .portal-nav { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; gap: 1rem; align-items: center; }
-  .portal-nav a { color: white; text-decoration: none; }
-  .portal-content { max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-  .portal-content h1 { margin-top: 0; }
-  table { width: 100%; border-collapse: collapse; background: white; }
-  th, td { padding: 0.5rem 1rem; text-align: left; border-bottom: 1px solid #eee; }
-  th { background: #f8f8f8; }
-  .btn { display: inline-block; padding: 0.5rem 1rem; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }
+  body {{ margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }}
+  .portal-nav {{ background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; gap: 1rem; align-items: center; }}
+  .portal-nav a {{ color: white; text-decoration: none; }}
+  .portal-content {{ max-width: 800px; margin: 2rem auto; padding: 0 1rem; }}
+  .portal-content h1 {{ margin-top: 0; }}
+  table {{ width: 100%; border-collapse: collapse; background: white; }}
+  th, td {{ padding: 0.5rem 1rem; text-align: left; border-bottom: 1px solid #eee; }}
+  th {{ background: #f8f8f8; }}
+  .btn {{ display: inline-block; padding: 0.5rem 1rem; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; }}
 </style>
 </head>
 <body>
@@ -539,7 +540,7 @@ def portal_my_invoices(request):
         if not moves or not moves.ids:
             content = "<h1>My Invoices</h1><p>No invoices yet.</p><p><a href=\"/shop\">Browse shop</a></p>"
             return Response(PORTAL_MY_HTML.format(content=content), content_type="text/html; charset=utf-8")
-        move_rows = Move.browse(moves.ids).read(["name", "partner_id", "state", "invoice_origin", "line_ids"])
+        move_rows = Move.browse(moves.ids).read(["id", "name", "partner_id", "state", "invoice_origin", "line_ids"])
         html = "<h1>My Invoices</h1><table><tr><th>Number</th><th>Origin</th><th>Status</th><th></th></tr>"
         for r in move_rows:
             name = (r.get("name") or "").replace("<", "&lt;")
@@ -637,6 +638,24 @@ def portal_my_invoice_pay(request, move_id):
         inv_state = m.get("state", "")
         if inv_state == "paid":
             return redirect(f"/my/invoices/{move_id}")
+        def _provider_rows(code=None, limit=None):
+            domain = [("state", "in", ["enabled", "test"])]
+            if code:
+                domain.insert(0, ("code", "=", code))
+            rows = Provider.search_read(domain, ["id", "code"])
+            if rows:
+                return rows[:limit] if limit else rows
+            params = ["enabled", "test"]
+            sql = "SELECT id, code FROM payment_provider WHERE state IN (%s, %s)"
+            if code:
+                sql += " AND code = %s"
+                params.append(code)
+            sql += " ORDER BY id"
+            if limit:
+                sql += " LIMIT %s"
+                params.append(limit)
+            cr.execute(sql, params)
+            return cr.fetchall() or []
         if request.method == "POST":
             provider_code = request.form.get("provider", "demo")
             lines = MoveLine.search([("move_id", "=", move_id)])
@@ -646,9 +665,9 @@ def portal_my_invoice_pay(request, move_id):
                 return redirect(f"/my/invoices/{move_id}")
             currency_id = m.get("currency_id")
             currency_id = currency_id[0] if isinstance(currency_id, (list, tuple)) and currency_id else currency_id
-            providers = Provider.search_read([("code", "=", provider_code), ("state", "in", ["enabled", "test"])], ["id", "code"])
+            providers = _provider_rows(provider_code)
             if not providers:
-                providers = Provider.search_read([("state", "in", ["enabled", "test"])], ["id", "code"], limit=1)
+                providers = _provider_rows(limit=1)
             if not providers:
                 return redirect(f"/my/invoices/{move_id}")
             import secrets
@@ -666,12 +685,15 @@ def portal_my_invoice_pay(request, move_id):
                 # Phase 732: Phase 731 sync runs on create when state is done; no direct paid write.
                 return redirect(f"/my/invoices/{move_id}")
             return redirect(f"/payment/status/{ref}")
-        providers = Provider.search_read([("state", "in", ["enabled", "test"])], ["id", "code"])
+        providers = _provider_rows()
         opts = "".join(f'<option value="{p.get("code", "")}">{p.get("code", "demo").title()}</option>' for p in providers)
+        sid = request.cookies.get("erp_session")
+        csrf_token = ensure_session_csrf(sid) if sid else ""
         content = f"""
         <h1>Pay Invoice</h1>
         <p><a href="/my/invoices/{move_id}">&larr; Back to invoice</a></p>
         <form method="post" style="max-width:400px;margin-top:1rem">
+          <input type="hidden" name="csrf_token" value="{csrf_token}"/>
           <p><label>Payment method<br/><select name="provider" style="width:100%;padding:0.5rem">{opts}</select></label></p>
           <button type="submit" class="btn" style="margin-top:1rem;padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Pay Now</button>
         </form>

@@ -6,7 +6,7 @@
 
 | Module | Role |
 |--------|------|
-| `stock` | `stock.picking`, `stock.move`, `stock.quant`, reservation, partial qty (Phase 530), validate lifecycle (Phase 525) |
+| `stock` | `stock.picking`, `stock.move`, `stock.quant`, `stock.scrap` (**Phase 748**), reservation, partial qty (Phase 530), validate lifecycle (Phase 525) |
 | `stock_account` | `stock.picking` inherit: `valuation_state` pending→posted on validate; `action_post_valuation` helper |
 
 ## Odoo 19 `stock_account` (behavioural breadth)
@@ -21,6 +21,7 @@ Upstream adds valuation on **moves** (`value`, `account_move_id`, anglo-saxon / 
 | Account entries from stock | Real-time posting on done moves | Optional Tier **571** draft `account.move` (company flag); `stock_account` still no mandatory posting | MRP cost stub uses `account.move` separately |
 | Picking valuation flag | N/A as single field | `valuation_state` marks transfer “valued” for integrations | Keep; document as **subset** (Phase 539) |
 | Quant value | Valued quants, ownership exclusions | Quantity-focused quants | Align later if product needs COGS |
+| Scrap orders | `stock.scrap`, validate → move | **`stock.scrap`** + **`action_validate`** → **`done`** **`stock.move`** (quant hooks) — **1.238.0** | Subset vs full Odoo scrap UX (sequences, wizard); extend as needed |
 
 ## Tests
 

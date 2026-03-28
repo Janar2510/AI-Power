@@ -42,7 +42,7 @@ Portal and checkout flows should set **`account_move_id`** on invoice payments s
 - Payment bridge (DB smoke, **Phase 733**/**734**): `tests/test_payment_transaction_invoice_db_phase733.py`, `tests/test_payment_transaction_write_done_phase734.py`, `tests/test_portal_invoice_pay_phase199.py`, `tests/payment_test_bootstrap.py`
 - Posting: `tests/test_account_post_phase467.py`, `tests/test_account_post_phase535.py`
 - Taxes: `tests/test_account_tax_compute_phase536.py`
-- Bank / wizard: `tests/test_bank_statement_phase193.py`, `tests/test_reconcile_wizard_phase195.py`, `tests/test_bank_statement_action_reconcile_phase537.py`
+- Bank / wizard: `tests/test_bank_statement_phase193.py`, `tests/test_reconcile_wizard_phase195.py`, `tests/test_bank_statement_action_reconcile_phase537.py`, `tests/test_account_bank_statement_line_phase744.py`
 
 ## Parity matrix
 
@@ -71,6 +71,10 @@ See **Phases 535–538** in `docs/parity_matrix.md`.
 **Shipped (Phase 599):** **`account.journal.currency_id`** — optional currency on the journal; on **create**, when omitted, defaults from **`res.company.currency_id`** for the journal’s **`company_id`** (or first company). Tests: `tests/test_account_journal_currency_phase599.py`.
 
 **Shipped (Phase 605):** **`account.move.currency_id`** — on **create**, when omitted, defaults from **`account.journal.currency_id`** when **`journal_id`** is set. Tests: `tests/test_account_move_currency_from_journal_phase605.py`.
+
+**Shipped (Phase 736):** **`account.move.payment_state`** — computed **`not_paid`** / **`in_payment`** / **`partial`** / **`paid`** from invoice residual plus linked **`payment.transaction`** states. The legacy **`state == "paid"`** compatibility path remains in **`_sync_payment_state_from_transactions`**, but richer invoice-payment semantics no longer depend on callers reading only the binary **`state`** field. Tests: `tests/test_account_move_payment_state_phase736.py`, plus existing `tests/test_account_payment_phase468.py`.
+
+**Shipped (Phase 744):** **`account.bank.statement.line`** — optional **`sequence`**, **`amount_currency`**, **`foreign_currency_id`**, **`payment_ref`**, **`transaction_type`**, and computed **`is_reconciled`** (true when **`move_id`** is set). Tests: **`tests/test_account_bank_statement_line_phase744.py`**.
 
 Remaining deferrals (clean-room vs `odoo-19.0/addons/account/` when prioritized):
 

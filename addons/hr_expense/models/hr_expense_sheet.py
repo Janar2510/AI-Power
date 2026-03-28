@@ -65,20 +65,26 @@ class HrExpenseSheet(Model):
         self.write({"state": "approve"})
         self.expense_line_ids.write({"state": "approved"})
 
-    def action_done(self):
-        """Create account.move for expenses."""
+    def _create_account_move_for_sheet(self, post_move=True):
+        """Build journal entry from expense lines; link sheet; optionally post (shared by action_done / action_sheet_move_create)."""
         for sheet in self:
             if sheet.state != "approve":
                 continue
             env = getattr(sheet, "env", None)
             if not env:
                 continue
+            row0 = sheet.read(["account_move_id", "journal_id"])[0]
+            if row0.get("account_move_id"):
+                continue
             Move = env.get("account.move")
             Journal = env.get("account.journal")
             if not Move or not Journal:
                 continue
-            journals = Journal.search([("type", "=", "purchase")], limit=1)
-            journal_id = journals.ids[0] if journals.ids else None
+            journal_id = row0.get("journal_id")
+            journal_id = journal_id[0] if isinstance(journal_id, (list, tuple)) and journal_id else journal_id
+            if not journal_id:
+                journals = Journal.search([("type", "=", "purchase")], limit=1)
+                journal_id = journals.ids[0] if journals.ids else None
             if not journal_id:
                 journals = Journal.search([], limit=1)
                 journal_id = journals.ids[0] if journals.ids else None
@@ -86,13 +92,13 @@ class HrExpenseSheet(Model):
                 continue
             lines = sheet.expense_line_ids
             if not lines or not lines.ids:
-                sheet.write({"state": "done"})
                 continue
             line_rows = lines.read(["name", "unit_amount", "quantity", "date", "analytic_account_id", "employee_id"])
             total = sum(r.get("unit_amount", 0) * r.get("quantity", 1) for r in line_rows)
             move_vals = {
                 "journal_id": journal_id,
                 "move_type": "entry",
+                "hr_expense_sheet_id": sheet.ids[0] if sheet.ids else None,
             }
             move = Move.create(move_vals)
             MoveLine = env.get("account.move.line")
@@ -130,8 +136,26 @@ class HrExpenseSheet(Model):
                         "name": f"Expense {sheet.name}",
                         "credit": total,
                     })
-            move.action_post()
-            sheet.write({"state": "done", "account_move_id": move.id})
+            if post_move:
+                move.action_post()
+            sheet.write({"account_move_id": move.id})
+        return True
+
+    def action_sheet_move_create(self):
+        """Odoo parity: create (and post) account.move for an approved sheet; sets account_move_id."""
+        return self._create_account_move_for_sheet(post_move=True)
+
+    def action_done(self):
+        """Mark done; create posted account.move when lines exist (uses shared bridge)."""
+        for sheet in self:
+            if sheet.state != "approve":
+                continue
+            lines = sheet.expense_line_ids
+            if not lines or not lines.ids:
+                sheet.write({"state": "done"})
+                continue
+            sheet._create_account_move_for_sheet(post_move=True)
+            sheet.write({"state": "done"})
         return True
 
     def action_cancel(self):

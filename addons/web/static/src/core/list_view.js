@@ -104,7 +104,19 @@
     });
     var actionsHtml = LCP.buildListActionsHtml({ addLabel: addLabel, reportName: reportName });
 
-    var html = '<div class="o-list-shell"><h2>' + escHtml(title) + "</h2>";
+    var panelAside = "";
+    if (typeof LCP.buildSearchPanelAsideHtml === "function" && searchModel && typeof searchModel.getSearchPanelSections === "function") {
+      var secs = searchModel.getSearchPanelSections();
+      if (secs && secs.length) {
+        panelAside = LCP.buildSearchPanelAsideHtml({ sections: secs });
+      }
+    }
+
+    var html = '<div class="o-list-shell"' + (panelAside ? ' style="display:flex;gap:var(--card-gap);align-items:flex-start"' : "") + ">";
+    if (panelAside) {
+      html += '<div class="o-list-search-panel-host">' + panelAside + "</div>";
+    }
+    html += '<div class="o-list-shell-main" style="flex:1;min-width:0"><h2>' + escHtml(title) + "</h2>";
     html += (UI.ControlPanel && UI.ControlPanel.renderHTML ? UI.ControlPanel.renderHTML({
       viewSwitcherHtml: renderViewSwitcher(route, currentView, h),
       searchTerm: searchTerm,
@@ -130,6 +142,16 @@
     }
 
     function attachCommonHandlers() {
+      container.querySelectorAll(".o-search-panel-item").forEach(function (pb) {
+        pb.onclick = function () {
+          var fname = pb.getAttribute("data-value");
+          if (!fname) return;
+          var cur = currentListState.activeSearchFilters || [];
+          if (cur.indexOf(fname) < 0) currentListState.activeSearchFilters = cur.concat(fname);
+          var si = container.querySelector("#list-search");
+          h.loadRecords(model, route, si ? si.value.trim() : "", stageFilter, null, currentListState.savedFilterId, 0, null);
+        };
+      });
       var btn = container.querySelector("#btn-add");
       if (btn) btn.onclick = function () { window.location.hash = route + "/new"; };
       function saveCurrentState() {
@@ -429,9 +451,9 @@
           title: "No records yet",
           subtitle: "Create your first record to start working.",
           actionLabel: addLabel,
-        }) + "</div>";
+        }) + "</div></div>";
       } else {
-        container.innerHTML = html + '<p class="o-list-empty">No records yet.</p></div>';
+        container.innerHTML = html + '<p class="o-list-empty">No records yet.</p></div></div>';
       }
       attachCommonHandlers();
       if (UI.EmptyState && typeof UI.EmptyState.wire === "function") {
@@ -581,7 +603,7 @@
 
       var total = totalCount != null ? totalCount : (records ? records.length : 0);
       var pager = UI.Pager && UI.Pager.renderHTML ? UI.Pager.renderHTML({ total: total, offset: offset, limit: limit }) : "";
-      container.innerHTML = html + tbl + pager + "</div>";
+      container.innerHTML = html + tbl + pager + "</div></div>";
 
       (function setupBulkActions() {
         var bar = container.querySelector("#bulk-action-bar");

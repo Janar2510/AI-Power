@@ -12,3 +12,9 @@ Use **`base.automation`** (server actions + domain triggers) for deterministic f
 
 - No privileged AI: tools run as the requesting user.
 - State-changing automations require explicit approval in UI or signed server rules.
+
+## Phase C2 (2026-03) — automation × AI boundary
+
+- **`base.automation`** continues to run server actions / webhooks / field updates via `core.orm.automation` (`run_on_time` cron).
+- **Direct LLM tool invocation from automation** remains a product-scoped follow-up: add an `ir.actions.server` code path or explicit `action_type` only after audit + confirmation UX is defined.
+- **`/ai/chat/stream`**: reserved endpoint returns **501** until streaming is implemented (see `ai_controller.ai_chat_stream`).

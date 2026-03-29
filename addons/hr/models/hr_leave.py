@@ -57,6 +57,14 @@ class HrLeave(Model):
         readonly=True,
         help="Filled when leave is approved (Phase 491 HR lifecycle).",
     )
+    approval_note = fields.Text(
+        string="Approval Note",
+        help="Optional note added by manager when approving or refusing (Track P2).",
+    )
+    refuse_reason = fields.Text(
+        string="Refusal Reason",
+        help="Reason provided by manager when refusing the leave request (Track P2).",
+    )
 
     @classmethod
     def _create_hr_leave_record(cls, vals):
@@ -83,18 +91,24 @@ class HrLeave(Model):
         """Submit for approval."""
         self.write({"state": "confirm"})
 
-    def action_validate(self):
-        """Manager approves; record work-entry adjustment note for payroll visibility."""
+    def action_validate(self, approval_note=None):
+        """Manager approves; record work-entry adjustment note for payroll visibility (Track P2)."""
         for rec in self:
             row = rec.read(["number_of_days"])[0]
             days = float(row.get("number_of_days") or 0)
             note = f"Leave approved: {days:g} working day(s) marked for work entry adjustment."
-            rec.write({"state": "validate", "work_entry_note": note})
+            write_vals = {"state": "validate", "work_entry_note": note}
+            if approval_note:
+                write_vals["approval_note"] = str(approval_note)
+            rec.write(write_vals)
         return True
 
-    def action_refuse(self):
-        """Manager refuses."""
-        self.write({"state": "refuse"})
+    def action_refuse(self, reason=None):
+        """Manager refuses; optionally records the refusal reason (Track P2)."""
+        write_vals = {"state": "refuse"}
+        if reason:
+            write_vals["refuse_reason"] = str(reason)
+        self.write(write_vals)
 
     def action_draft(self):
         """Reset to draft."""

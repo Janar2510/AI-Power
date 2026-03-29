@@ -1,0 +1,18 @@
+// dark.scss — Dark mode bundle entry point (Track L3).
+// Replaces the monolithic _dark.css for progressive component-scoped dark overrides.
+// Build: sass src/scss/dark.scss dist/webclient.dark.css
+//
+// Each component imports its own *.dark.scss partial that scopes overrides under [data-theme="dark"].
+// The original _dark.css tokens remain the foundation; component-level files handle component rules.
+
+// Foundation: existing dark tokens (unchanged)
+// These are already loaded separately as _dark.css in web.assets_web.
+// Include here only when building a standalone dark bundle.
+// @import 'dark_tokens';
+
+// Per-component dark overrides
+@import 'views/list/list_renderer.dark';
+@import 'views/form/form_controller.dark';
+@import 'core/dialog.dark';
+@import 'core/dropdown.dark';
+@import 'search/control_panel.dark';

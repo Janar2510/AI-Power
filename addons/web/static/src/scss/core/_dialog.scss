@@ -1,0 +1,148 @@
+// _dialog.scss — Dialog + modal surface styles (Track L2).
+
+.o-modal-open {
+  overflow: hidden;
+}
+
+.o-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-dialog, 1000);
+  padding: var(--space-md);
+  animation: dialogFadeIn var(--duration-base) var(--ease-out-expo);
+}
+
+@keyframes dialogFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.o-dialog-panel {
+  background: var(--color-surface-1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 640px;
+  width: 100%;
+  max-height: calc(100vh - var(--space-xl) * 2);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: dialogSlideIn var(--duration-base) var(--ease-spring);
+}
+
+@keyframes dialogSlideIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.o-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.o-dialog-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.o-dialog-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: var(--text-lg);
+  line-height: 1;
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast), background var(--duration-fast);
+
+  &:hover {
+    color: var(--color-text);
+    background: var(--color-surface-2);
+  }
+}
+
+.o-dialog-body {
+  padding: var(--space-lg);
+  flex: 1;
+  overflow-y: auto;
+}
+
+.o-dialog-body-text {
+  font-size: var(--text-md);
+  color: var(--color-text);
+  margin: 0 0 var(--space-md);
+  line-height: var(--leading-relaxed);
+}
+
+.o-dialog-footer {
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.o-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+.o-dialog-breadcrumbs {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-sm);
+}
+
+// ── S2 migration: rules moved from webclient.css (Phase 1c) ──────────────────
+.o-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1300;
+  padding: var(--space-lg);
+}
+
+.o-dialog-panel {
+  width: min(28rem, 100%);
+  background: var(--color-surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.o-dialog-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--color-text);
+}
+
+.o-dialog-body {
+  margin: 0;
+  color: var(--color-text);
+  line-height: 1.45;
+}
+
+.o-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--card-gap);
+  margin-top: var(--space-sm);
+}

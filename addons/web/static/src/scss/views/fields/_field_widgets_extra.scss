@@ -1,0 +1,95 @@
+// Post-1.248 P3 / S5 — OWL field widgets (tokens only)
+
+.o-field-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface-1));
+  color: var(--color-primary);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.o-field-statusbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.o-field-statusbar-step {
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.o-field-statusbar-step--active {
+  color: var(--color-text-on-primary);
+  background: var(--color-primary);
+  border-color: transparent;
+}
+
+.o-field-priority {
+  display: inline-flex;
+  gap: var(--space-2xs);
+  letter-spacing: -0.06em;
+}
+
+.o-field-priority-star {
+  color: color-mix(in srgb, var(--text-muted) 55%, var(--color-surface-1));
+  font-size: var(--text-md);
+}
+
+.o-field-priority-star--on {
+  color: var(--color-warning);
+}
+
+.o-field-link {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.o-field-link:hover {
+  text-decoration: underline;
+}
+
+.o-field-image-wrap {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+}
+
+.o-field-image-thumb {
+  max-height: 3rem;
+  max-width: 6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  object-fit: cover;
+}
+
+.o-field-image-placeholder {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.o-field-color-swatch {
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  vertical-align: middle;
+}
+
+.o-field-color-input {
+  width: 3rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+}

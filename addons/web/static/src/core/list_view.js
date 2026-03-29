@@ -631,13 +631,21 @@
           bulkDelete.onclick = function () {
             var ids = getSelectedIds();
             if (!ids.length) return;
-            if (!confirm("Delete " + ids.length + " record(s)?")) return;
-            rpc.callKw(model, "unlink", [ids], {})
-              .then(function () {
-                showToast("Deleted", "success");
-                h.loadRecords(model, route, currentListState.searchTerm, stageFilter, undefined, currentListState.savedFilterId, offset, limit, h.getHashDomainParam ? h.getHashDomainParam() : undefined);
-              })
-              .catch(function (err) { showToast(err.message || "Delete failed", "error"); });
+            var cm = h.confirmModal || function (o) { return Promise.resolve(window.confirm((o && o.message) || "")); };
+            cm({
+              title: "Delete records",
+              message: "Delete " + ids.length + " record(s)?",
+              confirmLabel: "Delete",
+              cancelLabel: "Cancel",
+            }).then(function (ok) {
+              if (!ok) return;
+              rpc.callKw(model, "unlink", [ids], {})
+                .then(function () {
+                  showToast("Deleted", "success");
+                  h.loadRecords(model, route, currentListState.searchTerm, stageFilter, undefined, currentListState.savedFilterId, offset, limit, h.getHashDomainParam ? h.getHashDomainParam() : undefined);
+                })
+                .catch(function (err) { showToast(err.message || "Delete failed", "error"); });
+            });
           };
         }
         if (bulkClear) bulkClear.onclick = function () { container.querySelectorAll(".list-row-select").forEach(function (cb) { cb.checked = false; }); if (selectAll) selectAll.checked = false; updateBar(); };

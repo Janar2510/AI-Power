@@ -477,27 +477,27 @@
     setActionStack([]);
     var container = document.createElement('div');
     container.id = 'discuss-container';
-    container.style.cssText = 'display:grid;grid-template-columns:220px 1fr;gap:var(--space-md);min-height:400px';
+    container.className = 'o-discuss-layout';
     main.innerHTML = '';
     main.appendChild(container);
 
     var sidebarEl = document.createElement('div');
-    sidebarEl.style.cssText = 'border-right:1px solid var(--border-color);padding:var(--space-md)';
+    sidebarEl.className = 'o-discuss-sidebar';
     var msgArea = document.createElement('div');
-    msgArea.style.cssText = 'display:flex;flex-direction:column;padding:var(--space-md)';
+    msgArea.className = 'o-discuss-main';
     container.appendChild(sidebarEl);
     container.appendChild(msgArea);
 
     sidebarEl.innerHTML =
-      '<h3 style="margin:0 0 var(--space-sm)">Channels</h3>' +
-      '<button type="button" id="discuss-new-channel" style="margin-bottom:var(--space-md);padding:var(--space-sm) var(--space-md);background:var(--color-primary);color:white;border:none;border-radius:4px;cursor:pointer">New Channel</button>' +
+      '<h3 class="o-discuss-section-title">Channels</h3>' +
+      '<button type="button" id="discuss-new-channel" class="o-discuss-btn-primary">New Channel</button>' +
       '<div id="discuss-channel-list"></div>';
 
     msgArea.innerHTML =
-      '<div id="discuss-messages" style="flex:1;overflow-y:auto;min-height:200px"></div>' +
-      '<div id="discuss-compose" style="margin-top:var(--space-md);display:none">' +
-      '<textarea id="discuss-body" rows="2" style="width:100%;padding:var(--space-sm);border:1px solid var(--border-color);border-radius:4px;resize:vertical"></textarea>' +
-      '<button type="button" id="discuss-post-btn" style="margin-top:var(--space-sm);padding:var(--space-sm) var(--space-md);background:var(--color-primary);color:white;border:none;border-radius:4px;cursor:pointer">Send</button>' +
+      '<div id="discuss-messages" class="o-discuss-messages"></div>' +
+      '<div id="discuss-compose" class="o-discuss-compose">' +
+      '<textarea id="discuss-body" rows="2" class="o-discuss-textarea"></textarea>' +
+      '<button type="button" id="discuss-post-btn" class="o-discuss-send-btn">Send</button>' +
       '</div>';
 
     fetch('/discuss/channel/list', { credentials: 'include' })
@@ -506,48 +506,47 @@
         var listEl = document.getElementById('discuss-channel-list');
         if (!listEl) return;
         if (!channels || !channels.length) {
-          listEl.innerHTML = '<p style="color:var(--text-muted)">No channels. Create one.</p>';
+          listEl.innerHTML = '<p class="o-discuss-muted">No channels. Create one.</p>';
           return;
         }
         listEl.innerHTML = channels.map(function (c) {
           var active = channelId && c.id === parseInt(channelId, 10)
-            ? ' style="background:var(--color-primary-10);font-weight:600"' : '';
-          return '<a href="#discuss/' + c.id + '" class="discuss-channel-link" data-id="' + c.id + '"' + active +
-            ' style="display:block;padding:var(--space-sm);border-radius:4px;text-decoration:none;color:inherit;margin-bottom:2px">' +
+            ? ' discuss-channel-link--active' : '';
+          return '<a href="#discuss/' + c.id + '" class="discuss-channel-link' + active + '" data-id="' + c.id + '">' +
             (c.name || '').replace(/</g, '&lt;') + '</a>';
         }).join('');
 
         if (channelId) {
           var compose = document.getElementById('discuss-compose');
-          if (compose) compose.style.display = 'block';
+          if (compose) compose.classList.add('o-discuss-compose--visible');
           fetch('/discuss/channel/' + channelId + '/messages', { credentials: 'include' })
             .then(function (r) { return r.json(); })
             .then(function (msgs) {
               var msgEl = document.getElementById('discuss-messages');
               if (!msgEl) return;
               if (!msgs || !msgs.length) {
-                msgEl.innerHTML = '<p style="color:var(--text-muted)">No messages yet.</p>';
+                msgEl.innerHTML = '<p class="o-discuss-muted">No messages yet.</p>';
                 return;
               }
               msgEl.innerHTML = msgs.map(function (m) {
                 var body = (m.body || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
                 var date = (m.date || '').substring(0, 19).replace('T', ' ');
-                return '<div style="padding:var(--space-sm);border-bottom:1px solid var(--border-color)">' +
-                  '<span style="font-size:0.85rem;color:var(--text-muted)">' + date + '</span><br>' + body + '</div>';
+                return '<div class="o-discuss-msg-row">' +
+                  '<span class="o-discuss-msg-meta">' + date + '</span><br>' + body + '</div>';
               }).join('');
             })
             .catch(function () {
               var msgEl = document.getElementById('discuss-messages');
-              if (msgEl) msgEl.innerHTML = '<p style="color:var(--text-muted)">Could not load messages.</p>';
+              if (msgEl) msgEl.innerHTML = '<p class="o-discuss-muted">Could not load messages.</p>';
             });
         } else {
           var msgEl = document.getElementById('discuss-messages');
-          if (msgEl) msgEl.innerHTML = '<p style="color:var(--text-muted)">Select a channel.</p>';
+          if (msgEl) msgEl.innerHTML = '<p class="o-discuss-muted">Select a channel.</p>';
         }
       })
       .catch(function () {
         var listEl = document.getElementById('discuss-channel-list');
-        if (listEl) listEl.innerHTML = '<p style="color:var(--text-muted)">Could not load channels.</p>';
+        if (listEl) listEl.innerHTML = '<p class="o-discuss-muted">Could not load channels.</p>';
       });
 
     document.getElementById('discuss-new-channel').onclick = function () {
@@ -586,8 +585,8 @@
           document.getElementById('discuss-body').value = '';
           var msgEl = document.getElementById('discuss-messages');
           var div = document.createElement('div');
-          div.style.cssText = 'padding:var(--space-sm);border-bottom:1px solid var(--border-color)';
-          div.innerHTML = '<span style="font-size:0.85rem;color:var(--text-muted)">' +
+          div.className = 'o-discuss-msg-row';
+          div.innerHTML = '<span class="o-discuss-msg-meta">' +
             (msg.date || '').substring(0, 19).replace('T', ' ') + '</span><br>' +
             (msg.body || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
           msgEl.appendChild(div);
@@ -616,8 +615,8 @@
         var msgEl = document.getElementById('discuss-messages');
         if (!msgEl) return;
         var div = document.createElement('div');
-        div.style.cssText = 'padding:var(--space-sm);border-bottom:1px solid var(--border-color)';
-        div.innerHTML = '<span style="font-size:0.85rem;color:var(--text-muted)">' +
+        div.className = 'o-discuss-msg-row';
+        div.innerHTML = '<span class="o-discuss-msg-meta">' +
           (new Date().toISOString().substring(0, 19).replace('T', ' ')) + '</span><br>' +
           (msg.body || '').replace(/</g, '&lt;').replace(/\n/g, '<br>');
         msgEl.appendChild(div);

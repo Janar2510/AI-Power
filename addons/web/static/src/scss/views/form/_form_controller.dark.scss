@@ -1,0 +1,37 @@
+// form_controller.dark.scss — Form view dark mode overrides (Track L3).
+
+[data-theme="dark"] {
+  .o-form-renderer.o-form-sheet {
+    background: var(--color-surface-1);
+    border-color: var(--border-color);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .o-form-header {
+    border-bottom-color: var(--border-color);
+  }
+
+  .o-form-group {
+    border-bottom-color: var(--color-border-subtle);
+  }
+
+  .o-form-label {
+    color: var(--text-muted);
+  }
+
+  .o-field-input {
+    background: var(--color-surface-2);
+    border-color: var(--border-color);
+    color: var(--color-text);
+
+    &:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--focus-ring-color);
+    }
+
+    &:disabled {
+      background: color-mix(in srgb, var(--color-surface-2) 60%, transparent);
+      color: var(--text-muted);
+    }
+  }
+}

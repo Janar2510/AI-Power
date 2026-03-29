@@ -1,0 +1,114 @@
+// _variables.scss — Bootstrap 5.3.3 variable overrides mapped from ERP design tokens (Track L1).
+// This file is compiled BEFORE Bootstrap import to replace Bootstrap defaults with Foundry One tokens.
+// Usage: @import 'variables'; @import 'bootstrap/scss/bootstrap'; @import 'your-overrides';
+//
+// Bootstrap variable reference: https://github.com/twbs/bootstrap/blob/v5.3.3/scss/_variables.scss
+
+// ─── Typography ───────────────────────────────────────────────────────────────
+$font-family-sans-serif: var(--font-sans) !default;
+$font-family-monospace:  var(--font-mono) !default;
+$font-size-root:         null !default;
+$font-size-base:         1rem !default; // corresponds to --text-md
+$font-size-sm:           0.875rem !default; // --text-sm
+$font-size-lg:           1.125rem !default; // --text-lg
+$line-height-base:       1.45 !default; // --leading-normal
+$line-height-sm:         1.2 !default;  // --leading-tight
+$line-height-lg:         1.65 !default; // --leading-relaxed
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+// Bootstrap color system mapped to ERP tokens
+// Note: SCSS variables cannot directly reference CSS custom properties at compile time.
+// We set concrete fallback values matching the light theme defaults in _tokens.css.
+$primary:         #1a1a2e !default; // --color-primary
+$secondary:       #6c757d !default;
+$success:         #2e7d32 !default; // --color-success
+$info:            #2563eb !default; // --color-info
+$warning:         #f9a825 !default; // --color-warning
+$danger:          #c62828 !default; // --color-danger
+$light:           #f8f9fc !default; // --color-surface-2
+$dark:            #1a1a2e !default; // --color-primary
+
+// Body
+$body-color:      #333333 !default; // --color-text
+$body-bg:         #f5f5f5 !default; // --color-bg
+$link-color:      #2563eb !default; // --color-link
+$link-decoration: none !default;
+
+// ─── Spacing ──────────────────────────────────────────────────────────────────
+$spacer: 1rem !default; // Bootstrap uses this for spacing scale
+
+// Override Bootstrap spacing scale to align with ERP tokens:
+// --space-xs: 0.25rem | --space-sm: 0.5rem | --space-md: 0.75rem | --space-lg: 1rem | --space-xl: 1.5rem
+$spacers: (
+  0: 0,
+  1: 0.25rem,   // --space-xs
+  2: 0.5rem,    // --space-sm
+  3: 0.75rem,   // --space-md
+  4: 1rem,      // --space-lg
+  5: 1.5rem,    // --space-xl
+  6: 2rem,
+  7: 3rem,
+) !default;
+
+// ─── Border radius ────────────────────────────────────────────────────────────
+$border-radius:    8px !default;  // --radius-md
+$border-radius-sm: 4px !default;  // --radius-sm
+$border-radius-lg: 12px !default; // --radius-lg
+$border-radius-xl: 16px !default; // --radius-xl
+$border-radius-pill: 9999px !default;
+
+// ─── Shadows ──────────────────────────────────────────────────────────────────
+$box-shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.08) !default;    // --shadow-sm
+$box-shadow:    0 6px 18px rgba(15, 23, 42, 0.12) !default;   // --shadow-md
+$box-shadow-lg: 0 16px 34px rgba(15, 23, 42, 0.18) !default;  // --shadow-lg
+
+// ─── Transitions ─────────────────────────────────────────────────────────────
+$transition-base:   all 220ms cubic-bezier(0.22, 1, 0.36, 1) !default; // --duration-base + --ease-spring
+$transition-fade:   opacity 150ms linear !default;
+
+// ─── Components ───────────────────────────────────────────────────────────────
+$border-color: #dddddd !default; // --border-color
+$border-width: 1px !default;
+
+// Form controls
+$input-bg:                    #ffffff !default;
+$input-border-color:          #dddddd !default;
+$input-border-radius:         4px !default;
+$input-focus-border-color:    #1a1a2e !default;
+$input-focus-box-shadow:      0 0 0 3px rgba(26, 26, 46, 0.14) !default;
+$input-padding-y:             0.4rem !default;
+$input-padding-x:             0.6rem !default;
+$input-font-size:             0.875rem !default;
+
+// Buttons
+$btn-border-radius:   4px !default;
+$btn-font-weight:     500 !default;
+$btn-font-size:       0.875rem !default;
+$btn-padding-y:       0.4rem !default;
+$btn-padding-x:       0.875rem !default;
+$btn-transition:      color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease !default;
+
+// Cards
+$card-bg:              #ffffff !default; // --color-surface-1
+$card-border-radius:   8px !default;    // --radius-md
+$card-border-color:    #dddddd !default;
+$card-box-shadow:      0 2px 6px rgba(15, 23, 42, 0.08) !default;
+
+// Navbar (we don't use Bootstrap's navbar but keep variable for partial compat)
+$navbar-light-color:       #333333 !default;
+$navbar-dark-color:        #f6f7fb !default;
+
+// Tables
+$table-striped-bg:    rgba(26, 26, 46, 0.04) !default;
+$table-hover-bg:      rgba(26, 26, 46, 0.06) !default;
+$table-border-color:  #eeeeee !default;
+
+// Modals
+$modal-backdrop-bg:      rgba(51, 51, 51, 0.35) !default;
+$modal-content-bg:       #ffffff !default;
+$modal-content-border-radius: 8px !default;
+$modal-header-padding:   1rem !default;
+
+// Focus ring (accessibility)
+$focus-ring-color:  rgba(26, 26, 46, 0.25) !default;
+$focus-ring-width:  3px !default;

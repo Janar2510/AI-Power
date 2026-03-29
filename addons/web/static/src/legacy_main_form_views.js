@@ -1,4 +1,9 @@
 /**
+ * @deprecated Track O3 — This module is scheduled for retirement once the OWL
+ * FormController (Track J3) is fully wired via ActionContainer (Track O2).
+ * Do NOT add new functionality here. Migrate logic to
+ * app/views/form/form_controller.js and app/views/fields/core_fields.js.
+ *
  * Legacy web.assets_web: form field helpers + form view rendering + CRUD.
  * Loaded before main.js; sets window.__ERP_FORM_VIEWS (Phase 1.245 Track D1).
  */
@@ -144,6 +149,11 @@
    * 14. confirmModal
    * ────────────────────────────────────────────── */
   function confirmModal(opts) {
+    // Track P3: prefer OWL DialogService → UIComponents.ConfirmDialog → native confirm
+    var DS = window.AppCore && window.AppCore.DialogService;
+    if (DS && typeof DS.confirm === 'function') {
+      return DS.confirm(opts || {});
+    }
     if (window.UIComponents && window.UIComponents.ConfirmDialog && typeof window.UIComponents.ConfirmDialog.confirm === 'function') {
       return window.UIComponents.ConfirmDialog.confirm(opts || {});
     }
@@ -863,19 +873,23 @@
         };
       });
 
-      main.querySelectorAll('.form-notebook').forEach(function (nb) {
-        var tabs = nb.querySelectorAll('.notebook-tab');
-        var pages = nb.querySelectorAll('.notebook-page');
-        tabs.forEach(function (tab, i) {
-          tab.onclick = function () {
-            tabs.forEach(function (t) { t.classList.remove('active'); });
-            pages.forEach(function (p) { p.classList.remove('active'); });
-            tab.classList.add('active');
-            var page = nb.querySelector('.notebook-page[data-page="' + i + '"]');
-            if (page) page.classList.add('active');
-          };
+      if (window.AppCore && window.AppCore.NotebookWidget && typeof window.AppCore.NotebookWidget.wire === 'function') {
+        window.AppCore.NotebookWidget.wire(main);
+      } else {
+        main.querySelectorAll('.form-notebook').forEach(function (nb) {
+          var tabs = nb.querySelectorAll('.notebook-tab');
+          var pages = nb.querySelectorAll('.notebook-page');
+          tabs.forEach(function (tab, i) {
+            tab.onclick = function () {
+              tabs.forEach(function (t) { t.classList.remove('active'); });
+              pages.forEach(function (p) { p.classList.remove('active'); });
+              tab.classList.add('active');
+              var page = nb.querySelector('.notebook-page[data-page="' + i + '"]');
+              if (page) page.classList.add('active');
+            };
+          });
         });
-      });
+      }
 
       var selects = form.querySelectorAll('select[data-comodel]');
       var m2oneWidgets = form.querySelectorAll('.m2one-widget');

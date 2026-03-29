@@ -6,6 +6,12 @@
     "build:web": "esbuild addons/web/static/src/app/main.js --bundle --format=iife --outfile=addons/web/static/dist/modern_webclient.js --sourcemap",
     "build:web:min": "esbuild addons/web/static/src/app/main.js --bundle --format=iife --outfile=addons/web/static/dist/modern_webclient.min.js --minify --sourcemap",
     "build:web:legacy": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.js --sourcemap",
+    "build:css": "sass addons/web/static/src/scss/main.scss addons/web/static/dist/webclient.css --style=expanded --source-map",
+    "build:css:min": "sass addons/web/static/src/scss/main.scss addons/web/static/dist/webclient.min.css --style=compressed --source-map",
+    "watch:css": "sass --watch addons/web/static/src/scss/main.scss:addons/web/static/dist/webclient.css",
+    "vendor:bootstrap": "node scripts/vendor_bootstrap.js",
+    "test:css": "sass addons/web/static/src/scss/main.scss /dev/null --style=compressed --no-source-map && sass addons/web/static/src/scss/dark.scss /dev/null --style=compressed --no-source-map && echo 'CSS build OK'",
+    "build:all": "npm run build:web && npm run build:css",
     "check:assets-concat": "python3 scripts/check_concat_bundle.py",
     "check:uipro:setup": "bash scripts/check_ui_ux_pro_max_setup.sh",
     "install:uipro:local": "bash scripts/install_uipro_cli_local.sh",
@@ -15,6 +21,7 @@
     "test:phases-539-541-db": "bash scripts/run_phases_539_541_db.sh"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "sass": "^1.86.3"
   }
 }

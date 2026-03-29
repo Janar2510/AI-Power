@@ -1,4 +1,9 @@
 /**
+ * @deprecated Track O3 — This module is scheduled for retirement once the OWL
+ * KanbanController/GraphController/CalendarController (Tracks J4) are fully
+ * wired via ActionContainer (Track O2).
+ * Do NOT add new functionality here. Migrate logic to app/views/{kanban,graph,calendar}/.
+ *
  * Legacy web.assets_web: graph / pivot / calendar / kanban / gantt / activity views.
  * Loaded before main.js; sets window.__ERP_CHART_VIEWS (Phase 1.245 Track D3).
  */
@@ -457,20 +462,20 @@
         addLabel: route === 'contacts' ? 'Add contact' : route === 'leads' ? 'Add lead' : route === 'orders' ? 'Add order' : route === 'products' ? 'Add product' : route === 'settings/users' ? 'Add user' : 'Add',
       });
     } else {
-      html += '<p class="o-graph-toolbar-fallback" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+      html += '<p class="o-graph-toolbar-fallback o-chart-toolbar-row">';
       html += _renderViewSwitcher(route, currentView);
-      html += '<span class="graph-type-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
+      html += '<span class="graph-type-switcher o-chart-type-switcher">';
       ['bar', 'line', 'pie'].forEach(function (t) {
         var active = t === graphType;
-        html += '<button type="button" class="btn-graph-type' + (active ? ' active' : '') + '" data-type="' + t + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? '#1a1a2e;color:white;border-color:#1a1a2e' : '#fff;color:#333') + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (t.charAt(0).toUpperCase() + t.slice(1)) + '</button>';
+        html += '<button type="button" class="btn-graph-type' + (active ? ' active' : '') + '" data-type="' + t + '">' + (t.charAt(0).toUpperCase() + t.slice(1)) + '</button>';
       });
       html += '</span>';
-      html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-      html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+      html += '<input type="text" id="list-search" placeholder="Search..." class="o-chart-search-input" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+      html += '<button type="button" id="btn-search" class="o-chart-toolbar-btn--primary">Search</button>';
       if (model === 'crm.lead') {
-        html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+        html += '<select id="list-stage-filter" class="o-chart-stage-select"><option value="">All stages</option></select>';
       }
-      html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
+      html += '<button type="button" id="btn-add" class="o-chart-toolbar-btn--primary">Add lead</button></p>';
     }
     html += '<div class="o-graph-container">';
     html += '<canvas id="graph-canvas"></canvas>';
@@ -699,16 +704,16 @@
         addLabel: pivotAddLabel,
       });
     } else {
-      html += '<p class="o-pivot-toolbar-fallback" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+      html += '<p class="o-pivot-toolbar-fallback o-chart-toolbar-row">';
       html += _renderViewSwitcher(route, 'pivot');
-      html += '<button type="button" id="btn-pivot-flip" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Flip axes</button>';
-      html += '<button type="button" id="btn-pivot-download" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Download CSV</button>';
-      html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-      html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
+      html += '<button type="button" id="btn-pivot-flip" class="o-chart-toolbar-btn">Flip axes</button>';
+      html += '<button type="button" id="btn-pivot-download" class="o-chart-toolbar-btn">Download CSV</button>';
+      html += '<input type="text" id="list-search" placeholder="Search..." class="o-chart-search-input" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+      html += '<button type="button" id="btn-search" class="o-chart-toolbar-btn--primary">Search</button>';
       if (model === 'crm.lead') {
-        html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+        html += '<select id="list-stage-filter" class="o-chart-stage-select"><option value="">All stages</option></select>';
       }
-      html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + pivotAddLabel + '</button></p>';
+      html += '<button type="button" id="btn-add" class="o-chart-toolbar-btn--primary">' + pivotAddLabel + '</button></p>';
     }
     html += '<div class="o-pivot-container o-card-gradient">';
     html += '<table class="o-pivot-table"><thead><tr><th class="o-pivot-th o-pivot-th--corner"></th>';
@@ -871,15 +876,15 @@
         addLabel: calAddLabel,
       });
     } else {
-      html += '<p class="o-calendar-toolbar-fallback" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;margin-bottom:var(--space-md)">';
+      html += '<p class="o-calendar-toolbar-fallback o-chart-toolbar-row">';
       html += _renderViewSwitcher(route, 'calendar');
-      html += '<button type="button" id="cal-prev" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Prev</button>';
-      html += '<span id="cal-title" style="min-width:140px;font-weight:600">' + monthTitleStr + '</span>';
-      html += '<button type="button" id="cal-next" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Next</button>';
-      html += '<button type="button" id="cal-today" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Today</button>';
-      html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
-      html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
-      html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + calAddLabel + '</button></p>';
+      html += '<button type="button" id="cal-prev" class="o-chart-toolbar-btn">Prev</button>';
+      html += '<span id="cal-title" class="o-cal-nav-title">' + monthTitleStr + '</span>';
+      html += '<button type="button" id="cal-next" class="o-chart-toolbar-btn">Next</button>';
+      html += '<button type="button" id="cal-today" class="o-chart-toolbar-btn">Today</button>';
+      html += '<input type="text" id="list-search" placeholder="Search..." class="o-chart-search-input" value="' + (searchTerm || '').replace(/"/g, '&quot;') + '">';
+      html += '<button type="button" id="btn-search" class="o-chart-toolbar-btn--primary">Search</button>';
+      html += '<button type="button" id="btn-add" class="o-chart-toolbar-btn--primary">' + calAddLabel + '</button></p>';
     }
     html += '<div class="o-calendar o-calendar-grid">';
     dayNames.forEach(function (dn) {
@@ -1004,13 +1009,13 @@
           })
         : '<h2>' +
           title +
-          '</h2><p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">' +
+          '</h2><p class="o-chart-toolbar-row">' +
           vs +
-          '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' +
+          '<input type="text" id="list-search" placeholder="Search..." class="o-chart-search-input" value="' +
           (searchTerm || '').replace(/"/g, '&quot;') +
-          '"><button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>' +
+          '"><button type="button" id="btn-search" class="o-chart-toolbar-btn--primary">Search</button>' +
           mid +
-          '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' +
+          '<button type="button" id="btn-add" class="o-chart-toolbar-btn--primary">' +
           addLabel +
           '</button></p><div id="kanban-area"></div>';
     main.innerHTML = html;

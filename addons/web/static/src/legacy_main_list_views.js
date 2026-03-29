@@ -1,4 +1,9 @@
 /**
+ * @deprecated Track O3 — This module is scheduled for retirement once the OWL
+ * ListController (Track J2) is fully wired via ActionContainer (Track O2).
+ * Do NOT add new functionality here. Migrate logic to
+ * app/views/list/list_controller.js and app/search/with_search.js.
+ *
  * Legacy web.assets_web: list view rendering + record loading + saved filters.
  * Loaded before main.js; sets window.__ERP_LIST_VIEWS (Phase 1.245 Track D2).
  */
@@ -89,7 +94,7 @@
     _parseActionDomain = ctx.parseActionDomain;
     _parseFilterDomain = ctx.parseFilterDomain;
     _buildSearchDomain = ctx.buildSearchDomain;
-    _getHashDomainParam = ctx.getHashDomainParam;
+    _getHashDomainParam = ctx.getHashDomainParam || getHashDomainFromHash;
 
     _showImportModal = ctx.showImportModal;
     _confirmModal = ctx.confirmModal;
@@ -390,6 +395,17 @@
     if (q < 0) return null;
     var params = new URLSearchParams(hash.slice(q + 1));
     return params.get('view') || null;
+  }
+
+  function getHashDomainFromHash() {
+    var hash = (window.location.hash || '').slice(1);
+    var q = hash.indexOf('?');
+    if (q < 0) return [];
+    var params = new URLSearchParams(hash.slice(q + 1));
+    var raw = params.get('domain');
+    if (!raw || !_parseActionDomain) return [];
+    var parsed = _parseActionDomain(raw);
+    return Array.isArray(parsed) && parsed.length ? parsed : [];
   }
 
   function getAvailableViewModes(route) {

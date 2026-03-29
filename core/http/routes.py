@@ -1351,3 +1351,83 @@ def index(request):
         _webclient_html(debug_assets=_is_debug_assets(request), session_bootstrap=session_bootstrap),
         content_type="text/html; charset=utf-8",
     )
+
+
+# ─── Track R1: Health and Readiness probes ────────────────────────────────────
+
+@route("/health", auth="none", methods=["GET"])
+def health_check(request):
+    """Process-alive probe for load balancers / container orchestrators (Track R1).
+
+    Returns 200 OK with a JSON body ``{"status": "ok"}`` when the process is
+    handling requests normally.  No database access is performed — this endpoint
+    must remain fast and dependency-free.
+    """
+    import json
+    return Response(
+        json.dumps({"status": "ok", "service": "erp-platform"}),
+        content_type="application/json",
+        status=200,
+    )
+
+
+@route("/readiness", auth="none", methods=["GET"])
+def readiness_check(request):
+    """Database-connection readiness probe (Track R1).
+
+    Checks:
+    1. The default database name is configured.
+    2. A lightweight DB connection can be obtained (``SELECT 1``).
+    3. The registry is loaded (i.e., the server has finished initialisation).
+
+    Returns 200 ``{"status":"ready"}`` when all checks pass, 503 otherwise.
+    """
+    import json
+    from core.tools import config as _config
+
+    checks = {}
+    ok = True
+
+    # Check 1: database configured
+    db = _config.get_config().get("db_name") or os.environ.get("ERP_DB", "")
+    if not db:
+        # Try to read db from session cookie as fallback
+        db = request.cookies.get("erp_db", "")
+    checks["db_configured"] = bool(db)
+    if not checks["db_configured"]:
+        ok = False
+
+    # Check 2: DB connectivity
+    if checks["db_configured"]:
+        try:
+            from core.sql_db import db_exists, get_cursor
+            if db_exists(db):
+                with get_cursor(db) as cr:
+                    cr.execute("SELECT 1")
+                checks["db_connection"] = True
+            else:
+                checks["db_connection"] = False
+                ok = False
+        except Exception as exc:
+            checks["db_connection"] = False
+            checks["db_error"] = str(exc)
+            ok = False
+    else:
+        checks["db_connection"] = False
+
+    # Check 3: registry loaded
+    try:
+        reg = _get_registry(db) if db else None
+        checks["registry_loaded"] = reg is not None
+        if not checks["registry_loaded"]:
+            ok = False
+    except Exception:
+        checks["registry_loaded"] = False
+        ok = False
+
+    status_code = 200 if ok else 503
+    return Response(
+        json.dumps({"status": "ready" if ok else "not_ready", "checks": checks}),
+        content_type="application/json",
+        status=status_code,
+    )

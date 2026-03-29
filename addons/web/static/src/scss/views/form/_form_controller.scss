@@ -1,0 +1,165 @@
+// _form_controller.scss — Form view surface styles (Track L2).
+// Scoped to .o-form-controller and .o-form-renderer.
+
+.o-form-controller {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.o-form-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--color-divider, var(--border-color));
+  flex-wrap: wrap;
+}
+
+.o-form-breadcrumb-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+.o-form-model-label {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.o-form-record-name {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &::before {
+    content: " / ";
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+}
+
+.o-form-button-box {
+  display: flex;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.o-form-loading {
+  text-align: center;
+  padding: var(--space-xl);
+}
+
+.o-form-renderer.o-form-sheet {
+  background: var(--color-surface-1, #fff);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.o-form-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md) var(--space-xl);
+  padding-bottom: var(--space-lg);
+  border-bottom: 1px solid var(--color-border-subtle, color-mix(in srgb, var(--border-color) 60%, transparent));
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.o-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+
+  &--readonly .o-form-label {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+}
+
+.o-form-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.o-field-required {
+  color: var(--color-danger);
+}
+
+.o-form-field {
+  // Field container — width follows grid
+}
+
+.o-field-value {
+  font-size: var(--text-md);
+  color: var(--color-text);
+  display: block;
+  min-height: 1.4em;
+
+  &.o-field-empty {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+}
+
+.o-field-input {
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg, var(--color-surface-1));
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--focus-ring-color);
+  }
+
+  &:disabled {
+    background: var(--color-surface-2);
+    color: var(--text-muted);
+    cursor: not-allowed;
+  }
+}
+
+.o-field-textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.o-field-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.o-field-select {
+  cursor: pointer;
+}

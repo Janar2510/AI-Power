@@ -11,7 +11,15 @@ from werkzeug.routing import Map, Rule
 from werkzeug.exceptions import NotFound
 
 from core.tools import config
-from core.tools.json_log import format_json_log
+from core.tools.json_log import (
+    format_json_log,
+    format_access_log,
+    generate_trace_id,
+    set_trace_id,
+    clear_trace_id,
+    _json_logging_enabled,
+    _access_logger,
+)
 
 from core.modules.assets import get_bundle_content
 
@@ -72,6 +80,39 @@ def _load_routes():
         pass
 
 _logger = logging.getLogger("erp.http")
+
+
+def _wrap_start_response_json_access(environ: dict, start_response: Callable, trace_id: str = "") -> Callable:
+    """Wrap WSGI start_response to emit a JSON access log line (Track R2)."""
+    import time as _time
+
+    method = environ.get("REQUEST_METHOD", "-")
+    path = environ.get("PATH_INFO", "/")
+    remote_addr = environ.get("HTTP_X_FORWARDED_FOR") or environ.get("REMOTE_ADDR", "-")
+    _t0 = _time.time()
+
+    def _logging_start_response(status, headers, exc_info=None):
+        duration_ms = (_time.time() - _t0) * 1000
+        status_code = int(status.split(" ", 1)[0]) if status else 0
+        content_length = 0
+        for name, val in headers:
+            if name.lower() == "content-length":
+                try:
+                    content_length = int(val)
+                except ValueError:
+                    pass
+        log_line = format_access_log(
+            method, path, status_code, duration_ms,
+            remote_addr=str(remote_addr),
+            content_length=content_length,
+            trace_id=trace_id,
+        )
+        _access_logger.info(log_line)
+        # Also inject trace ID into response headers
+        headers.append(("X-Request-ID", trace_id))
+        return start_response(status, headers, exc_info)
+
+    return _logging_start_response
 
 # Security headers (Phase 99, 203)
 from .security import SECURITY_HEADERS, check_rate_limit, validate_csrf
@@ -247,8 +288,16 @@ class Application:
         _load_routes()
 
     def __call__(self, environ: dict, start_response: Callable):
-        if config.get_config().get("json_access_log"):
-            start_response = _wrap_start_response_json_access(environ, start_response)
+        # Track R2: propagate or generate trace ID per request
+        _trace = (
+            environ.get("HTTP_X_TRACE_ID")
+            or environ.get("HTTP_X_REQUEST_ID")
+            or generate_trace_id()
+        )
+        set_trace_id(_trace)
+
+        if config.get_config().get("json_access_log") or _json_logging_enabled():
+            start_response = _wrap_start_response_json_access(environ, start_response, _trace)
         if config.get_config().get("debug_profiling"):
             try:
                 from core.profiling import init_request_profiling

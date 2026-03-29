@@ -37,4 +37,10 @@
   --focus-ring-color: color-mix(in srgb, var(--color-primary) 82%, white 12%);
   --status-unread: #ff8f6b;
   --status-notification-bg: rgba(73, 39, 30, 0.42);
+  /* H3: depth + divider parity in dark */
+  --color-divider: color-mix(in srgb, var(--border-color) 88%, var(--color-text) 12%);
+  --surface-noise: none;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);
 }

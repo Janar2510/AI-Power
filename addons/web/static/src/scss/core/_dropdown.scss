@@ -1,0 +1,66 @@
+// _dropdown.scss — Dropdown component surface styles (Track L2).
+
+.o-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.o-dropdown-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.o-dropdown-menu {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  left: 0;
+  z-index: var(--z-dropdown, 500);
+  background: var(--color-surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  min-width: 180px;
+  max-height: 340px;
+  overflow-y: auto;
+  animation: dropdownIn var(--duration-fast) var(--ease-out-expo);
+}
+
+@keyframes dropdownIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.o-dropdown-list {
+  list-style: none;
+  margin: var(--space-xs) 0;
+  padding: 0;
+}
+
+.o-dropdown-item {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--duration-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+
+  &:hover {
+    background: var(--color-row-hover);
+  }
+
+  &--disabled {
+    color: var(--text-muted);
+    cursor: not-allowed;
+
+    &:hover { background: none; }
+  }
+}
+
+// Dropdown separator
+.o-dropdown-separator {
+  height: 1px;
+  background: var(--border-color);
+  margin: var(--space-xs) 0;
+}

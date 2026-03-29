@@ -45,6 +45,12 @@
         body.innerHTML = '<img class="o-attachment-image" src="' + esc(url) + '" alt="' + esc(name) + '">';
       } else if (mime.indexOf("pdf") >= 0) {
         body.innerHTML = '<iframe class="o-attachment-pdf" src="' + esc(url) + '" title="' + esc(name) + '"></iframe>';
+      } else if (mime.indexOf("video/") === 0) {
+        body.innerHTML =
+          '<video class="o-attachment-video" controls src="' + esc(url) + '" title="' + esc(name) + '"></video>';
+      } else if (mime.indexOf("text/") === 0) {
+        body.innerHTML =
+          '<iframe class="o-attachment-text" src="' + esc(url) + '" title="' + esc(name) + '"></iframe>';
       } else {
         body.innerHTML = '<a class="o-btn o-btn-primary" href="' + esc(url) + '" target="_blank" rel="noopener">Download</a>';
       }
@@ -82,5 +88,7 @@
   window.UIComponents = window.UIComponents || {};
   window.UIComponents.AttachmentViewer = {
     open: open,
+    /** @deprecated Use open() — alias for file preview parity */
+    openFilePreview: open,
   };
 })();

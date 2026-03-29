@@ -37,7 +37,7 @@
     if (HelpersCore && typeof HelpersCore.renderSkeletonHtml === "function") {
       return HelpersCore.renderSkeletonHtml(lines, shortLast);
     }
-    return '<p style="color:var(--text-muted)">Loading...</p>';
+    return '<p class="o-skeleton-msg">Loading...</p>';
   }
 
   const rpc = window.Services && window.Services.rpc ? window.Services.rpc : (window.Session || { callKw: () => Promise.reject(new Error('RPC not loaded')) });
@@ -233,184 +233,24 @@
     return PU.parseCSV ? PU.parseCSV(text) : [];
   }
 
-
-  function showImportModal(model, route) {
-    const cols = getListColumns(model);
-    const modelFields = ['id'].concat(cols.map(function (c) { return typeof c === 'object' ? c.name : c; }));
-    const overlay = document.createElement('div');
-    overlay.id = 'import-modal-overlay';
-    overlay.className = 'o-import-modal-overlay';
-    let html = '<div id="import-modal" class="o-import-modal-panel" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">';
-    html += '<h3 id="import-modal-title" class="o-import-modal-title">Import CSV / Excel</h3>';
-    html += '<p><input type="file" id="import-file" class="o-import-modal-file" accept=".csv,.xlsx"></p>';
-    html += '<div id="import-preview" class="o-import-modal-hidden">';
-    html += '<p><strong>Preview (first 5 rows)</strong></p>';
-    html += '<div id="import-preview-table"></div>';
-    html += '<p><strong>Column mapping</strong></p>';
-    html += '<div id="import-mapping"></div>';
-    html += '<p class="o-import-modal-actions"><button type="button" id="import-do-btn" class="o-btn o-btn-primary">Import</button>';
-    html += ' <button type="button" id="import-cancel-btn" class="o-btn o-btn-secondary">Cancel</button></p>';
-    html += '</div>';
-    html += '<div id="import-result" class="o-import-modal-hidden"></div>';
-    html += '</div>';
-    overlay.innerHTML = html;
-    document.body.appendChild(overlay);
-    const modal = document.getElementById('import-modal');
-    const focusables = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-    function getFocusables() { return modal ? modal.querySelectorAll(focusables) : []; }
-    function trapFocus(e) {
-      if (e.key !== 'Tab') return;
-      const els = getFocusables();
-      if (!els.length) return;
-      const first = els[0], last = els[els.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    }
-    function closeOnEscape(e) {
-      if (e.key === 'Escape') { document.removeEventListener('keydown', closeOnEscape); overlay.remove(); }
-    }
-    function closeModal() {
-      document.removeEventListener('keydown', closeOnEscape);
-      overlay.remove();
-    }
-    modal.addEventListener('keydown', trapFocus);
-    document.addEventListener('keydown', closeOnEscape);
-    setTimeout(function () { const f = document.getElementById('import-file'); if (f) f.focus(); }, 50);
-    let csvHeaders = [];
-    let csvRows = [];
-    let importFile = null;
-    const fileInput = document.getElementById('import-file');
-    fileInput.onchange = function () {
-      const f = fileInput.files && fileInput.files[0];
-      if (!f) return;
-      importFile = f;
-      csvRows = [];
-      const isXlsx = (f.name || '').toLowerCase().endsWith('.xlsx');
-      if (isXlsx) {
-        const fd = new FormData();
-        fd.append('file', f);
-      const authHdrs = (window.Services && window.Services.session && window.Services.session.getAuthHeaders) ? window.Services.session.getAuthHeaders() : {};
-      fetch('/web/import/preview', { method: 'POST', credentials: 'include', headers: authHdrs, body: fd })
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (data.error) { showToast(data.error, 'error'); return; }
-            csvHeaders = data.headers || [];
-            csvRows = data.rows || [];
-            renderImportPreview();
-          })
-          .catch(function () { showToast('Preview failed', 'error'); });
-      } else {
-        const r = new FileReader();
-        r.onload = function () {
-          const parsed = parseCSV(r.result || '');
-          if (!parsed.length) { showToast('No rows in CSV', 'error'); return; }
-          csvHeaders = parsed[0];
-          csvRows = parsed.slice(1);
-          renderImportPreview();
-        };
-        r.readAsText(f);
-      }
-      importFile = f;
-    };
-    function renderImportPreview() {
-      if (ImportCore && typeof ImportCore.renderPreview === "function") {
-        var previewHtml = ImportCore.renderPreview(csvHeaders || [], csvRows || [], modelFields || []);
-        if (previewHtml && previewHtml.table && previewHtml.mapping) {
-          document.getElementById('import-preview-table').innerHTML = previewHtml.table;
-          document.getElementById('import-mapping').innerHTML = previewHtml.mapping;
-          document.getElementById('import-preview').classList.remove('o-import-modal-hidden');
-          return;
-        }
-      }
-      const preview = csvRows.slice(0, 5);
-      let tbl = '<table class="o-import-modal-table"><tr>';
-      csvHeaders.forEach(function (h) { tbl += '<th>' + String(h).replace(/</g, '&lt;') + '</th>'; });
-      tbl += '</tr>';
-      preview.forEach(function (row) {
-        tbl += '<tr>';
-        csvHeaders.forEach(function (_, i) { tbl += '<td>' + String((row && row[i]) || '').replace(/</g, '&lt;') + '</td>'; });
-        tbl += '</tr>';
-      });
-      tbl += '</table>';
-      document.getElementById('import-preview-table').innerHTML = tbl;
-      let mapHtml = '<table class="o-import-modal-table"><tr><th>Column</th><th>Map to field</th></tr>';
-      csvHeaders.forEach(function (h, i) {
-        mapHtml += '<tr><td>' + String(h).replace(/</g, '&lt;') + '</td><td><select class="import-map-select o-import-modal-map-select" data-csv-idx="' + i + '">';
-        mapHtml += '<option value="">-- Skip --</option>';
-        const autoMatch = modelFields.find(function (mf) { return mf.toLowerCase() === String(h).toLowerCase().replace(/\s/g, '_'); });
-        modelFields.forEach(function (mf) {
-          const sel = (autoMatch === mf || (!autoMatch && mf === h)) ? ' selected' : '';
-          mapHtml += '<option value="' + (mf || '').replace(/"/g, '&quot;') + '"' + sel + '>' + (mf || '').replace(/</g, '&lt;') + '</option>';
-        });
-        mapHtml += '</select></td></tr>';
-      });
-      mapHtml += '</table>';
-      document.getElementById('import-mapping').innerHTML = mapHtml;
-      document.getElementById('import-preview').classList.remove('o-import-modal-hidden');
-    }
-    document.getElementById('import-do-btn').onclick = function () {
-      const selects = overlay.querySelectorAll('.import-map-select');
-      const csvIdxToField = {};
-      selects.forEach(function (s) {
-        const idx = parseInt(s.dataset.csvIdx, 10);
-        const f = s.value;
-        if (f) csvIdxToField[idx] = f;
-      });
-      const fieldSet = {};
-      const fields = [];
-      Object.keys(csvIdxToField).sort(function (a, b) { return parseInt(a, 10) - parseInt(b, 10); }).forEach(function (idx) {
-        const f = csvIdxToField[idx];
-        if (!fieldSet[f]) { fields.push(f); fieldSet[f] = true; }
-      });
-      if (!fields.length) { showToast('Map at least one column', 'error'); return; }
-      const mapping = {};
-      Object.keys(csvIdxToField).forEach(function (k) { mapping[k] = csvIdxToField[k]; });
-      if (!importFile) { showToast('Select a file first', 'error'); return; }
-      const fd = new FormData();
-      fd.append('file', importFile);
-      fd.append('model', model);
-      fd.append('mapping', JSON.stringify(mapping));
-      const authHdrsExec = (window.Services && window.Services.session && window.Services.session.getAuthHeaders) ? window.Services.session.getAuthHeaders() : {};
-      fetch('/web/import/execute', { method: 'POST', credentials: 'include', headers: authHdrsExec, body: fd })
-        .then(function (r) {
-          return r.json().then(function (data) {
-            if (!r.ok) throw new Error(data.error || 'Import failed');
-            return data;
-          });
-        })
-        .then(handleImportResult)
-        .catch(function (err) { showToast(err.message || 'Import failed', 'error'); });
-    };
-    function handleImportResult(res) {
-      document.getElementById('import-preview').classList.add('o-import-modal-hidden');
-      const r = document.getElementById('import-result');
-      r.classList.remove('o-import-modal-hidden');
-      r.innerHTML = '<p><strong>Import complete</strong></p><p>Created: ' + (res.created || 0) + ', Updated: ' + (res.updated || 0) + '</p>';
-      if (res.errors && res.errors.length) {
-        r.innerHTML += '<p class="o-import-modal-error">Errors:</p><table class="o-import-modal-table"><tr><th>Row</th><th>Field</th><th>Message</th></tr>';
-        res.errors.forEach(function (e) {
-          r.innerHTML += '<tr><td>' + (e.row || '') + '</td><td>' + (e.field || '').replace(/</g, '&lt;') + '</td><td>' + (e.message || '').replace(/</g, '&lt;') + '</td></tr>';
-        });
-        r.innerHTML += '</table>';
-      }
-      r.innerHTML += '<p class="o-import-modal-actions"><button type="button" id="import-close-btn" class="o-btn o-btn-primary">Close</button></p>';
-      document.getElementById('import-close-btn').onclick = function () {
-        closeModal();
-        loadRecords(model, route, currentListState.searchTerm);
-      };
-      if (!res.errors || !res.errors.length) {
-        showToast('Imported ' + (res.created || 0) + ' created, ' + (res.updated || 0) + ' updated', 'success');
-        setTimeout(function () {
-          closeModal();
-          loadRecords(model, route, currentListState.searchTerm);
-        }, 1500);
-      }
-    }
-    document.getElementById('import-cancel-btn').onclick = closeModal;
+  /** Optional `domain=` query on the hash (JSON domain list); used by list loadRecords override. */
+  function getHashDomainParam() {
+    var hash = (window.location.hash || '').slice(1);
+    var q = hash.indexOf('?');
+    if (q < 0) return [];
+    var params = new URLSearchParams(hash.slice(q + 1));
+    var raw = params.get('domain');
+    if (!raw) return [];
+    var parsed = parseActionDomain(raw);
+    return Array.isArray(parsed) && parsed.length ? parsed : [];
   }
+
+  var CHROME = window.__ERP_CHROME_BLOCK || {};
+  function showImportModal(model, route) {
+    if (CHROME.showImportModal) return CHROME.showImportModal(model, route);
+  }
+
+
 
   function buildMenuTree(menus) { return SR.buildMenuTree ? SR.buildMenuTree(menus) : []; }
   function getAppRoots(tree, menus) { return SR.getAppRoots ? SR.getAppRoots(tree, menus) : []; }
@@ -438,6 +278,33 @@
       return true;
     }
     return false;
+  }
+
+  // ─── Track O2: Route-to-OWL bridge ────────────────────────────────────────
+  /**
+   * Try to route a list/form/kanban path through the OWL ActionContainer via
+   * ActionBus instead of legacy string-HTML builders.
+   *
+   * Returns true when the OWL path was taken so the caller can skip legacy rendering.
+   * Falls back gracefully when viewRegistry has no OWL controller for the type.
+   */
+  function _tryOwlRoute(viewType, model, resId, extraProps) {
+    var AB = window.AppCore && window.AppCore.ActionBus;
+    if (!AB || typeof AB.trigger !== 'function') return false;
+    // Post-1.248: OWL path only when ActionContainer is mounted (not just #action-manager placeholder)
+    if (!window.__ERP_OWL_ACTION_CONTAINER_MOUNTED) return false;
+    var mountEl = document.getElementById('action-manager');
+    if (!mountEl) return false;
+    // Check viewRegistry has a controller
+    var vr = window.AppCore && window.AppCore.viewRegistry;
+    var desc = vr && typeof vr.get === 'function' && vr.get(viewType);
+    if (!desc) return false;
+    AB.trigger('ACTION_MANAGER:UPDATE', Object.assign({
+      viewType: viewType,
+      resModel: model,
+      resId: resId || null,
+    }, extraProps ? { props: extraProps } : {}));
+    return true;
   }
 
   /**
@@ -559,322 +426,7 @@
   }
 
   function renderNavbar(userCompanies, userLangs, currentLang) {
-    if (modernShellOwner && window.__erpModernShellController) {
-      window.__erpModernShellController.applyNavContext({
-        userCompanies: userCompanies || null,
-        userLangs: userLangs || [],
-        currentLang: currentLang || "en_US",
-      });
-      return true;
-    }
-    if (NavbarCore && typeof NavbarCore.render === "function") {
-      var coreHandled = NavbarCore.render({
-        navbar: navbar,
-        appShell: appShell,
-        appSidebar: appSidebar,
-        userCompanies: userCompanies || [],
-        userLangs: userLangs || [],
-        currentLang: currentLang || "en_US",
-        viewsSvc: viewsSvc,
-      });
-      if (coreHandled) return;
-    }
-    if (!navbar) return;
-    userLangs = userLangs || [];
-    currentLang = currentLang || 'en_US';
-    var menus = (viewsSvc && viewsSvc.getMenus()) ? viewsSvc.getMenus() : [];
-    var tree = menus.length ? buildMenuTree(menus) : [];
-    var appRoots = getAppRoots(tree, menus);
-    var routeHash = (window.location.hash || '#home').replace(/^#/, '');
-    var routeBase = routeHash.split('?')[0];
-    /* Home / apps grid: do not use stored app or first-app fallback for chrome — hash drives main
-       content (#home) while stored erp_sidebar_app made sidebar/header show a different app (Phase nav fix). */
-    var atHome = routeBase === '' || routeBase === 'home';
-    var autoAppId = getAppIdForRoute(routeBase, menus);
-    var storedAppId = typeof localStorage !== 'undefined' ? (localStorage.getItem('erp_sidebar_app') || '') : '';
-    var selectedAppId = '';
-    if (atHome) {
-      selectedAppId = autoAppId || '';
-      if (typeof localStorage !== 'undefined' && !selectedAppId) {
-        try {
-          localStorage.removeItem('erp_sidebar_app');
-        } catch (e) { /* noop */ }
-      }
-    } else {
-      selectedAppId = autoAppId || storedAppId || (appRoots[0] && appRoots[0].menu && appRoots[0].menu.id) || '';
-    }
-    var selectedRoot = appRoots.find(function (n) {
-      return String((n.menu && n.menu.id) || '') === String(selectedAppId);
-    }) || null;
-    var selectedAppName = (selectedRoot && selectedRoot.menu && selectedRoot.menu.name) ? selectedRoot.menu.name : '';
-    if (selectedAppId && typeof localStorage !== 'undefined') localStorage.setItem('erp_sidebar_app', selectedAppId);
-    var useSidebar = !!appSidebar;
-    var staleBannerHtml = '';
-    if (menus.length === 0) {
-      staleBannerHtml = 'Navigation menus missing. Run: <code style="padding:var(--space-xs) var(--space-sm);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--color-text) 12%,transparent)">erp-bin db upgrade -d ' +
-        escNavHtml(window.Session && window.Session.db ? String(window.Session.db) : 'erp') + '</code>';
-    }
-    var html = '';
-    if (useSidebar) {
-      html += '<button type="button" class="nav-hamburger" aria-label="Open menu">&#9776;</button>';
-      html += '<button type="button" class="nav-sidebar-toggle" aria-label="Collapse sidebar" title="Collapse menu" aria-expanded="true">&#9664;</button>';
-    } else {
-      html += '<button type="button" class="nav-hamburger" aria-label="Toggle menu" style="display:none">&#9776;</button>';
-    }
-    html += '<span class="nav-toolbar-left"><a href="#home" class="logo logo-link" title="Apps">ERP Platform</a>';
-    if (useSidebar) {
-      html += '<button type="button" id="nav-apps-home" class="nav-link nav-apps-home" title="Apps">Apps</button>';
-      if (selectedAppName) {
-        html += '<span class="nav-current-app">' + escNavHtml(selectedAppName) + '</span>';
-      }
-    }
-    if (!useSidebar) {
-      html += '<nav role="navigation" class="nav-menu" aria-label="Main navigation" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
-      if (staleBannerHtml) {
-        html += '<span class="nav-menu-stale-banner" style="padding:0.25rem 0.5rem;background:var(--color-warning);color:var(--color-text);font-size:0.85rem;border-radius:var(--radius-sm)">' + staleBannerHtml + '</span>';
-      }
-      if (menus.length) {
-        tree.forEach(function (node) {
-          const m = node.menu;
-          const action = m.action ? viewsSvc.getAction(m.action) : null;
-          const route = action ? actionToRoute(action) : menuToRoute(m);
-          const href = route ? '#' + route : '#';
-          const cls = 'nav-link' + (route ? '' : ' nav-link-disabled');
-          if (node.children.length) {
-            html += '<span class="nav-dropdown" style="position:relative;display:inline-block">';
-            html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
-            html += '<span class="nav-dropdown-content" style="display:none;position:absolute;top:100%;left:0;background:#1a1a2e;min-width:140px;padding:0.5rem 0;border-radius:4px;z-index:100">';
-            node.children.forEach(function (ch) {
-              const cm = ch.menu;
-              const caction = cm.action ? viewsSvc.getAction(cm.action) : null;
-              const croute = caction ? actionToRoute(caction) : menuToRoute(cm);
-              const chref = croute ? '#' + croute : '#';
-              html += '<a href="' + chref + '" class="nav-link" style="display:block;padding:0.5rem 1rem;white-space:nowrap" data-menu-id="' + (cm.id || '').replace(/"/g, '&quot;') + '">' + (cm.name || '').replace(/</g, '&lt;') + '</a>';
-            });
-            html += '</span></span>';
-          } else {
-            html += '<a href="' + href + '" class="' + cls + '" data-menu-id="' + (m.id || '').replace(/"/g, '&quot;') + '">' + (m.name || '').replace(/</g, '&lt;') + '</a>';
-          }
-        });
-      }
-      html += '</nav>';
-    }
-    html += '</span><span class="nav-user" style="margin-left:auto;display:flex;align-items:center;gap:0.75rem">';
-    if (userCompanies && userCompanies.allowed_companies && userCompanies.allowed_companies.length > 1) {
-      const cur = userCompanies.current_company;
-      html += '<span class="nav-dropdown company-switcher" style="position:relative;display:inline-block">';
-      html += '<button type="button" class="nav-link company-switcher-btn" style="background:none;border:none;cursor:pointer;font:inherit;color:inherit" title="Switch company">';
-      html += (cur && cur.name ? cur.name : 'Company') + ' &#9662;</button>';
-      html += '<span class="nav-dropdown-content company-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:160px;padding:0.5rem 0;background:#1a1a2e;border-radius:4px;z-index:100">';
-      userCompanies.allowed_companies.forEach(function (c) {
-        const active = cur && c.id === cur.id ? ' nav-link-active' : '';
-        html += '<button type="button" class="nav-link company-option' + active + '" style="display:block;width:100%;text-align:left;padding:0.5rem 1rem;background:none;border:none;cursor:pointer;font:inherit;color:inherit" data-company-id="' + (c.id || '') + '">' + (c.name || '').replace(/</g, '&lt;') + '</button>';
-      });
-      html += '</span></span>';
-    } else if (userCompanies && userCompanies.current_company) {
-      html += '<span class="nav-company-badge" title="Current company">' + (userCompanies.current_company.name || '').replace(/</g, '&lt;') + '</span>';
-    }
-    if (userLangs && userLangs.length > 1) {
-      const cur = userLangs.find(function (l) { return l.code === currentLang; }) || userLangs[0];
-      html += '<span class="nav-dropdown lang-switcher" style="position:relative;display:inline-block">';
-      html += '<button type="button" class="nav-link lang-switcher-btn" style="background:none;border:none;cursor:pointer;font:inherit;color:inherit" title="Language">' + (cur.name || cur.code || 'Lang').replace(/</g, '&lt;') + ' &#9662;</button>';
-      html += '<span class="nav-dropdown-content lang-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:120px;padding:0.5rem 0;background:#1a1a2e;border-radius:4px;z-index:100">';
-      userLangs.forEach(function (l) {
-        const active = l.code === currentLang ? ' nav-link-active' : '';
-        html += '<button type="button" class="nav-link lang-option' + active + '" style="display:block;width:100%;text-align:left;padding:0.5rem 1rem;background:none;border:none;cursor:pointer;font:inherit;color:inherit" data-lang="' + (l.code || '').replace(/"/g, '&quot;') + '">' + (l.name || l.code || '').replace(/</g, '&lt;') + '</button>';
-      });
-      html += '</span></span>';
-    }
-    const theme = (typeof localStorage !== 'undefined' && localStorage.getItem('erp_theme')) || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    html += '<button type="button" class="nav-link theme-toggle" style="background:none;border:none;cursor:pointer;font:inherit;color:inherit" title="Toggle dark mode" aria-label="Toggle theme">' + (theme === 'dark' ? '\u263D' : '\u263C') + '</button>';
-    html += '<span class="nav-dropdown notification-bell" style="position:relative;display:inline-block">';
-    html += '<button type="button" class="nav-link notification-bell-btn" style="background:none;border:none;cursor:pointer;font:inherit;color:inherit;position:relative" title="Notifications" aria-label="Notifications">&#128276;</button>';
-    html += '<span class="notification-badge" style="display:none;position:absolute;top:-4px;right:-4px;background:#c00;color:white;font-size:0.7rem;min-width:1.2em;height:1.2em;border-radius:50%;text-align:center;line-height:1.2em;padding:0 4px">0</span>';
-    html += '<span class="nav-dropdown-content notification-dropdown" style="display:none;position:absolute;top:100%;right:0;min-width:280px;max-width:360px;max-height:400px;overflow-y:auto;padding:0.5rem 0;background:#1a1a2e;border-radius:4px;z-index:100;margin-top:4px">';
-    html += '<div class="notification-header" style="padding:0.5rem 1rem;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center"><span>Notifications</span><button type="button" class="nav-link mark-all-read" style="background:none;border:none;cursor:pointer;font-size:0.85rem;color:var(--text-muted)">Mark all read</button></div>';
-    html += '<div id="notification-list" style="max-height:320px;overflow-y:auto"></div>';
-    html += '</span></span>';
-    html += '<a href="#discuss" class="nav-link" title="Discuss">Discuss</a>';
-    html += '<span class="o-systray-registry"></span>';
-    html += '<a href="/web/logout" class="nav-link">Logout</a>';
-    html += '</span>';
-    navbar.innerHTML = html;
-    if (window.__erpNavbarContract && typeof window.__erpNavbarContract.markDelegated === 'function') {
-      window.__erpNavbarContract.markDelegated(navbar);
-    }
-    renderSystrayMount();
-    if (appSidebar) {
-      var sidebarTree = tree;
-      if (appRoots.length && selectedAppId) {
-        if (selectedRoot) {
-          sidebarTree = selectedRoot.children && selectedRoot.children.length
-            ? selectedRoot.children
-            : [selectedRoot];
-        }
-      }
-      if (SidebarCore && typeof SidebarCore.render === "function") {
-        appSidebar.innerHTML = SidebarCore.render({
-          tree: sidebarTree,
-          staleBannerHtml: staleBannerHtml,
-          buildSidebarNavHtml: buildSidebarNavHtml,
-        }) || buildSidebarNavHtml(sidebarTree, staleBannerHtml);
-        if (typeof SidebarCore.wire === "function") {
-          SidebarCore.wire({ wireSidebarAfterRender: wireSidebarAfterRender });
-        } else {
-          wireSidebarAfterRender();
-        }
-      } else {
-        appSidebar.innerHTML = buildSidebarNavHtml(sidebarTree, staleBannerHtml);
-        wireSidebarAfterRender();
-      }
-    }
-    var appsHomeBtn = navbar.querySelector('#nav-apps-home');
-    if (appsHomeBtn) {
-      appsHomeBtn.addEventListener('click', function () {
-        window.location.hash = '#home';
-      });
-    }
-    var hamburger = navbar.querySelector('.nav-hamburger');
-    var navMenu = navbar.querySelector('.nav-menu');
-    if (hamburger && navMenu && !appSidebar) {
-      function updateHamburgerVisibility() {
-        hamburger.style.display = (window.innerWidth <= 768) ? 'flex' : 'none';
-        if (window.innerWidth > 768) navMenu.classList.remove('nav-menu-open');
-      }
-      if (window.innerWidth <= 768) hamburger.style.display = 'flex';
-      hamburger.onclick = function () {
-        navMenu.classList.toggle('nav-menu-open');
-      };
-      window.addEventListener('resize', updateHamburgerVisibility);
-    }
-    if (appSidebar && hamburger) {
-      function syncMobileHamburgerVisibility() {
-        hamburger.style.display = (window.innerWidth <= 1023) ? 'inline-flex' : 'none';
-      }
-      syncMobileHamburgerVisibility();
-      window.addEventListener('resize', syncMobileHamburgerVisibility);
-    }
-    navbar.querySelectorAll('.theme-toggle').forEach(function (btn) {
-      btn.onclick = function () {
-        const root = document.documentElement;
-        const cur = root.getAttribute('data-theme') || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        const next = cur === 'dark' ? 'light' : 'dark';
-        root.setAttribute('data-theme', next);
-        if (typeof localStorage !== 'undefined') localStorage.setItem('erp_theme', next);
-        btn.textContent = next === 'dark' ? '\u263D' : '\u263C';
-      };
-    });
-    navbar.querySelectorAll('.nav-dropdown').forEach(function (dd) {
-      const label = dd.querySelector('a') || dd.querySelector('button');
-      const content = dd.querySelector('.nav-dropdown-content');
-      if (label && content) {
-        var isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        if (isTouch && window.innerWidth <= 768) {
-          label.onclick = function (e) {
-            if (dd.classList.contains('nav-dropdown-open')) {
-              dd.classList.remove('nav-dropdown-open');
-              content.style.display = 'none';
-            } else {
-              navbar.querySelectorAll('.nav-dropdown-open').forEach(function (o) {
-                o.classList.remove('nav-dropdown-open');
-                var c = o.querySelector('.nav-dropdown-content');
-                if (c) c.style.display = 'none';
-              });
-              dd.classList.add('nav-dropdown-open');
-              content.style.display = 'block';
-            }
-            e.preventDefault();
-            e.stopPropagation();
-          };
-        } else {
-          label.onmouseenter = function () { content.style.display = 'block'; };
-          dd.onmouseleave = function () { content.style.display = 'none'; };
-        }
-      }
-    });
-    navbar.querySelectorAll('.company-option').forEach(function (btn) {
-      btn.onclick = function () {
-        const cid = parseInt(btn.getAttribute('data-company-id'), 10);
-        if (!cid) return;
-        fetch('/web/session/set_current_company', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ company_id: cid })
-        }).then(function (r) {
-          if (r.ok) {
-            if (window.Services && window.Services.session) window.Services.session.clearCache();
-            window.location.reload();
-          }
-        });
-      };
-    });
-    navbar.querySelectorAll('.lang-option').forEach(function (btn) {
-      btn.onclick = function () {
-        const lang = btn.getAttribute('data-lang');
-        if (!lang) return;
-        fetch('/web/session/set_lang', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ lang: lang })
-        }).then(function (r) {
-          if (r.ok) {
-            if (window.Services && window.Services.session) window.Services.session.clearCache();
-            window.location.reload();
-          }
-        });
-      };
-    });
-    var bellBtn = navbar.querySelector('.notification-bell-btn');
-    var bellDropdown = navbar.querySelector('.notification-dropdown');
-    var badgeEl = navbar.querySelector('.notification-badge');
-    function loadNotificationCount() {
-      fetch('/mail/notifications', { credentials: 'include' }).then(function (r) { return r.json(); }).then(function (list) {
-        var n = (list && list.length) || 0;
-        if (badgeEl) {
-          badgeEl.textContent = n > 99 ? '99+' : String(n);
-          badgeEl.style.display = n > 0 ? 'block' : 'none';
-        }
-      }).catch(function () {});
-    }
-    function loadNotificationList() {
-      var listEl = document.getElementById('notification-list');
-      if (!listEl) return;
-      fetch('/mail/notifications', { credentials: 'include' }).then(function (r) { return r.json(); }).then(function (list) {
-        if (!list || !list.length) {
-          listEl.innerHTML = '<p style="padding:1rem;color:var(--text-muted);margin:0">No new notifications</p>';
-          return;
-        }
-        var modelToRoute = { 'res.partner': 'contacts', 'crm.lead': 'leads', 'sale.order': 'orders', 'mail.channel': 'discuss' };
-        listEl.innerHTML = list.map(function (n) {
-          var route = modelToRoute[n.res_model] || (n.res_model ? (n.res_model || '').replace(/\\./g, '_') : '');
-          var href = (route === 'discuss' && n.res_id) ? '#discuss/' + n.res_id : (route ? '#' + route + '/edit/' + (n.res_id || '') : '#');
-          var body = (n.body || '').replace(/</g, '&lt;').substring(0, 80);
-          return '<a href="' + href + '" class="notification-item" data-id="' + (n.id || '') + '" style="display:block;padding:0.5rem 1rem;border-bottom:1px solid var(--border-color);text-decoration:none;color:inherit;font-size:0.9rem" onclick="document.querySelector(\'.notification-dropdown\').style.display=\'none\'">' + body + '<br><span style="font-size:0.75rem;color:var(--text-muted)">' + (n.date || '').substring(0, 16) + '</span></a>';
-        }).join('');
-      }).catch(function () { listEl.innerHTML = '<p style="padding:1rem;color:var(--text-muted);margin:0">Could not load</p>'; });
-    }
-    if (bellBtn && bellDropdown) {
-      bellBtn.onclick = function () {
-        var isOpen = bellDropdown.style.display === 'block';
-        bellDropdown.style.display = isOpen ? 'none' : 'block';
-        if (!isOpen) loadNotificationList();
-      };
-      document.addEventListener('click', function (e) {
-        if (bellDropdown && bellDropdown.style.display === 'block' && !bellDropdown.contains(e.target) && !bellBtn.contains(e.target)) {
-          bellDropdown.style.display = 'none';
-        }
-      });
-    }
-    if (navbar.querySelector('.mark-all-read')) {
-      navbar.querySelector('.mark-all-read').onclick = function () {
-        var markReadHdrs = { 'Content-Type': 'application/json' };
-        if (window.Services && window.Services.session && window.Services.session.getAuthHeaders) Object.assign(markReadHdrs, window.Services.session.getAuthHeaders());
-        fetch('/mail/notifications/mark_read', { method: 'POST', credentials: 'include', headers: markReadHdrs, body: JSON.stringify({ all: true }) }).then(function () { loadNotificationCount(); loadNotificationList(); });
-      };
-    }
-    loadNotificationCount();
+    if (CHROME.renderNavbar) return CHROME.renderNavbar(userCompanies, userLangs, currentLang);
   }
 
   function getListColumns(model) {
@@ -1116,7 +668,12 @@
   function serverValueToDatetimeLocal(v) { return FV.serverValueToDatetimeLocal ? FV.serverValueToDatetimeLocal(v) : ''; }
   function dateInputToServer(v) { return FV.dateInputToServer ? FV.dateInputToServer(v) : false; }
   function datetimeLocalToServer(v) { return FV.datetimeLocalToServer ? FV.datetimeLocalToServer(v) : false; }
-  function confirmModal(o) { return FV.confirmModal ? FV.confirmModal(o) : Promise.resolve(window.confirm('Are you sure?')); }
+  function confirmModal(o) {
+    // Track P3: prefer OWL DialogService → legacy FV.confirmModal → native confirm
+    var DS = window.AppCore && window.AppCore.DialogService;
+    if (DS && typeof DS.confirm === 'function') return DS.confirm(o || {});
+    return FV.confirmModal ? FV.confirmModal(o) : Promise.resolve(window.confirm('Are you sure?'));
+  }
   function isBinaryField(m, f) { return FV.isBinaryField ? FV.isBinaryField(m, f) : false; }
   function isHtmlField(m, f) { return FV.isHtmlField ? FV.isHtmlField(m, f) : false; }
   function isImageField(m, f) { return FV.isImageField ? FV.isImageField(m, f) : false; }
@@ -1183,145 +740,15 @@
   }
 
   function renderAccountingReport(reportType, title) {
-    if (GraphViewCore && typeof GraphViewCore.renderAccountingReport === "function") {
-      var graphHandled = GraphViewCore.renderAccountingReport(main, { reportType: reportType, title: title, rpc: rpc });
-      if (graphHandled) return;
-    }
-    actionStack = [{ label: title, hash: 'reports/' + reportType }];
-    const today = new Date().toISOString().slice(0, 10);
-    const yearStart = today.slice(0, 4) + '-01-01';
-    main.innerHTML = '<h2>' + title + '</h2><p style="margin-bottom:1rem">' +
-      '<label>From <input type="date" id="report-date-from" value="' + yearStart + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
-      '<label>To <input type="date" id="report-date-to" value="' + today + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
-      '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
-      '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
-      '</p><div id="report-table" style="overflow-x:auto">' + skeletonHtml(8, true) + '</div>';
-    function loadReport() {
-      const df = document.getElementById('report-date-from').value || yearStart;
-      const dt = document.getElementById('report-date-to').value || today;
-      const method = reportType === 'trial-balance' ? 'get_trial_balance' : (reportType === 'profit-loss' ? 'get_profit_loss' : 'get_balance_sheet');
-      const args = reportType === 'balance-sheet' ? [dt] : [df, dt];
-      rpc.callKw('account.account', method, args, {})
-        .then(function (rows) {
-          const el = document.getElementById('report-table');
-          if (!el) return;
-          if (!rows || !rows.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data</p>'; return; }
-          const cols = Object.keys(rows[0]);
-          let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
-          cols.forEach(function (c) { tbl += '<th style="padding:0.5rem;border:1px solid var(--border-color);text-align:left">' + String(c).replace(/</g, '&lt;') + '</th>'; });
-          tbl += '</tr></thead><tbody>';
-          rows.forEach(function (r) {
-            tbl += '<tr>';
-            cols.forEach(function (c) {
-              const v = r[c];
-              const val = (typeof v === 'number' && (c === 'debit' || c === 'credit' || c === 'balance')) ? v.toFixed(2) : (v || '');
-              tbl += '<td style="padding:0.5rem;border:1px solid var(--border-color)">' + String(val).replace(/</g, '&lt;') + '</td>';
-            });
-            tbl += '</tr>';
-          });
-          tbl += '</tbody></table>';
-          el.innerHTML = tbl;
-        })
-        .catch(function (err) {
-          const el = document.getElementById('report-table');
-          if (el) el.innerHTML = '<p style="color:#c00">' + (err.message || 'Failed to load').replace(/</g, '&lt;') + '</p>';
-        });
-    }
-    document.getElementById('report-refresh').onclick = loadReport;
-    document.getElementById('report-print').onclick = function () { window.print(); };
-    loadReport();
+    if (CHROME.renderAccountingReport) return CHROME.renderAccountingReport(reportType, title);
   }
 
   function renderStockValuationReport() {
-    if (GraphViewCore && typeof GraphViewCore.renderStockValuationReport === "function") {
-      var stockHandled = GraphViewCore.renderStockValuationReport(main, { rpc: rpc });
-      if (stockHandled) return;
-    }
-    actionStack = [{ label: 'Stock Valuation', hash: 'reports/stock-valuation' }];
-    main.innerHTML = '<h2>Stock Valuation</h2><p style="margin-bottom:1rem">' +
-      '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Refresh</button>' +
-      '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
-      '</p><div id="report-table" style="overflow-x:auto">' + skeletonHtml(8, true) + '</div>';
-    function loadReport() {
-      rpc.callKw('product.product', 'get_stock_valuation_report', [], {})
-        .then(function (rows) {
-          const el = document.getElementById('report-table');
-          if (!el) return;
-          if (!rows || !rows.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data</p>'; return; }
-          const cols = ['product', 'category', 'qty_available', 'standard_price', 'total_value'];
-          let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
-          cols.forEach(function (c) { tbl += '<th style="padding:0.5rem;border:1px solid var(--border-color);text-align:left">' + String(c).replace(/_/g, ' ').replace(/</g, '&lt;') + '</th>'; });
-          tbl += '</tr></thead><tbody>';
-          rows.forEach(function (r) {
-            tbl += '<tr>';
-            cols.forEach(function (c) {
-              const v = r[c];
-              const val = (typeof v === 'number' && (c === 'standard_price' || c === 'total_value')) ? v.toFixed(2) : (v || '');
-              tbl += '<td style="padding:0.5rem;border:1px solid var(--border-color)">' + String(val).replace(/</g, '&lt;') + '</td>';
-            });
-            tbl += '</tr>';
-          });
-          tbl += '</tbody></table>';
-          el.innerHTML = tbl;
-        })
-        .catch(function (err) {
-          const el = document.getElementById('report-table');
-          if (el) el.innerHTML = '<p style="color:#c00">' + (err.message || 'Failed to load').replace(/</g, '&lt;') + '</p>';
-        });
-    }
-    document.getElementById('report-refresh').onclick = loadReport;
-    document.getElementById('report-print').onclick = function () { window.print(); };
-    loadReport();
+    if (CHROME.renderStockValuationReport) return CHROME.renderStockValuationReport();
   }
 
   function renderSalesRevenueReport() {
-    if (GraphViewCore && typeof GraphViewCore.renderSalesRevenueReport === "function") {
-      var salesHandled = GraphViewCore.renderSalesRevenueReport(main, { rpc: rpc });
-      if (salesHandled) return;
-    }
-    actionStack = [{ label: 'Sales Revenue', hash: 'reports/sales-revenue' }];
-    const today = new Date().toISOString().slice(0, 10);
-    const yearStart = today.slice(0, 4) + '-01-01';
-    main.innerHTML = '<h2>Sales Revenue</h2><p style="margin-bottom:1rem">' +
-      '<label>From <input type="date" id="report-date-from" value="' + yearStart + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
-      '<label>To <input type="date" id="report-date-to" value="' + today + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
-      '<label>Group by <select id="report-group-by" style="padding:0.35rem;margin:0 0.5rem"><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option><option value="product">Product</option></select></label>' +
-      '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
-      '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
-      '</p><div id="report-table" style="overflow-x:auto">' + skeletonHtml(8, true) + '</div>';
-    function loadReport() {
-      const df = document.getElementById('report-date-from').value || yearStart;
-      const dt = document.getElementById('report-date-to').value || today;
-      const groupBy = (document.getElementById('report-group-by') && document.getElementById('report-group-by').value) || 'month';
-      rpc.callKw('sale.order', 'get_sales_revenue_report', [df, dt], { group_by: groupBy })
-        .then(function (rows) {
-          const el = document.getElementById('report-table');
-          if (!el) return;
-          if (!rows || !rows.length) { el.innerHTML = '<p style="color:var(--text-muted)">No data</p>'; return; }
-          const cols = Object.keys(rows[0]);
-          let tbl = '<table style="width:100%;border-collapse:collapse"><thead><tr>';
-          cols.forEach(function (c) { tbl += '<th style="padding:0.5rem;border:1px solid var(--border-color);text-align:left">' + String(c).replace(/_/g, ' ').replace(/</g, '&lt;') + '</th>'; });
-          tbl += '</tr></thead><tbody>';
-          rows.forEach(function (r) {
-            tbl += '<tr>';
-            cols.forEach(function (c) {
-              const v = r[c];
-              const val = (typeof v === 'number' && c === 'revenue') ? v.toFixed(2) : (v || '');
-              tbl += '<td style="padding:0.5rem;border:1px solid var(--border-color)">' + String(val).replace(/</g, '&lt;') + '</td>';
-            });
-            tbl += '</tr>';
-          });
-          tbl += '</tbody></table>';
-          el.innerHTML = tbl;
-        })
-        .catch(function (err) {
-          const el = document.getElementById('report-table');
-          if (el) el.innerHTML = '<p style="color:#c00">' + (err.message || 'Failed to load').replace(/</g, '&lt;') + '</p>';
-        });
-    }
-    document.getElementById('report-refresh').onclick = loadReport;
-    document.getElementById('report-print').onclick = function () { window.print(); };
-    loadReport();
+    if (CHROME.renderSalesRevenueReport) return CHROME.renderSalesRevenueReport();
   }
 
   /** Phase 632–633: website/eCommerce app roots; phase 633 strict routing for unknown slugs */
@@ -1458,42 +885,55 @@
       const route = listMatch[1];
       const model = getModelForRoute(route);
       if (model) {
-        dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
-        loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+        // Track O2: prefer OWL controller; fall back to legacy string-HTML
+        if (!_tryOwlRoute('list', model, null, { domain: getHashDomainParam() })) {
+          dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
+          loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+        }
       }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (newMatch) {
       const route = newMatch[1];
       const model = getModelForRoute(route);
-      if (model) renderForm(model, route);
+      if (model) {
+        if (!_tryOwlRoute('form', model, null)) renderForm(model, route);
+      }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (editMatch) {
       const route = editMatch[1], id = editMatch[2];
       const model = getModelForRoute(route);
-      if (model) renderForm(model, route, id);
+      if (model) {
+        if (!_tryOwlRoute('form', model, parseInt(id, 10) || id)) renderForm(model, route, id);
+      }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (genericListMatch) {
       const route = genericListMatch[1];
       const model = getModelForRoute(route);
       if (model) {
-        dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
-        loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+        if (!_tryOwlRoute('list', model, null, { domain: getHashDomainParam() })) {
+          dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
+          loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+        }
       }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (genericNewMatch) {
       const route = genericNewMatch[1];
       const model = getModelForRoute(route);
-      if (model) renderForm(model, route);
+      if (model) {
+        if (!_tryOwlRoute('form', model, null)) renderForm(model, route);
+      }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else if (genericEditMatch) {
       const route = genericEditMatch[1], id = genericEditMatch[2];
       const model = getModelForRoute(route);
-      if (model) renderForm(model, route, id);
+      if (model) {
+        if (!_tryOwlRoute('form', model, parseInt(id, 10) || id)) renderForm(model, route, id);
+      }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
       else renderHome();
     } else {
@@ -1763,6 +1203,35 @@
     renderSystrayMount: renderSystrayMount,
     navContext: navContext,
   });
+  if (CHROME.install) CHROME.install({
+    modernShellOwner: modernShellOwner,
+    NavbarCore: NavbarCore,
+    navbar: navbar,
+    appShell: appShell,
+    appSidebar: appSidebar,
+    viewsSvc: viewsSvc,
+    buildMenuTree: buildMenuTree,
+    getAppRoots: getAppRoots,
+    getAppIdForRoute: getAppIdForRoute,
+    escNavHtml: escNavHtml,
+    actionToRoute: actionToRoute,
+    menuToRoute: menuToRoute,
+    renderSystrayMount: renderSystrayMount,
+    SidebarCore: SidebarCore,
+    buildSidebarNavHtml: buildSidebarNavHtml,
+    wireSidebarAfterRender: wireSidebarAfterRender,
+    getListColumns: getListColumns,
+    showToast: showToast,
+    parseCSV: parseCSV,
+    ImportCore: ImportCore,
+    loadRecords: loadRecords,
+    getCurrentListState: function () { return currentListState; },
+    setActionStack: function (s) { actionStack = s; },
+    GraphViewCore: GraphViewCore,
+    main: main,
+    rpc: rpc,
+    skeletonHtml: skeletonHtml,
+  });
 
   function bootLegacyWebClient() {
     if (window.__erpLegacyRuntime && window.__erpLegacyRuntime.booted) {
@@ -1816,9 +1285,9 @@
         window.Services.bus.start(['res.partner_' + sessionData.uid]);
       }
     }).catch(function (err) {
-      main.innerHTML = '<h2>Unable to load</h2><p style="color:var(--text-muted);margin:1rem 0">' +
+      main.innerHTML = '<h2>Unable to load</h2><p class="o-error-panel__muted">' +
         (err && err.message ? String(err.message).replace(/</g, '&lt;') : 'Network or server error') + '</p>' +
-        '<p><a href="/web/login" style="color:var(--color-primary)">Go to login</a> &middot; <a href="javascript:location.reload()" style="color:var(--color-primary)">Retry</a></p>';
+        '<p class="o-error-panel__links"><a href="/web/login">Go to login</a> &middot; <a href="javascript:location.reload()">Retry</a></p>';
     });
   }
 

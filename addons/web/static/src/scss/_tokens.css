@@ -85,4 +85,28 @@
   --leading-normal: 1.45;
   --leading-relaxed: 1.65;
   --tracking-tight: -0.02em;
+  /* Phase 1.246 H1: alias tokens for spec / legacy references */
+  --font-body: var(--font-sans);
+  --text-base: var(--text-md);
+  --tracking-wide: 0.03em;
+  --space-2xs: 0.125rem;
+  --color-border: var(--border-color);
+  --bg-card: var(--color-surface-1);
+
+  /* Layout breakpoints (documented scale; use in @media alongside these values) */
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+
+  /* Kanban column accents (avoid raw hex in component SCSS) */
+  --kanban-accent-1: #e06c75;
+  --kanban-accent-2: #e5a44a;
+  --kanban-accent-3: #e5d04a;
+  --kanban-accent-4: #98c379;
+  --kanban-accent-5: #2e7d32;
+  --kanban-accent-6: #21867a;
+  --kanban-accent-7: #56b6c2;
+  --kanban-accent-8: #61afef;
+  --kanban-accent-9: #5e81f4;
 }

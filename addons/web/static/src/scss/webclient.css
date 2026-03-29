@@ -1,3 +1,20 @@
+/*
+ * webclient.css — ERP Platform legacy stylesheet (Phase 78 + design system).
+ *
+ * MIGRATION STATUS (Track S2):
+ * The following sections have been migrated to per-surface SCSS files:
+ *   - Modal/dialog rules (Phase 1c)  → scss/core/_dialog.scss
+ *   - Control panel dropdowns (2b)   → scss/search/_control_panel.scss
+ *   - Kanban card chrome (Phase 603) → scss/views/kanban/_kanban_controller.scss
+ *   - Filter chips                   → scss/search/_control_panel.scss
+ *
+ * Target: reduce this file below 40 KB. Current: 83 KB.
+ * Compiled SCSS from main.scss: ~22 KB (minified via npm run build:css).
+ *
+ * Remaining rules in this file are legacy shell/bootstrap fallbacks
+ * that will be migrated in later waves (Track S2 continued).
+ */
+
 /* Web client base styles - Phase 78 design system; Phase 757: :root tokens in _tokens.css + _dark.css (manifest order). */
 
 @media (prefers-contrast: more) {
@@ -282,9 +299,9 @@ body {
 
 .o-sidebar-link:hover,
 .o-sidebar-link:focus-visible {
-  color: white;
+  color: var(--color-text-on-primary);
   background: color-mix(in srgb, var(--color-surface-1) 10%, transparent);
-  border-left-color: color-mix(in srgb, var(--color-primary) 80%, white);
+  border-left-color: color-mix(in srgb, var(--color-primary) 80%, var(--color-text-on-primary));
 }
 
 .o-sidebar-link.o-sidebar-link-disabled {
@@ -293,7 +310,7 @@ body {
 }
 
 .o-sidebar-link.o-sidebar-link--active {
-  color: white;
+  color: var(--color-text-on-primary);
   background: color-mix(in srgb, var(--color-primary) 30%, transparent);
   border-left-color: var(--color-primary);
   font-weight: 600;
@@ -486,7 +503,7 @@ i.o-sidebar-icon {
 
 .o-btn-primary {
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-on-primary);
   border-color: var(--color-primary);
 }
 
@@ -541,14 +558,14 @@ i.o-sidebar-icon {
   align-items: center;
   justify-content: center;
   background: var(--color-primary);
-  color: #fff;
+  color: var(--color-text-on-primary);
   font-weight: 600;
 }
 
 .o-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--color-backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1009,7 +1026,7 @@ i.o-sidebar-icon {
 
 #navbar {
   background: var(--shell-surface-strong);
-  color: white;
+  color: var(--color-text-on-primary);
   padding: var(--space-sm) var(--space-lg);
   display: flex;
   align-items: center;
@@ -1033,9 +1050,9 @@ i.o-sidebar-icon {
   width: var(--touch-target-min, 2.75rem);
   height: var(--touch-target-min, 2.75rem);
   padding: 0;
-  border: 1px solid color-mix(in srgb, white 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-text-on-primary) 25%, transparent);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, white 8%, transparent);
+  background: color-mix(in srgb, var(--color-text-on-primary) 8%, transparent);
   color: inherit;
   cursor: pointer;
   flex-shrink: 0;
@@ -1043,7 +1060,7 @@ i.o-sidebar-icon {
 
 #navbar .nav-sidebar-toggle:hover,
 #navbar .nav-sidebar-toggle:focus-visible {
-  background: color-mix(in srgb, white 14%, transparent);
+  background: color-mix(in srgb, var(--color-text-on-primary) 14%, transparent);
 }
 
 @media (min-width: 1024px) {
@@ -1071,7 +1088,7 @@ i.o-sidebar-icon {
 }
 
 #navbar .nav-current-app {
-  color: rgba(255, 255, 255, 0.9);
+  color: color-mix(in srgb, var(--color-text-on-primary) 90%, transparent);
   font-weight: 600;
   white-space: nowrap;
   max-width: 14rem;
@@ -1085,15 +1102,21 @@ i.o-sidebar-icon {
 }
 
 #navbar .nav-link {
-  color: rgba(255, 255, 255, 0.9);
+  color: color-mix(in srgb, var(--color-text-on-primary) 90%, transparent);
   text-decoration: none;
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-sm);
 }
 
 #navbar .nav-link:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text-on-primary);
+  background: color-mix(in srgb, var(--color-text-on-primary) 12%, transparent);
+}
+
+#navbar .nav-link:focus-visible,
+#navbar button:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 #navbar .nav-link-disabled {
@@ -1144,7 +1167,7 @@ i.o-sidebar-icon {
 .form-dirty-banner {
   padding: var(--space-sm) var(--space-md);
   background: var(--color-warning);
-  color: #333;
+  color: var(--color-text);
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-md);
   font-size: 0.9rem;
@@ -1181,7 +1204,7 @@ i.o-sidebar-icon {
 .o-statusbar-item--active {
   font-weight: 600;
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-on-primary);
 }
 .o-statusbar-item--done {
   color: var(--text-muted);
@@ -1208,7 +1231,7 @@ i.o-sidebar-icon {
 }
 .o-form-header .btn-action-object.btn-primary {
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-on-primary);
   border-color: var(--color-primary);
 }
 .o-form-header .btn-action-object:hover {
@@ -1237,7 +1260,7 @@ i.o-sidebar-icon {
   opacity: 0.6;
 }
 .kanban-drag-over {
-  background: rgba(26, 26, 46, 0.08) !important;
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent) !important;
 }
 
 /* Chat panel */
@@ -1247,12 +1270,12 @@ i.o-sidebar-icon {
   right: var(--space-xl);
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-on-primary);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 0.9rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
   z-index: 100;
 }
 
@@ -1267,8 +1290,8 @@ i.o-sidebar-icon {
   width: 360px;
   max-width: 90vw;
   height: 100vh;
-  background: white;
-  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.15);
+  background: var(--color-surface-1);
+  box-shadow: calc(-1 * var(--space-xs)) 0 var(--space-lg) color-mix(in srgb, var(--color-text) 18%, transparent);
   display: flex;
   flex-direction: column;
   z-index: 200;
@@ -1381,7 +1404,7 @@ i.o-sidebar-icon {
 .chat-send-btn {
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-primary);
-  color: white;
+  color: var(--color-text-on-primary);
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -1413,7 +1436,7 @@ i.o-sidebar-icon {
   pointer-events: auto;
   padding: var(--space-md) var(--space-lg);
   border-radius: var(--radius-sm);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-md);
   background: var(--color-bg);
   border-left: 4px solid var(--color-primary);
   display: flex;
@@ -1488,7 +1511,7 @@ i.o-sidebar-icon {
 .notebook-tabs {
   display: flex;
   gap: 0.25rem;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border-color);
   margin-bottom: 1rem;
 }
 
@@ -1499,11 +1522,11 @@ i.o-sidebar-icon {
   border-bottom: 2px solid transparent;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .notebook-tab:hover {
-  color: #333;
+  color: var(--color-text);
 }
 
 .notebook-tab.active {
@@ -1517,6 +1540,186 @@ i.o-sidebar-icon {
 
 .notebook-page.active {
   display: block;
+}
+
+/* Phase 1.246 H4: field_registry — replace repeated inline styles */
+.o-field-input {
+  box-sizing: border-box;
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  width: 100%;
+}
+.o-field-input--textarea {
+  resize: vertical;
+  min-height: 6rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+.o-field-input--max12 {
+  max-width: 12rem;
+  width: auto;
+}
+.o-field-input--max16 {
+  max-width: 16rem;
+  width: auto;
+}
+.o-field-input--w4 {
+  width: 4rem;
+}
+.o-field-input--w8 {
+  width: 8rem;
+}
+.o-field-color {
+  width: 3rem;
+  height: 2.25rem;
+  margin-top: var(--space-sm);
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+}
+.o-field-badge-input {
+  width: 100%;
+  max-width: 16rem;
+  margin-top: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--border-color);
+  font-size: 0.85rem;
+  box-sizing: border-box;
+}
+.o-field-mt-sm {
+  margin-top: var(--space-sm);
+}
+.o-field-mt-xs {
+  margin-top: var(--space-xs);
+}
+.o-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--card-gap);
+  margin-top: var(--space-sm);
+}
+.o-field-row--wrap {
+  flex-wrap: wrap;
+}
+.o-field-row-input {
+  flex: 1;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+}
+.o-field-help {
+  display: block;
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
+.o-field-handle-pill {
+  display: inline-block;
+  margin-top: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+}
+.o-field-m2m-grid {
+  margin-top: var(--space-sm);
+  display: grid;
+  gap: var(--space-xs);
+}
+.o-field-canvas {
+  max-width: 100%;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  touch-action: none;
+  cursor: crosshair;
+}
+.o-field-progress {
+  margin-top: var(--space-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.o-field-progress .o-field-input {
+  margin-top: 0;
+}
+.o-field-progress-track {
+  flex: 1;
+  height: 8px;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+.o-field-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  width: 0%;
+  transition: width var(--duration-base);
+}
+.o-m2one-widget {
+  margin-top: var(--space-sm);
+  position: relative;
+}
+.o-m2one-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--color-surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+}
+.o-one2many-placeholder {
+  margin-top: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+.o-field-m2m-host {
+  margin-top: var(--space-sm);
+  min-height: 2rem;
+}
+.o-field-bin-status {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-left: var(--space-xs);
+}
+.o-field-image-preview {
+  max-width: 200px;
+  max-height: 150px;
+  display: none;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+.o-field-file-mt {
+  margin-top: var(--space-sm);
+}
+.o-field-checkbox-gap {
+  margin-right: var(--space-xs);
+}
+.o-skeleton-msg {
+  color: var(--text-muted);
+}
+.o-error-panel__muted {
+  color: var(--text-muted);
+  margin: var(--space-lg) 0;
+}
+.o-error-panel__links a {
+  color: var(--color-primary);
 }
 
 .breadcrumbs {
@@ -1813,7 +2016,7 @@ i.o-sidebar-icon {
   padding: 0.3rem 0.6rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-warning) 20%, transparent);
-  color: white;
+  color: var(--color-text);
 }
 
 .o-navbar-chip {
@@ -1822,7 +2025,7 @@ i.o-sidebar-icon {
   min-height: 2.2rem;
   padding: 0.2rem 0.7rem;
   border-radius: 999px;
-  background: color-mix(in srgb, white 8%, transparent);
+  background: color-mix(in srgb, var(--color-text-on-primary) 8%, transparent);
 }
 
 .o-navbar-badge {
@@ -2080,6 +2283,15 @@ i.o-sidebar-icon {
   background: var(--color-surface-0);
 }
 
+.o-attachment-video,
+.o-attachment-text {
+  width: 100%;
+  max-height: min(70vh, 480px);
+  min-height: 12rem;
+  border: 0;
+  background: var(--color-surface-0);
+}
+
 .o-shortcut-sheet kbd {
   font-family: var(--font-mono);
   border: 1px solid var(--border-color);
@@ -2141,7 +2353,7 @@ textarea:focus-visible {
     padding: var(--space-sm);
     background: none;
     border: none;
-    color: white;
+    color: var(--color-text-on-primary);
     cursor: pointer;
     font-size: 1.5rem;
     margin-right: var(--space-sm);
@@ -2689,6 +2901,14 @@ textarea:focus-visible {
   flex-wrap: wrap;
 }
 
+.o-statusbar--pipeline {
+  padding: var(--space-xs);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
 .o-statusbar-stage {
   padding: var(--space-xs) var(--space-sm);
   border: 1px solid var(--color-border);
@@ -2718,6 +2938,179 @@ textarea:focus-visible {
   gap: var(--space-xs);
 }
 
+.o-tags-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+}
+.o-tags-list--empty {
+  color: var(--text-muted);
+}
+.o-tags-list-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-2));
+  border: 1px solid var(--color-border-subtle);
+  color: var(--color-text);
+}
+
+.html-widget.o-field-input {
+  display: block;
+}
+
+.o-m2one-widget .m2one-input {
+  margin-top: 0;
+}
+
+/* Phase 1.246 H4: legacy chart / pivot / calendar toolbar fallbacks */
+.o-chart-toolbar-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+}
+.o-chart-type-switcher {
+  display: inline-flex;
+  gap: 2px;
+  margin-right: var(--space-sm);
+}
+.o-chart-toolbar-btn {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+.o-chart-toolbar-btn--primary {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.o-chart-search-input {
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  min-width: 200px;
+  background: var(--color-input-bg);
+  color: var(--color-text);
+}
+.o-chart-stage-select {
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+}
+.btn-graph-type {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border-color);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+.btn-graph-type.active {
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  border-color: var(--color-primary);
+}
+.o-cal-nav-title {
+  min-width: 140px;
+  font-weight: 600;
+}
+
+/* Phase 1.246 H4: discuss shell (legacy_main_shell_routes) */
+.o-discuss-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--space-md);
+  min-height: 400px;
+}
+.o-discuss-sidebar {
+  border-right: 1px solid var(--border-color);
+  padding: var(--space-md);
+}
+.o-discuss-main {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+}
+.o-discuss-section-title {
+  margin: 0 0 var(--space-sm);
+}
+.o-discuss-btn-primary {
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.o-discuss-messages {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 200px;
+}
+.o-discuss-compose {
+  margin-top: var(--space-md);
+  display: none;
+}
+.o-discuss-compose--visible {
+  display: block;
+}
+.o-discuss-textarea {
+  width: 100%;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  box-sizing: border-box;
+}
+.o-discuss-send-btn {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.o-discuss-muted {
+  color: var(--text-muted);
+}
+.discuss-channel-link {
+  display: block;
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: inherit;
+  margin-bottom: 2px;
+}
+.discuss-channel-link--active {
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  font-weight: 600;
+}
+.o-discuss-msg-row {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border-color);
+}
+.o-discuss-msg-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .o-m2m-tag {
   display: inline-flex;
   align-items: center;
@@ -2735,75 +3128,7 @@ textarea:focus-visible {
   background: var(--color-surface-0);
 }
 
-.o-command-palette {
-  position: fixed;
-  inset: 0;
-  background: var(--color-backdrop);
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 12vh;
-  z-index: 1200;
-}
-
-.o-command-palette-panel {
-  width: min(40rem, 92vw);
-  background: var(--color-surface-0);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-#o-command-input {
-  width: 100%;
-  padding: var(--space-sm);
-}
-
-/* Phase 1c: modal confirm dialog */
-.o-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-backdrop);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1300;
-  padding: var(--space-lg);
-}
-
-.o-dialog-panel {
-  width: min(28rem, 100%);
-  background: var(--color-surface-1);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  padding: var(--space-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.o-dialog-title {
-  margin: 0;
-  font-size: 1.1rem;
-  color: var(--color-text);
-}
-
-.o-dialog-body {
-  margin: 0;
-  color: var(--color-text);
-  line-height: 1.45;
-}
-
-.o-dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--card-gap);
-  margin-top: var(--space-sm);
-}
+/* Command palette + dialog shell → scss/shell/_overlays.scss (Post-1.248 S2) */
 
 /* Phase 2b: control panel dropdowns */
 .o-cp-dropdown-wrap {

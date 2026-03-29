@@ -1,0 +1,10 @@
+// Bootstrap 5.3.3 functions stub — Track S1
+// Place-holder so that @import of Bootstrap does not fail while the real
+// Bootstrap SCSS files are being vendored.  Replace with the real Bootstrap
+// SCSS when running: npm run vendor:bootstrap
+@function tint-color($color, $weight) { @return mix(white, $color, $weight); }
+@function shade-color($color, $weight) { @return mix(black, $color, $weight); }
+@function shift-color($color, $weight) {
+  @if $weight > 0 { @return shade-color($color, $weight); }
+  @return tint-color($color, -$weight);
+}

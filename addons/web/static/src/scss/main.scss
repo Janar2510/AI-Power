@@ -1,0 +1,29 @@
+// main.scss — ERP Platform SCSS entry point (Track L1).
+// Compilation order: design tokens → Bootstrap variables → Bootstrap → component overrides → component CSS
+//
+// Build: npm run build:css (sass src/scss/main.scss dist/webclient.css)
+// The output replaces / supplements webclient.css in web.assets_web.
+
+// 1. Design tokens (compiled to CSS custom properties — unchanged)
+@import 'tokens';    // Maps to _tokens.scss or uses CSS custom properties
+
+// 2. Bootstrap variable overrides (before Bootstrap import)
+@import 'variables';
+
+// 3. Bootstrap 5.3.3 — Track S1: stub vendored at lib/bootstrap/scss/bootstrap.scss
+// The stub provides a minimal reboot + utility classes so the build works today.
+// Replace with the real Bootstrap source via: npm run vendor:bootstrap
+@import '../../lib/bootstrap/scss/bootstrap';
+
+// 4. Component stylesheets (order matches manifest asset loading)
+// Use explicit _ prefix to resolve SASS @import ambiguity when both
+// _name.scss and name.scss exist in the same directory.
+@import 'webclient/_webclient';
+@import 'shell/overlays';
+@import 'views/list/_list_renderer';
+@import 'views/form/_form_controller';
+@import 'views/kanban/_kanban_controller';
+@import 'views/fields/field_widgets_extra';
+@import 'search/_control_panel';
+@import 'core/_dialog';
+@import 'core/_dropdown';

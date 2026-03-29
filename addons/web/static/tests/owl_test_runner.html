@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>ERP Platform — OWL Component Unit Tests (Track Q1)</title>
+  <style>
+    :root {
+      --pass: #22c55e;
+      --fail: #ef4444;
+      --skip: #f59e0b;
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --radius: 6px;
+    }
+    body { margin: 0; font-family: "Fira Code", monospace, system-ui; background: var(--bg); color: var(--text); padding: 1.5rem; }
+    h1 { margin: 0 0 1rem; font-size: 1.25rem; letter-spacing: 0.02em; }
+    #summary { display: flex; gap: 1rem; margin-bottom: 1rem; font-size: 0.9rem; }
+    .badge { padding: 0.25rem 0.6rem; border-radius: var(--radius); font-weight: 600; }
+    .badge.pass { background: var(--pass); color: #fff; }
+    .badge.fail { background: var(--fail); color: #fff; }
+    .badge.total { background: var(--surface); color: var(--text); }
+    #results { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+    .test-item { padding: 0.5rem 0.75rem; border-radius: var(--radius); background: var(--surface); display: flex; align-items: flex-start; gap: 0.75rem; }
+    .test-item.pass .icon { color: var(--pass); }
+    .test-item.fail { border-left: 3px solid var(--fail); }
+    .test-item.fail .icon { color: var(--fail); }
+    .test-name { font-size: 0.875rem; }
+    .test-error { font-size: 0.75rem; color: var(--fail); margin-top: 0.25rem; white-space: pre-wrap; }
+    .suite-header { font-size: 0.75rem; color: var(--muted); padding: 0.75rem 0.25rem 0.25rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <h1>OWL Component Unit Tests</h1>
+  <div id="summary">
+    <span class="badge total" id="badge-total">0 tests</span>
+    <span class="badge pass" id="badge-pass">0 passed</span>
+    <span class="badge fail" id="badge-fail">0 failed</span>
+  </div>
+  <ul id="results"></ul>
+
+  <!-- OWL runtime (must be present before any ES module imports) -->
+  <script>
+    /* Minimal OWL stub for test isolation — real OWL loaded from dist */
+    window.owl = window.owl || {};
+  </script>
+  <script src="/web/static/lib/owl/owl.js" onerror="console.warn('OWL lib not found; using stub')"></script>
+
+  <!-- Mock RPC / helpers -->
+  <script src="/web/static/tests/mock_rpc.js"></script>
+  <script src="/web/static/tests/test_helpers.js"></script>
+
+  <!-- OWL test framework shim -->
+  <script>
+    window.__OWL_TESTS = [];
+    function suite(name, fn) {
+      window.__OWL_TESTS.push({ suite: name, fn });
+    }
+    function test(name, fn) {
+      if (!window.__OWL_TESTS._current) return;
+      window.__OWL_TESTS._current.tests.push({ name, fn });
+    }
+    function assert(cond, msg) {
+      if (!cond) throw new Error(msg || "Assertion failed");
+    }
+    function assertEqual(a, b, msg) {
+      if (a !== b) throw new Error(msg || `Expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
+    }
+    function assertIncludes(arr, val, msg) {
+      if (!Array.isArray(arr) || !arr.includes(val))
+        throw new Error(msg || `Expected array to include ${JSON.stringify(val)}`);
+    }
+  </script>
+
+  <!-- Tests -->
+  <script src="/web/static/tests/test_owl_view_registry.js"></script>
+  <script src="/web/static/tests/test_owl_field_registry.js"></script>
+  <script src="/web/static/tests/test_owl_dialog_service.js"></script>
+  <script src="/web/static/tests/test_owl_search_bar.js"></script>
+  <script src="/web/static/tests/test_owl_pager.js"></script>
+
+  <!-- Runner -->
+  <script>
+    (async function runAll() {
+      const resultsList = document.getElementById('results');
+      let passed = 0, failed = 0;
+
+      for (const suiteEntry of window.__OWL_TESTS) {
+        const tests = [];
+        // Collect tests
+        suiteEntry.fn({ suite: suiteEntry.suite, tests });
+
+        const header = document.createElement('li');
+        header.className = 'suite-header';
+        header.textContent = suiteEntry.suite;
+        resultsList.appendChild(header);
+
+        for (const t of tests) {
+          let ok = true, errMsg = '';
+          try {
+            await Promise.resolve(t.fn());
+          } catch (e) {
+            ok = false;
+            errMsg = e && e.message ? e.message : String(e);
+          }
+          if (ok) passed++; else failed++;
+
+          const li = document.createElement('li');
+          li.className = 'test-item ' + (ok ? 'pass' : 'fail');
+          li.innerHTML = `<span class="icon">${ok ? '✓' : '✗'}</span>
+            <div><div class="test-name">${t.name}</div>
+            ${errMsg ? `<div class="test-error">${errMsg}</div>` : ''}</div>`;
+          resultsList.appendChild(li);
+        }
+      }
+
+      const total = passed + failed;
+      document.getElementById('badge-total').textContent = total + ' test' + (total !== 1 ? 's' : '');
+      document.getElementById('badge-pass').textContent = passed + ' passed';
+      document.getElementById('badge-fail').textContent = failed + ' failed';
+      document.title = `(${failed === 0 ? '✓' : '✗'} ${passed}/${total}) OWL Tests`;
+    })();
+  </script>
+</body>
+</html>

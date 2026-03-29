@@ -51,6 +51,14 @@ The active product direction is defined by the Foundry One brand system and the 
 - **Modifier evaluation**: Small Python-expression evaluator in JS for view modifiers
 - **Migration rule**: the modular runtime is now the strategic owner; legacy globals are temporary adapters
 
+### Odoo-style client layers (post–1.246)
+
+- **`model/relational_model.js`**: client-side `Record` / `DynamicList` facade over `Services.orm` (no new RPC contract).
+- **`search/`**: `search_model.js`, `with_search.js`, `search_bar.js` — shared search contract; legacy `core/search_model.js` remains a shim when needed.
+- **`views/view.js`**: default view registrations + `__ERP_ViewResolver` for act_window targets.
+- **`services/action.js`**: consolidated `doActionButton` / `loadState` entry points toward a single action service.
+- **`legacy_main_chrome_block.js`**: import modal, navbar HTML, and report fallbacks; **`main.js`** delegates via `CHROME.install(ctx)` after list state exists.
+
 ## State Rules
 
 - **Server-state**: Authoritative; versioned by write-date; updated by RPC

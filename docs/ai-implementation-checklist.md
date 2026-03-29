@@ -49,12 +49,12 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Phases 490–524 (business depth, frontend, AI, production)
 
-- [ ] **Phase 679 (optional):** product must pick a **490–524** row before implementation — through **1.233.0** this slice stays **docs-only** (no **490–524** code); see **`docs/deferred_product_backlog.md`**.
-- [ ] MRP: `mrp.workorder`, reservation + quant completion on MO done; SO-driven MO when `product.template.manufacture_on_order` and `sale_mrp` loaded.
-- [ ] HR: employee lifecycle + contract start + attendance promotion; leave approval note; payroll + attendance lines.
-- [ ] Web: `npm run build:web` succeeds when Node is available; `tsconfig.json` + `framework/component_base.js` present.
+- [ ] **Phase 679 (optional):** product must pick a **490–524** row before implementation — through **1.233.0** this slice stays **docs-only** (no **490–524** code); see **`docs/deferred_product_backlog.md`**. **Post-1.248:** MRP/HR depth items below are implemented independently of this gate (Track P1/P2); the gate remains for *additional* 490–524 scope.
+- [x] MRP: `mrp.workorder`, reservation + quant completion on MO done; SO-driven MO when `product.template.manufacture_on_order` and `sale_mrp` loaded (**Post-1.248 / 1.248.0 Track P1** — parity rows **B3**, **526**, **539–541**).
+- [x] HR: employee lifecycle + contract start + attendance promotion; leave approval note; payroll + attendance lines (**Post-1.248 / 1.248.0 Track P2** — **B4**, **751**, **728** payslip merge-safe).
+- [x] Web: `npm run build:web` succeeds when Node is available; `tsconfig.json` + `framework/component_base.js` present (**verified:** `npm run build:web` → `modern_webclient.js`).
 - [x] AI: `ai_assistant.embeddings.pipeline` documents pgvector; `retrieve_chunks` uses **`<=>`** only when **`pg_extension.vector`** is installed **and** the embedding column is native **`vector`**; otherwise ILIKE (**Phase 745**).
-- [ ] Ops: `/readiness` for probes; `json_log.format_json_log` available; security checklist doc reviewed.
+- [x] Ops: `/readiness` for probes; `json_log.format_json_log` available; security checklist doc reviewed (**1.248.0 Tracks R1/R2** — **`core/http/routes.py`**, **`ERP_JSON_ACCESS_LOG`**, **Phase 529**).
 
 ## Phases 525–529 (reference roadmap: stock/MRP depth, assets, RAG, hardening)
 
@@ -295,7 +295,8 @@ Verification checklist for AI assistant module deployment and feature additions.
 ## Next phases / Odoo parity (1.201)
 
 - [x] `web.assets_web` loads `field_registry.js`, `search_model.js`, `action_manager.js` before `list_view.js` / `main.js` (**evidence:** **`addons/web/__manifest__.py`** — **627** audit).
-- [ ] Confirm modal works for bulk delete, row delete, and unsaved form navigation (`UIComponents.ConfirmDialog`).
+- [x] Confirm modal works for **bulk delete** and **row delete** via `confirmModal` / `UIComponents.ConfirmDialog` (**evidence:** **`core/list_view.js`** bulk **`confirmModal`** — **1.246**; row delete already used **`confirmModal`**).
+- [ ] Confirm modal for **unsaved form navigation** still to be wired uniformly (`UIComponents.ConfirmDialog`).
 - [ ] Optional: set `attachment_location=file` and `data_dir` (or `filestore_path`) for disk attachments; Pillow optional for image resize (`attachment_image_max`).
 - [ ] In-process cron runs in dev (`erp-bin server` single worker); `ir.cron._trigger` issues `NOTIFY erp_cron_wake` when DB supports it.
 - [ ] `mail.followers` / `mail.tracking.value` access rows present; upgrade DB after pull so new tables/columns exist.

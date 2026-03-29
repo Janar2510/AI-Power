@@ -1,0 +1,168 @@
+// _list_renderer.scss — List view surface styles (Track L2).
+// Scoped to .o-list-renderer and .o-list-controller.
+
+.o-list-controller {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.o-list-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--color-divider, var(--border-color));
+  flex-wrap: wrap;
+}
+
+.o-list-title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  flex: 1 0 auto;
+}
+
+.o-list-actions-bar {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.o-list-renderer {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--color-surface-1);
+}
+
+.o-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+
+  thead {
+    background: var(--color-surface-2);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+}
+
+.o-list-th {
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
+  user-select: none;
+
+  &.o-list-th-checkbox {
+    width: 40px;
+  }
+
+  &--sortable {
+    cursor: pointer;
+
+    &:hover {
+      color: var(--color-text);
+      background: var(--color-row-hover);
+    }
+  }
+
+  &--sorted {
+    color: var(--color-primary);
+  }
+}
+
+.o-list-th-actions {
+  width: 48px;
+}
+
+.o-list-sort-icon {
+  font-size: 0.65em;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.o-list-row {
+  transition: background var(--duration-fast) ease;
+
+  &:hover {
+    background: var(--color-row-hover);
+    cursor: pointer;
+  }
+
+  &--selected {
+    background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  }
+
+  &--new {
+    background: color-mix(in srgb, var(--color-success) 8%, transparent);
+  }
+}
+
+.o-list-td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border-subtle, var(--border-color));
+  color: var(--color-text);
+  vertical-align: middle;
+
+  &.o-list-td-checkbox {
+    width: 40px;
+    text-align: center;
+  }
+
+  &--integer, &--float, &--monetary {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &--boolean {
+    text-align: center;
+  }
+}
+
+.o-list-td-actions {
+  text-align: right;
+  padding: var(--space-xs) var(--space-sm);
+  opacity: 0;
+
+  .o-list-row:hover & {
+    opacity: 1;
+  }
+}
+
+.o-list-row-action {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+
+  &:hover {
+    color: var(--color-danger);
+    background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  }
+}
+
+.o-list-row-empty .o-list-empty-cell {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.o-list-aggregates td {
+  padding: var(--space-sm) var(--space-md);
+  border-top: 2px solid var(--border-color);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  background: var(--color-surface-2);
+}

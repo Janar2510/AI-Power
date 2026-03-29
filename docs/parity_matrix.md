@@ -36,6 +36,14 @@ Tracks Odoo 19.0 feature parity with our implementation. Status: `planned` | `in
 
 | API Surface | Odoo Contract | Our Implementation | Status |
 |-------------|---------------|--------------------|--------|
+| Client RelationalModel facade | `web/static/src/model/relational_model` | `addons/web/static/src/model/relational_model.js` | done |
+| Search layer (SearchModel / WithSearch) | `web/static/src/search/*` | `addons/web/static/src/search/search_model.js`, `with_search.js`, `search_bar.js` | done |
+| View registry resolver | `web/static/src/views/view.js` | `addons/web/static/src/views/view.js`, `__ERP_ViewResolver` | done |
+| Single action service surface | `webclient/actions/action_service.js` | `addons/web/static/src/services/action.js` + `ActionManager` bridge + OWL **`ActionContainer`** on **`#action-manager`** (`webclient.js`) + **`ActionBus`** (`Post-1.248`) | done |
+| HTTP readiness probes (R1) | `/readiness` vs `/health` | `core/http/routes.py` readiness checks (503 when not ready) | done |
+| Structured JSON access log (R2) | Odoo-style request logging hooks | `ERP_JSON_ACCESS_LOG` / `--json-access-log`; `json_log.format_json_log` | done |
+| HR payslip merge-safe create | `hr.payslip` ORM invariants | `tests.test_merge_safe_create_evidence_phase728` + model wiring | done |
+| MRP workorder + MO quant completion | `mrp.workorder`; stock moves on MO done | `mrp_workorder.py`, `mrp_production.py`; tests **B3** / **526** / stock phases | done |
 | Internal RPC (web client) | Session-aware, record-rule protected | `core/http/rpc.py`, `/web/dataset/call_kw` | done |
 | External JSON-2 | Token/key-based, multi-db headers | `core/http/json2.py` | done |
 | Extension controllers | `@route`, auth modes | `core/http/controller.py` | done |

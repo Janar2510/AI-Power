@@ -1,0 +1,273 @@
+// _control_panel.scss — Search + Control Panel surface styles (Track L2).
+
+.o-control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+  border-bottom: 1px solid var(--color-divider, var(--border-color));
+  margin-bottom: var(--space-md);
+}
+
+.o-control-panel-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.o-control-panel-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+
+  .o-breadcrumb-item {
+    color: var(--color-primary);
+    cursor: pointer;
+    text-decoration: none;
+
+    &:hover { text-decoration: underline; }
+    &:last-child { color: var(--color-text); cursor: default; &:hover { text-decoration: none; } }
+  }
+
+  .o-breadcrumb-sep {
+    color: var(--text-muted);
+  }
+}
+
+.o-control-panel-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.o-control-panel-dropdowns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--card-gap);
+  align-items: center;
+}
+
+.o-control-panel-filters {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+// Search bar
+.o-search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 1;
+  max-width: 520px;
+  min-width: 220px;
+}
+
+.o-search-bar-input {
+  flex: 1;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+
+  &:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--focus-ring-color);
+  }
+}
+
+// Facet chips
+.o-facet-bar {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  padding: var(--space-xs) 0;
+}
+
+.o-facet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 2px var(--space-sm);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+  border-radius: var(--radius-xl);
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.o-facet-chip-label {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.o-facet-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  padding: 0;
+  line-height: 1;
+  font-size: 0.8em;
+  opacity: 0.7;
+
+  &:hover { opacity: 1; }
+}
+
+// View switcher
+.o-view-switcher {
+  display: flex;
+  gap: 2px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.o-view-switcher-btn {
+  background: none;
+  border: none;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: calc(var(--radius-sm) - 2px);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  transition: all var(--duration-fast);
+
+  &.active, &--active {
+    background: var(--color-surface-1);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &:hover:not(.active):not(.o-view-switcher-btn--active) {
+    color: var(--color-text);
+  }
+}
+
+// Search panel (sidebar)
+.o-search-panel {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  padding: var(--space-md);
+  overflow-y: auto;
+}
+
+.o-search-panel-section {
+  margin-bottom: var(--space-md);
+}
+
+.o-search-panel-section-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.o-search-panel-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  transition: background var(--duration-fast);
+
+  &:hover {
+    background: var(--color-row-hover);
+  }
+
+  &--active {
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    color: var(--color-primary);
+    font-weight: 500;
+  }
+}
+
+// ── S2 migration: control panel dropdown rules from webclient.css (Phase 2b) ─
+.o-cp-dropdown-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.o-cp-dropdown-toggle {
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+
+  &:hover { background: var(--color-surface-2); }
+}
+
+.o-cp-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: var(--space-xs);
+  min-width: 12rem;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--color-surface-1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 50;
+  padding: var(--space-xs) 0;
+}
+
+.o-cp-dropdown-wrap.o-open .o-cp-dropdown-menu { display: block; }
+
+.o-cp-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 0.9rem;
+
+  &:hover, &.active { background: var(--color-surface-2); }
+}
+
+.o-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-primary);
+  color: var(--color-surface-1);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.o-filter-chip-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}

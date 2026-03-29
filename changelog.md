@@ -1,5 +1,163 @@
 # Changelog
 
+## Post-1.248 — implementation wave (same train as 1.248.0)
+
+### Fixed
+
+- **OWL routing guard:** `main.js` `_tryOwlRoute` now returns `false` unless `window.__ERP_OWL_ACTION_CONTAINER_MOUNTED` is set by OWL `ActionContainer` `onMounted`, so legacy list/form rendering runs when the OWL shell is not active (restores navigation).
+- **Action shell:** `webclient.js` mounts `ActionContainer` on `#action-manager` after shell load (with `mountComponent` / CSP fallback).
+
+### Added
+
+- **P3 webclient:** `WithSearch(ListController)` used for list actions from `ActionContainer`; `app/main.js` imports `search/search_model.js`, calls `commandPalette.initHotkey()` after `startServices`; OWL `fieldRegistry` mirrored to `Services.fieldRegistry` with `format()`; new field widgets: `badge`, `statusbar`, `priority`, `url`, `email`, `phone`, `image`, `color_picker`.
+- **P5 design system:** `scss/shell/_overlays.scss` (command palette), `scss/views/fields/_field_widgets_extra.scss`, responsive form grid + kanban column scaling, kanban accents as `--kanban-accent-*` tokens; command palette block removed from monolithic `webclient.css` (superseded by SCSS partial).
+- **Bootstrap vendor:** `scripts/vendor_bootstrap.js` now shell-quotes paths so `npm run vendor:bootstrap` works when the repo path contains spaces (real Bootstrap 5.3.3 SCSS copied to `lib/bootstrap/scss/`).
+
+### Docs
+
+- `docs/ai-implementation-checklist.md` — MRP, HR, Web build, Ops rows marked done; Phase 679 note clarified.
+- `docs/parity_matrix.md` — action service row **done**; rows for readiness, JSON access log, HR payslip, MRP WO/quants.
+- `docs/odoo19-webclient-gap-table.md` — Search / field widgets / action manager / hotkeys rows refreshed for 1.248+.
+
+---
+
+## 1.248.0 — 2026-03-29 (Post-1.247 — Tracks O–S: Legacy Retirement, Backend Depth, Testing, Ops, Design)
+
+### Added
+
+**Track O — Legacy main.js Progressive Retirement**
+- `app/search/with_search.js` — `WithSearch(Controller, options)` HOC factory: creates/receives `SearchModel`, renders `ControlPanel` above the wrapped Controller, re-triggers `loadRecords` on every search model domain change. `createSearchModel(resModel, opts)` helper exposed on `AppCore`.
+- `main.js` — `_tryOwlRoute(viewType, model, resId, extraProps)` bridge function: checks `viewRegistry` + `#action-manager` DOM mount point; routes list/form/kanban routes through `ActionBus.trigger("ACTION_MANAGER:UPDATE")` instead of legacy string-HTML builders when OWL controller available. Falls back gracefully.
+- `app/services/view_service.js` — `ViewService`: `loadViews(model, viewTypes, ctx)` batch RPC (JSON-RPC `get_views`), `loadView(model, viewType)` lazy single-type fetch, `getFields(model)` `fields_get` with caching, `clearViewCache(model)`. Exposed as `window.AppCore.ViewService`.
+- `app/views/list/list_controller.js` — `searchModel` prop accepted; subscribes to `SearchModel.subscribe()` for automatic reload on domain change; `loadRecords` now uses `searchModel.getDomain(baseDomain)` when available.
+
+**Track O — Deprecation markers added**
+- `legacy_main_list_views.js`, `legacy_main_form_views.js`, `legacy_main_chart_views.js` — `@deprecated Track O3` JSDoc headers pointing migration target files.
+
+**Track P — Backend Functional Enrichment**
+- `addons/mrp/models/mrp_workorder.py` — `action_done_with_quant()`: marks WO done and triggers `_mrp_apply_done_moves_to_quants()` on parent MO when all WOs complete.
+- `addons/hr/models/hr_employee.py` — `action_contract_start()`: opens first draft contract + advances lifecycle to `active`; `action_attendance_promotion()`: advances lifecycle after 1000 h worked; `action_depart()`: closes open contracts + sets departed.
+- `addons/hr/models/hr_leave.py` — `approval_note` + `refuse_reason` fields; `action_validate(approval_note)` and `action_refuse(reason)` accept optional note/reason.
+- `addons/hr/models/hr_payslip.py` — `hr.payslip` model stub: `gross_wage` compute from contract monthly wage / 22 work days × worked_days, `action_confirm()`, `action_cancel()`, auto-fill contract.
+- `addons/hr/models/__init__.py` — imports `hr_payslip`.
+- `main.js` + `legacy_main_form_views.js` — `confirmModal()` prefers `AppCore.DialogService.confirm()` → `UIComponents.ConfirmDialog` → `window.confirm`.
+
+**Track Q — Testing Infrastructure**
+- `addons/web/static/tests/owl_test_runner.html` — OWL-specific browser test runner; dark themed; suite/test/assert/assertEqual/assertIncludes DSL.
+- `addons/web/static/tests/test_owl_view_registry.js` — 5 tests: add/get/duplicate-guard/resolve/entries.
+- `addons/web/static/tests/test_owl_field_registry.js` — 4 tests: add/get/getAll/overwrite.
+- `addons/web/static/tests/test_owl_dialog_service.js` — 4 tests: Promise, accept, cancel, opts forwarded.
+- `addons/web/static/tests/test_owl_search_bar.js` — 4 tests: facet add/remove/domain/dedup.
+- `addons/web/static/tests/test_owl_pager.js` — 6 tests: initial offset, next/prev navigation, clamp at total, clamp at 0, direct update event.
+- `tests/e2e/test_owl_views_e2e.py` — Playwright E2E tests: list loads via ActionBus, form mounts, kanban mounts, search bar filters records.
+- `tests/test_mrp_so_driven_mo.py` — Unit tests: SO-driven MO creation, `action_done_with_quant` state transition.
+
+**Track R — Operational Readiness**
+- `core/http/routes.py` — `/health` endpoint (process-alive, no DB); `/readiness` endpoint (DB connect + `SELECT 1` + registry loaded, 200/503).
+- `core/tools/json_log.py` — Thread-local `set_trace_id`/`get_trace_id`/`generate_trace_id`; `format_access_log(method, path, status, duration_ms, …)`; `JsonFormatter` stdlib logging formatter; `install_json_log_handler()` attaches JSON handler when `ERP_JSON_ACCESS_LOG=1`; eagerly installs `_access_logger` + `_error_logger`.
+- `core/http/application.py` — Per-request trace ID generated/propagated from `X-Trace-ID`/`X-Request-ID` headers; `_wrap_start_response_json_access()` emits JSON access log lines + injects `X-Request-ID` response header; activated when `ERP_JSON_ACCESS_LOG=1` env var set.
+
+**Track S — Design System Completion**
+- `lib/bootstrap/scss/bootstrap.scss` + `_bootstrap-functions.scss` — Minimal Bootstrap 5.3.3 stub: reboot, 40+ utility classes (display, flex, gap, spacing, text, border, shadow), ready for replacement via `npm run vendor:bootstrap`.
+- `scripts/vendor_bootstrap.js` — Node script to download real Bootstrap 5.3.3 SCSS from npm registry via `npm pack`.
+- `scss/main.scss` — Bootstrap `@import` activated; per-surface partial imports use explicit `_name` prefix to resolve SASS ambiguity.
+- `package.json` — `test:css` script added (compiles `main.scss` + `dark.scss`, verifies no errors).
+- `scss/core/_dialog.scss` — Dialog overlay/panel/title/body/actions migrated from `webclient.css` Phase 1c.
+- `scss/search/_control_panel.scss` — CP dropdown and filter chip rules migrated from `webclient.css` Phase 2b.
+- `scss/views/kanban/_kanban_controller.scss` — Kanban card chrome rules migrated from `webclient.css` Phase 603.
+- `scss/webclient.css` — Migration status header added; SCSS output 22 KB minified.
+
+### Build
+- `npm run build:web` → `dist/modern_webclient.js` 299.2 KB
+- `npm run build:css` → SCSS compiles cleanly (Bootstrap stub activated)
+
+---
+
+## 1.247.0 — 2026-03-28 (Post-1.246 Frontend Architecture — Tracks I–N)
+
+### Added
+
+**Track I — OWL Component Library**
+- `app/core/hooks.js` — `useService`, `useEnv`, `useAsyncState`, `useDebounce`, `useForwardRef`, `useExternalListener`, `useAutoFocus` matching Odoo 19 `@web/core/utils/hooks` boundary.
+- `app/core/dialog.js` — `Dialog` + `ConfirmationDialog` OWL components with modal stacking, overlay service, keyboard trap (Escape), and `DialogService.confirm()/open()` for legacy callers.
+- `app/core/dropdown.js` — `Dropdown` + `DropdownItem` OWL components with keyboard nav (Arrow, Enter, Escape) and nesting support.
+- `app/core/notebook.js` — `Notebook` + `NotebookPage` OWL components; slot-based pages, keyboard tab switching.
+- `app/core/pager.js` — `Pager` OWL component; offset/limit/total model, `onUpdate` callback.
+- `app/core/autocomplete.js` — `AutoComplete` OWL component; debounced async source, keyboard nav, `onSelect` callback.
+- `app/core/colorlist.js` — `ColorList` OWL component; 12-colour palette matching Odoo 19 CE kanban colors.
+
+**Track J — View MVC Architecture**
+- `app/views/view_registry.js` — `createViewRegistry()`, typed descriptor validation, `resolveViewDescriptor()`, `registerView()`. Syncs to `window.Services.viewRegistry` for concat-bundle access.
+- `app/views/list/list_controller.js` — `ListController` OWL component; ORM load, selection, delete, pager; registered as `viewRegistry.add("list")`.
+- `app/views/list/list_renderer.js` — `ListRenderer` OWL component; table/rows, sortable columns, aggregates, checkbox selection.
+- `app/views/form/form_controller.js` — `FormController` OWL component; record load/save/discard, edit/readonly toggle; registered as `viewRegistry.add("form")`.
+- `app/views/form/form_renderer.js` — `FormRenderer` OWL component; two-column field groups, per-type input rendering.
+- `app/views/kanban/kanban_controller.js` — `KanbanController`; delegates to `AppCore.KanbanViewModule`; registered as `viewRegistry.add("kanban")`.
+- `app/views/graph/graph_controller.js` — `GraphController`; delegates to `AppCore.GraphViewModule`; registered as `viewRegistry.add("graph")`.
+- `app/views/pivot/pivot_controller.js` — `PivotController`; registered as `viewRegistry.add("pivot")`.
+- `app/views/calendar/calendar_controller.js` — `CalendarController`; registered as `viewRegistry.add("calendar")`.
+
+**Track K — Action Service Completion**
+- `services/action.js` — K1: added `ir.actions.server` dispatch (RPC `ir.actions.server.run` + result chain), `ir.actions.client` resolution via `ERPFrontendRegistries.category("actions")`, `onAction()` subscription hook.
+- `app/action_container.js` — `ActionContainer` OWL component + `ActionBus` pub/sub; listens to `ACTION_MANAGER:UPDATE` events and dynamically mounts view Controllers via the view registry.
+- `app/client_actions.js` — `registerBuiltinClientActions()` seeds both `env.registries.category("actions")` and `Services.action` with: `home`, `reload`, `settings`, `discuss`, `dashboard`, `import`, `web.action_base_debug_log` and their xml_id aliases.
+
+**Track L — CSS Architecture**
+- `scss/_variables.scss` — Bootstrap 5.3.3 variable overrides mapped from Foundry One tokens (typography, colors, spacing, radius, shadows, form controls, buttons, cards).
+- `scss/main.scss` — SCSS entry point; import chain: tokens → variables → Bootstrap (opt-in) → per-surface components.
+- `scss/webclient/_webclient.scss` — shell grid layout (CSS Grid, responsive sidebar collapse).
+- `scss/views/list/_list_renderer.scss` — list table, sortable headers, row hover, aggregates footer.
+- `scss/views/form/_form_controller.scss` — form sheet, two-column groups, field inputs, labels.
+- `scss/views/kanban/_kanban_controller.scss` — kanban columns, cards, color-coded borders.
+- `scss/search/_control_panel.scss` — control panel bar, search bar, facet chips, view switcher, search panel sidebar.
+- `scss/core/_dialog.scss` — dialog overlay, panel, header, footer, actions.
+- `scss/core/_dropdown.scss` — dropdown menu, items, separator.
+- `scss/dark.scss` — L3 dark mode bundle entry: per-component `*.dark.scss` files scoped to `[data-theme="dark"]`.
+- `package.json` — `build:css`, `build:css:min`, `watch:css`, `vendor:bootstrap`, `build:all` scripts; added `sass ^1.86.3` devDependency.
+
+**Track M — Field Widget Components**
+- `app/views/fields/field.js` — `Field` OWL wrapper; resolves widget from `fieldRegistry`, visual feedback (`required`, `readonly`, `invalid`), `getFieldVisualFeedback()` helper.
+- `app/views/fields/core_fields.js` — 10 core OWL field components: `CharField`, `IntegerField`, `FloatField`, `BooleanField`, `DateField`, `DatetimeField`, `TextField`, `SelectionField`, `MonetaryField`, `HtmlField`; each registered on `fieldRegistry`.
+- `app/views/fields/relational_fields.js` — `Many2oneField` (AutoComplete + name_search), `Many2manyTagsField` (tag pills + remove), `One2manyField` / `X2ManyField` (embedded list); each registered on `fieldRegistry`.
+
+**Track N — Search & Control Panel**
+- `app/search/search_bar.js` — `SearchBar` OWL component; facet chips, autocomplete suggestions, keyboard nav, `onSearch` callback, search panel toggle button.
+- `app/search/search_panel.js` — `SearchPanel` + `SearchPanelSection` OWL components; category (single-select) and filter (multi-select) modes; collapsible sections.
+- `app/search/control_panel.js` — `ControlPanel` OWL component composing `Breadcrumbs`, `ViewSwitcher`, `SearchBar`, `ActionMenu` (Dropdown), and `Pager`.
+
+### Fixed
+
+- **`getHashDomainParam` ReferenceError:** `routeApplyInternal` called `getHashDomainParam()` but it was never defined in `main.js` (only forwarded to `LV.install`). Added `getHashDomainParam()` to read optional `domain=` from the hash query string and parse via `parseActionDomain`. `legacy_main_list_views.js` adds `getHashDomainFromHash` as install fallback when `ctx.getHashDomainParam` is missing.
+
+### Changed
+
+- `app/main.js` — imports all Track I–N modules; calls `registerBuiltinClientActions(env)` after service startup; exposes `ActionBus`, `ActionContainer`, `ControlPanel`, `SearchPanel`, `SearchBarOWL` on `AppCore`.
+- `app/services.js` — `createModernServices` now properly exported.
+- Built bundle: `dist/modern_webclient.js` grows from ~215 KB to **290.7 KB** (all new OWL components + field registry).
+
+---
+
+## 1.246.0 — 2026-03-28
+
+### Added
+
+- **G5 Chrome extraction:** `legacy_main_chrome_block.js` in `web.assets_web` (before `main.js`); `main.js` delegates import modal, navbar, and accounting/stock/sales report fallbacks through `window.__ERP_CHROME_BLOCK.install(ctx)`. `main.js` reduced to **~1259 lines** (from ~1847).
+- **H1 Token aliases:** `--font-body`, `--text-base`, `--tracking-wide`, `--space-2xs`, `--color-border`, `--bg-card` in `_tokens.css`.
+- **H3 Dark depth:** `_dark.css` overrides for `--shadow-sm/md/lg`, `--color-divider`, `--surface-noise`.
+- **H4 Field + legacy toolbar classes:** `.o-field-*` utilities in `webclient.css`; **`core/field_registry.js`** has **no** inline `style=`; chart/pivot/calendar/kanban fallback toolbars + discuss shell use shared classes; **`main.js`** error/skeleton strings use classes. (**`legacy_main_form_views.js`** still carries legacy inline styles — next pass.)
+- **H5 Components:** `components/notebook_widget.js` (`AppCore.NotebookWidget.wire`), `components/tags_list.js` (`UIComponents.TagsList.renderPills`), `AttachmentViewer.openFilePreview` alias + video/text preview branches; list **bulk delete** uses `confirmModal` like row delete; `Statusbar` pipeline toolbar role + `data-stage`.
+- **H6 A11y:** `#navbar` link/button `:focus-visible` ring; existing global `:focus-visible` retained.
+
+### Changed
+
+- **H2 `webclient.css`:** Notebook tabs, chat panel, avatars, primary buttons, modal overlay, kanban drag tint, toasts, navbar/sidebar/chat colors — **token-driven** (`var(--color-text-on-primary)`, `var(--color-backdrop)`, `var(--shadow-md)`, etc.).
+- **`legacy_main_form_views.js`:** Notebook wiring prefers `AppCore.NotebookWidget` when present.
+
+### Documentation
+
+- `docs/frontend.md` — Odoo-style client layers subsection.
+- `docs/parity_matrix.md` — rows for RelationalModel, search layer, view resolver, action service.
+
 ## 1.245.0 — 2026-03-28
 
 ### Added

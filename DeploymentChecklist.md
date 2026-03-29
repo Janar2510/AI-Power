@@ -1,5 +1,173 @@
 # Deployment Checklist
 
+## Post-1.248 — OWL action shell + webclient P3/P5
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** — zero errors; bundle size within budget.
+- [ ] **`npm run build:css`** — SCSS compiles (includes `shell/_overlays.scss`, `views/fields/_field_widgets_extra.scss`).
+- [ ] **Optional:** **`npm run vendor:bootstrap`** — vend real Bootstrap 5.3.3 SCSS when network available (replaces stub under `addons/web/static/lib/bootstrap/scss/`).
+
+### Verification
+
+- [ ] After load: `window.__ERP_OWL_ACTION_CONTAINER_MOUNTED === true` when esbuild-primary shell is active.
+- [ ] App tile → list opens (OWL path **or** legacy fallback if flag false).
+- [ ] **Mod+K** / **Ctrl+K** opens command palette from modular boot (`commandPalette.initHotkey`).
+- [ ] List view from `ActionContainer` shows control panel / search chrome (`WithSearch`).
+
+---
+
+## Post–1.247 — Tracks O–S: Legacy Retirement, Backend Depth, Testing, Ops, Design (release 1.248.0)
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** — bundle must be ≤ 400 KB, zero errors. Current: 299.2 KB ✓
+- [ ] **`npm run build:css`** — SCSS compiles cleanly with Bootstrap stub (exit 0). ✓
+- [ ] **`npm run test:css`** — Run SCSS smoke build for main.scss + dark.scss.
+- [ ] **`npm run check:assets-concat`** — no ESM `export`/`import` in concat files.
+- [ ] Python: `from core.tools.json_log import format_json_log, format_access_log` — import succeeds.
+- [ ] HTTP: `GET /health` → 200 `{"status":"ok","service":"erp-platform"}`.
+- [ ] HTTP: `GET /readiness` → 200 `{"status":"ready",...}` or 503 when DB not available (expected in test env without DB).
+
+### Verification
+
+- [ ] Console: `window.AppCore.WithSearch` defined (Track O1).
+- [ ] Console: `window.AppCore.createSearchModel("res.partner")` returns an object with `getDomain`.
+- [ ] Console: `window.AppCore.ViewService.loadViews` is a function (Track O4).
+- [ ] Console: `window.AppCore.ActionBus.trigger("ACTION_MANAGER:UPDATE", { viewType: "list", resModel: "res.partner" })` — OWL ListController mounts (Track O2).
+- [ ] Console: `window.AppCore.DialogService.confirm({ body: "Test?" })` opens OWL dialog (Track P3).
+- [ ] `ERP_JSON_ACCESS_LOG=1` env var set: access logs emit JSON lines with `trace_id` to stdout (Track R2).
+- [ ] `X-Request-ID` response header present in every HTTP response (Track R2).
+
+### New Files (Tracks O–S)
+
+| Module | File path |
+|--------|-----------|
+| O1 WithSearch HOC | `app/search/with_search.js` |
+| O4 View service | `app/services/view_service.js` |
+| P2 HR payslip stub | `addons/hr/models/hr_payslip.py` |
+| Q1 OWL test runner | `addons/web/static/tests/owl_test_runner.html` |
+| Q1 view registry tests | `addons/web/static/tests/test_owl_view_registry.js` |
+| Q1 field registry tests | `addons/web/static/tests/test_owl_field_registry.js` |
+| Q1 dialog service tests | `addons/web/static/tests/test_owl_dialog_service.js` |
+| Q1 search bar tests | `addons/web/static/tests/test_owl_search_bar.js` |
+| Q1 pager tests | `addons/web/static/tests/test_owl_pager.js` |
+| Q2 E2E OWL views | `tests/e2e/test_owl_views_e2e.py` |
+| P1 MRP SO test | `tests/test_mrp_so_driven_mo.py` |
+| S1 Bootstrap stub | `addons/web/static/lib/bootstrap/scss/bootstrap.scss` |
+| S1 Bootstrap functions | `addons/web/static/lib/bootstrap/scss/_bootstrap-functions.scss` |
+| S1 vendor script | `scripts/vendor_bootstrap.js` |
+
+### Modified Files (Tracks O–S)
+
+| Module | File path |
+|--------|-----------|
+| O2 OWL route bridge | `addons/web/static/src/main.js` |
+| O3 deprecation markers | `legacy_main_list_views.js`, `legacy_main_form_views.js`, `legacy_main_chart_views.js` |
+| O1 searchModel prop | `app/views/list/list_controller.js` |
+| O1 main imports | `app/main.js` |
+| P1 workorder quant | `addons/mrp/models/mrp_workorder.py` |
+| P2 employee lifecycle | `addons/hr/models/hr_employee.py` |
+| P2 leave approval note | `addons/hr/models/hr_leave.py` |
+| P2 payslip model | `addons/hr/models/__init__.py` |
+| P3 confirm modal | `main.js`, `legacy_main_form_views.js` |
+| R1 health probes | `core/http/routes.py` |
+| R2 JSON logging | `core/tools/json_log.py`, `core/http/application.py` |
+| S1 Bootstrap import | `addons/web/static/src/scss/main.scss` |
+| S2 CSS migration | `scss/core/_dialog.scss`, `scss/search/_control_panel.scss`, `scss/views/kanban/_kanban_controller.scss`, `scss/webclient.css` |
+| S2 test:css script | `package.json` |
+
+### Notes
+
+- OWL routing bridge (`_tryOwlRoute`) is opt-in: only activates when `viewRegistry` has a descriptor AND `#action-manager` DOM element exists. Legacy `loadRecords`/`renderForm` remain as fallback.
+- Bootstrap stub at `lib/bootstrap/scss/` is a functional minimal reboot. Replace with real Bootstrap 5.3.3 source via `npm run vendor:bootstrap` (requires npm access).
+- `hr.payslip` is a stub model — full payroll compute rules are deferred (gated per deferred_product_backlog.md).
+- `ERP_JSON_ACCESS_LOG=1` activates JSON access logs; without it, logs are standard Python logging.
+- `/readiness` expects DB access; returns 503 in CI environments without a live PostgreSQL instance (expected behaviour).
+
+---
+
+## Post–1.246 — Frontend Architecture Tracks I–N (release 1.247.0)
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** — bundle must be ≤ 400 KB, zero errors. Current: 290.7 KB ✓
+- [ ] **`npm run check:assets-concat`** — no ESM `export`/`import` in concat files.
+- [ ] No new files added to `web.assets_web` (Tracks I–N are in `app/` ESM, built by esbuild).
+- [ ] `npm install` to pick up `sass ^1.86.3` devDependency if running CSS build.
+- [ ] **`npm run build:css`** (optional for SCSS pipeline) — requires `sass` installed.
+
+### Verification
+
+- [ ] Console: `window.AppCore.viewRegistry.getAll()` returns 6 descriptors (list, form, kanban, graph, pivot, calendar).
+- [ ] Console: `window.AppCore.fieldRegistry.getAll()` returns ≥ 14 field descriptors.
+- [ ] Console: `window.ERPFrontendRegistries.category("actions").has("settings")` returns `true`.
+- [ ] Console: `window.AppCore.ActionBus` exists (K2 ActionBus pub/sub).
+- [ ] Console: `window.Services.action.doAction({ type: "ir.actions.server", id: 1 })` does NOT throw `Unknown action type`.
+- [ ] Light/dark toggle: dialog, dropdown, list, form, search panel all use CSS custom properties (no raw colors).
+- [ ] `window.AppCore.DialogService.confirm({ title: "Test", body: "OK?" })` opens a modal.
+
+### New Files (Track I–N)
+
+| Module | File path |
+|--------|-----------|
+| I1 hooks | `app/core/hooks.js` |
+| I2 dialog | `app/core/dialog.js` |
+| I2 dropdown | `app/core/dropdown.js` |
+| I2 notebook | `app/core/notebook.js` |
+| I3 pager | `app/core/pager.js` |
+| I3 autocomplete | `app/core/autocomplete.js` |
+| I3 colorlist | `app/core/colorlist.js` |
+| J1 view registry | `app/views/view_registry.js` |
+| J2 list | `app/views/list/list_controller.js`, `list_renderer.js` |
+| J3 form | `app/views/form/form_controller.js`, `form_renderer.js` |
+| J4 kanban | `app/views/kanban/kanban_controller.js` |
+| J4 graph | `app/views/graph/graph_controller.js` |
+| J4 pivot | `app/views/pivot/pivot_controller.js` |
+| J4 calendar | `app/views/calendar/calendar_controller.js` |
+| K2 action container | `app/action_container.js` |
+| K3 client actions | `app/client_actions.js` |
+| L1 SCSS variables | `scss/_variables.scss`, `scss/main.scss` |
+| L2 component CSS | `scss/webclient/`, `scss/views/`, `scss/search/`, `scss/core/` |
+| L3 dark bundles | `*/_*.dark.scss` in each component folder, `scss/dark.scss` |
+| M1 field wrapper | `app/views/fields/field.js` |
+| M2 core fields | `app/views/fields/core_fields.js` |
+| M3 relational fields | `app/views/fields/relational_fields.js` |
+| N1 control panel | `app/search/control_panel.js` |
+| N2 search bar | `app/search/search_bar.js` |
+| N3 search panel | `app/search/search_panel.js` |
+
+### Notes
+
+- All Track I–N components are **ESM modules** in `app/`. They are bundled into `dist/modern_webclient.js` by `npm run build:web`. No new IIFE files added to `web.assets_web`.
+- `services/action.js` (concat IIFE) extended with `ir.actions.server` and `ir.actions.client` registry resolution — backward compatible.
+- `app/services.js` `createModernServices` is now properly `export`ed.
+- SCSS pipeline is **opt-in**: existing `webclient.css` / `_tokens.css` / `_dark.css` remain. The new `scss/` tree is the migration target; `npm run build:css` produces `dist/webclient.css`.
+- Dark mode pattern: `[data-theme="dark"]` + `*.dark.scss` per component replaces monolithic `_dark.css` for new components.
+
+---
+
+## Post–245 — Chrome block + design hardening + client layers (release 1.246.0)
+
+### Pre-Deployment
+
+- [ ] **`addons/web/__manifest__.py`:** `legacy_main_chrome_block.js` immediately **before** `main.js`; `notebook_widget.js` + `tags_list.js` with other components; search/model/view assets unchanged from 1.245 unless you rebased.
+- [ ] Run **`npm run check:assets-concat`**, **`npm run build:web`**, **`npm run build:web:legacy`**.
+- [ ] Smoke: import CSV modal, navbar (menus, systray, notifications), reports (`reports/trial-balance`, stock valuation, sales revenue), list bulk delete confirmation.
+
+### Verification
+
+- [ ] Console: `window.__ERP_CHROME_BLOCK` and `CHROME.install` ran (no errors on boot).
+- [ ] Light/dark: notebook tabs, chat panel, navbar dropdowns use tokens (no raw `#fff` / `#ddd` in new paths).
+- [ ] Optional: `UIComponents.TagsList.renderPills([{name:'A'}])` returns pill markup.
+
+### Notes
+
+- **`main.js`** ~1259 lines; chrome lives in **`legacy_main_chrome_block.js`**.
+- Inline **`style=`** in `field_registry.js`, discuss shell, and chart fallback toolbars removed in favour of **`webclient.css`** classes.
+
+---
+
 ## Post–244 — Deep main.js extraction + webclient architecture + backend hardening (release 1.245.0)
 
 ### Pre-Deployment

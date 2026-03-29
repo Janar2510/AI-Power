@@ -1,0 +1,26 @@
+// dialog.dark.scss — Dialog dark mode overrides (Track L3).
+
+[data-theme="dark"] {
+  .o-dialog-panel {
+    background: var(--color-surface-1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  }
+
+  .o-dialog-header {
+    border-bottom-color: var(--border-color);
+  }
+
+  .o-dialog-footer {
+    border-top-color: var(--border-color);
+  }
+
+  .o-dialog-title {
+    color: var(--color-text);
+  }
+
+  .o-dialog-close-btn {
+    &:hover {
+      background: var(--color-surface-2);
+    }
+  }
+}

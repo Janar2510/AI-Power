@@ -1,0 +1,39 @@
+// list_renderer.dark.scss — List view dark mode overrides (Track L3).
+// Loaded as part of web.assets_web_dark bundle.
+// Uses [data-theme="dark"] selector for specificity.
+
+[data-theme="dark"] {
+  .o-list-renderer {
+    background: var(--color-surface-1);
+    border-color: var(--border-color);
+  }
+
+  .o-list-table thead {
+    background: var(--color-surface-2);
+  }
+
+  .o-list-th {
+    border-bottom-color: var(--border-color);
+    color: var(--text-muted);
+  }
+
+  .o-list-row {
+    &:hover {
+      background: var(--color-row-hover);
+    }
+
+    &--selected {
+      background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+    }
+  }
+
+  .o-list-td {
+    border-bottom-color: var(--color-border-subtle);
+    color: var(--color-text);
+  }
+
+  .o-list-aggregates td {
+    background: var(--color-surface-2);
+    border-top-color: var(--border-color);
+  }
+}

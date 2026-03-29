@@ -1,0 +1,25 @@
+// dropdown.dark.scss — Dropdown dark mode overrides (Track L3).
+
+[data-theme="dark"] {
+  .o-dropdown-menu {
+    background: var(--color-surface-1);
+    border-color: var(--border-color);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .o-dropdown-item {
+    color: var(--color-text);
+
+    &:hover {
+      background: var(--color-row-hover);
+    }
+
+    &--disabled {
+      color: var(--text-muted);
+    }
+  }
+
+  .o-dropdown-separator {
+    background: var(--border-color);
+  }
+}

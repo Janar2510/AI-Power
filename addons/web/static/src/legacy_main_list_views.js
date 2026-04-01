@@ -442,6 +442,20 @@
   }
 
   // ─── loadRecords (core data-fetch + dispatch) ─────────────────────────
+  /** Bounded wait for list RPC (search_count + search_read); avoids perpetual skeleton on hung TCP/DB. */
+  var LIST_SEARCH_RPC_DEADLINE_MS = 25000;
+
+  function renderListLoadFailure(title, err, retryFn) {
+    var msg = err && err.message ? String(err.message).replace(/</g, '&lt;') : 'Failed to load';
+    _main.innerHTML =
+      '<h2>' + title + '</h2>' +
+      '<p class="error o-list-load-error">' + msg + '</p>' +
+      '<div class="o-list-load-retry-wrap"><button type="button" class="o-btn o-btn-primary" id="o-list-load-retry">Retry</button></div>';
+    var retryBtn = document.getElementById('o-list-load-retry');
+    if (retryBtn && typeof retryFn === 'function') {
+      retryBtn.onclick = function () { retryFn(); };
+    }
+  }
 
   function loadRecords(model, route, searchTerm, stageFilter, viewTypeOverride, savedFilterId, offsetOverride, orderOverride, domainOverride) {
     var viewType = viewTypeOverride != null ? viewTypeOverride : getPreferredViewType(route);
@@ -581,7 +595,13 @@
         var searchCountPromise = _rpc.callKw(model, 'search_count', [domain], {})
           .catch(function () { return null; });
 
-        return Promise.all([searchCountPromise, searchReadPromise]).then(function (results) {
+        var rpcCombined = Promise.all([searchCountPromise, searchReadPromise]);
+        var deadlineReject = new Promise(function (_, rej) {
+          setTimeout(function () {
+            rej(new Error('List data request timed out. Check your connection or try again.'));
+          }, LIST_SEARCH_RPC_DEADLINE_MS);
+        });
+        return Promise.race([rpcCombined, deadlineReject]).then(function (results) {
           var totalCount = results[0] != null ? results[0] : (results[1].length + offset);
           var records = results[1];
           currentListState.totalCount = totalCount;
@@ -600,8 +620,9 @@
         });
       });
     }).catch(function (err) {
-      _main.innerHTML = '<h2>' + title + '</h2><p class="error o-list-load-error">' +
-        (err.message || 'Failed to load') + '</p>';
+      renderListLoadFailure(title, err, function () {
+        loadRecords(model, route, searchTerm, stageFilter, viewTypeOverride, savedFilterId, offsetOverride, orderOverride, domainOverride);
+      });
     });
   }
 

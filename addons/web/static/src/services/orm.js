@@ -5,7 +5,7 @@
  * Usage (legacy):  Services.orm.read('res.partner', [1,2], ['name'])
  * Usage (modern):  env.services.orm.read(...)
  *
- * Phase 1.245 Track E1.
+ * Phase 1.245 Track E1. Phase 806b: create/write/unlink invalidate `__ERP_RELATIONAL_MODEL` read cache.
  */
 (function () {
   function _rpc() {
@@ -31,6 +31,24 @@
     var rpc = _rpc();
     if (!rpc) return Promise.reject(new Error('RPC service not available'));
     return rpc.callKw(model, method, args || [], _mergeContext(kwargs));
+  }
+
+  function _relationalModel() {
+    return window.__ERP_RELATIONAL_MODEL;
+  }
+
+  /** Phase 806: drop client readRecord cache rows after ORM mutations. */
+  function _invalidateReadRecordCache(model, ids) {
+    var RM = _relationalModel();
+    if (!RM || typeof RM.invalidateReadRecordCache !== 'function' || !model) return;
+    if (ids == null) {
+      RM.invalidateReadRecordCache(model, null);
+      return;
+    }
+    var list = Array.isArray(ids) ? ids : [ids];
+    list.forEach(function (id) {
+      RM.invalidateReadRecordCache(model, id);
+    });
   }
 
   var orm = {
@@ -89,7 +107,10 @@
      */
     create: function (model, vals, kwargs) {
       var records = Array.isArray(vals) ? vals : [vals];
-      return _callKw(model, 'create', [records], kwargs);
+      return _callKw(model, 'create', [records], kwargs).then(function (res) {
+        _invalidateReadRecordCache(model, null);
+        return res;
+      });
     },
 
     /**
@@ -100,7 +121,10 @@
      */
     write: function (model, ids, data, kwargs) {
       var idList = Array.isArray(ids) ? ids : [ids];
-      return _callKw(model, 'write', [idList, data || {}], kwargs);
+      return _callKw(model, 'write', [idList, data || {}], kwargs).then(function (res) {
+        _invalidateReadRecordCache(model, idList);
+        return res;
+      });
     },
 
     /**
@@ -111,7 +135,10 @@
     unlink: function (model, ids, kwargs) {
       var idList = Array.isArray(ids) ? ids : [ids];
       if (!idList.length) return Promise.resolve(true);
-      return _callKw(model, 'unlink', [idList], kwargs);
+      return _callKw(model, 'unlink', [idList], kwargs).then(function (res) {
+        _invalidateReadRecordCache(model, idList);
+        return res;
+      });
     },
 
     /**

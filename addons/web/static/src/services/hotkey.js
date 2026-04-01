@@ -24,6 +24,8 @@
       var scoped = scopes[activeScope] || {};
       var fn = scoped[key] || handlers[key];
       if (typeof fn === "function") {
+        /* Align with command palette + browser defaults: avoid Mod+K being stolen by Chrome. */
+        if (key === "mod+k" || key === "mod+shift+k") evt.preventDefault();
         fn(evt);
       }
     });

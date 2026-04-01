@@ -18,8 +18,16 @@ export function actionToRoute(action) {
     }
     return null;
   }
-  if (action.type !== "ir.actions.act_window") return null;
-  const modelSlug = String(action.res_model || "").replace(/\./g, "_");
+  // Menus / legacy classifier sometimes use type "window"; JSON may omit type but include res_model.
+  const actType = action.type || "";
+  const hasModel = !!(action.res_model || action.resModel);
+  if (actType !== "ir.actions.act_window" && actType !== "window") {
+    if (!hasModel || actType === "ir.actions.act_client" || actType === "ir.actions.report") {
+      return null;
+    }
+  }
+  const modelSlug = String(action.res_model || action.resModel || "").replace(/\./g, "_");
+  if (!modelSlug) return null;
   const byModel = {
     res_partner: "contacts",
     crm_lead: ((action.name || "").toLowerCase().indexOf("pipeline") >= 0) ? "pipeline" : (((action.name || "").toLowerCase().indexOf("activit") >= 0) ? "crm/activities" : "leads"),
@@ -215,6 +223,7 @@ export function getAppIdForRoute(route, menus, viewsService) {
     return false;
   });
   if (match != null) return match;
+  /** Phase 689: infer app from res_model when the route slug did not match any menu action. */
   const gmf =
     typeof window !== "undefined" && typeof window.__ERP_getModelForRoute === "function"
       ? window.__ERP_getModelForRoute

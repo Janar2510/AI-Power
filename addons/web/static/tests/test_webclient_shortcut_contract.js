@@ -43,4 +43,34 @@
     }
     return { pass: pass, fail: fail, errors: errors };
   };
+
+  window.Tests.webclientShortcutContractModular = function () {
+    var pass = 0;
+    var fail = 0;
+    var errors = [];
+    var c = window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT;
+    if (!c || !c.modular || !c.modular.length) {
+      fail++;
+      errors.push("missing modular shortcut contract");
+      return { pass: pass, fail: fail, errors: errors };
+    }
+    if (c.modular.length < 3) {
+      fail++;
+      errors.push("expected at least 3 modular shortcuts, got " + c.modular.length);
+    } else {
+      pass++;
+    }
+    var keys = c.modular
+      .map(function (x) {
+        return x.key;
+      })
+      .join(",");
+    if (keys.indexOf("mod+k") < 0 || keys.indexOf("alt+h") < 0 || keys.indexOf("alt+k") < 0) {
+      fail++;
+      errors.push("modular keys should include alt+h, mod+k, alt+k: " + keys);
+    } else {
+      pass++;
+    }
+    return { pass: pass, fail: fail, errors: errors };
+  };
 })();

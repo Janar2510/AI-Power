@@ -202,7 +202,7 @@ viewRegistry.add("form", {
   type: "form",
   Controller: FormController,
   Renderer: FormRenderer,
-  searchMenuTypes: [],
+  searchMenuTypes: ["filter", "favorite"],
 });
 
 window.AppCore = window.AppCore || {};

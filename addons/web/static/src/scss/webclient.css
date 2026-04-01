@@ -1036,6 +1036,17 @@ i.o-sidebar-icon {
   box-shadow: var(--shell-shadow-inner);
 }
 
+/* Primary chrome (glass shell) must absorb remaining width; debug toggle stays fixed-width (Safari flex). */
+#navbar > .o-navbar-shell {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+#navbar > .o-debug-toggle {
+  flex-shrink: 0;
+  align-self: center;
+}
+
 #navbar .nav-toolbar-left {
   display: flex;
   align-items: center;
@@ -1134,6 +1145,7 @@ i.o-sidebar-icon {
 
 #main {
   flex: 1;
+  min-height: 0;
   padding: var(--space-lg) var(--space-xl);
   max-width: 100%;
   box-sizing: border-box;
@@ -3586,6 +3598,10 @@ textarea:focus-visible {
 
 .o-list-load-error {
   color: var(--color-danger);
+}
+
+.o-list-load-retry-wrap {
+  margin-top: var(--space-md);
 }
 
 /* Phase 597–598: form chatter chrome (tokenized shell; gradient border via .o-card-gradient) */

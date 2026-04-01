@@ -21,5 +21,26 @@
     modK: Object.freeze({
       note: "Command palette via services/hotkey.js (not Alt)",
     }),
+    /** Post-1.250 / 1.250.1: modular boot (`app/main.js`) — see `docs/odoo19-webclient-gap-table.md` hotkeys row. */
+    modular: Object.freeze([
+      Object.freeze({
+        key: "alt+h",
+        when: "outside inputs",
+        action: "Navigate to #home",
+        source: "Services.hotkey.register from bootModernWebClient",
+      }),
+      Object.freeze({
+        key: "mod+k",
+        when: "global",
+        action: "Open command palette",
+        source: "commandPalette.initHotkey after startServices",
+      }),
+      Object.freeze({
+        key: "alt+k",
+        when: "list route (DATA_ROUTES_SLUGS)",
+        action: "dispatchActWindowForListRoute + switch to kanban (shortcutAltK)",
+        source: "main.js keydown Alt branch",
+      }),
+    ]),
   });
 })();

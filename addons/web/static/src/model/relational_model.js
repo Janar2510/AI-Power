@@ -1,8 +1,16 @@
 /**
  * Client-side relational model facade (Phase 1.246 G1).
  * Minimal DataPoint / Record / DynamicList over Services.orm — clean-room, not Odoo copy.
+ * Phase 804: optional readRecord cache. Phase 806b: Services.orm create/write/unlink call invalidateReadRecordCache (see services/orm.js).
  */
 (function () {
+  var _readRecordCache = Object.create(null);
+
+  function _readCacheKey(resModel, id, fields) {
+    var fk = (fields || []).slice().sort().join("\0");
+    return resModel + "\0" + id + "\0" + fk;
+  }
+
   function _orm() {
     return window.Services && window.Services.orm;
   }
@@ -68,9 +76,43 @@
       var orm = _orm();
       if (!orm) return Promise.reject(new Error("ORM unavailable"));
       var idList = Array.isArray(ids) ? ids : [ids];
-      return orm.read(resModel, idList, fields || []).then(function (rows) {
+      var fieldList = fields || [];
+      if (idList.length === 1) {
+        var ck = _readCacheKey(resModel, idList[0], fieldList);
+        var hit = _readRecordCache[ck];
+        if (hit) {
+          return Promise.resolve(new Record(resModel, hit.id, Object.assign({}, hit.values)));
+        }
+      }
+      return orm.read(resModel, idList, fieldList).then(function (rows) {
         var r = rows && rows[0];
-        return r ? new Record(resModel, r.id, r) : null;
+        var rec = r ? new Record(resModel, r.id, r) : null;
+        if (rec && idList.length === 1) {
+          _readRecordCache[_readCacheKey(resModel, rec.id, fieldList)] = {
+            id: rec.id,
+            values: Object.assign({}, rec.values),
+          };
+        }
+        return rec;
+      });
+    },
+    clearReadRecordCache: function () {
+      _readRecordCache = Object.create(null);
+    },
+    /**
+     * Drop cached reads for one record (all field sets) or all ids in a model when id omitted.
+     */
+    invalidateReadRecordCache: function (resModel, id) {
+      var prefix = String(resModel || "") + "\0";
+      if (id == null) {
+        Object.keys(_readRecordCache).forEach(function (k) {
+          if (k.indexOf(prefix) === 0) delete _readRecordCache[k];
+        });
+        return;
+      }
+      var p2 = prefix + id + "\0";
+      Object.keys(_readRecordCache).forEach(function (k) {
+        if (k.indexOf(p2) === 0) delete _readRecordCache[k];
       });
     },
     /**

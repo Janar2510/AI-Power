@@ -22,6 +22,15 @@
     }
   }
 
+  function pollPayload() {
+    var payload = { channels: _channels, last: _lastId };
+    if (window.Services && window.Services.session && window.Services.session.getCsrfToken) {
+      var t = window.Services.session.getCsrfToken();
+      if (t) payload.csrf_token = t;
+    }
+    return JSON.stringify(payload);
+  }
+
   function poll() {
     if (!_channels.length) return;
     var pollHdrs = { 'Content-Type': 'application/json' };
@@ -30,17 +39,18 @@
       method: 'POST',
       headers: pollHdrs,
       credentials: 'include',
-      body: JSON.stringify({ channels: _channels, last: _lastId })
+      body: pollPayload()
     }).then(function (r) {
       if (r.status === 403 && window.Services && window.Services.session && window.Services.session.refreshCsrfToken) {
         return window.Services.session.refreshCsrfToken().then(function (token) {
           if (!token) return r;
           var retryHdrs = { 'Content-Type': 'application/json', 'X-CSRF-Token': token };
+          var retryBody = { channels: _channels, last: _lastId, csrf_token: token };
           return fetch('/longpolling/poll', {
             method: 'POST',
             headers: retryHdrs,
             credentials: 'include',
-            body: JSON.stringify({ channels: _channels, last: _lastId }),
+            body: JSON.stringify(retryBody),
           });
         });
       }

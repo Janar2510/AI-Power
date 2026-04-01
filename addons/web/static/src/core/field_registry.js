@@ -1,5 +1,7 @@
 /**
  * Field widget registry — Odoo-style widget name -> HTML for form fields (Phase 5).
+ * Phase 806: widgets referenced in `addons/**/views/*.xml` are covered here —
+ * statusbar, many2many_tags, priority, progressbar, binary, one2many (grep-driven).
  */
 (function () {
   var registry = {};
@@ -149,6 +151,25 @@
       '<p class="attr-field" data-fname="' + esc(fname) + '"><label>' + esc(label) + '</label>' +
       '<select name="' + esc(fname) + '" class="o-state-selection-select">' +
       '<option value="normal">● Normal</option><option value="warning">● Warning</option><option value="blocked">● Blocked</option></select></p>'
+    );
+  });
+
+  /** Same shell as `legacy_main_form_views` statusbar branch — `wireForm` fills `.o-statusbar` via RPC. */
+  register("statusbar", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    var meta = api.getFieldMeta && api.getFieldMeta(model, fname);
+    var comodel = (meta && meta.comodel) || (f && f.comodel) || "";
+    return (
+      "<p><label>" +
+      esc(label) +
+      '</label><div class="o-statusbar" data-fname="' +
+      esc(fname) +
+      '" data-comodel="' +
+      esc(comodel) +
+      '" data-clickable="1" style="margin-top:0.25rem;display:flex;align-items:center;gap:0;flex-wrap:wrap"></div><input type="hidden" name="' +
+      esc(fname) +
+      '"></p>'
     );
   });
 

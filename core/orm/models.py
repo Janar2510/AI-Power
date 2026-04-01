@@ -922,9 +922,11 @@ class ModelBase(metaclass=Model):
             if not comodel:
                 continue
             ids = []
+            seen_m2o = set()
             for row in rows:
                 v = row.get(fname)
-                if v and v not in ids:
+                if v and v not in seen_m2o:
+                    seen_m2o.add(v)
                     ids.append(v)
             if not ids:
                 continue

@@ -49,7 +49,7 @@ Verification checklist for AI assistant module deployment and feature additions.
 
 ## Phases 490–524 (business depth, frontend, AI, production)
 
-- [ ] **Phase 679 (optional):** product must pick a **490–524** row before implementation — through **1.233.0** this slice stays **docs-only** (no **490–524** code); see **`docs/deferred_product_backlog.md`**. **Post-1.248:** MRP/HR depth items below are implemented independently of this gate (Track P1/P2); the gate remains for *additional* 490–524 scope.
+- [ ] **Phase 679 (optional):** product must pick a **490–524** row before implementation — through **1.233.0** this slice stays **docs-only** (no **490–524** code); see **`docs/deferred_product_backlog.md`**. **Post-1.248:** MRP/HR depth items below are implemented independently of this gate (Track P1/P2); the gate remains for *additional* 490–524 scope. **2026-04:** default **named row** + acceptance paragraph documented under *679 — named next-depth row* in **`deferred_product_backlog.md`** (**Phase P5 / full `view_service` depth**); product may substitute.
 - [x] MRP: `mrp.workorder`, reservation + quant completion on MO done; SO-driven MO when `product.template.manufacture_on_order` and `sale_mrp` loaded (**Post-1.248 / 1.248.0 Track P1** — parity rows **B3**, **526**, **539–541**).
 - [x] HR: employee lifecycle + contract start + attendance promotion; leave approval note; payroll + attendance lines (**Post-1.248 / 1.248.0 Track P2** — **B4**, **751**, **728** payslip merge-safe).
 - [x] Web: `npm run build:web` succeeds when Node is available; `tsconfig.json` + `framework/component_base.js` present (**verified:** `npm run build:web` → `modern_webclient.js`).
@@ -229,6 +229,49 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **734:** **`test_payment_transaction_write_done_phase734`** — **`write({state: done})`** after **`pending`** **`create`**; shared **`tests/payment_test_bootstrap.py`**.
 - [x] **647b:** Design gate in **`account_partial_reconcile_design.md`** + skipped **`test_phase647b_gated_next_slice_placeholder`**.
 - [x] **Ops staging:** **`DeploymentChecklist.md`** — **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`** pilot smoke.
+
+## Post-1.250 (release 1.250.0 — form WithSearch, route plugins, boot debug)
+
+- [x] **Form + search (OWL path):** **`FormWithSearch`** + **`with_search.js`** **`controlPanelProps`** (**`t-props`**) + **`form_controller.js`** **`searchMenuTypes`** (**evidence:** **`action_container.js`**, **`with_search.js`**, **`form_controller.js`**).
+- [x] **Route plugins:** **`installRouteApplyRegistryPlugins()`** — discuss, reports, website/eCommerce, settings (**evidence:** **`main.js`**).
+- [x] **Boot debug:** **`erp_debug_mode`** → **`erpDebugBootLog`** for modern boot exception + shell timeout (**evidence:** **`debug_boot.js`**, **`app/main.js`**, **`webclient.js`**).
+- [x] **Shortcut contract:** **`__ERP_WEBCLIENT_SHORTCUT_CONTRACT.modular`** for **Alt+H** / **Mod+K** (**evidence:** **`webclient_shortcut_contract.js`**).
+- [x] **Phase P4/P5/P6:** CSP/OWL stance and **`view_service`** depth unchanged (planning-only); **647b** / **679** still gated (**evidence:** **`DeploymentChecklist.md`**, **`deferred_product_backlog.md`**, **`odoo19-webclient-gap-table.md`**).
+- [x] **Build:** **`npm run build:web`** after **`app/`** edits → **`modern_webclient.js`**.
+
+## Post-1.250.1 (release 1.250.1 — plan tracks 803–805)
+
+- [x] **803 — Product gate docs:** **`deferred_product_backlog.md`** (**647b** template, **679** default **P5** row); **`account_odoo19_gap_audit`** / checklist cross-links; **`parity_matrix`** row **803**.
+- [x] **804 — Web + core + legacy:** **`field_registry`** **`statusbar`**; **`relational_model`** read cache + invalidate APIs; **`webclient_shortcut_contract.modular`** **Alt+K**; **`hotkey.js`** **Mod+K** **`preventDefault`**; **`_prefetch_many2one_display`** dedupe; **`legacy_main_import.js`** / **`legacy_main_reports.js`** + chrome delegates; JS tests **`statusbar`**, **`webclientShortcutContractModular`**.
+- [x] **805 — Deferred verticals:** Odoo path table in **`deferred_product_backlog.md`**; **`parity_matrix`** row **805**.
+- [x] **Core inventory:** **`odoo19_core_gap_table.md`** addon **`core.tools`** table (**2026-04**).
+- [x] **Docs:** **`main_js_extraction_catalog.md`**, **`changelog.md`**, **`DeploymentChecklist.md`** Post-1.250.1.
+
+## Post-1.250.2 (release 1.250.2 — post–1.250.1 engineering plan)
+
+- [x] **806 — Navbar extraction:** **`legacy_main_navbar_block.js`** + chrome delegates; **`parity_matrix`** / **`main_js_extraction_catalog`** (**evidence:** **`__manifest__.py`**, **`legacy_main_chrome_block.js`**).
+- [x] **806b — Client cache + widgets:** **`services/orm.js`** **`invalidateReadRecordCache`** on **create/write/unlink**; **`field_registry`** header + **`test_field_registry`** production widget list (**evidence:** **`orm.js`**, **`test_field_registry.js`**).
+- [x] **807 — Track A bridge:** **`deferred_product_backlog.md`** execution checklist (**647b** / **679**) — **no code** without product steps (**evidence:** same file §Track A).
+- [x] **808 — Prefetch evidence doc:** **`odoo19_core_gap_table.md`** §Prefetch / N+1 + client cache table.
+- [x] **809 — Vertical template:** **`deferred_product_backlog.md`** §Deferred vertical acceptance template.
+- [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`DeploymentChecklist.md`**, **`parity_matrix.md`**.
+
+## Post-1.250.3 (release 1.250.3 — web client loading + app picker diagnostics)
+
+- [x] **List RPC deadline:** **`legacy_main_list_views.js`** **`loadRecords`** — **25s** **`Promise.race`** on **`search_count`/`search_read`** + **Retry** + **`.o-list-load-retry-wrap`** (**evidence:** **`webclient.css`**, **`changelog.md`**).
+- [x] **selectApp debug:** **`legacy_main_shell_routes.js`** **`erp_debug_mode`** **`[erp-shell-debug]`** logs + **8s** hash mismatch note (**evidence:** same file).
+- [x] **Cleanup:** removed **7473** ingest **`fetch`** from **`main.js`**, **`app/main.js`**, **`app/webclient.js`**; **`npm run build:web`** (**evidence:** grep).
+- [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`DeploymentChecklist.md`**.
+
+## Post-1.249 (release 1.249.0 — navigation, route registry, OWL/CSP docs)
+
+- [x] **Navigation:** Same-hash **`router.navigate`** triggers **`ErpLegacyRouter.route()`**; **`navigateActWindowIfAvailable`** one-shot sync + 6s deadline; **`ViewManager.openFromActWindow`** **`loadViews`** 7s race (**evidence:** **`services.js`**, **`main.js`**, **`view_manager.js`**).
+- [x] **Route registry:** **`core/route_apply_registry.js`** + manifest entry + **`main.js`** early return hook (**evidence:** **`__manifest__.py`**, **`route_apply_registry.js`**).
+- [x] **Kanban + search (OWL path):** **`KanbanWithSearch`** + domain **`onPatched`** reload (**evidence:** **`action_container.js`**, **`kanban_controller.js`**).
+- [x] **Hotkey:** **Alt+H** → **`#home`** from modular boot (**evidence:** **`app/main.js`**).
+- [x] **E2E:** **`tests/e2e/test_app_tile_navigation_tour.py`** (optional DB + server).
+- [x] **Tests:** **`tests.test_main_js_route_consistency_phase631`** reads **`legacy_main_route_tables.js`** / **`legacy_main_route_resolve.js`**.
+- [x] **Phase F:** Product gates **647b** / **679** unchanged — see **`docs/deferred_product_backlog.md`**.
 
 ## Phases 620–628 (kanban load-more + home layout + checklist audit + release 1.218.0)
 

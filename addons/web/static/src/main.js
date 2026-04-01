@@ -233,17 +233,28 @@
     return PU.parseCSV ? PU.parseCSV(text) : [];
   }
 
-  /** Optional `domain=` query on the hash (JSON domain list); used by list loadRecords override. */
-  function getHashDomainParam() {
-    var hash = (window.location.hash || '').slice(1);
-    var q = hash.indexOf('?');
+  /**
+   * Optional `domain=` query on the hash (JSON domain list); used by list loadRecords override.
+   * @param {string} [fullHashSlice] — hash without leading `#` (e.g. routeApplyInternal’s `hash`); defaults to current location.
+   */
+  function parseDomainFromRouteHash(fullHashSlice) {
+    var h = fullHashSlice != null ? String(fullHashSlice) : (window.location.hash || '').slice(1);
+    var q = h.indexOf('?');
     if (q < 0) return [];
-    var params = new URLSearchParams(hash.slice(q + 1));
+    var params = new URLSearchParams(h.slice(q + 1));
     var raw = params.get('domain');
     if (!raw) return [];
     var parsed = parseActionDomain(raw);
     return Array.isArray(parsed) && parsed.length ? parsed : [];
   }
+
+  function getHashDomainParam() {
+    return parseDomainFromRouteHash(null);
+  }
+
+  // Global fallbacks for stale web.bundle.js / tooling splits that call getHashDomainParam out of scope.
+  window.__ERP_parseDomainFromRouteHash = parseDomainFromRouteHash;
+  window.__ERP_getHashDomainParam = getHashDomainParam;
 
   var CHROME = window.__ERP_CHROME_BLOCK || {};
   function showImportModal(model, route) {
@@ -268,13 +279,41 @@
     var slug = targetRoute || 'home';
     var nextHash = '#' + slug;
     var VM = window.AppCore && window.AppCore.ViewManager;
+    /** Ensure hash + legacy route() run even if modular doAction skipped navigation (actionToRoute null, etc.). */
+    function syncHashAfterOpenFromActWindow() {
+      renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
+      var wantRaw = String(slug || 'home');
+      var wantBase = wantRaw.split('?')[0];
+      var curRaw = (window.location.hash || '#home').replace(/^#/, '') || 'home';
+      var curBase = curRaw.split('?')[0];
+      if (curBase !== wantBase) {
+        window.location.hash = '#' + wantRaw;
+      } else {
+        route();
+      }
+    }
     if (VM && typeof VM.openFromActWindow === 'function' && action) {
       if (window.location.hash === nextHash) {
         renderNavbar(navContext.userCompanies, navContext.userLangs, navContext.currentLang);
         route();
         return true;
       }
-      VM.openFromActWindow(action, opt);
+      var p = VM.openFromActWindow(action, opt);
+      /** Post-1.249 Phase A: one-shot sync + deadline so hung loadViews cannot strand #action-manager. */
+      var syncDone = false;
+      var navSyncTimer = null;
+      function syncOnce() {
+        if (syncDone) return;
+        syncDone = true;
+        if (navSyncTimer != null) clearTimeout(navSyncTimer);
+        syncHashAfterOpenFromActWindow();
+      }
+      navSyncTimer = setTimeout(syncOnce, 6000);
+      if (p && typeof p.then === 'function') {
+        p.then(syncOnce).catch(syncOnce);
+      } else {
+        syncOnce();
+      }
       return true;
     }
     return false;
@@ -291,10 +330,20 @@
   function _tryOwlRoute(viewType, model, resId, extraProps) {
     var AB = window.AppCore && window.AppCore.ActionBus;
     if (!AB || typeof AB.trigger !== 'function') return false;
+    // Default shell: cspScriptEvalBlocked true → OWL templates cannot compile; never skip legacy renderers.
+    var _fb = typeof window !== 'undefined' && window.__erpFrontendBootstrap;
+    if (!_fb || _fb.cspScriptEvalBlocked !== false) return false;
     // Post-1.248: OWL path only when ActionContainer is mounted (not just #action-manager placeholder)
     if (!window.__ERP_OWL_ACTION_CONTAINER_MOUNTED) return false;
     var mountEl = document.getElementById('action-manager');
     if (!mountEl) return false;
+    // CSP fallback shell: no real OWL views — always use legacy list/form renderers.
+    if (
+      mountEl.matches("[data-erp-owl-fallback]") ||
+      mountEl.querySelector("[data-erp-owl-fallback]")
+    ) {
+      return false;
+    }
     // Check viewRegistry has a controller
     var vr = window.AppCore && window.AppCore.viewRegistry;
     var desc = vr && typeof vr.get === 'function' && vr.get(viewType);
@@ -818,6 +867,12 @@
   }
 
   function routeApplyInternal(hash, base) {
+    // Use route hash + parseDomainFromRouteHash so list branches never rely on a separate
+    // getHashDomainParam binding (Safari/ReferenceError if closure/minify order regresses).
+    var listDomainFromHash =
+      typeof parseDomainFromRouteHash === "function"
+        ? parseDomainFromRouteHash(hash)
+        : (window.__ERP_parseDomainFromRouteHash && window.__ERP_parseDomainFromRouteHash(hash)) || [];
     if (main) {
       main.classList.remove("o-view-enter");
       main.classList.add("o-view-exit");
@@ -828,67 +883,26 @@
     }
     var decoded = window.ActionManager && typeof window.ActionManager.decodeStackFromHash === 'function' ? window.ActionManager.decodeStackFromHash(hash) : null;
     if (decoded && decoded.length) actionStack = decoded;
+    var RAR = window.AppCore && window.AppCore.routeApplyRegistry;
+    if (RAR && typeof RAR.runBeforeDataRoutes === 'function' && RAR.runBeforeDataRoutes(hash, base)) {
+      return;
+    }
     const dataRoutes = DATA_ROUTES_SLUGS;
     const editMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/edit\\/(\\d+)$'));
     const newMatch = hash.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')\\/new$'));
     const listMatch = base.match(new RegExp('^(' + dataRoutes.replace(/\//g, '\\/') + ')$'));
-    const settingsApiKeysMatch = hash.match(/^settings\/apikeys$/);
-    const settingsTotpMatch = hash.match(/^settings\/totp$/);
-    const settingsDashboardMatch = hash.match(/^settings\/dashboard-widgets$/);
-    const settingsIndexMatch = hash.match(/^settings\/?$/);
-    const discussMatch = hash.match(/^discuss$/);
-    const discussChannelMatch = hash.match(/^discuss\/(\d+)$/);
-    const reportsTrialMatch = hash.match(/^reports\/trial-balance$/);
-    const reportsPLMatch = hash.match(/^reports\/profit-loss$/);
-    const reportsBSMatch = hash.match(/^reports\/balance-sheet$/);
-    const reportsStockValMatch = hash.match(/^reports\/stock-valuation$/);
-    const reportsSalesRevMatch = hash.match(/^reports\/sales-revenue$/);
     const genericEditMatch = hash.match(/^([a-z0-9_/-]+)\/edit\/(\d+)$/i);
     const genericNewMatch = hash.match(/^([a-z0-9_/-]+)\/new$/i);
     const genericListMatch = base.match(/^([a-z0-9_/-]+)$/i);
 
-    if (reportsTrialMatch) {
-      renderAccountingReport('trial-balance', 'Trial Balance');
-    } else if (reportsPLMatch) {
-      renderAccountingReport('profit-loss', 'Profit & Loss');
-    } else if (reportsBSMatch) {
-      renderAccountingReport('balance-sheet', 'Balance Sheet');
-    } else if (reportsStockValMatch) {
-      renderStockValuationReport();
-    } else if (reportsSalesRevMatch) {
-      renderSalesRevenueReport();
-    } else if (discussMatch || discussChannelMatch) {
-      renderDiscuss(discussChannelMatch ? discussChannelMatch[1] : null);
-    } else if (base === 'website') {
-      renderAppShellPlaceholder(
-        'website',
-        'Website',
-        'Website pages and editor are scaffolded in modules; open Products for catalogue data, or Home.',
-        { secondaryActionLabel: 'Open Products', secondaryHash: 'products' }
-      );
-    } else if (base === 'ecommerce') {
-      renderAppShellPlaceholder(
-        'ecommerce',
-        'eCommerce',
-        'Shop flows are partially scaffolded. Use Products, Sale Orders, or Invoicing for catalogue and orders.',
-        { secondaryActionLabel: 'Open Sale Orders', secondaryHash: 'orders' }
-      );
-    } else if (settingsApiKeysMatch) {
-      renderApiKeysSettings();
-    } else if (settingsTotpMatch) {
-      renderTotpSettings();
-    } else if (settingsDashboardMatch) {
-      renderDashboardWidgets();
-    } else if (settingsIndexMatch) {
-      renderSettings();
-    } else if (listMatch) {
+    if (listMatch) {
       const route = listMatch[1];
       const model = getModelForRoute(route);
       if (model) {
         // Track O2: prefer OWL controller; fall back to legacy string-HTML
-        if (!_tryOwlRoute('list', model, null, { domain: getHashDomainParam() })) {
+        if (!_tryOwlRoute('list', model, null, { domain: listDomainFromHash })) {
           dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
-          loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+          loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, listDomainFromHash);
         }
       }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
@@ -913,9 +927,9 @@
       const route = genericListMatch[1];
       const model = getModelForRoute(route);
       if (model) {
-        if (!_tryOwlRoute('list', model, null, { domain: getHashDomainParam() })) {
+        if (!_tryOwlRoute('list', model, null, { domain: listDomainFromHash })) {
           dispatchActWindowForListRoute(route, { source: 'routeApplyList' });
-          loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, getHashDomainParam());
+          loadRecords(model, route, currentListState.route === route ? currentListState.searchTerm : '', undefined, undefined, undefined, undefined, undefined, listDomainFromHash);
         }
       }
       else if (window.__ERP_STRICT_ROUTING) renderUnknownRoutePlaceholder(route);
@@ -940,6 +954,75 @@
       renderHome();
     }
   }
+
+  /** Post-1.250: discuss, reports, website/eCommerce placeholders, settings — via route_apply_registry (Phase P1). */
+  (function installRouteApplyRegistryPlugins() {
+    var R = window.AppCore && window.AppCore.routeApplyRegistry;
+    if (!R || typeof R.registerBeforeDataRoutes !== 'function') return;
+    R.registerBeforeDataRoutes(function (hash, base) {
+      var discussMatch = hash.match(/^discuss$/);
+      var discussChannelMatch = hash.match(/^discuss\/(\d+)$/);
+      if (discussMatch || discussChannelMatch) {
+        renderDiscuss(discussChannelMatch ? discussChannelMatch[1] : null);
+        return true;
+      }
+      if (hash.match(/^reports\/trial-balance$/)) {
+        renderAccountingReport('trial-balance', 'Trial Balance');
+        return true;
+      }
+      if (hash.match(/^reports\/profit-loss$/)) {
+        renderAccountingReport('profit-loss', 'Profit & Loss');
+        return true;
+      }
+      if (hash.match(/^reports\/balance-sheet$/)) {
+        renderAccountingReport('balance-sheet', 'Balance Sheet');
+        return true;
+      }
+      if (hash.match(/^reports\/stock-valuation$/)) {
+        renderStockValuationReport();
+        return true;
+      }
+      if (hash.match(/^reports\/sales-revenue$/)) {
+        renderSalesRevenueReport();
+        return true;
+      }
+      if (base === 'website') {
+        renderAppShellPlaceholder(
+          'website',
+          'Website',
+          'Website pages and editor are scaffolded in modules; open Products for catalogue data, or Home.',
+          { secondaryActionLabel: 'Open Products', secondaryHash: 'products' }
+        );
+        return true;
+      }
+      if (base === 'ecommerce') {
+        renderAppShellPlaceholder(
+          'ecommerce',
+          'eCommerce',
+          'Shop flows are partially scaffolded. Use Products, Sale Orders, or Invoicing for catalogue and orders.',
+          { secondaryActionLabel: 'Open Sale Orders', secondaryHash: 'orders' }
+        );
+        return true;
+      }
+      if (hash.match(/^settings\/apikeys$/)) {
+        renderApiKeysSettings();
+        return true;
+      }
+      if (hash.match(/^settings\/totp$/)) {
+        renderTotpSettings();
+        return true;
+      }
+      if (hash.match(/^settings\/dashboard-widgets$/)) {
+        renderDashboardWidgets();
+        return true;
+      }
+      if (hash.match(/^settings\/?$/)) {
+        renderSettings();
+        return true;
+      }
+      return false;
+    });
+  })();
 
   function routeInternal() {
     const hash = (window.location.hash || '#home').slice(1);
@@ -1160,7 +1243,12 @@
     getListColumns: getListColumns, getTitle: getTitle, getReportName: getReportName,
     getActionForRoute: getActionForRoute, actionToRoute: actionToRoute,
     parseActionDomain: parseActionDomain, parseFilterDomain: parseFilterDomain,
-    buildSearchDomain: buildSearchDomain, getHashDomainParam: function () { return getHashDomainParam.apply(null, arguments); },
+    buildSearchDomain: buildSearchDomain,
+    getHashDomainParam: function () {
+      if (typeof getHashDomainParam === 'function') return getHashDomainParam.apply(null, arguments);
+      var g = typeof window !== 'undefined' && window.__ERP_getHashDomainParam;
+      return typeof g === 'function' ? g.apply(null, arguments) : null;
+    },
     showImportModal: showImportModal, confirmModal: function () { return confirmModal.apply(null, arguments); },
     getAvailableViewModes: function () { return getAvailableViewModes.apply(null, arguments); },
     setViewAndReload: function () { return setViewAndReload.apply(null, arguments); },

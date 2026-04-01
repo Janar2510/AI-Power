@@ -27,6 +27,7 @@
         if (n === "m2o_x") return { type: "many2one", comodel: "res.users" };
         if (n === "m2m_x") return { type: "many2many", comodel: "res.groups" };
         if (n === "line_ids") return { type: "one2many", comodel: "sale.order.line", inverse_name: "order_id" };
+        if (n === "x_statusbar" || n === "stage_id") return { type: "many2one", comodel: "crm.stage" };
         return { type: "char" };
       },
     };
@@ -56,6 +57,7 @@
       "many2one",
       "many2many_tags",
       "one2many",
+      "statusbar",
     ].forEach(function (widget) {
       test("render " + widget, function () {
         var fname =
@@ -65,7 +67,9 @@
               ? "m2m_x"
               : widget === "one2many"
                 ? "line_ids"
-                : "x_" + widget;
+                : widget === "statusbar"
+                  ? "x_statusbar"
+                  : "x_" + widget;
         var html = W.render("res.partner", { name: fname, widget: widget }, api);
         H.assertTrue(typeof html === "string" && html.length > 0, "html should be generated");
       });
@@ -79,6 +83,26 @@
     test("state_selection uses o-state-selection-select", function () {
       var h = W.render("res.partner", { name: "st", widget: "state_selection" }, api);
       H.assertTrue(h.indexOf("o-state-selection-select") >= 0);
+    });
+
+    test("statusbar has o-statusbar shell and hidden input for wireForm", function () {
+      var h = W.render("crm.lead", { name: "x_statusbar", widget: "statusbar", comodel: "crm.stage" }, api);
+      H.assertTrue(h.indexOf("o-statusbar") >= 0 && h.indexOf('type="hidden"') >= 0 && h.indexOf("data-comodel") >= 0);
+    });
+
+    test("widgets used in addon view XML (phase 806 grep) all render", function () {
+      var cases = [
+        { widget: "statusbar", model: "crm.lead", field: { name: "x_sb", widget: "statusbar", comodel: "crm.stage" } },
+        { widget: "many2many_tags", model: "res.partner", field: { name: "m2m_x", widget: "many2many_tags" } },
+        { widget: "priority", model: "res.partner", field: { name: "x_priority", widget: "priority" } },
+        { widget: "progressbar", model: "res.partner", field: { name: "x_progressbar", widget: "progressbar" } },
+        { widget: "binary", model: "res.partner", field: { name: "x_binary", widget: "binary" } },
+        { widget: "one2many", model: "res.partner", field: { name: "line_ids", widget: "one2many" } },
+      ];
+      cases.forEach(function (c) {
+        var html = W.render(c.model, c.field, api);
+        H.assertTrue(typeof html === "string" && html.length > 0, c.widget + " should render");
+      });
     });
 
     return results;

@@ -36,8 +36,15 @@
       if (/^[a-z0-9_\-/]+$/i.test(rawUrl)) return rawUrl;
       return null;
     }
-    if (action.type !== 'ir.actions.act_window') return null;
-    var m = (action.res_model || '').replace(/\./g, '_');
+    var actType = action.type || '';
+    var hasModel = !!(action.res_model || action.resModel);
+    if (actType !== 'ir.actions.act_window' && actType !== 'window') {
+      if (!hasModel || actType === 'ir.actions.act_client' || actType === 'ir.actions.report') {
+        return null;
+      }
+    }
+    var m = String(action.res_model || action.resModel || '').replace(/\./g, '_');
+    if (!m) return null;
     if (m === 'res_partner') return 'contacts';
     if (m === 'crm_lead') {
       var name = (action.name || '').toLowerCase();

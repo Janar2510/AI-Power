@@ -65,7 +65,18 @@
     },
 
     getAction(id) {
-      return (_cache && _cache.actions && _cache.actions[id]) || null;
+      const actions = _cache && _cache.actions;
+      if (!actions || id == null || id === "") {
+        return null;
+      }
+      if (Object.prototype.hasOwnProperty.call(actions, id)) {
+        return actions[id];
+      }
+      const s = String(id);
+      if (Object.prototype.hasOwnProperty.call(actions, s)) {
+        return actions[s];
+      }
+      return null;
     },
 
     getMenus() {

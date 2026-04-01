@@ -129,6 +129,7 @@ def _needs_cors(path: str) -> bool:
         or path == "/web/session/get_session_info" or path == "/web/load_views"
         or path.startswith("/web/translations") or path.startswith("/web/session/")
         or path.startswith("/discuss/") or path.startswith("/mail/notifications")
+        or path.startswith("/longpolling/")
     )
 
 
@@ -306,6 +307,19 @@ class Application:
                 pass
         request = Request(environ)
 
+        # WebSocket must use unwrapped start_response (simple-websocket); everything else needs CORS early so
+        # rate-limit / CSRF error bodies are visible to fetch() (otherwise browsers report "access control checks").
+        pre_security_start_response = start_response
+        upgrade_hdr = environ.get("HTTP_UPGRADE", "").lower()
+        is_websocket_handshake = (
+            request.path == "/websocket/"
+            and request.method == "GET"
+            and "websocket" in upgrade_hdr
+            and _websocket_handler
+        )
+        if not is_websocket_handshake:
+            start_response = _add_security_headers(start_response, environ)
+
         # Phase 203: Rate limiting
         allowed, retry_after = check_rate_limit(request)
         if not allowed:
@@ -333,11 +347,8 @@ class Application:
                 return resp(environ, start_response)
 
         # WebSocket: use raw start_response (simple-websocket needs it; wrapping causes "write() before start_response")
-        if request.path == "/websocket/" and request.method == "GET":
-            upgrade = environ.get("HTTP_UPGRADE", "").lower()
-            if "websocket" in upgrade and _websocket_handler:
-                return _websocket_handler(environ, start_response)
-        start_response = _add_security_headers(start_response, environ)
+        if is_websocket_handshake:
+            return _websocket_handler(environ, pre_security_start_response)
 
         # Report routes: /report/html/<name>/<ids> or /report/pdf/<name>/<ids>
         if request.path.startswith("/report/") and request.method == "GET":

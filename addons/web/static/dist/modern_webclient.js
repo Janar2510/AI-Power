@@ -103,9 +103,14 @@
           };
           var showImportModal = helpers.showImportModal || function() {
           };
-          var getHashDomainParam = helpers.getHashDomainParam || function() {
+          function resolveListHashDomain() {
+            var fn = helpers.getHashDomainParam;
+            if (fn && typeof fn === "function") return fn();
+            if (typeof window !== "undefined" && typeof window.__ERP_getHashDomainParam === "function") {
+              return window.__ERP_getHashDomainParam();
+            }
             return null;
-          };
+          }
           var confirmModal = helpers.confirmModal || function() {
             return Promise.resolve(false);
           };
@@ -334,7 +339,7 @@
                       if (!ok || !rpc || !rpc.callKw) return;
                       rpc.callKw(model, "unlink", [ids], {}).then(function() {
                         showToast("Deleted", "success");
-                        loadRecords(model, route, currentListState.searchTerm, stageFilter, void 0, currentListState.savedFilterId, offset, limit, getHashDomainParam());
+                        loadRecords(model, route, currentListState.searchTerm, stageFilter, void 0, currentListState.savedFilterId, offset, limit, resolveListHashDomain());
                       }).catch(function(err) {
                         showToast(err.message || "Delete failed", "error");
                       });
@@ -1048,8 +1053,15 @@
       }
       return null;
     }
-    if (action.type !== "ir.actions.act_window") return null;
-    const modelSlug = String(action.res_model || "").replace(/\./g, "_");
+    const actType = action.type || "";
+    const hasModel = !!(action.res_model || action.resModel);
+    if (actType !== "ir.actions.act_window" && actType !== "window") {
+      if (!hasModel || actType === "ir.actions.act_client" || actType === "ir.actions.report") {
+        return null;
+      }
+    }
+    const modelSlug = String(action.res_model || action.resModel || "").replace(/\./g, "_");
+    if (!modelSlug) return null;
     const byModel = {
       res_partner: "contacts",
       crm_lead: (action.name || "").toLowerCase().indexOf("pipeline") >= 0 ? "pipeline" : (action.name || "").toLowerCase().indexOf("activit") >= 0 ? "crm/activities" : "leads",
@@ -1321,7 +1333,18 @@
         return cache && cache.menus || [];
       },
       getAction(id) {
-        return cache && cache.actions ? cache.actions[id] : null;
+        const actions = cache && cache.actions;
+        if (!actions || id == null || id === "") {
+          return null;
+        }
+        if (Object.prototype.hasOwnProperty.call(actions, id)) {
+          return actions[id];
+        }
+        const s = String(id);
+        if (Object.prototype.hasOwnProperty.call(actions, s)) {
+          return actions[s];
+        }
+        return null;
       },
       getView(model, type) {
         const list = cache && cache.views ? cache.views[model] || [] : [];
@@ -1562,6 +1585,9 @@
         const next = String(route || "home").replace(/^#/, "");
         if ((window.location.hash || "#home") === "#" + next) {
           notify();
+          if (window.ErpLegacyRouter && typeof window.ErpLegacyRouter.route === "function") {
+            window.ErpLegacyRouter.route();
+          }
           return next;
         }
         window.location.hash = "#" + next;
@@ -2176,9 +2202,20 @@
             return m && String(m.id || "") === menuId;
           });
           if (menu) {
-            ev.preventDefault();
-            actionSvc.navigateFromMenu(menu).catch(function() {
-            });
+            const views = env.services.views;
+            const actionRef = menu.action;
+            const action = actionRef && views && typeof views.getAction === "function" ? views.getAction(actionRef) : null;
+            const mu = window.ERPFrontendRuntime && window.ERPFrontendRuntime.menuUtils;
+            const fromAction = action && mu && typeof mu.actionToRoute === "function" ? mu.actionToRoute(action) : null;
+            const fromMenu = !fromAction && mu && typeof mu.menuToRoute === "function" ? mu.menuToRoute(menu) : null;
+            const canProgrammaticNav = !!(fromAction || fromMenu);
+            if (canProgrammaticNav) {
+              ev.preventDefault();
+              const fallbackHash = "#" + String(fromAction || fromMenu).replace(/^#/, "");
+              actionSvc.navigateFromMenu(menu).catch(function() {
+                window.location.hash = fallbackHash;
+              });
+            }
           }
         }
         if (window.innerWidth <= 1023 && window.__erpModernShellController) {
@@ -3178,14 +3215,14 @@
     type: "form",
     Controller: FormController,
     Renderer: FormRenderer,
-    searchMenuTypes: []
+    searchMenuTypes: ["filter", "favorite"]
   });
   window.AppCore = window.AppCore || {};
   window.AppCore.FormController = FormController;
 
   // addons/web/static/src/app/views/kanban/kanban_controller.js
   var owl9 = window.owl;
-  var { Component: Component8, useState: useState6, xml: xml8, onMounted: onMounted6, useRef: useRef5, useEnv: useEnv4 } = owl9;
+  var { Component: Component8, useState: useState6, xml: xml8, onMounted: onMounted6, onPatched: onPatched3, useRef: useRef5, useEnv: useEnv4 } = owl9;
   var KanbanController = class extends Component8 {
     static template = xml8`
     <div class="o-kanban-controller o-kanban-view" t-ref="root">
@@ -3208,8 +3245,16 @@
       this.rootRef = useRef5("root");
       this.contentRef = useRef5("kanbanContent");
       this.state = useState6({ loading: false });
+      this._lastDomainJson = "";
       onMounted6(() => {
         this._renderLegacy();
+      });
+      onPatched3(() => {
+        var d = JSON.stringify(this.props.domain || []);
+        if (d !== this._lastDomainJson) {
+          this._lastDomainJson = d;
+          this._renderLegacy();
+        }
       });
     }
     get title() {
@@ -3773,16 +3818,11 @@
   }
   function WithSearch(Controller, options) {
     options = options || {};
+    const formMode = !!options.formMode;
     class WithSearchWrapper extends Component12 {
       static template = xml12`
       <div class="o-with-search">
-        <ControlPanel
-          breadcrumbs="state.breadcrumbs"
-          views="state.availableViews"
-          activeView="props.viewType || 'list'"
-          pagerProps="state.pagerProps"
-          searchBarProps="searchBarProps"
-          onViewSwitch="onViewSwitch"/>
+        <ControlPanel t-props="controlPanelProps"/>
         <t t-component="InnerController"
            t-props="innerProps"
            t-ref="innerRef"/>
@@ -3790,12 +3830,15 @@
       static components = { ControlPanel, InnerController: Controller };
       static props = {
         resModel: String,
+        resId: { type: [Number, String], optional: true },
         domain: { type: Array, optional: true },
         context: { type: Object, optional: true },
         viewType: { type: String, optional: true },
         columns: { type: Array, optional: true },
         limit: { type: Number, optional: true },
         onOpenRecord: { type: Function, optional: true },
+        onSaved: { type: Function, optional: true },
+        onBack: { type: Function, optional: true },
         slots: { type: Object, optional: true }
       };
       setup() {
@@ -3804,10 +3847,16 @@
           context: this.props.context,
           state: {}
         });
+        var viewsChrome = [];
+        if (formMode) {
+          viewsChrome = [{ type: "form", label: "Form" }];
+        } else if (options.searchMenuTypes) {
+          viewsChrome = [{ type: "list", label: "List" }, { type: "kanban", label: "Kanban" }];
+        }
         this.state = useState10({
           domain: this._computeDomain(),
           breadcrumbs: [{ name: this._titleFor(resModel) }],
-          availableViews: options.searchMenuTypes ? [{ type: "list", label: "List" }, { type: "kanban", label: "Kanban" }] : [],
+          availableViews: viewsChrome,
           pagerProps: null
         });
         this._unsubscribe = null;
@@ -3828,24 +3877,35 @@
         return base;
       }
       _titleFor(model) {
-        if (!model) return "List";
+        if (!model) return formMode ? "Form" : "List";
         const parts = String(model).split(".");
         return parts[parts.length - 1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       }
-      get searchBarProps() {
+      get activeViewKey() {
+        return this.props.viewType || (formMode ? "form" : "list");
+      }
+      get controlPanelProps() {
         return {
+          breadcrumbs: this.state.breadcrumbs,
+          views: this.state.availableViews,
+          activeView: this.activeViewKey,
           searchModel: this._sm,
-          onSearch: this.onSearch.bind(this)
+          onSearch: this.onSearch.bind(this),
+          onViewSwitch: this.onViewSwitch.bind(this),
+          pager: this.state.pagerProps || void 0
         };
       }
       get innerProps() {
         return {
           resModel: this.props.resModel,
+          resId: this.props.resId,
           domain: this.state.domain,
           context: this.props.context,
           columns: this.props.columns,
           limit: this.props.limit,
           onOpenRecord: this.props.onOpenRecord,
+          onSaved: this.props.onSaved,
+          onBack: this.props.onBack,
           searchModel: this._sm
         };
       }
@@ -3880,6 +3940,11 @@
   var owl14 = window.owl;
   var { Component: Component13, useState: useState11, xml: xml13, onMounted: onMounted9, onWillUnmount: onWillUnmount7, useRef: useRef8 } = owl14;
   var ListWithSearch = WithSearch(ListController, { searchMenuTypes: ["filter", "groupBy", "favorite"] });
+  var KanbanWithSearch = WithSearch(KanbanController, { searchMenuTypes: ["filter", "groupBy", "favorite"] });
+  var FormWithSearch = WithSearch(FormController, {
+    formMode: true,
+    searchMenuTypes: ["filter", "favorite"]
+  });
   var _listeners = /* @__PURE__ */ new Map();
   var ActionBus = {
     on(event, handler) {
@@ -3902,8 +3967,8 @@
   window.AppCore.ActionBus = ActionBus;
   var CONTROLLER_MAP = {
     list: ListWithSearch,
-    form: FormController,
-    kanban: KanbanController
+    form: FormWithSearch,
+    kanban: KanbanWithSearch
   };
   var ActionContainer = class extends Component13 {
     static template = xml13`
@@ -3957,11 +4022,17 @@
         if (vt === "list" && Controller === ListController) {
           Controller = ListWithSearch;
         }
+        if (vt === "kanban" && Controller === KanbanController) {
+          Controller = KanbanWithSearch;
+        }
+        if (vt === "form" && Controller === FormController) {
+          Controller = FormWithSearch;
+        }
       } else {
         Controller = CONTROLLER_MAP[vt] || ListController;
       }
       const controllerProps = Object.assign(
-        { resModel: resModel || "res.partner" },
+        { resModel: resModel || "res.partner", viewType: vt },
         resId ? { resId } : {},
         props || {}
       );
@@ -3972,7 +4043,42 @@
       };
     }
   };
+  ActionContainer.fallbackMount = function actionContainerFallbackMount(env, target) {
+    window.__ERP_OWL_ACTION_CONTAINER_MOUNTED = false;
+    if (target) {
+      target.setAttribute("data-erp-owl-fallback", "1");
+      target.classList.add("o-action-container--csp-fallback");
+    }
+    return {
+      destroy() {
+        if (target) {
+          target.removeAttribute("data-erp-owl-fallback");
+          target.classList.remove("o-action-container--csp-fallback");
+        }
+      },
+      mode: "fallback"
+    };
+  };
   window.AppCore.ActionContainer = ActionContainer;
+
+  // addons/web/static/src/app/debug_boot.js
+  function erpDebugBootLog(event, detail) {
+    try {
+      if (typeof localStorage === "undefined" || localStorage.getItem("erp_debug_mode") !== "1") {
+        return;
+      }
+      const payload = { ts: Date.now(), event: String(event || "unknown") };
+      if (detail && typeof detail === "object") {
+        Object.keys(detail).forEach(function(k) {
+          payload[k] = detail[k];
+        });
+      }
+      if (typeof console !== "undefined" && console.info) {
+        console.info("[erp-debug-boot]", JSON.stringify(payload));
+      }
+    } catch (_e) {
+    }
+  }
 
   // addons/web/static/src/app/webclient.js
   var WebClient = class {
@@ -3992,7 +4098,29 @@
       this.target.setAttribute("data-erp-runtime-version", this.env.bootstrap.version);
       this.target.classList.add("o-webclient-modern");
       this.env.services.router.start();
-      this.env.services.shell.load().finally(() => {
+      const shellLoadDeadlineMs = 2e4;
+      const shellLoadedOrTimeout = Promise.race([
+        this.env.services.shell.load().then(function(r) {
+          return { ok: true, result: r };
+        }).catch(function(err) {
+          erpDebugBootLog("shell_load_rejected", {
+            message: err && err.message,
+            stack: err && err.stack
+          });
+          return { ok: false, rejected: true };
+        }),
+        new Promise(function(resolve) {
+          setTimeout(function() {
+            resolve({ ok: false, timedOut: true });
+          }, shellLoadDeadlineMs);
+        })
+      ]);
+      shellLoadedOrTimeout.then(function(race) {
+        if (race && race.timedOut) {
+          erpDebugBootLog("shell_load_timeout", { deadlineMs: shellLoadDeadlineMs });
+        }
+      });
+      shellLoadedOrTimeout.finally(() => {
         this.navbarApp = mountNavBar(this.env, navbar);
         this.sidebarApp = mountSidebar(this.env, sidebar);
         if (actionMgr) {
@@ -7678,45 +7806,66 @@
     if (window.__ERPModernWebClientLoaded) {
       return window.__ERPModernWebClientRuntime || null;
     }
-    window.__ERPModernWebClientLoaded = true;
-    registerNavbarContract();
-    registerNavbarFacade();
-    registerHomeModule();
-    registerModernViewFacades();
-    const bootstrap = createBootstrap();
-    const env = createEnv(bootstrap);
-    startServices(env);
-    registerTemplates(env);
-    const cp = env.services.commandPalette;
-    if (cp && typeof cp.initHotkey === "function") {
-      cp.initHotkey();
-    }
-    window.ERPFrontendRuntime = window.ERPFrontendRuntime || {};
-    window.ERPFrontendRuntime.menuUtils = menu_utils_exports;
-    if (env.services.menu && typeof env.services.menu.load === "function") {
-      env.services.menu.load(false).catch(function() {
+    try {
+      registerNavbarContract();
+      registerNavbarFacade();
+      registerHomeModule();
+      registerModernViewFacades();
+      const bootstrap = createBootstrap();
+      const env = createEnv(bootstrap);
+      startServices(env);
+      registerTemplates(env);
+      const cp = env.services.commandPalette;
+      if (cp && typeof cp.initHotkey === "function") {
+        cp.initHotkey();
+      }
+      const hk = window.Services && window.Services.hotkey;
+      if (hk && typeof hk.register === "function") {
+        hk.register("alt+h", function(evt) {
+          if (!evt || evt.defaultPrevented) return;
+          var t = evt.target;
+          if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+          evt.preventDefault();
+          window.location.hash = "#home";
+        });
+      }
+      window.ERPFrontendRuntime = window.ERPFrontendRuntime || {};
+      window.ERPFrontendRuntime.menuUtils = menu_utils_exports;
+      if (env.services.menu && typeof env.services.menu.load === "function") {
+        env.services.menu.load(false).catch(function() {
+        });
+      }
+      registerBuiltinClientActions(env);
+      const app = new WebClient(env, document.getElementById("webclient"));
+      app.mount();
+      const runtime = {
+        env,
+        app,
+        version: bootstrap.version,
+        boot: bootModernWebClient,
+        menuUtils: menu_utils_exports,
+        /** Phase 636: modular action entry (doAction, navigateFromMenu, doActionButton). */
+        action: env.services.action,
+        /** Phase 691: Odoo-shaped view service (loadViews, getView). */
+        view: env.services.view,
+        /** Track K2+K3: ActionBus + BUILTIN_CLIENT_ACTIONS */
+        ActionBus,
+        clientActions: BUILTIN_CLIENT_ACTIONS
+      };
+      window.__ERPModernWebClientRuntime = runtime;
+      window.ERPFrontendRuntime = runtime;
+      window.__ERPModernWebClientLoaded = true;
+      return runtime;
+    } catch (err) {
+      if (typeof console !== "undefined" && console.error) {
+        console.error("[modern-webclient] boot failed", err);
+      }
+      erpDebugBootLog("modern_boot_exception", {
+        message: err && err.message,
+        stack: err && err.stack
       });
+      return null;
     }
-    registerBuiltinClientActions(env);
-    const app = new WebClient(env, document.getElementById("webclient"));
-    app.mount();
-    const runtime = {
-      env,
-      app,
-      version: bootstrap.version,
-      boot: bootModernWebClient,
-      menuUtils: menu_utils_exports,
-      /** Phase 636: modular action entry (doAction, navigateFromMenu, doActionButton). */
-      action: env.services.action,
-      /** Phase 691: Odoo-shaped view service (loadViews, getView). */
-      view: env.services.view,
-      /** Track K2+K3: ActionBus + BUILTIN_CLIENT_ACTIONS */
-      ActionBus,
-      clientActions: BUILTIN_CLIENT_ACTIONS
-    };
-    window.__ERPModernWebClientRuntime = runtime;
-    window.ERPFrontendRuntime = runtime;
-    return runtime;
   }
   bootModernWebClient();
 })();

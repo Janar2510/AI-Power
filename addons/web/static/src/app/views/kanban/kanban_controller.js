@@ -5,7 +5,7 @@
  */
 
 const owl = window.owl;
-const { Component, useState, xml, onMounted, useRef, useEnv } = owl;
+const { Component, useState, xml, onMounted, onPatched, useRef, useEnv } = owl;
 import { viewRegistry } from "../view_registry.js";
 
 export class KanbanController extends Component {
@@ -32,9 +32,17 @@ export class KanbanController extends Component {
     this.rootRef = useRef("root");
     this.contentRef = useRef("kanbanContent");
     this.state = useState({ loading: false });
+    this._lastDomainJson = "";
 
     onMounted(() => {
       this._renderLegacy();
+    });
+    onPatched(() => {
+      var d = JSON.stringify(this.props.domain || []);
+      if (d !== this._lastDomainJson) {
+        this._lastDomainJson = d;
+        this._renderLegacy();
+      }
     });
   }
 

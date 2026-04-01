@@ -134,8 +134,22 @@ function wireSidebar(host, env, onAfterWire) {
           return m && String(m.id || "") === menuId;
         });
         if (menu) {
-          ev.preventDefault();
-          actionSvc.navigateFromMenu(menu).catch(function () {});
+          const views = env.services.views;
+          const actionRef = menu.action;
+          const action =
+            actionRef && views && typeof views.getAction === "function" ? views.getAction(actionRef) : null;
+          const mu = window.ERPFrontendRuntime && window.ERPFrontendRuntime.menuUtils;
+          const fromAction = action && mu && typeof mu.actionToRoute === "function" ? mu.actionToRoute(action) : null;
+          const fromMenu =
+            !fromAction && mu && typeof mu.menuToRoute === "function" ? mu.menuToRoute(menu) : null;
+          const canProgrammaticNav = !!(fromAction || fromMenu);
+          if (canProgrammaticNav) {
+            ev.preventDefault();
+            const fallbackHash = "#" + String(fromAction || fromMenu).replace(/^#/, "");
+            actionSvc.navigateFromMenu(menu).catch(function () {
+              window.location.hash = fallbackHash;
+            });
+          }
         }
       }
       if (window.innerWidth <= 1023 && window.__erpModernShellController) {

@@ -3,6 +3,7 @@ import { mountSidebar } from "./sidebar.js";
 import { attachShellChrome } from "./shell_chrome.js";
 import { ActionContainer } from "./action_container.js";
 import { mountComponent } from "./owl_bridge.js";
+import { erpDebugBootLog } from "./debug_boot.js";
 
 export class WebClient {
   constructor(env, target) {
@@ -23,7 +24,33 @@ export class WebClient {
     this.target.setAttribute("data-erp-runtime-version", this.env.bootstrap.version);
     this.target.classList.add("o-webclient-modern");
     this.env.services.router.start();
-    this.env.services.shell.load().finally(() => {
+    /** Never block legacy boot forever if session/views/menu fetches hang (offline proxy, stalled TCP). */
+    const shellLoadDeadlineMs = 20000;
+    const shellLoadedOrTimeout = Promise.race([
+      this.env.services.shell
+        .load()
+        .then(function (r) {
+          return { ok: true, result: r };
+        })
+        .catch(function (err) {
+          erpDebugBootLog("shell_load_rejected", {
+            message: err && err.message,
+            stack: err && err.stack,
+          });
+          return { ok: false, rejected: true };
+        }),
+      new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ ok: false, timedOut: true });
+        }, shellLoadDeadlineMs);
+      }),
+    ]);
+    shellLoadedOrTimeout.then(function (race) {
+      if (race && race.timedOut) {
+        erpDebugBootLog("shell_load_timeout", { deadlineMs: shellLoadDeadlineMs });
+      }
+    });
+    shellLoadedOrTimeout.finally(() => {
       this.navbarApp = mountNavBar(this.env, navbar);
       this.sidebarApp = mountSidebar(this.env, sidebar);
       if (actionMgr) {

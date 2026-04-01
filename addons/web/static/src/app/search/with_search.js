@@ -62,17 +62,12 @@ export function createSearchModel(resModel, opts) {
  */
 export function WithSearch(Controller, options) {
   options = options || {};
+  const formMode = !!options.formMode;
 
   class WithSearchWrapper extends Component {
     static template = xml`
       <div class="o-with-search">
-        <ControlPanel
-          breadcrumbs="state.breadcrumbs"
-          views="state.availableViews"
-          activeView="props.viewType || 'list'"
-          pagerProps="state.pagerProps"
-          searchBarProps="searchBarProps"
-          onViewSwitch="onViewSwitch"/>
+        <ControlPanel t-props="controlPanelProps"/>
         <t t-component="InnerController"
            t-props="innerProps"
            t-ref="innerRef"/>
@@ -82,12 +77,15 @@ export function WithSearch(Controller, options) {
 
     static props = {
       resModel: String,
+      resId: { type: [Number, String], optional: true },
       domain: { type: Array, optional: true },
       context: { type: Object, optional: true },
       viewType: { type: String, optional: true },
       columns: { type: Array, optional: true },
       limit: { type: Number, optional: true },
       onOpenRecord: { type: Function, optional: true },
+      onSaved: { type: Function, optional: true },
+      onBack: { type: Function, optional: true },
       slots: { type: Object, optional: true },
     };
 
@@ -98,12 +96,16 @@ export function WithSearch(Controller, options) {
         state: {},
       });
 
+      var viewsChrome = [];
+      if (formMode) {
+        viewsChrome = [{ type: "form", label: "Form" }];
+      } else if (options.searchMenuTypes) {
+        viewsChrome = [{ type: "list", label: "List" }, { type: "kanban", label: "Kanban" }];
+      }
       this.state = useState({
         domain: this._computeDomain(),
         breadcrumbs: [{ name: this._titleFor(resModel) }],
-        availableViews: options.searchMenuTypes
-          ? [{ type: "list", label: "List" }, { type: "kanban", label: "Kanban" }]
-          : [],
+        availableViews: viewsChrome,
         pagerProps: null,
       });
 
@@ -129,28 +131,40 @@ export function WithSearch(Controller, options) {
     }
 
     _titleFor(model) {
-      if (!model) return "List";
+      if (!model) return formMode ? "Form" : "List";
       const parts = String(model).split(".");
       return parts[parts.length - 1]
         .replace(/_/g, " ")
         .replace(/\b\w/g, (c) => c.toUpperCase());
     }
 
-    get searchBarProps() {
+    get activeViewKey() {
+      return this.props.viewType || (formMode ? "form" : "list");
+    }
+
+    get controlPanelProps() {
       return {
+        breadcrumbs: this.state.breadcrumbs,
+        views: this.state.availableViews,
+        activeView: this.activeViewKey,
         searchModel: this._sm,
         onSearch: this.onSearch.bind(this),
+        onViewSwitch: this.onViewSwitch.bind(this),
+        pager: this.state.pagerProps || undefined,
       };
     }
 
     get innerProps() {
       return {
         resModel: this.props.resModel,
+        resId: this.props.resId,
         domain: this.state.domain,
         context: this.props.context,
         columns: this.props.columns,
         limit: this.props.limit,
         onOpenRecord: this.props.onOpenRecord,
+        onSaved: this.props.onSaved,
+        onBack: this.props.onBack,
         searchModel: this._sm,
       };
     }

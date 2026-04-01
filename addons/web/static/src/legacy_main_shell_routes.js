@@ -15,6 +15,15 @@
 
   var DashboardCore, SettingsCore, DiscussViewCore, SidebarCore;
 
+  function _erpShellDebugLog(event, data) {
+    try {
+      if (typeof localStorage === 'undefined' || localStorage.getItem('erp_debug_mode') !== '1') return;
+      if (typeof console !== 'undefined' && console.info) {
+        console.info('[erp-shell-debug]', String(event || 'event'), data && typeof data === 'object' ? data : {});
+      }
+    } catch (e) { /* noop */ }
+  }
+
   SR.install = function (ctx) {
     rpc = ctx.rpc;
     viewsSvc = ctx.viewsSvc;
@@ -149,12 +158,37 @@
     var selectedRoot = appRoots.find(function (n) {
       return String((n.menu && n.menu.id) || '') === String(appId);
     });
-    if (!selectedRoot) return;
+    if (!selectedRoot) {
+      _erpShellDebugLog('selectApp_no_selectedRoot', { appId: String(appId), appRootsCount: appRoots.length });
+      return;
+    }
     if (typeof localStorage !== 'undefined') localStorage.setItem('erp_sidebar_app', String(appId));
     var nav = getDefaultNavFromAppNode(selectedRoot);
     var targetRoute = nav && nav.route ? nav.route : 'home';
     var nextHash = '#' + targetRoute;
-    if (navigateActWindowIfAvailable(nav && nav.action, targetRoute, { source: 'selectApp', appId: String(appId) })) {
+    var menuRef = nav && nav.menu ? nav.menu : {};
+    var actionRef = menuRef.action;
+    var actionResolved = actionRef && viewsSvc && viewsSvc.getAction ? viewsSvc.getAction(actionRef) : null;
+    _erpShellDebugLog('selectApp', {
+      appId: String(appId),
+      targetRoute: targetRoute,
+      hasNav: !!nav,
+      menuActionRef: actionRef != null ? String(actionRef) : '',
+      actionResolved: !!actionResolved,
+    });
+    var tookVmPath = navigateActWindowIfAvailable(nav && nav.action, targetRoute, { source: 'selectApp', appId: String(appId) });
+    if (tookVmPath) {
+      _erpShellDebugLog('selectApp_vm_path', { targetRoute: targetRoute });
+      setTimeout(function () {
+        try {
+          if (typeof localStorage === 'undefined' || localStorage.getItem('erp_debug_mode') !== '1') return;
+          var curBase = (window.location.hash || '#home').replace(/^#/, '').split('?')[0] || 'home';
+          var wantBase = String(targetRoute || 'home').split('?')[0] || 'home';
+          if (wantBase !== 'home' && curBase !== wantBase) {
+            _erpShellDebugLog('selectApp_hash_mismatch_after_8s', { current: curBase, expected: wantBase });
+          }
+        } catch (e) { /* noop */ }
+      }, 8000);
       return;
     }
     if (window.location.hash === nextHash) {

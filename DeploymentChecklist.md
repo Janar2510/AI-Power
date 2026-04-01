@@ -1,5 +1,93 @@
 # Deployment Checklist
 
+## Post-1.250.3 — List RPC deadline + selectApp debug + remove debug ingest
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** / **`npm run check:assets-concat`** after edits to **`legacy_main_list_views.js`**, **`legacy_main_shell_routes.js`**, **`main.js`**, **`app/main.js`**, **`app/webclient.js`**, or **`webclient.css`**.
+
+### Verification
+
+- [ ] **`python3 -m unittest tests.test_main_js_route_consistency_phase631 tests.test_modern_action_contract_phase636`**
+- [ ] Smoke: **`#home`** — click **two** app tiles; hash and **`#action-manager`** content update.
+- [ ] Smoke: hard refresh on a **list** hash (e.g. **`#contacts`**) — either data loads or, if RPC is stalled, an error + **Retry** appears within **~25s** (not infinite skeleton).
+
+---
+
+## Post-1.250.2 — Navbar module + ORM cache invalidation + matrix 806–809
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** / **`npm run check:assets-concat`** after edits to **`legacy_main_navbar_block.js`**, **`legacy_main_chrome_block.js`**, **`services/orm.js`**, **`field_registry.js`**, or **`__manifest__.py`**.
+
+### Verification
+
+- [ ] **`python3 -m unittest tests.test_main_js_route_consistency_phase631 tests.test_modern_action_contract_phase636`**
+- [ ] **`test_runner.html`** — **`field_registry`** suite (includes production widget grep test).
+- [ ] Smoke: navbar, notifications bell, company/lang dropdowns still work after chrome delegate change.
+
+---
+
+## Post-1.250.1 — Legacy import/reports split + webclient shortcuts + matrix 803–805
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** after edits to **`legacy_main_import.js`**, **`legacy_main_reports.js`**, **`legacy_main_chrome_block.js`**, **`field_registry.js`**, **`relational_model.js`**, **`hotkey.js`**, **`webclient_shortcut_contract.js`**, or **`__manifest__.py`** asset order.
+- [ ] **`npm run check:assets-concat`** — new legacy files are non-ESM IIFEs (concat-safe).
+
+### Verification
+
+- [ ] **`python3 -m unittest tests.test_main_js_route_consistency_phase631 tests.test_modern_action_contract_phase636`** — action/hash contracts unchanged.
+- [ ] **`addons/web/static/tests/test_runner.html`** — **`field_registry`**, **`webclientShortcutContract`**, **`webclientShortcutContractModular`** pass.
+- [ ] Smoke: list **Import** opens modal; **`#reports/trial-balance`** still loads (delegates to **`legacy_main_reports`**).
+
+---
+
+## Post-1.250 — Form WithSearch + route_apply plugins + optional boot debug
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** after edits to `app/main.js`, `app/webclient.js`, `app/search/with_search.js`, `app/action_container.js`, `app/debug_boot.js`, or `core/webclient_shortcut_contract.js`.
+- [ ] **`npm run check:assets-concat`** — `route_apply_registry.js` and legacy `main.js` remain concat-safe.
+
+### Verification
+
+- [ ] **URL:** exercise the shell at **`http://127.0.0.1:8069`** (or **`localhost:8069`**) **with port** — Safari “localhost” without port often mis-routes.
+- [ ] **Stale shell:** unregister **`/web/sw.js`** (PWA) when diagnosing cached bundles.
+- [ ] **OWL path (CSP allows eval, `cspScriptEvalBlocked: false`):** opening a **form** from **`ActionContainer`** shows **ControlPanel** + search bar above the form; domain changes propagate where **`SearchModel`** is non-stub.
+- [ ] **Default CSP:** production behaviour unchanged — legacy list/form/kanban still canonical; **`FormWithSearch`** only applies when OWL mounts.
+- [ ] **Discuss / reports / settings hashes:** `#discuss`, `#reports/trial-balance`, `#settings`, etc. still resolve (handled via **`installRouteApplyRegistryPlugins`** + **`phase631`** tests).
+- [ ] Optional support: set **`localStorage.erp_debug_mode = "1"`**, reload — on shell **20s** timeout or modern boot throw, console shows **`[erp-debug-boot]`** JSON line.
+
+### Strategic note (reaffirmed — Phase P4)
+
+- **Precompiled OWL vs legacy-canonical:** unchanged from Post-1.249 — production default keeps **`cspScriptEvalBlocked: true`**; full precompile pipeline remains **product-scheduled**. See **`docs/odoo19-webclient-gap-table.md`** and **Phase P5** **`view_service`** scope (planning-only until milestone).
+
+---
+
+## Post-1.249 — Navigation reliability + route registry + OWL/CSP stance
+
+### Strategic note (OWL + CSP — Phase D)
+
+- **Production default:** `cspScriptEvalBlocked: true` in [`core/http/routes.py`](core/http/routes.py) `_webclient_html` → OWL **templates do not compile** under typical `script-src` without `unsafe-eval`. **`#action-manager`** uses **`ActionContainer.fallbackMount`**; **list/form/kanban content** is driven by **legacy** `main.js` + `loadRecords` / `renderForm`.
+- **OWL ActionContainer + `_tryOwlRoute`:** Only active when bootstrap sets **`cspScriptEvalBlocked: false`** *and* HTTP **CSP** actually allows eval (dev/pilot). Do not flip the flag in production without matching CSP and a security review.
+- **Future:** Precompiled OWL templates or a dedicated CSP policy remain **out of scope** until scheduled; track in [`docs/odoo19-webclient-gap-table.md`](docs/odoo19-webclient-gap-table.md).
+
+### Pre-Deployment
+
+- [ ] **`npm run build:web`** after touching `app/main.js`, `action_container.js`, or `services.js`.
+- [ ] **`npm run check:assets-concat`** — includes new **`route_apply_registry.js`** in `web.assets_web`.
+- [ ] **`bus_service.js`** is concat-listed in `web.assets_web` (no separate esbuild); restart server after edits so `/web/assets/web.assets_web.js` is regenerated if you use cached bundles.
+
+### Verification
+
+- [ ] **Alt+H** (outside inputs): navigates to `#home` (modular hotkey registration).
+- [ ] **App tile** from Home leaves `.o-home-apps` and shows list/table or form in `#action-manager`.
+- [ ] Optional: **`pytest tests/e2e/test_app_tile_navigation_tour.py`** with server + DB.
+- [ ] **Bus longpolling:** No console “Fetch … `/longpolling/poll` … access control checks” — CSRF error responses must include CORS headers (`core/http/application.py` wraps security headers before CSRF); poll POST includes `csrf_token` in JSON when session cache has it.
+
+---
+
 ## Post-1.248 — OWL action shell + webclient P3/P5
 
 ### Pre-Deployment
@@ -10,8 +98,9 @@
 
 ### Verification
 
-- [ ] After load: `window.__ERP_OWL_ACTION_CONTAINER_MOUNTED === true` when esbuild-primary shell is active.
-- [ ] App tile → list opens (OWL path **or** legacy fallback if flag false).
+- [ ] With default bootstrap (`cspScriptEvalBlocked: true`): `window.__ERP_OWL_ACTION_CONTAINER_MOUNTED === false` and `#action-manager` has `data-erp-owl-fallback` (CSP fallback does **not** clear the node — legacy fills it). App menus still show **legacy** list/form (not blank).
+- [ ] If you opt in to OWL views (`cspScriptEvalBlocked: false` in bootstrap only when CSP allows `unsafe-eval`): `__ERP_OWL_ACTION_CONTAINER_MOUNTED === true` and lists can use the OWL `ActionContainer` path.
+- [ ] App tile → list opens (legacy path under default CSP; OWL path only when eval is explicitly allowed).
 - [ ] **Mod+K** / **Ctrl+K** opens command palette from modular boot (`commandPalette.initHotkey`).
 - [ ] List view from `ActionContainer` shows control panel / search chrome (`WithSearch`).
 

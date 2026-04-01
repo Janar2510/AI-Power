@@ -40,7 +40,15 @@
     var parseFilterDomain = helpers.parseFilterDomain || function () { return []; };
     var saveSavedFilter = helpers.saveSavedFilter || function () { return Promise.resolve(); };
     var showImportModal = helpers.showImportModal || function () {};
-    var getHashDomainParam = helpers.getHashDomainParam || function () { return null; };
+    /** Domain from hash for list reloads; avoids bare `getHashDomainParam` in nested callbacks (Safari + bundled `let` blocks can drop the closure). */
+    function resolveListHashDomain() {
+      var fn = helpers.getHashDomainParam;
+      if (fn && typeof fn === "function") return fn();
+      if (typeof window !== "undefined" && typeof window.__ERP_getHashDomainParam === "function") {
+        return window.__ERP_getHashDomainParam();
+      }
+      return null;
+    }
     var confirmModal = helpers.confirmModal || function () { return Promise.resolve(false); };
     var applyActionStackForList = helpers.applyActionStackForList || function () {};
     var renderViewSwitcher = helpers.renderViewSwitcher || function () { return ""; };
@@ -249,7 +257,7 @@
                 if (!ok || !rpc || !rpc.callKw) return;
                 rpc.callKw(model, "unlink", [ids], {}).then(function () {
                   showToast("Deleted", "success");
-                  loadRecords(model, route, currentListState.searchTerm, stageFilter, undefined, currentListState.savedFilterId, offset, limit, getHashDomainParam());
+                  loadRecords(model, route, currentListState.searchTerm, stageFilter, undefined, currentListState.savedFilterId, offset, limit, resolveListHashDomain());
                 }).catch(function (err) { showToast(err.message || "Delete failed", "error"); });
               });
             };

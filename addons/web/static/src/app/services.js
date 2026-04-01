@@ -52,7 +52,18 @@ function createFallbackViews(bootstrap) {
       return (cache && cache.menus) || [];
     },
     getAction(id) {
-      return cache && cache.actions ? cache.actions[id] : null;
+      const actions = cache && cache.actions;
+      if (!actions || id == null || id === "") {
+        return null;
+      }
+      if (Object.prototype.hasOwnProperty.call(actions, id)) {
+        return actions[id];
+      }
+      const s = String(id);
+      if (Object.prototype.hasOwnProperty.call(actions, s)) {
+        return actions[s];
+      }
+      return null;
     },
     getView(model, type) {
       const list = cache && cache.views ? (cache.views[model] || []) : [];
@@ -313,6 +324,10 @@ function createRouterService() {
       const next = String(route || "home").replace(/^#/, "");
       if ((window.location.hash || "#home") === "#" + next) {
         notify();
+        /** Hash unchanged: no hashchange — run legacy router so #action-manager repaints (app tile / act_window). */
+        if (window.ErpLegacyRouter && typeof window.ErpLegacyRouter.route === "function") {
+          window.ErpLegacyRouter.route();
+        }
         return next;
       }
       window.location.hash = "#" + next;

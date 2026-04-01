@@ -66,7 +66,17 @@
         return runLegacyFallback();
       };
       if (viewSvc && typeof viewSvc.loadViews === "function" && resModel) {
-        return Promise.resolve(viewSvc.loadViews(resModel, [["list"], ["form"]]))
+        const loadP = viewSvc.loadViews(resModel, [["list"], ["form"]]);
+        const deadlineMs = 7000;
+        const raced = Promise.race([
+          Promise.resolve(loadP),
+          new Promise(function (_, rej) {
+            setTimeout(function () {
+              rej(new Error("loadViews deadline"));
+            }, deadlineMs);
+          }),
+        ]);
+        return raced
           .then(function (payload) {
             if (typeof window !== "undefined") {
               var fk =

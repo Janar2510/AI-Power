@@ -1,10 +1,102 @@
 # Changelog
 
+## 1.250.3 — Web client list timeout + app picker diagnostics (Odoo-shell alignment)
+
+### Fixed
+
+- **Legacy list load:** **`legacy_main_list_views.js`** **`loadRecords`** — **`Promise.race`** deadline (**25s**) on **`search_count` + `search_read`** so hung RPC cannot leave perpetual **Loading…**; failure path shows **Retry** (**`o-btn o-btn-primary`**) re-invoking the same load (**`webclient.css`** **`.o-list-load-retry-wrap`**).
+- **App tiles / shell:** **`legacy_main_shell_routes.js`** **`selectApp`** — opt-in **`localStorage erp_debug_mode=1`** logs (**`[erp-shell-debug]`**) for missing app root, action resolution, VM path, and hash mismatch after **8s** when expected route ≠ **home**.
+- **Noise:** removed temporary **Cursor debug** **`fetch`** to **`127.0.0.1:7473`** from **`main.js`**, **`app/main.js`**, **`app/webclient.js`** (rebuild **`modern_webclient.js`**).
+
+---
+
+## 1.250.2 — Post–1.250.1 plan (navbar split, ORM cache invalidation, tracks 807–809)
+
+### Added
+
+- **`legacy_main_navbar_block.js`:** **`renderNavbar`**, notifications, sidebar wiring; **`legacy_main_chrome_block.js`** is a thin delegate shell (**Phase 806**).
+- **`Services.orm`:** after successful **`create` / `write` / `unlink`**, invalidate **`__ERP_RELATIONAL_MODEL`** read cache (**Phase 806b**).
+- **Docs:** **`deferred_product_backlog.md`** — Track **807** (product gate execution order), **809** (deferred vertical acceptance template); **`odoo19_core_gap_table.md`** — **808** prefetch + client cache notes.
+- **Tests:** **`test_field_registry`** — asserts all widgets used in current **`addons/**/views/*.xml`** **`widget=`** grep render via **`FieldWidgets`**.
+
+### Docs
+
+- **`parity_matrix.md`** — **806**, **806b**, **807**, **808**, **809**; **`main_js_extraction_catalog.md`** — navbar row complete.
+
+### Fixed
+
+- **Modern sidebar:** avoid **`preventDefault`** on menu links unless **`actionToRoute` / `menuToRoute`** can resolve navigation; **`navigateFromMenu`** rejection falls back to the resolved hash. **`views.getAction`** (and fallback views in **`app/services.js`**) resolve action keys via string-safe lookup so **`menu.action`** matches **`load_views.actions`**.
+
+---
+
+## 1.250.1 — Plan execution (product gates doc, webclient, core inventory, legacy split)
+
+### Added
+
+- **Product gates:** **`docs/deferred_product_backlog.md`** — **647b** acceptance template (D1/D2); **679** default named row (**Phase P5** / full **`view_service`**) with acceptance paragraph; **2026-04** execution log. Cross-links in **`ai-implementation-checklist`**, **`account_odoo19_gap_audit`**. **Phase 805:** Odoo path table for deferred verticals (l10n, mailing, livechat, spreadsheets).
+- **Web client:** **`statusbar`** widget on **`field_registry.js`** (legacy **`FieldWidgets.render`** path); **`relational_model.js`** read-through cache with **`clearReadRecordCache`** / **`invalidateReadRecordCache`**; **`webclient_shortcut_contract.modular`** **Alt+K**; **`hotkey.js`** **`preventDefault`** for **Mod+K** / **Mod+Shift+K**; JS tests **`statusbar`**, **`webclientShortcutContractModular`**.
+- **Legacy split:** **`legacy_main_import.js`**, **`legacy_main_reports.js`** (manifest before **`legacy_main_chrome_block.js`**); chrome **`install`** forwards **`ctx`** to submodules.
+- **Core:** **`_prefetch_many2one_display`** collects distinct M2O ids with a **`set`** (order-preserving list); **`docs/odoo19_core_gap_table.md`** addon **`core.tools`** import inventory (**2026-04**).
+
+### Docs
+
+- **`docs/parity_matrix.md`** — Phases **803**–**805**; **`docs/main_js_extraction_catalog.md`** — completed import/reports rows.
+
+---
+
+## 1.250.0 — Post-1.250 (form WithSearch, route plugins, boot debug, docs)
+
+### Fixed
+
+- **`WithSearch` → `ControlPanel` wiring:** `ControlPanel` now receives `searchModel`, `onSearch`, `pager`, and view chrome via **`t-props="controlPanelProps"`** so the search bar and breadcrumbs actually bind (previous `searchBarProps` / `pagerProps` keys were not `ControlPanel` props).
+
+### Added
+
+- **`debug_boot.js`:** `erpDebugBootLog(event, detail)` — one JSON line to **`console.info`** when **`localStorage.erp_debug_mode === "1"`** (e.g. **`modern_boot_exception`**, **`shell_load_timeout`**).
+- **OWL form + search:** **`FormWithSearch`** = `WithSearch(FormController, { formMode: true })` in **`action_container.js`**; **`viewType`** passed on controller props; **`form_controller.js`** **`searchMenuTypes`**: `["filter", "favorite"]`.
+- **Route plugins:** **`installRouteApplyRegistryPlugins()`** in **`main.js`** registers discuss, report hashes, website/eCommerce placeholders, and settings slugs on **`route_apply_registry`** before data-route matching.
+- **Hotkey contract:** **`__ERP_WEBCLIENT_SHORTCUT_CONTRACT.modular`** documents **Alt+H** and **Mod+K** from modular boot (legacy **Alt+** array unchanged for **`test_webclient_shortcut_contract.js`**).
+
+### Docs
+
+- **`docs/odoo19-webclient-gap-table.md`** — search (form **`WithSearch`**), route apply (**1.250** plugins), hotkeys (**modular** contract), **`view_service`** milestone note.
+- **`DeploymentChecklist.md`** — Post-1.250 verification (debug flag, OWL form path, build).
+- **`docs/parity_matrix.md`**, **`docs/ai-implementation-checklist.md`**, **`docs/deferred_product_backlog.md`** — **1.250.0** wave; **647b** / **679** still product-gated.
+
+---
+
+## 1.249.0 — Post-1.249 (navigation, route registry, WithSearch kanban, docs)
+
+### Fixed
+
+- **Modern shell “never loads” (blank / stuck Loading):** `__ERPModernWebClientLoaded` is set only after synchronous modern boot succeeds (try/catch) so the HTML fallback can start legacy if `modern_webclient.js` throws. `WebClient.mount` races `shell.load()` with a **20s** deadline so a hung session/menu fetch cannot block `_bootLegacyRuntime()` forever. Inline shell script also retries legacy boot on `queueMicrotask` / `setTimeout(0)`.
+- **Blank main + crowded header (Safari / default CSP):** `ActionContainer.fallbackMount` no longer wipes `#action-manager` to an empty placeholder — it only sets `data-erp-owl-fallback` on the host so legacy `route()` / `loadRecords` can paint. `_tryOwlRoute` treats that attribute on `#action-manager` itself as “use legacy”. **Navbar:** `#navbar > .o-navbar-shell` uses `flex: 1 1 0%` + `min-width: 0`; `#main` gets `min-height: 0` for column flex; debug toggle `flex-shrink: 0`.
+- **Longpolling CORS / CSRF:** `Application` now applies `_add_security_headers` (including `Access-Control-Allow-*` for `/longpolling/`) **before** rate limit and CSRF, so 403/429 responses are not misreported as “Fetch … due to access control checks” in WebKit/Safari. **`bus_service.js`** sends `csrf_token` in the poll JSON body when the session cache has it (matches `validate_csrf` body check) so polls succeed even if `X-CSRF-Token` is missing.
+- **App tile / act_window navigation:** `router.navigate` now calls `ErpLegacyRouter.route()` when the target hash is unchanged (no `hashchange`), so `#action-manager` repaints after `doAction` / `actionToRoute`. `navigateActWindowIfAvailable` uses a one-shot **6s deadline** so a hung `loadViews` cannot block `syncHashAfterOpenFromActWindow`. `ViewManager.openFromActWindow` **race**s `loadViews` with a **7s** timeout before `runDoAction`.
+- **Phase 631 tests:** `test_main_js_route_consistency_phase631` reads `DATA_ROUTES_SLUGS`, `menuToRoute`, and `getModelForRoute` from **`legacy_main_route_tables.js`** / **`legacy_main_route_resolve.js`** (802 split).
+- **Phase 636 tests:** `test_modern_action_contract_phase636` follows the same split — assertions target **`legacy_main_form_views.js`**, **`legacy_main_list_views.js`**, **`legacy_main_chart_views.js`**, **`legacy_main_shell_routes.js`**, **`list_view_module.js`**, and **`kanban_view_module.js`** where logic left `main.js`.
+
+### Added
+
+- **`route_apply_registry.js`:** `AppCore.routeApplyRegistry.registerBeforeDataRoutes` / `runBeforeDataRoutes` — extension point before monolithic `routeApplyInternal` branches (`web.assets_web` manifest).
+- **E2E:** `tests/e2e/test_app_tile_navigation_tour.py` — Home app tile leaves `.o-home-apps` and shows list chrome.
+- **Alt+H** (outside inputs): `#home` via `Services.hotkey` from modular boot.
+- **OWL kanban + search:** `KanbanWithSearch` in `ActionContainer`; `KanbanController` re-runs legacy KVM when `props.domain` changes (`onPatched`).
+
+### Docs
+
+- `DeploymentChecklist.md` — Post-1.249 OWL/CSP operator stance; `docs/odoo19-webclient-gap-table.md` — registry + search/kanban note; `docs/parity_matrix.md` — 1.249 row; `docs/ai-implementation-checklist.md` — Post-1.249 wave; `docs/deferred_product_backlog.md` — Phase F unchanged.
+
+---
+
 ## Post-1.248 — implementation wave (same train as 1.248.0)
 
 ### Fixed
 
-- **OWL routing guard:** `main.js` `_tryOwlRoute` now returns `false` unless `window.__ERP_OWL_ACTION_CONTAINER_MOUNTED` is set by OWL `ActionContainer` `onMounted`, so legacy list/form rendering runs when the OWL shell is not active (restores navigation).
+- **`getHashDomainParam` ReferenceError (Safari):** `list_view_module.js` bulk-delete reload now calls `resolveListHashDomain()` (helpers + `window.__ERP_getHashDomainParam`) instead of a bare `getHashDomainParam()` inside a nested promise callback, where esbuild/`let` scoping could leave the identifier undefined. `LV.install`’s `getHashDomainParam` delegate falls back to `__ERP_getHashDomainParam` if the closure binding is missing.
+- **OWL routing + CSP:** `main.js` `_tryOwlRoute` returns `false` whenever `__erpFrontendBootstrap.cspScriptEvalBlocked` is not explicitly `false`, so list/form/kanban routes always use legacy string-HTML renderers under the default no–`unsafe-eval` CSP (fixes blank `#action-manager` when OWL root mounted but child templates could not compile).
+- **OWL routing guard:** `main.js` `_tryOwlRoute` also returns `false` unless `window.__ERP_OWL_ACTION_CONTAINER_MOUNTED` is set by OWL `ActionContainer` `onMounted`, so legacy list/form rendering runs when the OWL shell is not active (restores navigation).
+- **CSP fallback:** `ActionContainer.fallbackMount` clears `__ERP_OWL_ACTION_CONTAINER_MOUNTED` so the mounted flag cannot leak from a prior OWL session.
 - **Action shell:** `webclient.js` mounts `ActionContainer` on `#action-manager` after shell load (with `mountComponent` / CSP fallback).
 
 ### Added

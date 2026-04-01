@@ -1170,6 +1170,7 @@ def _webclient_html(debug_assets: bool = False, session_bootstrap: dict | None =
         "shellOwner": "modern",
         "legacyAdapterEnabled": True,
         # Aligns with SECURITY_HEADERS script-src (no unsafe-eval): shell uses fallbackMount without client-side eval probe.
+        # Post-1.249: production list/form/kanban content stays legacy until CSP allows eval or OWL precompile is scheduled.
         "cspScriptEvalBlocked": True,
         "endpoints": {
             "sessionInfo": "/web/session/get_session_info",
@@ -1241,9 +1242,19 @@ if (typeof localStorage !== "undefined" && localStorage.getItem("erp_theme")) {{
 {js_tags}
 <script src="/web/static/dist/modern_webclient.js"></script>
 <script>
-if (!window.__ERPModernWebClientLoaded && window.__erpLegacyRuntime && typeof window.__erpLegacyRuntime.start === "function") {{
-  window.__erpLegacyRuntime.start();
-}}
+(function () {{
+  function erpTryLegacyBoot() {{
+    if (!window.__ERPModernWebClientLoaded && window.__erpLegacyRuntime && typeof window.__erpLegacyRuntime.start === "function") {{
+      window.__erpLegacyRuntime.start();
+    }}
+  }}
+  erpTryLegacyBoot();
+  if (typeof queueMicrotask === "function") {{
+    queueMicrotask(erpTryLegacyBoot);
+  }} else {{
+    setTimeout(erpTryLegacyBoot, 0);
+  }}
+}})();
 </script>
 <script>
 if ("serviceWorker" in navigator) {{

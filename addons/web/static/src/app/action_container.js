@@ -17,6 +17,13 @@ import { WithSearch } from "./search/with_search.js";
 
 /** Post-1.248 P3: live list controllers use ControlPanel + SearchModel domain. */
 const ListWithSearch = WithSearch(ListController, { searchMenuTypes: ["filter", "groupBy", "favorite"] });
+/** Post-1.249 Phase C: kanban uses same search chrome + merged domain for legacy KVM. */
+const KanbanWithSearch = WithSearch(KanbanController, { searchMenuTypes: ["filter", "groupBy", "favorite"] });
+/** Post-1.250 Phase P2: OWL form path gets ControlPanel + SearchModel (filter/favorite) when CSP allows OWL. */
+const FormWithSearch = WithSearch(FormController, {
+  formMode: true,
+  searchMenuTypes: ["filter", "favorite"],
+});
 
 // ─── ActionBus ────────────────────────────────────────────────────────────────
 // Simple publish-subscribe bus for ACTION_MANAGER:UPDATE events.
@@ -43,8 +50,8 @@ window.AppCore.ActionBus = ActionBus;
 // ─── ActionContainer ──────────────────────────────────────────────────────────
 const CONTROLLER_MAP = {
   list: ListWithSearch,
-  form: FormController,
-  kanban: KanbanController,
+  form: FormWithSearch,
+  kanban: KanbanWithSearch,
 };
 
 export class ActionContainer extends Component {
@@ -109,12 +116,18 @@ export class ActionContainer extends Component {
       if (vt === "list" && Controller === ListController) {
         Controller = ListWithSearch;
       }
+      if (vt === "kanban" && Controller === KanbanController) {
+        Controller = KanbanWithSearch;
+      }
+      if (vt === "form" && Controller === FormController) {
+        Controller = FormWithSearch;
+      }
     } else {
       Controller = CONTROLLER_MAP[vt] || ListController;
     }
 
     const controllerProps = Object.assign(
-      { resModel: resModel || "res.partner" },
+      { resModel: resModel || "res.partner", viewType: vt },
       resId ? { resId } : {},
       props || {}
     );
@@ -126,5 +139,30 @@ export class ActionContainer extends Component {
     };
   }
 }
+
+/**
+ * CSP / Trusted Types: no unsafe-eval for OWL template compilation.
+ * owl_bridge.js uses this when cspScriptEvalBlocked() or when owl.mount fails.
+ * Does not set __ERP_OWL_ACTION_CONTAINER_MOUNTED — legacy main.js keeps routing.
+ *
+ * Do not replace #action-manager innerHTML: an empty placeholder leaves the main area blank if
+ * legacy route() is slow or errors; keep server "Loading…" until loadRecords/renderForm runs.
+ */
+ActionContainer.fallbackMount = function actionContainerFallbackMount(env, target) {
+  window.__ERP_OWL_ACTION_CONTAINER_MOUNTED = false;
+  if (target) {
+    target.setAttribute("data-erp-owl-fallback", "1");
+    target.classList.add("o-action-container--csp-fallback");
+  }
+  return {
+    destroy() {
+      if (target) {
+        target.removeAttribute("data-erp-owl-fallback");
+        target.classList.remove("o-action-container--csp-fallback");
+      }
+    },
+    mode: "fallback",
+  };
+};
 
 window.AppCore.ActionContainer = ActionContainer;

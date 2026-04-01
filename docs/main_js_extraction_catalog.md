@@ -14,16 +14,17 @@
 | List rendering + record loading + saved filters (15 fns) | `legacy_main_list_views.js` | Before `main.js` | ~319 |
 | Graph/pivot/calendar/kanban/gantt/activity (16 fns) | `legacy_main_chart_views.js` | Before `main.js` | ~989 |
 | Discuss/home/dashboard/settings/sidebar (24 fns) | `legacy_main_shell_routes.js` | Before `main.js` | ~1172 |
+| Import modal (`showImportModal`) | `legacy_main_import.js` | Before `legacy_main_chrome_block.js` | ~177 |
+| Accounting / stock / sales report shells | `legacy_main_reports.js` | Before `legacy_main_chrome_block.js` | ~140 |
+| Navbar + notifications + sidebar chrome | `legacy_main_navbar_block.js` | Before `legacy_main_chrome_block.js` | ~318 |
 
-`main.js` is now **1847 lines** (down from 5378) — under the <2000 target. All extracted functions have thin delegates in `main.js` that call the extraction modules. Dependencies are wired via `install(ctx)` at boot time.
+`main.js` is now **1847 lines** (down from 5378) — under the <2000 target. All extracted functions have thin delegates in `main.js` that call the extraction modules. Dependencies are wired via `install(ctx)` at boot time. **Phase 804:** import + reports; **Phase 806:** navbar + notifications in `legacy_main_navbar_block.js`; `legacy_main_chrome_block.js` is a thin delegate shell calling **`install(ctx)`** on import, reports, and navbar modules.
 
 ## Next candidates (stretch)
 
 | Area | Functions / region | Blocker | Suggested file |
 |------|-------------------|---------|----------------|
-| Navbar render | `renderNavbar` (~320 lines) | Deeply intertwined with sidebar | Could further slim main.js |
-| Import modal | `showImportModal` (~177 lines) | Self-contained | `legacy_main_import.js` |
-| Accounting reports | `renderAccountingReport` etc. (~200 lines) | Straightforward | `legacy_main_reports.js` |
+| *None queued* | Chrome split complete for import/reports/navbar | — | — |
 
 ## Verification (each extraction)
 

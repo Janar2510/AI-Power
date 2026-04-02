@@ -465,13 +465,14 @@
           '<p><kbd>Alt+E</kbd> Toggle edit mode</p>' +
           '<p><kbd>Alt+L</kbd> List view</p>' +
           '<p><kbd>Alt+K</kbd> Kanban view</p>' +
+          '<p><kbd>Alt+/</kbd> Focus list search</p>' +
           '<p><kbd>Alt+P</kbd> Print / preview</p>' +
           "<p><kbd>Esc</kbd> Close modal</p>" +
           "</div>",
       });
       return;
     }
-    window.alert("Shortcuts: Mod+K, Alt+N, Alt+S, Alt+E, Alt+L, Alt+K, Alt+P, Esc");
+    window.alert("Shortcuts: Mod+K, Alt+N, Alt+S, Alt+E, Alt+L, Alt+K, Alt+/, Alt+P, Esc");
   }
 
   function renderNavbar(userCompanies, userLangs, currentLang) {
@@ -1132,6 +1133,16 @@
       if (previewBtn) {
         e.preventDefault();
         previewBtn.click();
+      }
+    } else if (e.key === '/') {
+      /* Phase 812: list search focus (Odoo-style); see webclient_shortcut_contract.js */
+      if (listMatch) {
+        e.preventDefault();
+        const si = document.getElementById("list-search");
+        if (si && typeof si.focus === "function") {
+          si.focus();
+          if (typeof si.select === "function") si.select();
+        }
       }
     }
   });

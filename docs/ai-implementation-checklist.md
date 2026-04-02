@@ -263,6 +263,35 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **Cleanup:** removed **7473** ingest **`fetch`** from **`main.js`**, **`app/main.js`**, **`app/webclient.js`**; **`npm run build:web`** (**evidence:** grep).
 - [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`DeploymentChecklist.md`**.
 
+## Post-1.250.4 (release 1.250.4 — post–1.250.3 engineering plan: 810–813 + product gate log)
+
+- [x] **Product gate log:** **`deferred_product_backlog.md`** — **647b** / **679** / **809** unchanged; no **P5 `view_service`** in this train (**evidence:** **Post–1.250.4** bullet).
+- [x] **810 — Form RPC deadline:** **`legacy_main_form_views.js`** **`raceFormLoadRpc`** on **`default_get`** + **`read`**; **`renderFormLoadFailure`** + **Retry**; **`webclient.css`** form error tokens (**evidence:** **`changelog.md`**).
+- [x] **811 — App tile E2E:** **`.github/workflows/ci.yml`** **`e2e-pr-smoke`** includes **`test_app_tile_navigation_tour.py`**; brand locator **ERP Platform** | **Foundry One** (**evidence:** workflow + test file).
+- [x] **812 — Hotkeys slice:** **`main.js`** **Alt+/** list search focus; **`webclient_shortcut_contract.js`** + **`test_webclient_shortcut_contract.js`** (**evidence:** **`odoo19-webclient-gap-table.md`**).
+- [x] **813 — Core 808 evidence:** **`odoo19_core_gap_table.md`** prefetch table row (**evidence:** same file).
+- [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`DeploymentChecklist.md`**, **`parity_matrix.md`**.
+
+## Post-1.250.7 (release 1.250.7 — incremental reliability; no P5 / 679)
+
+- [x] **Session fetch bound:** **`addons/web/static/src/services/session.js`** **`getSessionInfo`** **15s** **`AbortController`**; unblocks shell when TCP hangs (**evidence:** same file).
+- [x] **ViewService fetch bound:** **`addons/web/static/src/app/services/view_service.js`** **`_jsonRpc`** **20s** timeout (**evidence:** same file).
+- [x] **Shell / list cross-reference:** **`webclient.js`** comment; **`legacy_main_list_views.js`** note re **`session.js`** (**evidence:** same files).
+- [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`parity_matrix.md`**.
+
+## Post-1.250.6 (release 1.250.6 — post–1.250.5 plan: 814–817 + product gate log)
+
+- [x] **814a — Field widgets:** **`crm.lead`** form **`ai_win_probability`** + **`widget="percentage"`**; **`field_registry.js`** docstring; **`test_field_registry.js`** case (**evidence:** **`crm_views.xml`**).
+- [x] **815 — ir.rule generic skip:** **`core/data/data_loader.py`** **`_SKIP_MODELS`** includes **`ir.rule`**; **`tests/test_data_loader_ir_rule_skip_phase815.py`** (**evidence:** no **`model_id`** write on init).
+- [x] **816 — Core §808:** **`odoo19_core_gap_table.md`** post-train evidence row (**evidence:** same file).
+- [x] **817 — Operator docs:** **`DeploymentChecklist.md`** + **`docs/frontend.md`** local shell vs **psql**, **`db init`**, port **8069** (**evidence:** same files).
+- [x] **PWA `start_url`:** **`GET /web`** serves the same shell as **`GET /`** (not **404**); **`tests/test_http.py`** **`test_web_start_url_not_404_matches_root_when_unauthenticated`** (**evidence:** **`core/http/routes.py`** **`web_app_start_url`** / **`_web_shell_response`**).
+- [x] **Modern navbar flex:** **`#navbar > .o-modern-navbar-slot`** **`flex: 1 1 0%`** + column stretch in **`webclient.css`** (OWL slot fills header; avoids stacked chrome / dead clicks).
+- [x] **PWA / Safari tabs:** Auth HTML unregisters SW; **`sw.js`** **`erp-web-shell-v3`**, no **`clients.claim`** on activate (**evidence:** **`routes.py`**).
+- [x] **List prep timeouts:** **`legacy_main_list_views.js`** **`LIST_PREP_SESSION_MS`** / **`LIST_PREP_SAVED_FILTERS_MS`** before **`search_read`** (**evidence:** same file).
+- [x] **Product gate log:** **`deferred_product_backlog.md`** **Post–1.250.6** — **647b** / **679** / **809** unchanged; no **P5** code.
+- [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`parity_matrix.md`**, **`odoo19-webclient-gap-table.md`**.
+
 ## Post-1.249 (release 1.249.0 — navigation, route registry, OWL/CSP docs)
 
 - [x] **Navigation:** Same-hash **`router.navigate`** triggers **`ErpLegacyRouter.route()`**; **`navigateActWindowIfAvailable`** one-shot sync + 6s deadline; **`ViewManager.openFromActWindow`** **`loadViews`** 7s race (**evidence:** **`services.js`**, **`main.js`**, **`view_manager.js`**).

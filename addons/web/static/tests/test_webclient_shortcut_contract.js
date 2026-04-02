@@ -22,14 +22,14 @@
       errors.push("missing __ERP_WEBCLIENT_SHORTCUT_CONTRACT.alt");
       return { pass: pass, fail: fail, errors: errors };
     }
-    if (c.alt.length !== 6) {
+    if (c.alt.length !== 7) {
       fail++;
-      errors.push("expected 6 Alt+ shortcuts, got " + c.alt.length);
+      errors.push("expected 7 Alt+ shortcuts, got " + c.alt.length);
     } else {
       pass++;
     }
     var keys = sortedAltKeys(c);
-    if (keys !== "eklnps") {
+    if (keys !== "/eklnps") {
       fail++;
       errors.push("unexpected alt key set: " + keys);
     } else {

@@ -1,6 +1,7 @@
 """Configuration manager with Odoo-like flags."""
 
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -423,7 +424,9 @@ def _parse_config(args: list[str]) -> dict:
         "cors_origin": "",
         "session_store": "memory",
         "server_wide_modules": DEFAULT_SERVER_WIDE_MODULES.copy(),
-        "db_host": os.environ.get("PGHOST", "localhost"),
+        # Postgres.app on macOS often breaks trust auth via IPv6 (::1); TCP to 127.0.0.1 avoids the dialog failure.
+        "db_host": os.environ.get("PGHOST")
+        or ("127.0.0.1" if sys.platform == "darwin" else "localhost"),
         "db_port": int(os.environ.get("PGPORT", "5432")),
         "db_user": os.environ.get("PGUSER", os.environ.get("USER", "postgres")),
         "db_password": os.environ.get("PGPASSWORD", ""),

@@ -1,5 +1,65 @@
 # Changelog
 
+## 1.250.7 — Frontend reliability (session + ViewService fetch bounds; next-phase plan slice)
+
+### Fixed
+
+- **Session / shell bootstrap:** **`Services.session.getSessionInfo`** uses **`AbortController`** + **15s** timeout so a hung **`/web/session/get_session_info`** fetch cannot block **`shell.load()`** and the rest of the client indefinitely ([`session.js`](addons/web/static/src/services/session.js)). Successful responses still populate cache; **401** / abort / network errors resolve to **`null`** without caching failures.
+- **Modular ViewService:** **`_jsonRpc`** ( **`loadViews`** / **`fields_get`** ) uses **20s** fetch timeout ([`view_service.js`](addons/web/static/src/app/services/view_service.js)); existing **`.catch`** stubs still apply.
+
+### Docs
+
+- **`webclient.js`:** Comment links shell **20s** race to bounded session fetch.
+- **`legacy_main_list_views.js`:** Comment cross-reference to **`session.js`** timeout (list prep races remain).
+
+---
+
+## 1.250.6 — Post–1.250.5 plan (814 widget slice, 815 ir.rule init, 816–817 docs)
+
+### Added
+
+- **814a — Field widget parity:** CRM lead form **`ai_win_probability`** uses legacy **`percentage`** widget ([`crm_views.xml`](addons/crm/views/crm_views.xml)); **`test_field_registry.js`** production-widget case.
+
+### Fixed
+
+- **List views stuck on “Loading…”:** **`loadRecords`** now **timeouts** **`getSessionInfo`** (**8s**) and **`getSavedFilters`** / **`ir.filters`** (**10s**) before **`search_read`**, so a hung session or filters RPC cannot block invoice and other list screens forever ([`legacy_main_list_views.js`](addons/web/static/src/legacy_main_list_views.js)).
+- **Safari “page not responding” / force-reload on Login:** Standalone **login, TOTP, signup** pages now run **`navigator.serviceWorker.getRegistrations()` → `unregister()`** so a stuck PWA worker does not keep controlling the tab. **`/web/sw.js`** no longer calls **`clients.claim()`** on activate (less aggressive takeover); **`CACHE`** bumped to **`erp-web-shell-v3`** ([`routes.py`](core/http/routes.py)).
+- **Login / signup / TOTP pages (Safari blank or dark screen):** Removed **`webclient.css`** from those standalone HTML pages — it was loaded **without** **`_tokens.css`**, so **`var(--color-bg)`** / **`var(--color-text)`** on **`body`** were invalid and Safari often showed an empty or nearly black viewport. Pages now use **inline CSS only** + **`meta name="color-scheme" content="light"`** ([`routes.py`](core/http/routes.py)).
+- **Modern shell header layout:** **`#navbar > .o-modern-navbar-slot`** now gets the same **`flex: 1 1 0%`** / column stretch as the legacy direct-**`.o-navbar-shell`** rule, so Foundry/OWL chrome does not collapse and stack controls on top of each other (broken clicks, “nothing works” on Home). [**`webclient.css`**](addons/web/static/src/scss/webclient.css).
+- **PWA / bookmarks:** **`GET /web`** serves the same web client shell as **`GET /`** (redirect to **`/web/login`** when unauthenticated), matching **`manifest.webmanifest`** **`start_url`** ([`routes.py`](core/http/routes.py)); previously **`/web`** returned **404** and broke “Open app” from the installed PWA.
+- **815 — Init noise:** Generic XML loader skips **`ir.rule`** ([`data_loader.py`](core/data/data_loader.py)) so **`security/ir_rule.xml`** is applied only via **`init_data._load_ir_rules`** (Odoo-style **`model_id`** no longer hits ORM **`write`** with unknown fields). Test: **`tests/test_data_loader_ir_rule_skip_phase815.py`**.
+
+### Docs
+
+- **817:** Local dev runbook in [**`DeploymentChecklist.md`**](DeploymentChecklist.md) and [**`docs/frontend.md`**](docs/frontend.md).
+- **816:** **`odoo19_core_gap_table.md`** §808 post-train note; **`deferred_product_backlog.md`** Post–1.250.6 log; **`parity_matrix.md`**, **`ai-implementation-checklist.md`**, **`odoo19-webclient-gap-table.md`** (Field widgets row).
+
+---
+
+## 1.250.5 — macOS Postgres.app / `localhost` IPv6 trust fix
+
+### Fixed
+
+- **`core/tools/config.py`:** When **`PGHOST`** is unset on **macOS** (`darwin`), default **`db_host`** is **`127.0.0.1`** instead of **`localhost`**, avoiding **`::1`** connections that often trigger Postgres.app **trust** verification failures (empty DB / login errors while **`psql`** still works).
+
+---
+
+## 1.250.4 — Form load deadline, E2E app-tile PR smoke, list Alt+/ (post–1.250.3 plan)
+
+### Added
+
+- **Legacy form load:** **`legacy_main_form_views.js`** — **`Promise.race`** (**25s**) on **`default_get`** and **`read`** (**`loadRecord`**); failure shows **Retry** (**`o-btn o-btn-primary`**, **`webclient.css`** **`.o-form-load-error`** / **`.o-form-load-retry-wrap`**). Statusbar refresh **`read`** ignores deadline rejection (no full-view replace).
+- **Hotkeys (partial):** **`main.js`** **Alt+/** on list route focuses **`#list-search`**; shortcut help + **`webclient_shortcut_contract.js`** **`alt`** entry; **`test_webclient_shortcut_contract`** expects **7** Alt+ rows.
+- **E2E:** **PR** job **`e2e-pr-smoke`** runs **`test_app_tile_navigation_tour.py`** with portal payment tour; tour waits for **ERP Platform** or **Foundry One** brand text.
+
+### Docs
+
+- **`deferred_product_backlog.md`** — **Post–1.250.4** engineering log (**647b** / **679** / **809** unchanged, no **P5** code).
+- **`odoo19_core_gap_table.md`** §808 — evidence row for **1.250.4**; **`odoo19-webclient-gap-table.md`** hotkeys row — **Alt+/**.
+- **`parity_matrix.md`**, **`DeploymentChecklist.md`**, **`ai-implementation-checklist.md`**.
+
+---
+
 ## 1.250.3 — Web client list timeout + app picker diagnostics (Odoo-shell alignment)
 
 ### Fixed

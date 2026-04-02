@@ -48,6 +48,7 @@
             <field name="user_id" comodel="res.users"/>
             <field name="ai_score" readonly="1"/>
             <field name="ai_score_label" readonly="1"/>
+            <field name="ai_win_probability" widget="percentage" readonly="1"/>
             <field name="currency_id" comodel="res.currency" invisible="[('type','=','lead')]"/>
             <field name="expected_revenue" invisible="[('type','=','lead')]"/>
             <field name="description"/>

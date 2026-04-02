@@ -4,6 +4,8 @@ E2E: Home app grid → first app tile → main column shows content.
 Requires DB + server like test_login_list_form_tour.py.
 """
 
+import re
+
 import pytest
 
 
@@ -25,7 +27,10 @@ def test_app_tile_opens_main_content(
     page.get_by_role("button", name="Log in").click()
     page.wait_for_load_state("networkidle")
 
-    page.get_by_text("ERP Platform").first.wait_for(state="visible", timeout=10000)
+    # Navbar brand may be static "ERP Platform" or boot-time wordmark (e.g. Foundry One).
+    page.get_by_text(re.compile(r"ERP Platform|Foundry One")).first.wait_for(
+        state="visible", timeout=10000
+    )
 
     page.goto(f"{e2e_base_url}/web#home")
     page.wait_for_load_state("networkidle")

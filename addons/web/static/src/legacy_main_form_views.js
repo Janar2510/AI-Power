@@ -695,6 +695,34 @@
     return html;
   }
 
+  /** Bounded wait for dominant form load RPCs (`read`, `default_get`); mirrors list `loadRecords` deadline (phase 810). */
+  var FORM_LOAD_RPC_DEADLINE_MS = 25000;
+
+  function formLoadRpcDeadlineReject() {
+    return new Promise(function (_, rej) {
+      setTimeout(function () {
+        rej(new Error('Form data request timed out. Check your connection or try again.'));
+      }, FORM_LOAD_RPC_DEADLINE_MS);
+    });
+  }
+
+  function raceFormLoadRpc(promise) {
+    return Promise.race([promise, formLoadRpcDeadlineReject()]);
+  }
+
+  function renderFormLoadFailure(title, err, retryFn) {
+    var safeTitle = (title || 'Form').replace(/</g, '&lt;');
+    var msg = err && err.message ? String(err.message).replace(/</g, '&lt;') : 'Failed to load';
+    _ctx.main.innerHTML =
+      '<h2>' + safeTitle + '</h2>' +
+      '<p class="error o-form-load-error">' + msg + '</p>' +
+      '<div class="o-form-load-retry-wrap"><button type="button" class="o-btn o-btn-primary" id="o-form-load-retry">Retry</button></div>';
+    var retryBtn = document.getElementById('o-form-load-retry');
+    if (retryBtn && typeof retryFn === 'function') {
+      retryBtn.onclick = function () { retryFn(); };
+    }
+  }
+
   /* ──────────────────────────────────────────────
    * 36. renderForm  (main entry – includes wireFormViewAfterPaint)
    * ────────────────────────────────────────────── */
@@ -1097,7 +1125,7 @@
                           }
                         });
                       }
-                    });
+                    }).catch(function () { /* refresh-only; avoid replacing main on deadline */ });
                   })
                   .catch(function (err) { _ctx.showToast(err.message || 'Failed to update', 'error'); });
               }
@@ -1390,13 +1418,15 @@
             }
           });
         };
-        _ctx.rpc.callKw(model, 'default_get', [fieldNames], { context: context })
+        raceFormLoadRpc(_ctx.rpc.callKw(model, 'default_get', [fieldNames], { context: context }))
           .then(function (defaults) {
             applyDefaults(defaults);
             return loadOptions(defaults || {});
           })
           .then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); })
-          .catch(function () { loadOptions({}).then(function () { setupDependsOnHandlers(); setupOnchangeHandlers(); applyAttrsToForm(form, model); }); });
+          .catch(function (err) {
+            renderFormLoadFailure(formTitle, err, function () { renderForm(model, route, id); });
+          });
         setupOne2manyAddButtons(form, model);
         setupOne2manyComputedFields(form, model);
         setupO2mOnchangeHandlers();
@@ -1510,8 +1540,12 @@
                 }
               });
             });
+          } else {
+            renderFormLoadFailure(formTitle, new Error('Record not found'), function () { renderForm(model, route, id); });
           }
-        }).catch(function () {});
+        }).catch(function (err) {
+          renderFormLoadFailure(formTitle, err, function () { renderForm(model, route, id); });
+        });
         form.onsubmit = function (e) { e.preventDefault(); updateRecord(model, route, id, form); return false; };
         var btnDup = document.getElementById('btn-duplicate');
         var btnDel = document.getElementById('btn-delete-form');
@@ -1926,7 +1960,7 @@
   function loadRecord(model, id) {
     var fields = _ctx.getFormFields(model);
     var fnames = fields.map(function (f) { return typeof f === 'object' ? f.name : f; });
-    return _ctx.rpc.callKw(model, 'read', [[parseInt(id, 10)], fnames]);
+    return raceFormLoadRpc(_ctx.rpc.callKw(model, 'read', [[parseInt(id, 10)], fnames]));
   }
 
   /* ──────────────────────────────────────────────

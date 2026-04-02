@@ -61,20 +61,36 @@ def erp_webclient_esbuild_primary_enabled() -> bool:
     return True
 
 
+# Unregister PWA service workers on standalone auth pages so WebKit/Safari does not keep a stuck
+# controller over the origin (unresponsive tab, “force reload” for ERP Platform - Login).
+_STANDALONE_AUTH_SW_UNREGISTER = """
+<script>
+(function () {{
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.getRegistrations().then(function (regs) {{
+    regs.forEach(function (reg) {{ reg.unregister(); }});
+  }}).catch(function () {{}});
+}})();
+</script>"""
+
+
 LOGIN_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light"/>
 <title>ERP Platform - Login</title>
-<link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
 <style>
-  body {{ margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }}
-  .login-box {{ max-width: 320px; margin: 4rem auto; padding: 2rem; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
-  .login-box h1 {{ margin-top: 0; }}
-  .login-box input {{ width: 100%; padding: 0.5rem; margin: 0.5rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }}
-  .login-box button {{ width: 100%; padding: 0.75rem; margin-top: 0.5rem; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }}
+  /* Standalone login: do not load webclient.css without _tokens.css — undefined var(--color-bg) breaks body in Safari (blank / dark screen). */
+  html {{ color-scheme: light; background: #f5f5f5; }}
+  body {{ margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #222; min-height: 100vh; }}
+  .login-box {{ max-width: 320px; margin: 4rem auto; padding: 2rem; background: #fff; color: #222; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+  .login-box h1 {{ margin-top: 0; color: #111; }}
+  .login-box input {{ width: 100%; padding: 0.5rem; margin: 0.5rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: #222; }}
+  .login-box button {{ width: 100%; padding: 0.75rem; margin-top: 0.5rem; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }}
   .login-box .error {{ color: #c00; font-size: 0.9rem; }}
+  .login-box a {{ color: #1a1a2e; }}
 </style>
 </head>
 <body>
@@ -88,7 +104,7 @@ LOGIN_HTML = """<!DOCTYPE html>
   </form>
   <p class="error">{error}</p>
   <a href="/web/signup?db={db}">Create an account</a>
-</div>
+</div>""" + _STANDALONE_AUTH_SW_UNREGISTER + """
 </body>
 </html>"""
 
@@ -97,15 +113,17 @@ TOTP_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light"/>
 <title>ERP Platform - Two-Factor Authentication</title>
-<link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
 <style>
-  body {{ margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }}
-  .login-box {{ max-width: 320px; margin: 4rem auto; padding: 2rem; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
-  .login-box h1 {{ margin-top: 0; }}
-  .login-box input {{ width: 100%; padding: 0.5rem; margin: 0.5rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 1.2rem; letter-spacing: 0.2em; text-align: center; }}
-  .login-box button {{ width: 100%; padding: 0.75rem; margin-top: 0.5rem; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }}
+  html {{ color-scheme: light; background: #f5f5f5; }}
+  body {{ margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #222; min-height: 100vh; }}
+  .login-box {{ max-width: 320px; margin: 4rem auto; padding: 2rem; background: #fff; color: #222; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+  .login-box h1 {{ margin-top: 0; color: #111; }}
+  .login-box input {{ width: 100%; padding: 0.5rem; margin: 0.5rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 1.2rem; letter-spacing: 0.2em; text-align: center; background: #fff; color: #222; }}
+  .login-box button {{ width: 100%; padding: 0.75rem; margin-top: 0.5rem; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }}
   .login-box .error {{ color: #c00; font-size: 0.9rem; }}
+  .login-box a {{ color: #1a1a2e; }}
 </style>
 </head>
 <body>
@@ -119,7 +137,7 @@ TOTP_HTML = """<!DOCTYPE html>
   </form>
   <p class="error">{error}</p>
   <a href="/web/login?db={db}">Back to login</a>
-</div>
+</div>""" + _STANDALONE_AUTH_SW_UNREGISTER + """
 </body>
 </html>"""
 
@@ -349,7 +367,7 @@ def web_service_worker_stub(_request: Request):
     urls_literal = json.dumps(shell_urls)
     body = (
         "/* ERP Phase 556/590: cache shell assets; bump CACHE when precache set changes */\n"
-        "var CACHE = 'erp-web-shell-v2';\n"
+        "var CACHE = 'erp-web-shell-v3';\n"
         f"var SHELL_URLS = {urls_literal};\n"
         "self.addEventListener('install', function (e) {\n"
         "  e.waitUntil(\n"
@@ -358,9 +376,8 @@ def web_service_worker_stub(_request: Request):
         "    }).then(function () { return self.skipWaiting(); })\n"
         "  );\n"
         "});\n"
-        "self.addEventListener('activate', function (e) {\n"
-        "  e.waitUntil(self.clients.claim());\n"
-        "});\n"
+        "/* No clients.claim(): aggressive takeover correlated with Safari/WebKit unresponsive auth tabs. */\n"
+        "self.addEventListener('activate', function () {});\n"
         "self.addEventListener('fetch', function (e) {\n"
         "  var path;\n"
         "  try { path = new URL(e.request.url).pathname; } catch (err) { return; }\n"
@@ -384,17 +401,18 @@ SIGNUP_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light"/>
 <title>ERP Platform - Sign up</title>
-<link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
 <style>
-  body {{ margin: 0; font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; min-height: 100vh; }}
-  .signup-box {{ max-width: 320px; margin: 4rem auto; padding: 2rem; background: white; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
-  .signup-box h1 {{ margin-top: 0; }}
-  .signup-box input {{ width: 100%; padding: 0.5rem; margin: 0.5rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }}
-  .signup-box button {{ width: 100%; padding: 0.75rem; margin-top: 0.5rem; background: #1a1a2e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }}
+  html {{ color-scheme: light; background: #f5f5f5; }}
+  body {{ margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #222; min-height: 100vh; }}
+  .signup-box {{ max-width: 320px; margin: 4rem auto; padding: 2rem; background: #fff; color: #222; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }}
+  .signup-box h1 {{ margin-top: 0; color: #111; }}
+  .signup-box input {{ width: 100%; padding: 0.5rem; margin: 0.5rem 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: #222; }}
+  .signup-box button {{ width: 100%; padding: 0.75rem; margin-top: 0.5rem; background: #1a1a2e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }}
   .signup-box .error {{ color: #c00; font-size: 0.9rem; }}
   .signup-box .success {{ color: #080; font-size: 0.9rem; }}
-  .signup-box a {{ margin-top: 1rem; display: block; text-align: center; }}
+  .signup-box a {{ margin-top: 1rem; display: block; text-align: center; color: #1a1a2e; }}
 </style>
 </head>
 <body>
@@ -411,7 +429,7 @@ SIGNUP_HTML = """<!DOCTYPE html>
   <p class="error">{error}</p>
   <p class="success">{success}</p>
   <a href="/web/login">Already have an account? Log in</a>
-</div>
+</div>""" + _STANDALONE_AUTH_SW_UNREGISTER + """
 </body>
 </html>"""
 
@@ -1338,9 +1356,8 @@ def totp_disable(request):
     return Response('{"error": "Failed to disable"}', status=500, content_type="application/json")
 
 
-@route("/", auth="user", methods=["GET"])
-def index(request):
-    """Serve web client shell. Redirect to login if not authenticated. Phase 101: portal users -> /my."""
+def _web_shell_response(request: Request) -> Response:
+    """Serve web client shell or redirect to login / portal (``GET /`` and PWA ``start_url`` ``GET /web``)."""
     uid = get_session_uid(request)
     if uid is None:
         return redirect("/web/login")
@@ -1362,6 +1379,18 @@ def index(request):
         _webclient_html(debug_assets=_is_debug_assets(request), session_bootstrap=session_bootstrap),
         content_type="text/html; charset=utf-8",
     )
+
+
+@route("/web", auth="public", methods=["GET"])
+def web_app_start_url(request):
+    """PWA ``manifest.webmanifest`` ``start_url`` and ``/web`` bookmarks; same behaviour as ``GET /``."""
+    return _web_shell_response(request)
+
+
+@route("/", auth="user", methods=["GET"])
+def index(request):
+    """Serve web client shell. Redirect to login if not authenticated. Phase 101: portal users -> /my."""
+    return _web_shell_response(request)
 
 
 # ─── Track R1: Health and Readiness probes ────────────────────────────────────

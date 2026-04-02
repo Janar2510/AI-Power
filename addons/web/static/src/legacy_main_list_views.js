@@ -444,6 +444,10 @@
   // ─── loadRecords (core data-fetch + dispatch) ─────────────────────────
   /** Bounded wait for list RPC (search_count + search_read); avoids perpetual skeleton on hung TCP/DB. */
   var LIST_SEARCH_RPC_DEADLINE_MS = 25000;
+  /** Session + saved-filters prep must not block list paint forever (hung getSessionInfo / ir.filters). */
+  /** Note: `Services.session.getSessionInfo` fetch is also aborted at 15s in session.js. */
+  var LIST_PREP_SESSION_MS = 8000;
+  var LIST_PREP_SAVED_FILTERS_MS = 10000;
 
   function renderListLoadFailure(title, err, retryFn) {
     var msg = err && err.message ? String(err.message).replace(/</g, '&lt;') : 'Failed to load';
@@ -522,13 +526,23 @@
 
     var sessionSvc = window.Services && window.Services.session;
     var uidPromise = sessionSvc && sessionSvc.getSessionInfo
-      ? sessionSvc.getSessionInfo()
-          .then(function (info) { return info && info.uid ? info.uid : 1; })
-          .catch(function () { return 1; })
+      ? Promise.race([
+          sessionSvc.getSessionInfo()
+            .then(function (info) { return info && info.uid ? info.uid : 1; })
+            .catch(function () { return 1; }),
+          new Promise(function (resolve) {
+            setTimeout(function () { resolve(1); }, LIST_PREP_SESSION_MS);
+          }),
+        ])
       : Promise.resolve(1);
 
     uidPromise.then(function (uid) {
-      return getSavedFilters(model).then(function (savedFilters) {
+      return Promise.race([
+        getSavedFilters(model),
+        new Promise(function (resolve) {
+          setTimeout(function () { resolve(getSavedFiltersFromStorage(model)); }, LIST_PREP_SAVED_FILTERS_MS);
+        }),
+      ]).then(function (savedFilters) {
         var domain = actionDomain.slice();
 
         var savedFilter = savedFilterId

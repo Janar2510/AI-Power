@@ -7700,17 +7700,30 @@
   function _cacheKey(model, viewTypes) {
     return model + ":" + [...viewTypes].sort().join(",");
   }
+  var VIEWS_RPC_FETCH_MS = 2e4;
   async function _jsonRpc(path, params) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ jsonrpc: "2.0", method: "call", params })
-    });
-    if (!res.ok) throw new Error(`ViewService RPC ${path} \u2192 HTTP ${res.status}`);
-    const json = await res.json();
-    if (json.error) throw new Error(json.error.message || "RPC error");
-    return json.result;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const tid = setTimeout(function() {
+      if (controller) try {
+        controller.abort();
+      } catch (_e) {
+      }
+    }, VIEWS_RPC_FETCH_MS);
+    try {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ jsonrpc: "2.0", method: "call", params }),
+        signal: controller ? controller.signal : void 0
+      });
+      if (!res.ok) throw new Error(`ViewService RPC ${path} \u2192 HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error.message || "RPC error");
+      return json.result;
+    } finally {
+      clearTimeout(tid);
+    }
   }
   async function loadViews(model, viewTypes, context) {
     const key = _cacheKey(model, viewTypes);

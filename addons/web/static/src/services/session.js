@@ -3,21 +3,37 @@
  */
 (function () {
   let _cached = null;
+  /** Hung TCP / proxy: do not block shell boot or legacy prep forever (pairs with shell.load + list prep races). */
+  var SESSION_INFO_FETCH_MS = 15000;
+
   const session = {
     getSessionInfo(force) {
       if (!force && _cached) return Promise.resolve(_cached);
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var tid = setTimeout(function () {
+        if (controller) try { controller.abort(); } catch (_e) { /* noop */ }
+      }, SESSION_INFO_FETCH_MS);
       return fetch('/web/session/get_session_info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: '{}'
-      }).then(r => {
-        if (r.status === 401) return null;
-        return r.json();
-      }).then(data => {
-        _cached = data;
-        return data;
-      });
+        body: '{}',
+        signal: controller ? controller.signal : undefined,
+      })
+        .then(function (r) {
+          if (r.status === 401) return null;
+          return r.json();
+        })
+        .then(function (data) {
+          if (data) _cached = data;
+          return data;
+        })
+        .catch(function () {
+          return null;
+        })
+        .finally(function () {
+          clearTimeout(tid);
+        });
     },
     refreshCsrfToken() {
       return this.getSessionInfo(true).then(info => (info && info.csrf_token) ? info.csrf_token : null);

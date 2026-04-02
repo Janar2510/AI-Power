@@ -1042,6 +1042,15 @@ i.o-sidebar-icon {
   min-width: 0;
 }
 
+/* Modern OWL NavBar mounts AppCore.Navbar HTML inside .o-modern-navbar-slot (slot is direct child of #navbar, not .o-navbar-shell). Without flex:1 the chrome collapses and toolbar items overlap — clicks miss targets / feel dead (Safari especially). */
+#navbar > .o-modern-navbar-slot {
+  flex: 1 1 0%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 #navbar > .o-debug-toggle {
   flex-shrink: 0;
   align-self: center;
@@ -1789,8 +1798,12 @@ i.o-sidebar-icon {
   border: 1px solid var(--glass-border);
 }
 
-.o-modern-navbar-slot,
 .o-modern-sidebar-slot {
+  min-width: 0;
+}
+
+/* Navbar slot: flex rules under #navbar > .o-modern-navbar-slot; do not overflow:hidden (dropdowns extend past header). */
+.o-modern-navbar-slot {
   min-width: 0;
 }
 
@@ -3601,6 +3614,14 @@ textarea:focus-visible {
 }
 
 .o-list-load-retry-wrap {
+  margin-top: var(--space-md);
+}
+
+.o-form-load-error {
+  color: var(--color-danger);
+}
+
+.o-form-load-retry-wrap {
   margin-top: var(--space-md);
 }
 

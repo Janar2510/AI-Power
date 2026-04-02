@@ -96,6 +96,7 @@
         { widget: "many2many_tags", model: "res.partner", field: { name: "m2m_x", widget: "many2many_tags" } },
         { widget: "priority", model: "res.partner", field: { name: "x_priority", widget: "priority" } },
         { widget: "progressbar", model: "res.partner", field: { name: "x_progressbar", widget: "progressbar" } },
+        { widget: "percentage", model: "crm.lead", field: { name: "ai_win_probability", widget: "percentage" } },
         { widget: "binary", model: "res.partner", field: { name: "x_binary", widget: "binary" } },
         { widget: "one2many", model: "res.partner", field: { name: "line_ids", widget: "one2many" } },
       ];

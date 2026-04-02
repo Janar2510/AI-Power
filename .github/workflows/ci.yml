@@ -46,7 +46,7 @@ jobs:
           pip install "passlib[bcrypt]>=1.7"
           pip install pytest-cov
 
-      # Phase 576 / 586 / 593: ERP_WEBCLIENT_ESBUILD_PRIMARY=1 switches _webclient_html to per-file JS; SW precache follows (CACHE erp-web-shell-v2).
+      # Phase 576 / 586 / 593: ERP_WEBCLIENT_ESBUILD_PRIMARY=1 switches _webclient_html to per-file JS; SW precache follows (CACHE erp-web-shell-v3).
       # Regression: DeploymentChecklist v1.211.0; unittest test_webclient_html_esbuild_primary + test_web_service_worker_precache_*_phase590.
       - name: Web concat guard + bundle (esbuild)
         run: |
@@ -217,7 +217,7 @@ jobs:
           PGPASSWORD: postgres
         run: ./erp-bin db init -d erp
 
-      - name: Run portal payment E2E smoke
+      - name: Run portal + app-tile E2E smoke (phase 811)
         env:
           PGHOST: localhost
           PGPORT: 5432
@@ -229,4 +229,4 @@ jobs:
           E2E_DB: erp
         run: |
           python scripts/with_server.py --server "./erp-bin server" --port 8069 -- \
-            python -m pytest tests/e2e/test_portal_invoice_payment_tour_phase739.py -v --e2e-base-url http://localhost:8069 --e2e-db erp
+            python -m pytest tests/e2e/test_portal_invoice_payment_tour_phase739.py tests/e2e/test_app_tile_navigation_tour.py -v --e2e-base-url http://localhost:8069 --e2e-db erp

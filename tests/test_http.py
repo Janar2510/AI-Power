@@ -23,11 +23,26 @@ class TestHTTP(unittest.TestCase):
         else:
             self.assertIn(b"ERP Platform", r.data)
 
+    def test_web_start_url_not_404_matches_root_when_unauthenticated(self):
+        """PWA manifest ``start_url`` is ``/web``; it must not 404 (same redirect/shell as ``/``)."""
+        r = self.client.get("/web")
+        self.assertNotEqual(r.status_code, 404)
+        self.assertIn(r.status_code, (200, 302))
+        if r.status_code == 302:
+            self.assertIn("/web/login", r.headers.get("Location", ""))
+        else:
+            self.assertIn(b"ERP Platform", r.data)
+
     def test_login_page_returns_html(self):
         r = self.client.get("/web/login")
         self.assertEqual(r.status_code, 200)
         self.assertIn(b"ERP Platform", r.data)
         self.assertIn(b"Log in", r.data)
+        # Standalone login must not pull webclient.css without token files (Safari blank/dark viewport).
+        self.assertNotIn(b'href="/web/static/src/scss/webclient.css"', r.data)
+        self.assertIn(b'<meta name="color-scheme" content="light"/>', r.data)
+        self.assertIn(b"getRegistrations", r.data)
+        self.assertIn(b"unregister", r.data)
 
     def test_web_manifest_public_phase548(self):
         """GET /web/manifest.webmanifest returns installable shell JSON (Phase 548)."""
@@ -120,7 +135,7 @@ class TestHTTP(unittest.TestCase):
             r = self.client.get("/web/sw.js")
             self.assertEqual(r.status_code, 200)
             text = r.get_data(as_text=True)
-            self.assertIn("erp-web-shell-v2", text)
+            self.assertIn("erp-web-shell-v3", text)
             self.assertIn("/web/static/src/services/rpc.js", text)
             self.assertNotIn("/web/assets/web.assets_web.js", text)
         finally:
@@ -135,7 +150,7 @@ class TestHTTP(unittest.TestCase):
         try:
             r = self.client.get("/web/sw.js")
             text = r.get_data(as_text=True)
-            self.assertIn("erp-web-shell-v2", text)
+            self.assertIn("erp-web-shell-v3", text)
             self.assertNotIn("/web/assets/web.assets_web.js", text)
             self.assertIn("/web/static/src/services/rpc.js", text)
         finally:
@@ -150,7 +165,7 @@ class TestHTTP(unittest.TestCase):
             r = self.client.get("/web/sw.js")
             text = r.get_data(as_text=True)
             self.assertIn("/web/assets/web.assets_web.js", text)
-            self.assertIn("erp-web-shell-v2", text)
+            self.assertIn("erp-web-shell-v3", text)
         finally:
             if old is None:
                 os.environ.pop("ERP_WEBCLIENT_ESBUILD_PRIMARY", None)

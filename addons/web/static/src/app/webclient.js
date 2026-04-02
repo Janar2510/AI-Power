@@ -25,6 +25,7 @@ export class WebClient {
     this.target.classList.add("o-webclient-modern");
     this.env.services.router.start();
     /** Never block legacy boot forever if session/views/menu fetches hang (offline proxy, stalled TCP). */
+    /** `Services.session.getSessionInfo` also uses a bounded fetch (see session.js). */
     const shellLoadDeadlineMs = 20000;
     const shellLoadedOrTimeout = Promise.race([
       this.env.services.shell

@@ -1,7 +1,7 @@
 /**
  * Field widget registry — Odoo-style widget name -> HTML for form fields (Phase 5).
- * Phase 806: widgets referenced in `addons/**/views/*.xml` are covered here —
- * statusbar, many2many_tags, priority, progressbar, binary, one2many (grep-driven).
+ * Phase 806 / 814: widgets referenced in `addons/**/views/*.xml` are covered here —
+ * statusbar, many2many_tags, priority, progressbar, percentage, binary, one2many (grep-driven).
  */
 (function () {
   var registry = {};

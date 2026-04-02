@@ -10,6 +10,7 @@
     { key: "e", when: "edit control present", action: "Click .btn-edit or #btn-edit" },
     { key: "l", when: "form route", action: "Return to list hash for route" },
     { key: "k", when: "list route", action: "dispatchActWindowForListRoute + switch to kanban + reload records" },
+    { key: "/", when: "list route", action: "Focus and select #list-search (phase 812)" },
     { key: "p", when: "print/preview control", action: "Click #btn-preview-pdf or #btn-print-form" },
   ];
   window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT = Object.freeze({

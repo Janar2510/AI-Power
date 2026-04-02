@@ -53,7 +53,9 @@
 ### Verification
 
 - [ ] **URL:** exercise the shell at **`http://127.0.0.1:8069`** (or **`localhost:8069`**) **with port** — Safari “localhost” without port often mis-routes.
+- [ ] **PWA / manifest:** **`GET /web`** is the manifest **`start_url`** and matches **`GET /`** (login redirect when logged out, web client shell when logged in).
 - [ ] **Stale shell:** unregister **`/web/sw.js`** (PWA) when diagnosing cached bundles.
+- [ ] **Header looks stacked / clicks dead on Home:** hard-refresh (**Cmd+Shift+R**); confirm **`webclient.css`** includes **`#navbar > .o-modern-navbar-slot`** flex rule (modern OWL slot must grow like **`.o-navbar-shell`**). If refresh never finishes, unregister the service worker (Safari → Develop → Service Workers) and retry **`http://127.0.0.1:8069`** with port.
 - [ ] **OWL path (CSP allows eval, `cspScriptEvalBlocked: false`):** opening a **form** from **`ActionContainer`** shows **ControlPanel** + search bar above the form; domain changes propagate where **`SearchModel`** is non-stub.
 - [ ] **Default CSP:** production behaviour unchanged — legacy list/form/kanban still canonical; **`FormWithSearch`** only applies when OWL mounts.
 - [ ] **Discuss / reports / settings hashes:** `#discuss`, `#reports/trial-balance`, `#settings`, etc. still resolve (handled via **`installRouteApplyRegistryPlugins`** + **`phase631`** tests).
@@ -81,10 +83,21 @@
 
 ### Verification
 
+- [ ] **macOS + Postgres.app:** If the UI shows **Database erp does not exist** or **trust authentication** / **`::1`** errors while **`psql`** works, ensure **`erp`** exists (`erp-bin db init -d erp`) and either set **`PGHOST=127.0.0.1`** or rely on **1.250.5+** default **`db_host`**; restart Postgres.app or adjust **`pg_hba.conf`** if trust dialogs still fail ([Postgres.app permissions](https://postgresapp.com/l/app-permissions/)).
 - [ ] **Alt+H** (outside inputs): navigates to `#home` (modular hotkey registration).
 - [ ] **App tile** from Home leaves `.o-home-apps` and shows list/table or form in `#action-manager`.
-- [ ] Optional: **`pytest tests/e2e/test_app_tile_navigation_tour.py`** with server + DB.
+- [ ] **App tile E2E (phase 811):** PRs run **`tests/e2e/test_app_tile_navigation_tour.py`** in **`e2e-pr-smoke`** (with portal tour). Locally: **`python scripts/with_server.py --server "./erp-bin server" --port 8069 -- python -m pytest tests/e2e/test_app_tile_navigation_tour.py -v --e2e-base-url http://localhost:8069 --e2e-db erp`**
+- [ ] **Form load (phase 810):** After **`npm run build:web`**, legacy form **`read`** / **`default_get`** use a **25s** client deadline with **Retry** (same spirit as list **`loadRecords`**).
+- [ ] **Alt+/** on a **list** route focuses **`#list-search`** (phase **812**).
 - [ ] **Bus longpolling:** No console “Fetch … `/longpolling/poll` … access control checks” — CSRF error responses must include CORS headers (`core/http/application.py` wraps security headers before CSRF); poll POST includes `csrf_token` in JSON when session cache has it.
+
+### Local development quickstart (phase 817)
+
+- [ ] Use the **macOS Terminal** (or integrated terminal) — **not** **`psql`**. The **`psql`** prompt looks like **`erp=#`**; shell commands such as **`cd`** and **`python3.11`** do nothing there. Exit **`psql`** with **`\q`** first.
+- [ ] **Once per database:** from the project root **`erp-platform`**, run **`python3.11 erp-bin db init -d erp`** (or your Python 3.10+ with deps). You should see **`Database erp initialized.`** Warnings about **`ir.rule` / `model_id`** should be **gone** after **1.250.6** (**generic loader skips `ir.rule`**).
+- [ ] **Start the web server** (keep the window open): **`python3.11 erp-bin --http-port=8069`**. If you see **`Address already in use`**, free the port: **`lsof -ti :8069 | xargs kill -9`**, then start again.
+- [ ] **Browser:** **`http://127.0.0.1:8069/web/login?db=erp`** — default login **admin** / **admin** after a fresh init. Login HTML is **inline CSS only** (no **`webclient.css`** without tokens); if the form vanishes, hard-refresh and confirm the response has **`meta color-scheme light`**.
+- [ ] **1.250.7:** **`session.getSessionInfo`** and **`view_service`** **`_jsonRpc`** use bounded **`fetch`** (abort after **15s** / **20s**); shell **`shell.load`** still has **20s** race in **`webclient.js`**.
 
 ---
 
@@ -470,7 +483,7 @@
 
 - **Phase 738:** **`main.js`** delegates legacy fallback list rendering to **`AppCore.ListViewModule.render()`** when the extracted module is present; the inline fallback remains underneath for compatibility.
 - **Phase 739:** Portal payment flow now has typed-route support for **`/my/invoices/<id>`** and **`/my/invoices/<id>/pay`**, fixed invoice detail links, and a CSRF token on the pay form.
-- **CI:** **`e2e-pr-smoke`** runs the portal payment browser test on pull requests; the full **`tests/e2e/`** suite remains gated to main/master pushes.
+- **CI:** **`e2e-pr-smoke`** runs the portal payment tour **and** **`test_app_tile_navigation_tour.py`** on pull requests (**phase 811**); the full **`tests/e2e/`** suite remains gated to main/master pushes.
 - **647b** / **679:** Still **product-gated** — unchanged by **1.235.0**.
 
 ---
@@ -783,7 +796,7 @@
 ### Pre-Deployment
 
 - [ ] **590–592:** `npm run check:assets-concat && npm run build:web`. Smoke: home KPI numbers load (RPC); **#pipeline** from first KPI card; list **Print** opens PDF overlay; form **Print** opens PDF overlay; **Esc** closes PDF/attachment modals; focus returns to trigger.
-- [ ] **593:** **`CACHE` is `erp-web-shell-v2`** — clients with an older SW should hard-refresh or unregister the service worker once after deploy. With **`ERP_WEBCLIENT_ESBUILD_PRIMARY=1`**, precache matches per-file JS URLs (see `web_service_worker_stub`).
+- [ ] **593:** **`CACHE` is `erp-web-shell-v3`** — no **`clients.claim()`** on activate (Safari-friendly); login/signup/TOTP pages **unregister** all SWs on load. Hard-refresh once after deploy if tabs were stuck.
 - [ ] **594:** No DB migration; CRM config menus unchanged — unittest guards XML/model wiring.
 
 ### Verification

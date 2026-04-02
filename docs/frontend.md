@@ -84,7 +84,7 @@ The active product direction is defined by the Foundry One brand system and the 
 
 ### Alt+ shortcuts (legacy `main.js`)
 
-- Behaviour is implemented in `addons/web/static/src/main.js` (`keydown`, `e.altKey`). A frozen **contract** for documentation and tests lives in `addons/web/static/src/core/webclient_shortcut_contract.js` as **`window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT`** (six **Alt+** bindings: **N** new on list, **S** save form, **E** edit, **L** back to list, **K** kanban on list (**668:** **`dispatchActWindowForListRoute`** with **`shortcutAltK`**), **P** print/preview when controls exist; plus **Escape** for preview/attachment close). **`addons/web/static/tests/test_webclient_shortcut_contract.js`** asserts contract shape.
+- Behaviour is implemented in `addons/web/static/src/main.js` (`keydown`, `e.altKey`). A frozen **contract** for documentation and tests lives in `addons/web/static/src/core/webclient_shortcut_contract.js` as **`window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT`** (seven **Alt+** bindings: **N** new on list, **S** save form, **E** edit, **L** back to list, **K** kanban on list (**668:** **`dispatchActWindowForListRoute`** with **`shortcutAltK`**), **/** focus **`#list-search`** on list (**1.250.4**), **P** print/preview when controls exist; plus **Escape** for preview/attachment close). **`addons/web/static/tests/test_webclient_shortcut_contract.js`** asserts contract shape.
 
 ### Sidebar route debugging
 
@@ -223,8 +223,9 @@ When planning web changes, compare **read-only** `odoo-19.0/addons/web/__manifes
 
 - **Public** `GET /web/manifest.webmanifest` returns minimal Web App Manifest JSON (`name`, `start_url`, `display`, theme colours).
 - The webclient shell HTML includes `<link rel="manifest" href="/web/manifest.webmanifest"/>`.
-- **Phase 553:** **Public** `GET /web/sw.js` serves a minimal service worker (`install` → `skipWaiting`, `activate` → `clients.claim`). The shell registers it with `navigator.serviceWorker.register("/web/sw.js")` when supported.
-- **Phase 556 / 593 / 801:** The worker **pre-caches** shell URLs with **cache-first** `fetch` (**`CACHE`:** `erp-web-shell-v2` in `web_service_worker_stub`): by default **CSS + each manifest JS file** when esbuild-primary is on; **concat** CSS + **`web.assets_web.js`** when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=0`**. Bump **`CACHE`** in [core/http/routes.py](core/http/routes.py) when the precache set changes materially, or unregister the SW during development to avoid stale CSS/JS.
+- **Session fetch (1.250.7):** `Services.session.getSessionInfo` aborts the `POST /web/session/get_session_info` fetch after **15s** so `shell.load()` cannot wait on a stuck TCP connection forever (`addons/web/static/src/services/session.js`).
+- **Phase 553:** **Public** `GET /web/sw.js` serves a minimal service worker (`install` → `skipWaiting`; `activate` is a no-op — **no** `clients.claim()` so Safari/WebKit tabs stay responsive). The shell registers it with `navigator.serviceWorker.register("/web/sw.js")` when supported.
+- **Phase 556 / 593 / 801:** The worker **pre-caches** shell URLs with **cache-first** `fetch` (**`CACHE`:** `erp-web-shell-v3` in `web_service_worker_stub`). Standalone **login / signup / TOTP** pages **unregister** all service workers on load. By default **CSS + each manifest JS file** when esbuild-primary is on; **concat** CSS + **`web.assets_web.js`** when **`ERP_WEBCLIENT_ESBUILD_PRIMARY=0`**. Bump **`CACHE`** in [core/http/routes.py](core/http/routes.py) when the precache set changes materially, or unregister the SW during development to avoid stale CSS/JS.
 - **Limitation:** **No offline RPC** or full app cache — shell static files only; CRUD and JSON-RPC require network.
 
 ## Modular action service (Phases 636–639)
@@ -255,6 +256,13 @@ Symptom: choosing an app from the launcher or sidebar changes the URL hash but t
 
 - Align **`menuToRoute`**, **`actionToRoute`**, **`DATA_ROUTES_SLUGS`**, and **`getModelForRoute`** in **`addons/web/static/src/main.js`** with real menu **`name`** strings and **`ir.actions.act_window`** metadata.
 - Run **`python3 -m unittest tests.test_main_js_route_consistency_phase631`** after editing routes.
+
+## Local development quickstart (phase 817)
+
+- Run shell commands in **Terminal** (`%` or `$` prompt), **not** inside **`psql`** (`dbname=#`). Use **`\q`** to leave **`psql`**.
+- **Initialize DB once:** `cd` to **`erp-platform`**, then **`python3.11 erp-bin db init -d erp`** (adjust Python if you use a venv).
+- **Start HTTP server:** **`python3.11 erp-bin --http-port=8069`**. Port busy → **`lsof -ti :8069 | xargs kill -9`** then retry.
+- **Open:** **`http://127.0.0.1:8069/web/login?db=erp`**. See **`DeploymentChecklist.md`** for Postgres.app / **`db_host`** notes (**1.250.5+**).
 
 ## Non-Goals
 

@@ -63,6 +63,8 @@ Other `core/tools` consumers live under `core/http`, `core/cli`, `tests/`, and `
 | Many2one display batch | `core/orm/models.py` **`_prefetch_many2one_display`** | **Phase 804:** distinct M2O ids per read batch (order-preserving list + **`set`** dedupe). |
 | Client **`readRecord` cache** | `addons/web/static/src/model/relational_model.js` | **Phase 806:** **`Services.orm`** **`create` / `write` / `unlink`** (in **`services/orm.js`**) invalidate **`invalidateReadRecordCache`** so cached reads are not stale after RPC mutations. |
 | Next ORM prefetch work | — | Add **only** after measuring hot **`search_read`** paths (SQL log, repeated comodel **`read`** counts, or integration test evidence). Avoid speculative prefetch branches. |
+| **Post–1.250.4 evidence** | — | No new ORM **`_prefetch_*`** branch in this train. Legacy form **`read`** / **`default_get`** now use the same **25s client deadline** pattern as list **`loadRecords`** (**`legacy_main_form_views.js`**); server-side prefetch unchanged — extend **808** only when a concrete N+1 or **`call_kw`** hotspot is measured. |
+| **Post–1.250.6 evidence** | — | No new **`_prefetch_*`** or RPC hotspot measurement in this train. **815** removes duplicate **`ir.rule`** generic load noise during **`db init`** (**`data_loader._SKIP_MODELS`**) — unrelated to ORM prefetch but keeps init logs usable for future profiling. |
 
 ## Next steps (when prioritising core parity)
 

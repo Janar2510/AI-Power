@@ -15,7 +15,9 @@ from .xml_loader import parse_record_element
 _logger = logging.getLogger("erp.data_loader")
 
 # Handled by views_registry + init_data specialised loaders
-_SKIP_MODELS = frozenset({"ir.ui.view", "ir.actions.act_window", "ir.ui.menu"})
+# ir.rule: security/ir_rule.xml is loaded by init_data._load_ir_rules (model char + domain).
+# Generic XML uses Odoo-style model_id; skipping avoids duplicate loads and write errors on unknown fields.
+_SKIP_MODELS = frozenset({"ir.ui.view", "ir.actions.act_window", "ir.ui.menu", "ir.rule"})
 
 
 def _text_el(el: ET.Element) -> str:

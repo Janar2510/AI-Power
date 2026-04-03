@@ -85,7 +85,7 @@
   &--color-7 { border-left: 4px solid var(--kanban-accent-7); }
   &--color-8 { border-left: 4px solid var(--kanban-accent-8); }
   &--color-9 { border-left: 4px solid var(--kanban-accent-9); }
-  &--color-10 { border-left: 4px solid #c678dd; }
+  &--color-10 { border-left: 4px solid var(--kanban-accent-10); }
 }
 
 // ── S2 migration: rules moved from webclient.css (Phase 603) ─────────────────

@@ -579,8 +579,138 @@
     return true;
   }
 
+  // ── List view helper functions (Phase 1.250.17) ─────────────────────────
+  // These are the canonical implementations; main.js delegates to them via
+  // window.AppCore.ListViewModule.helpers after install().
+
+  var _viewsSvc = null;
+  var _rpc = null;
+
+  function _configureHelpers(opts) {
+    if (opts.viewsSvc) _viewsSvc = opts.viewsSvc;
+    if (opts.rpc) _rpc = opts.rpc;
+  }
+
+  function getListColumns(model) {
+    if (_viewsSvc && model) {
+      var v = _viewsSvc.getView(model, "list");
+      if (v && v.columns && v.columns.length) {
+        return v.columns.map(function (c) { return (typeof c === "object" ? c.name : c) || c; });
+      }
+    }
+    if (model === "crm.lead") return ["name", "type", "stage_id", "ai_score_label", "date_deadline", "expected_revenue", "tag_ids"];
+    if (model === "sale.order") return ["name", "partner_id", "date_order", "state", "amount_total"];
+    if (model === "product.product") return ["name", "list_price"];
+    if (model === "res.users") return ["name", "login", "active"];
+    return ["name", "is_company", "email", "phone", "city", "country_id", "state_id"];
+  }
+
+  function getSearchFields(model) {
+    if (_viewsSvc && model) {
+      var v = _viewsSvc.getView(model, "search");
+      if (v && v.search_fields && v.search_fields.length) return v.search_fields;
+    }
+    return ["name"];
+  }
+
+  function buildSearchDomain(model, searchTerm) {
+    var fields = getSearchFields(model);
+    if (!searchTerm || !fields.length) return [];
+    if (fields.length === 1) return [[fields[0], "ilike", searchTerm]];
+    var terms = fields.map(function (f) { return [f, "ilike", searchTerm]; });
+    var ops = [];
+    for (var i = 0; i < terms.length - 1; i++) ops.push("|");
+    return ops.concat(terms);
+  }
+
+  function getSavedFiltersFromStorage(model) {
+    try {
+      var raw = localStorage.getItem("erp_saved_filters_" + (model || "").replace(/\./g, "_"));
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+
+  function getSavedFilters(model) {
+    var sessionSvc = window.Services && window.Services.session;
+    if (!sessionSvc || !_rpc) return Promise.resolve(getSavedFiltersFromStorage(model));
+    return sessionSvc.getSessionInfo().then(function (info) {
+      if (!info || !info.uid) return getSavedFiltersFromStorage(model);
+      var domain = [["model_id", "=", model || ""], "|", ["user_id", "=", false], ["user_id", "=", info.uid]];
+      return _rpc.callKw("ir.filters", "search_read", [domain], { fields: ["id", "name", "domain"], limit: 100 })
+        .then(function (rows) {
+          return (rows || []).map(function (r) {
+            var dom = [];
+            try { dom = r.domain ? JSON.parse(r.domain) : []; } catch (e) {}
+            return { id: r.id, name: r.name || "Filter", domain: dom };
+          });
+        })
+        .catch(function () { return getSavedFiltersFromStorage(model); });
+    }).catch(function () { return getSavedFiltersFromStorage(model); });
+  }
+
+  function saveSavedFilter(model, name, domain) {
+    var sessionSvc = window.Services && window.Services.session;
+    var key = "erp_saved_filters_" + (model || "").replace(/\./g, "_");
+    if (!sessionSvc || !_rpc) {
+      var filters = getSavedFiltersFromStorage(model);
+      var id = "f" + Date.now();
+      filters.push({ id: id, name: name || "Filter", domain: domain || [] });
+      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+      return Promise.resolve(id);
+    }
+    return sessionSvc.getSessionInfo().then(function (info) {
+      if (!info || !info.uid) {
+        var filters2 = getSavedFiltersFromStorage(model);
+        var id2 = "f" + Date.now();
+        filters2.push({ id: id2, name: name || "Filter", domain: domain || [] });
+        try { localStorage.setItem(key, JSON.stringify(filters2)); } catch (e) {}
+        return id2;
+      }
+      return _rpc.callKw("ir.filters", "create", [{ name: name || "Filter", model_id: model || "", domain: JSON.stringify(domain || []), user_id: info.uid }], {})
+        .then(function (rec) {
+          if (!rec) return null;
+          if (Array.isArray(rec) && rec.length) return rec[0];
+          return rec.ids ? rec.ids[0] : (rec.id != null ? rec.id : null);
+        }).catch(function () {
+          var filters3 = getSavedFiltersFromStorage(model);
+          var id3 = "f" + Date.now();
+          filters3.push({ id: id3, name: name || "Filter", domain: domain || [] });
+          try { localStorage.setItem(key, JSON.stringify(filters3)); } catch (e) {}
+          return id3;
+        });
+    });
+  }
+
+  function removeSavedFilter(model, id) {
+    var key = "erp_saved_filters_" + (model || "").replace(/\./g, "_");
+    if (typeof id === "string" && id.indexOf("f") === 0) {
+      var filters = getSavedFiltersFromStorage(model).filter(function (f) { return f.id !== id; });
+      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+      return Promise.resolve();
+    }
+    if (!_rpc) return Promise.resolve();
+    return _rpc.callKw("ir.filters", "unlink", [[parseInt(id, 10)]], {}).catch(function () {
+      var filters = getSavedFiltersFromStorage(model).filter(function (f) { return f.id !== id; });
+      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
+    });
+  }
+
+  var helpers = {
+    getListColumns: getListColumns,
+    getSearchFields: getSearchFields,
+    buildSearchDomain: buildSearchDomain,
+    getSavedFilters: getSavedFilters,
+    getSavedFiltersFromStorage: getSavedFiltersFromStorage,
+    saveSavedFilter: saveSavedFilter,
+    removeSavedFilter: removeSavedFilter,
+    configure: _configureHelpers,
+  };
+
   window.AppCore = window.AppCore || {};
   window.AppCore.ListViewModule = {
     render: render,
+    helpers: helpers,
   };
 })();

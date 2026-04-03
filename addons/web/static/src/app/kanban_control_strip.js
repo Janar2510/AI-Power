@@ -29,7 +29,7 @@ export function buildKanbanChromeHtml(opts) {
     '<p class="o-kanban-control-strip" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
   html += vs;
   html +=
-    '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' +
+    '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' +
     escAttr(st) +
     '">';
   html +=

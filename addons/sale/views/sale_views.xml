@@ -20,9 +20,9 @@
         <list>
           <field name="name"/>
           <field name="partner_id" comodel="res.partner"/>
-          <field name="date_order"/>
+          <field name="date_order" widget="date"/>
           <field name="state"/>
-          <field name="amount_total"/>
+          <field name="amount_total" widget="monetary"/>
         </list>
       </field>
     </record>
@@ -39,10 +39,10 @@
             <field name="state" widget="statusbar"/>
             <field name="name"/>
             <field name="partner_id" comodel="res.partner"/>
-            <field name="date_order"/>
+            <field name="date_order" widget="date"/>
             <field name="currency_id" comodel="res.currency"/>
             <field name="pricelist_id" comodel="product.pricelist"/>
-            <field name="amount_total"/>
+            <field name="amount_total" widget="monetary"/>
             <field name="order_line">
               <list>
                 <field name="product_id" comodel="product.product"/>

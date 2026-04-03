@@ -2,6 +2,7 @@ import { mountNavBar } from "./navbar.js";
 import { mountSidebar } from "./sidebar.js";
 import { attachShellChrome } from "./shell_chrome.js";
 import { ActionContainer } from "./action_container.js";
+import { LoadingIndicator } from "./loading_indicator.js";
 import { mountComponent } from "./owl_bridge.js";
 import { erpDebugBootLog } from "./debug_boot.js";
 
@@ -13,6 +14,8 @@ export class WebClient {
     this.sidebarApp = null;
     /** Post-1.248 Phase 1: OWL app on #action-manager */
     this.actionContainerApp = null;
+    /** Post-1.250.10: top-bar loading indicator OWL app */
+    this.loadingIndicatorApp = null;
   }
 
   mount() {
@@ -54,6 +57,12 @@ export class WebClient {
     shellLoadedOrTimeout.finally(() => {
       this.navbarApp = mountNavBar(this.env, navbar);
       this.sidebarApp = mountSidebar(this.env, sidebar);
+      const loadingHost = document.getElementById("o-loading-indicator-host");
+      if (loadingHost) {
+        mountComponent(LoadingIndicator, loadingHost, { env: this.env }).then((app) => {
+          this.loadingIndicatorApp = app;
+        });
+      }
       if (actionMgr) {
         mountComponent(ActionContainer, actionMgr, { env: this.env }).then((app) => {
           this.actionContainerApp = app;

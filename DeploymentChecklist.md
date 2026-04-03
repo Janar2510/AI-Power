@@ -1,5 +1,237 @@
 # Deployment Checklist
 
+## Post-1.250.17 — View Ownership Transfer
+
+### Pre-Deployment
+- [ ] `core/release.py` version is `1.250.17`
+- [ ] `npm run build:web` completes without error (bundle ~362 KB)
+- [ ] `npm run check:bundle-budget` exits 0
+
+### Post-Deployment Verification
+
+**View module helpers**
+- [ ] `window.AppCore.ListViewModule.helpers.getListColumns("res.partner")` returns an array
+- [ ] `window.AppCore.ListViewModule.helpers.buildSearchDomain("res.partner", "test")` returns domain array
+- [ ] `window.AppCore.FormViewModule.helpers.getFormFields("res.partner")` returns array
+- [ ] `window.AppCore.KanbanViewModule.helpers.getKanbanGroupBy("crm.lead")` returns `"stage_id"`
+
+**Routing / titles**
+- [ ] Navigate to `#contacts` — title shows "Contacts" (from `SR.getTitle` delegation)
+- [ ] Navigate to `#manufacturing` — title shows "Manufacturing Orders"
+- [ ] Unknown hash `#zzz_test` — title falls back to "Zzz_test" (capitalized)
+
+**main.js slim-down**
+- [ ] `main.js` is 1,288 lines (down from 1,415 at 1.250.16)
+- [ ] No console errors related to getTitle, getListColumns, or saved filters
+
+---
+
+## Post-1.250.16 — Production Hardening
+
+### Pre-Deployment
+- [ ] `core/release.py` version is `1.250.16`
+- [ ] `npm run build:web` completes without error
+- [ ] `npm run check:bundle-budget` exits 0 (bundle ≤ 400 KB)
+- [ ] `python -m pytest tests/test_rpc.py -v` passes
+
+### Post-Deployment Verification
+
+**RPC Security**
+- [ ] POST `/jsonrpc` with `{"method": "nonexistent.method"}` → HTTP 404, body `{"error": {"code": -32601}}`
+- [ ] Verify no `params` are echoed in the response body
+- [ ] Server log shows WARNING for the unknown method attempt
+
+**PWA**
+- [ ] Open DevTools → Application → Service Workers — shows `/web/sw.js` registered with scope `/`
+- [ ] No 404 for the service worker URL in the Network tab
+
+**Debug menu**
+- [ ] Debug button shows in navbar when `localStorage.erp_debug_mode === "1"`
+- [ ] Click button → dropdown opens with version, "View metadata", "Technical info", "Toggle assets debug", "Run JS tests"
+- [ ] All dropdown item backgrounds use CSS variables (no hardcoded colours)
+
+**AI routes**
+- [ ] Unauthenticated `POST /ai/chat` → HTTP 401
+- [ ] 31st request from same session within 60s → HTTP 429 with `retry_after`
+- [ ] Authenticated request still works normally
+
+**Bundle budget**
+- [ ] `npm run build:web:meta` generates `dist/meta.json`
+- [ ] `npm run check:bundle-budget` reports ✅ OK and exits 0
+
+---
+
+## Post-1.250.15 — ViewService Completion + Legacy Extraction
+
+### Pre-Deployment
+- [ ] `core/release.py` version is `1.250.15`
+- [ ] `npm run build:web` completes without error (bundle ~351 KB)
+- [ ] `test_runner.html` — new suites `test_view_service.js`, `test_pwa.js`, `test_action_service_full.js` all pass
+
+### Post-Deployment Verification
+
+**ViewService**
+- [ ] `window.AppCore.ViewService.loadViews("res.partner", ["list","form"])` returns `{ views: { list: { arch, fields }, form: { arch, fields } }, fields: {...} }` in DevTools console
+- [ ] Call a second time — same Promise returned (no extra network request)
+- [ ] `window.AppCore.ViewService.getCachedView("res.partner", "list")` returns non-null arch after first `loadViews` call
+- [ ] `window.AppCore.ViewService.clearViewCache("res.partner")` then `loadViews` — fresh fetch occurs
+
+**Routing extraction**
+- [ ] `window.__ERP_RouteEngine` present in DevTools
+- [ ] `window.__ERP_canMountOwl()` returns `false` before ActionContainer mounts, `true` after
+- [ ] Hash navigation still works: `#contacts` → contact list, `#contacts/edit/1` → form
+- [ ] `window.__ERP_BreadcrumbEngine.getStack()` reflects current navigation stack
+
+**OWL/CSP consolidation**
+- [ ] Both `route_engine.js` `canMountOwl()` and `owl_bridge.js` `canMountOwl()` agree (same value in DevTools)
+- [ ] Legacy renderers are used when `cspScriptEvalBlocked = true` (no OWL double-render)
+
+---
+
+## Post-1.250.14 — Search, Action, and Command Parity
+
+### Pre-Deployment
+
+- [ ] `core/release.py` version is `1.250.14`
+- [ ] `npm run build:web` completes without error (bundle ~348 KB)
+- [ ] Open `test_runner.html` — existing routing smoke + relational model suites still pass
+
+### Post-Deployment Verification
+
+**Search integration**
+- [ ] Mount a standalone `ListController` (no `WithSearch`) — inline `SearchBar` appears above the list
+- [ ] Type in the SearchBar, press Enter — facet chip appears, list reloads with filtered domain
+- [ ] Click panel toggle — `SearchPanel` sidebar opens/closes with sections from `SearchModel.getSearchPanelSections()`
+- [ ] Toggle a filter in `SearchPanel` — `SearchModel.toggleFilter` fires; list reloads
+- [ ] Mount `WithSearch(ListController)` — no duplicate `SearchBar` (only from `ControlPanel`)
+
+**Action manager**
+- [ ] `Services.action.doAction({ type: 'ir.actions.act_window', res_model: 'res.partner', view_mode: 'list' })` triggers `ActionBus.trigger("ACTION_MANAGER:UPDATE", ...)` when OWL container is mounted
+- [ ] `Services.action.doAction({ type: 'ir.actions.act_url', url: '/web#home' })` updates the hash
+- [ ] `Services.action.doAction({ type: 'ir.actions.report', report_name: 'sale.report_saleorder', ids: [1] })` opens report URL
+- [ ] `Services.action.getStack()` returns array with pushed entries
+
+**Command palette**
+- [ ] `Mod+K` opens the palette — 9 built-in commands visible
+- [ ] `ArrowDown`/`ArrowUp` highlights items; `Enter` activates highlighted command
+- [ ] `Alt+S` navigates to `#settings`
+- [ ] `Alt+N` navigates to `/new` route or fires `ACTION_MANAGER:NEW_RECORD`
+
+**Field widgets**
+- [ ] Form view with `widget="radio"` on a selection field renders radio buttons
+- [ ] Form view with `widget="progressbar"` on a float renders a CSS progress bar
+- [ ] `AppCore.CoreFields.radio` accessible in DevTools
+
+---
+
+## Post-1.250.13 — View stack hardening: Gantt/Activity OWL + Discuss + route plugins + RelationalModel CRUD
+
+### Pre-Deployment
+
+- [ ] `core/release.py` version is `1.250.13`
+- [ ] `npm run build:web` completes without error (`gantt_controller.js`, `activity_controller.js` in bundle)
+- [ ] `python3 -m unittest tests.test_assets` passes — `route_apply_plugin_website.js`, `route_apply_plugin_ecommerce.js` in bundle URLs
+- [ ] Open `test_runner.html` — `relationalModel` suite passes all 8 assertions
+
+### Post-Deployment Verification
+
+- [ ] Navigate to `#gantt_tasks` or `#tasks` with gantt view type — timeline renders (or skeleton if no data)
+- [ ] Navigate to `#activity` — activity matrix renders with columns (or skeleton if no data)
+- [ ] Navigate to `#discuss` — Discuss channel UI renders (not the old fallback)
+- [ ] Navigate to `#website` — shows informational placeholder with "Open Products" button
+- [ ] Navigate to `#ecommerce` — shows informational placeholder with "Open Sale Orders" button
+- [ ] `window.__ERP_RELATIONAL_MODEL.create('res.partner', {name:'Test'})` resolves in DevTools
+
+---
+
+## Post-1.250.12 — Stabilize: debug cleanup + CSP revert + route dedup + CSS token audit
+
+### Pre-Deployment
+
+- [ ] `core/release.py` version is `1.250.12`
+- [ ] No `fetch('http://127.0.0.1:7473')` calls in any JS file (run `grep -r "7473" addons/web/static/src`)
+- [ ] `npm run build:web` completes without error
+- [ ] `python3 -m unittest tests.test_assets tests.test_views_registry` all pass
+- [ ] Open `test_runner.html` in browser — `test_routing_smoke` suite passes all assertions
+
+### Post-Deployment Verification
+
+- [ ] `GET /health` returns JSON with `status: ok` and `version` field
+- [ ] `GET /readiness` returns 200 with `{"status":"ready"}` when DB is up, 503 when DB is down
+- [ ] No `connect-src http://127.0.0.1:7473` visible in DevTools → Network → response headers
+- [ ] Dark mode: search inputs in kanban/calendar/graph/pivot use border that respects dark theme
+- [ ] Print preview: page background is white, text is dark regardless of theme
+
+---
+
+## Post-1.250.11 — Token hygiene + RPC resilience + route extraction + JS color audit
+
+### Pre-Deployment
+
+- [ ] `core/release.py` version is `1.250.11`
+- [ ] `npm run check:assets-concat` passes (new JS plugins in bundle)
+- [ ] `npm run build:web` completes without error
+- [ ] `python3 -m unittest tests.test_assets tests.test_views_registry` all pass
+- [ ] Open `test_runner.html` in browser — `test_rpc_resilience` passes all 3 assertions
+
+### Post-Deployment Verification
+
+- [ ] Navigate to `#reports/trial-balance` — report renders or shows informational fallback
+- [ ] Navigate to `#settings/apikeys` — settings page renders or shows informational fallback
+- [ ] Trigger a 502 from reverse proxy (or simulate) — client shows "non-JSON response" error, not opaque parse failure
+- [ ] Remaining-days badges use design token colors (no raw hex visible in DevTools for `.o-remaining-days-*` rules)
+- [ ] Dark mode: verify `--surface-secondary`, `--color-success-bg`, `--color-warning-bg`, `--color-danger-bg` all resolve (no transparent/invisible elements)
+- [ ] Kanban column 10 border uses `var(--kanban-accent-10)` in DevTools
+- [ ] `field_registry.js` color_picker input has no `value` attribute (uses browser default or token-set)
+
+---
+
+## Post-1.250.10 — Widget wiring + remaining_days + discuss route plugin + Alt+D + LoadingIndicator
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat`** after `__manifest__.py` changes (discuss plugin added).
+- [ ] **`npm run build:web`** after `loading_indicator.js` / `webclient.js` changes.
+
+### Verification
+
+- [ ] **`python3 -m unittest tests.test_views_registry tests.test_assets`** — widget attrs in list columns + discuss plugin in bundle.
+- [ ] **`test_runner.html`** — shortcut contract suite (10 Alt+ keys, `alt+d` in modular); `field_registry` suite (remaining_days tests).
+- [ ] Smoke: **Alt+D** (outside inputs) → `#discuss`; `res.partner` form shows email/phone input widgets; `sale.order` form shows monetary/date; project task form shows remaining_days badge.
+- [ ] Smoke: top loading bar appears briefly during RPC (trigger via slow 3G network or `window.__ERP_LOADING.push()` in DevTools → bar visible; `.pop()` → bar hides).
+- [ ] `window.__ERP_LOADING` exposed in DevTools console.
+
+---
+
+## Post-1.250.9 — ORM rpc race + res.partner boolean_toggle + Alt+G + #client-info
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat`** / **`npm run build:web`** after **`orm.js`**, **`main.js`**, **`app/main.js`**, **`webclient_shortcut_contract.js`**, route plugins, or **`__manifest__.py`**.
+
+### Verification
+
+- [ ] **`python3 -m unittest tests.test_assets tests.test_views_registry`** — bundle lists **`route_apply_plugin_client_info.js`**; **`res.partner`** form **`is_company`** has **`boolean_toggle`** in registry.
+- [ ] **`test_runner.html`** — shortcut contract suites.
+- [ ] Smoke: **`#client-info`** and **Alt+G** (outside inputs) → **`#contacts`**; contact form shows company toggle control.
+
+---
+
+## Post-1.250.8 — OWL load Retry + rpc_deadline + keyboard-shortcuts route + Alt+R + boolean_toggle
+
+### Pre-Deployment
+
+- [ ] **`npm run check:assets-concat`** and **`npm run build:web`** after **`__manifest__.py`**, **`main.js`**, **`action_container.js`**, **`list_controller.js`**, **`form_controller.js`**, **`field_registry.js`**, **`webclient_shortcut_contract.js`**, or new **`rpc_deadline.js`** / **`route_apply_plugin_*.js`**.
+- [ ] **`npm run test:css`** if **`webclient.css`** / SCSS tokens change.
+
+### Verification
+
+- [ ] **`python3 -m pytest tests/test_assets.py -q`** (bundle lists **`rpc_deadline.js`** + **`route_apply_plugin_keyboard_shortcuts.js`**).
+- [ ] **`test_runner.html`** — **`field_registry`**, **`webclientShortcutContract`**, **`rpc_deadline`** suites.
+- [ ] Smoke: **`#keyboard-shortcuts`** shows help + **Go to Home**; **Alt+R** outside inputs re-applies current route; OWL list (CSP allows OWL): stall **`search_read`** → error + **Retry** within **~25s**.
+
+---
+
 ## Post-1.250.3 — List RPC deadline + selectApp debug + remove debug ingest
 
 ### Pre-Deployment

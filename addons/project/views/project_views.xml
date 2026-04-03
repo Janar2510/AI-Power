@@ -75,7 +75,7 @@
           <field name="project_id" comodel="project.project"/>
           <field name="stage_id" comodel="project.task.type"/>
           <field name="user_ids" comodel="res.users" widget="many2many_tags"/>
-          <field name="date_deadline"/>
+          <field name="date_deadline" widget="date"/>
           <field name="description"/>
         </list>
       </field>
@@ -95,7 +95,7 @@
             <field name="user_ids" comodel="res.users" widget="many2many_tags"/>
             <field name="priority" widget="priority"/>
             <field name="progress" widget="progressbar"/>
-            <field name="date_deadline"/>
+            <field name="date_deadline" widget="remaining_days"/>
             <field name="description"/>
             <field name="activity_ids"/>
             <field name="message_ids"/>

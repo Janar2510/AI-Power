@@ -13,6 +13,7 @@ Inherits [foundations.md](./foundations.md) and [app-shell.md](./app-shell.md).
 - Form sheets should feel like the primary crafted work surface within the app shell.
 
 ## Controls
+- **Boolean “company” / switch fields:** Prefer **`boolean_toggle`** in view XML for clear toggle semantics; shell uses token classes **`o-boolean-toggle`** (see **`field_registry.js`**) — **1.250.9** base **`res.partner`** **`is_company`**.
 - Primary save action uses `.o-btn.o-btn-primary`.
 - Secondary actions use `.o-btn.o-btn-secondary`.
 - Keyboard hints use `data-shortcut` and `title` affordance.

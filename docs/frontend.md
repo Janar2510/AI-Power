@@ -22,6 +22,10 @@ The active product direction is defined by the Foundry One brand system and the 
 
 ## UI/UX Rules
 
+### UI/UX Pro Max (agent and human workflow)
+
+All **planning and implementation** for visible UI must use the **ui-ux-pro-max** skill: run `python3` on the skill’s `scripts/search.py` with `--design-system` for the product context (e.g. ERP dashboard, loading states, forms), then align results with **`design-system/MASTER.md`**, **`docs/brand-system.md`**, and the view or shell spec under **`design-system/specs/`**. Implementation stays **token- and class-based** (CSS custom properties, no new hardcoded colors). Use **`npm run check:uipro:setup`** to confirm Python, optional `uipro` CLI, and vendored skill paths.
+
 ### Action-First Navigation
 
 - Router and breadcrumbs treat actions as first-class (window, client, URL)
@@ -84,7 +88,9 @@ The active product direction is defined by the Foundry One brand system and the 
 
 ### Alt+ shortcuts (legacy `main.js`)
 
-- Behaviour is implemented in `addons/web/static/src/main.js` (`keydown`, `e.altKey`). A frozen **contract** for documentation and tests lives in `addons/web/static/src/core/webclient_shortcut_contract.js` as **`window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT`** (seven **Alt+** bindings: **N** new on list, **S** save form, **E** edit, **L** back to list, **K** kanban on list (**668:** **`dispatchActWindowForListRoute`** with **`shortcutAltK`**), **/** focus **`#list-search`** on list (**1.250.4**), **P** print/preview when controls exist; plus **Escape** for preview/attachment close). **`addons/web/static/tests/test_webclient_shortcut_contract.js`** asserts contract shape.
+- Behaviour is implemented in `addons/web/static/src/main.js` (`keydown`, `e.altKey`). A frozen **contract** for documentation and tests lives in `addons/web/static/src/core/webclient_shortcut_contract.js` as **`window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT`** (nine **Alt+** bindings: **N** new on list, **S** save form, **E** edit, **L** back to list, **K** kanban on list (**668:** **`dispatchActWindowForListRoute`** with **`shortcutAltK`**), **/** focus **`#list-search`** on list (**1.250.4**), **R** re-run **`route()`** for the current hash outside inputs (**1.250.8**), **G** navigate to **`#contacts`** outside inputs (**1.250.9**), **P** print/preview when controls exist; plus **Escape** for preview/attachment close). **`addons/web/static/tests/test_webclient_shortcut_contract.js`** asserts contract shape.
+- **1.250.8:** Hash **`#keyboard-shortcuts`** renders an in-app shortcut summary via **`route_apply_plugin_keyboard_shortcuts.js`** (registered after **`route_apply_registry.js`** in **`web.assets_web`**).
+- **1.250.9:** Hash **`#client-info`** shows client diagnostics (RPC deadline ms, links) via **`route_apply_plugin_client_info.js`**. Modular shell registers **Alt+G** in **`app/main.js`** (**`Services.hotkey`**) in addition to the legacy **`main.js`** **Alt** branch.
 
 ### Sidebar route debugging
 

@@ -4,6 +4,8 @@
   "description": "Modern web client bundler and frontend migration tooling",
   "scripts": {
     "build:web": "esbuild addons/web/static/src/app/main.js --bundle --format=iife --outfile=addons/web/static/dist/modern_webclient.js --sourcemap",
+    "build:web:meta": "esbuild addons/web/static/src/app/main.js --bundle --format=iife --outfile=addons/web/static/dist/modern_webclient.js --sourcemap --metafile=addons/web/static/dist/meta.json",
+    "check:bundle-budget": "node scripts/check_bundle_budget.js",
     "build:web:min": "esbuild addons/web/static/src/app/main.js --bundle --format=iife --outfile=addons/web/static/dist/modern_webclient.min.js --minify --sourcemap",
     "build:web:legacy": "esbuild addons/web/static/src/main.js --bundle --format=iife --outfile=addons/web/static/dist/web.bundle.js --sourcemap",
     "build:css": "sass addons/web/static/src/scss/main.scss addons/web/static/dist/webclient.css --style=expanded --source-map",

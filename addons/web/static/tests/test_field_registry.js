@@ -47,6 +47,7 @@
       "integer",
       "float",
       "boolean",
+      "boolean_toggle",
       "selection",
       "date",
       "datetime",
@@ -85,6 +86,11 @@
       H.assertTrue(h.indexOf("o-state-selection-select") >= 0);
     });
 
+    test("boolean_toggle uses o-boolean-toggle shell", function () {
+      var h = W.render("res.partner", { name: "active", widget: "boolean_toggle" }, api);
+      H.assertTrue(h.indexOf("o-boolean-toggle") >= 0 && h.indexOf('role="switch"') >= 0);
+    });
+
     test("statusbar has o-statusbar shell and hidden input for wireForm", function () {
       var h = W.render("crm.lead", { name: "x_statusbar", widget: "statusbar", comodel: "crm.stage" }, api);
       H.assertTrue(h.indexOf("o-statusbar") >= 0 && h.indexOf('type="hidden"') >= 0 && h.indexOf("data-comodel") >= 0);
@@ -104,6 +110,43 @@
         var html = W.render(c.model, c.field, api);
         H.assertTrue(typeof html === "string" && html.length > 0, c.widget + " should render");
       });
+    });
+
+    test("remaining_days widget renders badge and date input", function () {
+      var h = W.render("project.task", { name: "date_deadline", widget: "remaining_days" }, api);
+      H.assertTrue(h.indexOf("o-remaining-days") >= 0, "remaining_days badge class present");
+      H.assertTrue(h.indexOf('type="date"') >= 0, "remaining_days includes date input");
+      H.assertTrue(h.indexOf('data-fname="date_deadline"') >= 0, "remaining_days sets data-fname");
+    });
+
+    test("remaining_days overdue shows correct class", function () {
+      var yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      var iso = yesterday.toISOString().slice(0, 10);
+      var h = W.render("project.task", { name: "date_deadline", widget: "remaining_days", value: iso }, api);
+      H.assertTrue(h.indexOf("o-remaining-days--overdue") >= 0, "overdue class applied for past date");
+    });
+
+    test("remaining_days future ok shows correct class", function () {
+      var future = new Date();
+      future.setDate(future.getDate() + 10);
+      var iso = future.toISOString().slice(0, 10);
+      var h = W.render("project.task", { name: "date_deadline", widget: "remaining_days", value: iso }, api);
+      H.assertTrue(h.indexOf("o-remaining-days--ok") >= 0, "ok class applied for future date >7d");
+    });
+
+    test("production-wired widgets render correct input types (1.250.10)", function () {
+      var h;
+      h = W.render("res.partner", { name: "email", widget: "email" }, api);
+      H.assertTrue(h.indexOf('type="email"') >= 0, "email widget should use type=email");
+      h = W.render("res.partner", { name: "phone", widget: "phone" }, api);
+      H.assertTrue(h.indexOf('type="tel"') >= 0, "phone widget should use type=tel");
+      h = W.render("sale.order", { name: "amount_total", widget: "monetary" }, api);
+      H.assertTrue(h.indexOf('type="number"') >= 0 && h.indexOf('step="0.01"') >= 0, "monetary widget should use number step=0.01");
+      h = W.render("sale.order", { name: "date_order", widget: "date" }, api);
+      H.assertTrue(h.indexOf('type="date"') >= 0, "date widget should use type=date");
+      h = W.render("project.task", { name: "date_deadline", widget: "date" }, api);
+      H.assertTrue(h.indexOf('type="date"') >= 0, "date widget on task deadline should use type=date");
     });
 
     return results;

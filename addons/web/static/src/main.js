@@ -80,25 +80,38 @@
   var SR = window.__ERP_SHELL_ROUTES || {};
 
   function pushBreadcrumb(label, hash) {
-    actionStack.push({ label: label, hash: hash });
-    if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
-      window.ActionManager.saveToStorage(actionStack);
+    var BE = window.__ERP_BreadcrumbEngine;
+    if (BE) {
+      BE.push(label, hash);
+      actionStack = BE.getStack();
+    } else {
+      actionStack.push({ label: label, hash: hash });
+      if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
+        window.ActionManager.saveToStorage(actionStack);
+      }
     }
   }
 
   function popBreadcrumbTo(index) {
-    if (index < actionStack.length) {
-      actionStack = actionStack.slice(0, index + 1);
-      if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
-        window.ActionManager.saveToStorage(actionStack);
-      }
-      var entry = actionStack[actionStack.length - 1];
-      if (entry) {
-        var h = entry.hash;
-        if (window.ActionManager && actionStack.length > 1 && typeof window.ActionManager.syncHashWithStack === 'function') {
-          h = window.ActionManager.syncHashWithStack(h, actionStack);
+    var BE = window.__ERP_BreadcrumbEngine;
+    if (BE) {
+      BE.setStack(actionStack);
+      BE.popTo(index);
+      actionStack = BE.getStack();
+    } else {
+      if (index < actionStack.length) {
+        actionStack = actionStack.slice(0, index + 1);
+        if (window.ActionManager && typeof window.ActionManager.saveToStorage === 'function') {
+          window.ActionManager.saveToStorage(actionStack);
         }
-        window.location.hash = h;
+        var entry = actionStack[actionStack.length - 1];
+        if (entry) {
+          var h = entry.hash;
+          if (window.ActionManager && actionStack.length > 1 && typeof window.ActionManager.syncHashWithStack === 'function') {
+            h = window.ActionManager.syncHashWithStack(h, actionStack);
+          }
+          window.location.hash = h;
+        }
       }
     }
   }
@@ -139,6 +152,12 @@
    */
   /** Phase 694: persist multi-crumb stack in hash (?stack=) for reload/share; pairs with ActionManager.decodeStackFromHash (670). */
   function syncHashWithActionStackIfMulti(route) {
+    var BE = window.__ERP_BreadcrumbEngine;
+    if (BE) {
+      BE.setStack(actionStack);
+      BE.syncHashIfMulti(route);
+      return;
+    }
     if (typeof window === 'undefined' || !actionStack || actionStack.length <= 1) return;
     if (!window.ActionManager || typeof window.ActionManager.syncHashWithStack !== 'function') return;
     var cur = window.location.hash.slice(1);
@@ -216,7 +235,8 @@
     return RL.getActionForRoute ? RL.getActionForRoute(route) : null;
   }
   function getModelForRoute(route) {
-    return RL.getModelForRoute ? RL.getModelForRoute(route) : null;
+    var model = RL.getModelForRoute ? RL.getModelForRoute(route) : null;
+    return model;
   }
   if (typeof window !== 'undefined') {
     window.__ERP_getModelForRoute = getModelForRoute;
@@ -321,37 +341,25 @@
 
   // ─── Track O2: Route-to-OWL bridge ────────────────────────────────────────
   /**
-   * Try to route a list/form/kanban path through the OWL ActionContainer via
-   * ActionBus instead of legacy string-HTML builders.
-   *
-   * Returns true when the OWL path was taken so the caller can skip legacy rendering.
-   * Falls back gracefully when viewRegistry has no OWL controller for the type.
+   * Delegates to window.__ERP_tryOwlRoute (core/route_engine.js).
+   * Kept as a local alias so all internal callers are unaffected.
    */
   function _tryOwlRoute(viewType, model, resId, extraProps) {
+    var engineFn = window.__ERP_tryOwlRoute;
+    if (typeof engineFn === "function") return engineFn(viewType, model, resId, extraProps);
+    // Inline fallback when route_engine.js is not yet loaded
     var AB = window.AppCore && window.AppCore.ActionBus;
     if (!AB || typeof AB.trigger !== 'function') return false;
-    // Default shell: cspScriptEvalBlocked true → OWL templates cannot compile; never skip legacy renderers.
     var _fb = typeof window !== 'undefined' && window.__erpFrontendBootstrap;
     if (!_fb || _fb.cspScriptEvalBlocked !== false) return false;
-    // Post-1.248: OWL path only when ActionContainer is mounted (not just #action-manager placeholder)
     if (!window.__ERP_OWL_ACTION_CONTAINER_MOUNTED) return false;
     var mountEl = document.getElementById('action-manager');
     if (!mountEl) return false;
-    // CSP fallback shell: no real OWL views — always use legacy list/form renderers.
-    if (
-      mountEl.matches("[data-erp-owl-fallback]") ||
-      mountEl.querySelector("[data-erp-owl-fallback]")
-    ) {
-      return false;
-    }
-    // Check viewRegistry has a controller
     var vr = window.AppCore && window.AppCore.viewRegistry;
     var desc = vr && typeof vr.get === 'function' && vr.get(viewType);
     if (!desc) return false;
     AB.trigger('ACTION_MANAGER:UPDATE', Object.assign({
-      viewType: viewType,
-      resModel: model,
-      resId: resId || null,
+      viewType: viewType, resModel: model, resId: resId || null,
     }, extraProps ? { props: extraProps } : {}));
     return true;
   }
@@ -480,6 +488,8 @@
   }
 
   function getListColumns(model) {
+    var lvm = window.AppCore && window.AppCore.ListViewModule;
+    if (lvm && lvm.helpers) return lvm.helpers.getListColumns(model);
     if (viewsSvc && model) {
       const v = viewsSvc.getView(model, 'list');
       if (v && v.columns && v.columns.length) return v.columns.map(c => (typeof c === 'object' ? c.name : c) || c);
@@ -492,6 +502,8 @@
   }
 
   function getSearchFields(model) {
+    var lvm = window.AppCore && window.AppCore.ListViewModule;
+    if (lvm && lvm.helpers) return lvm.helpers.getSearchFields(model);
     if (viewsSvc && model) {
       const v = viewsSvc.getView(model, 'search');
       if (v && v.search_fields && v.search_fields.length) return v.search_fields;
@@ -515,6 +527,8 @@
   }
 
   function buildSearchDomain(model, searchTerm) {
+    var lvm = window.AppCore && window.AppCore.ListViewModule;
+    if (lvm && lvm.helpers) return lvm.helpers.buildSearchDomain(model, searchTerm);
     const fields = getSearchFields(model);
     if (!searchTerm || !fields.length) return [];
     if (fields.length === 1) return [[fields[0], 'ilike', searchTerm]];
@@ -524,84 +538,12 @@
     return ops.concat(terms);
   }
 
-  function getSavedFiltersFromStorage(model) {
-    try {
-      const raw = localStorage.getItem('erp_saved_filters_' + (model || '').replace(/\./g, '_'));
-      if (!raw) return [];
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
-    } catch (e) { return []; }
-  }
-  function getSavedFilters(model) {
-    const sessionSvc = window.Services && window.Services.session;
-    if (!sessionSvc) return Promise.resolve(getSavedFiltersFromStorage(model));
-    return sessionSvc.getSessionInfo().then(function (info) {
-      if (!info || !info.uid) return getSavedFiltersFromStorage(model);
-      const domain = [['model_id', '=', model || ''], '|', ['user_id', '=', false], ['user_id', '=', info.uid]];
-      return rpc.callKw('ir.filters', 'search_read', [domain], { fields: ['id', 'name', 'domain'], limit: 100 })
-        .then(function (rows) {
-          return (rows || []).map(function (r) {
-            var dom = [];
-            try { dom = r.domain ? JSON.parse(r.domain) : []; } catch (e) {}
-            return { id: r.id, name: r.name || 'Filter', domain: dom };
-          });
-        })
-        .catch(function () { return getSavedFiltersFromStorage(model); });
-    }).catch(function () { return getSavedFiltersFromStorage(model); });
-  }
-  function saveSavedFilter(model, name, domain) {
-    const sessionSvc = window.Services && window.Services.session;
-    if (!sessionSvc) {
-      const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
-      const filters = getSavedFiltersFromStorage(model);
-      const id = 'f' + Date.now();
-      filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
-      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
-      return Promise.resolve(id);
-    }
-    return sessionSvc.getSessionInfo().then(function (info) {
-      if (!info || !info.uid) {
-        const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
-        const filters = getSavedFiltersFromStorage(model);
-        const id = 'f' + Date.now();
-        filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
-        try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
-        return id;
-      }
-      return rpc.callKw('ir.filters', 'create', [{
-        name: name || 'Filter',
-        model_id: model || '',
-        domain: JSON.stringify(domain || []),
-        user_id: info.uid
-      }], {}).then(function (rec) {
-        if (!rec) return null;
-        if (Array.isArray(rec) && rec.length) return rec[0];
-        return rec.ids ? rec.ids[0] : (rec.id != null ? rec.id : null);
-      }).catch(function () {
-        const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
-        const filters = getSavedFiltersFromStorage(model);
-        const id = 'f' + Date.now();
-        filters.push({ id: id, name: name || 'Filter', domain: domain || [] });
-        try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
-        return id;
-      });
-    });
-  }
-  function removeSavedFilter(model, id) {
-    if (typeof id === 'string' && id.indexOf('f') === 0) {
-      const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
-      const filters = getSavedFiltersFromStorage(model).filter(function (f) { return f.id !== id; });
-      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
-      return Promise.resolve();
-    }
-    return rpc.callKw('ir.filters', 'unlink', [[parseInt(id, 10)]], {}).catch(function () {
-      const key = 'erp_saved_filters_' + (model || '').replace(/\./g, '_');
-      const filters = getSavedFiltersFromStorage(model).filter(function (f) { return f.id !== id; });
-      try { localStorage.setItem(key, JSON.stringify(filters)); } catch (e) {}
-    });
-  }
+  // Saved filter functions delegated to legacy_main_list_views.js (LV module).
+  // Shim definitions at the delegate block further below (getSavedFiltersFromStorage, etc.)
 
   function getFormFields(model) {
+    var fvm = window.AppCore && window.AppCore.FormViewModule;
+    if (fvm && fvm.helpers) return fvm.helpers.getFormFields(model);
     if (viewsSvc && model) {
       const v = viewsSvc.getView(model, 'form');
       if (v && v.fields && v.fields.length) {
@@ -623,62 +565,9 @@
     return ['name', 'is_company', 'type', 'email', 'phone', 'street', 'street2', 'city', 'zip', 'country_id', 'state_id'];
   }
 
+  // Delegated to SR.getTitle (legacy_main_shell_routes.js — Phase 1.250.17)
   function getTitle(route) {
-    if (route === 'contacts') return 'Contacts';
-    if (route === 'pipeline') return 'Pipeline';
-    if (route === 'crm/activities') return 'CRM Activities';
-    if (route === 'leads') return 'Leads';
-    if (route === 'orders') return 'Orders';
-    if (route === 'products') return 'Products';
-    if (route === 'attachments') return 'Attachments';
-    if (route === 'settings/users') return 'Users';
-    if (route === 'settings/approval_rules') return 'Approval Rules';
-    if (route === 'settings/approval_requests') return 'Approval Requests';
-    if (route === 'marketing/mailing_lists') return 'Mailing Lists';
-    if (route === 'marketing/mailings') return 'Mailings';
-    if (route === 'articles') return 'Articles';
-    if (route === 'knowledge_categories') return 'Categories';
-    if (route === 'leaves') return 'Leaves';
-    if (route === 'leave_types') return 'Leave Types';
-    if (route === 'allocations') return 'Allocations';
-    if (route === 'cron') return 'Scheduled Actions';
-    if (route === 'server_actions') return 'Server Actions';
-    if (route === 'sequences') return 'Sequences';
-    if (route === 'manufacturing') return 'Manufacturing Orders';
-    if (route === 'boms') return 'Bills of Materials';
-    if (route === 'workcenters') return 'Work Centers';
-    if (route === 'transfers') return 'Transfers';
-    if (route === 'warehouses') return 'Warehouses';
-    if (route === 'purchase_orders') return 'Purchase Orders';
-    if (route === 'invoices') return 'Invoices';
-    if (route === 'bank_statements') return 'Bank Statements';
-    if (route === 'journals') return 'Journals';
-    if (route === 'accounts') return 'Chart of Accounts';
-    if (route === 'employees') return 'Employees';
-    if (route === 'departments') return 'Departments';
-    if (route === 'jobs') return 'Job Positions';
-    if (route === 'attendances') return 'Attendances';
-    if (route === 'recruitment') return 'Recruitment';
-    if (route === 'time_off') return 'Time Off';
-    if (route === 'expenses') return 'Expenses';
-    if (route === 'projects') return 'Projects';
-    if (route === 'repair_orders') return 'Repairs';
-    if (route === 'surveys') return 'Surveys';
-    if (route === 'lunch_orders') return 'Lunch';
-    if (route === 'livechat_channels') return 'Live Chat';
-    if (route === 'project_todos') return 'To-Do';
-    if (route === 'recycle_models') return 'Data Recycle';
-    if (route === 'skills') return 'Skills';
-    if (route === 'elearning') return 'eLearning';
-    if (route === 'timesheets') return 'Timesheets';
-    if (route === 'tickets') return 'Tickets';
-    if (route === 'crm_stages') return 'CRM Stages';
-    if (route === 'crm_tags') return 'CRM Tags';
-    if (route === 'crm_lost_reasons') return 'Lost Reasons';
-    if (route === 'meetings') return 'Calendar';
-    if (route === 'pos_orders') return 'Point of Sale Orders';
-    if (route === 'pos_sessions') return 'POS Sessions';
-    return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records';
+    return SR.getTitle ? SR.getTitle(route) : (route ? (route.charAt(0).toUpperCase() + route.slice(1)) : 'Records');
   }
 
   String.prototype.escapeHtml = function () {
@@ -956,74 +845,11 @@
     }
   }
 
-  /** Post-1.250: discuss, reports, website/eCommerce placeholders, settings — via route_apply_registry (Phase P1). */
-  (function installRouteApplyRegistryPlugins() {
-    var R = window.AppCore && window.AppCore.routeApplyRegistry;
-    if (!R || typeof R.registerBeforeDataRoutes !== 'function') return;
-    R.registerBeforeDataRoutes(function (hash, base) {
-      var discussMatch = hash.match(/^discuss$/);
-      var discussChannelMatch = hash.match(/^discuss\/(\d+)$/);
-      if (discussMatch || discussChannelMatch) {
-        renderDiscuss(discussChannelMatch ? discussChannelMatch[1] : null);
-        return true;
-      }
-      if (hash.match(/^reports\/trial-balance$/)) {
-        renderAccountingReport('trial-balance', 'Trial Balance');
-        return true;
-      }
-      if (hash.match(/^reports\/profit-loss$/)) {
-        renderAccountingReport('profit-loss', 'Profit & Loss');
-        return true;
-      }
-      if (hash.match(/^reports\/balance-sheet$/)) {
-        renderAccountingReport('balance-sheet', 'Balance Sheet');
-        return true;
-      }
-      if (hash.match(/^reports\/stock-valuation$/)) {
-        renderStockValuationReport();
-        return true;
-      }
-      if (hash.match(/^reports\/sales-revenue$/)) {
-        renderSalesRevenueReport();
-        return true;
-      }
-      if (base === 'website') {
-        renderAppShellPlaceholder(
-          'website',
-          'Website',
-          'Website pages and editor are scaffolded in modules; open Products for catalogue data, or Home.',
-          { secondaryActionLabel: 'Open Products', secondaryHash: 'products' }
-        );
-        return true;
-      }
-      if (base === 'ecommerce') {
-        renderAppShellPlaceholder(
-          'ecommerce',
-          'eCommerce',
-          'Shop flows are partially scaffolded. Use Products, Sale Orders, or Invoicing for catalogue and orders.',
-          { secondaryActionLabel: 'Open Sale Orders', secondaryHash: 'orders' }
-        );
-        return true;
-      }
-      if (hash.match(/^settings\/apikeys$/)) {
-        renderApiKeysSettings();
-        return true;
-      }
-      if (hash.match(/^settings\/totp$/)) {
-        renderTotpSettings();
-        return true;
-      }
-      if (hash.match(/^settings\/dashboard-widgets$/)) {
-        renderDashboardWidgets();
-        return true;
-      }
-      if (hash.match(/^settings\/?$/)) {
-        renderSettings();
-        return true;
-      }
-      return false;
-    });
-  })();
+  /** Post-1.250: website/eCommerce route plugins — extracted to
+   * route_apply_plugin_website.js and route_apply_plugin_ecommerce.js (1.250.13).
+   * #discuss → route_apply_plugin_discuss.js (1.250.10);
+   * #reports/* → route_apply_plugin_reports.js (1.250.11);
+   * #settings/* → route_apply_plugin_settings.js (1.250.11). */
 
   function routeInternal() {
     const hash = (window.location.hash || '#home').slice(1);
@@ -1144,6 +970,30 @@
           if (typeof si.select === "function") si.select();
         }
       }
+    } else if (e.key === 'r' || e.key === 'R') {
+      /* Post-1.250.8: re-apply current hash (recover stuck shell without full reload). */
+      var tgt = e.target;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      route();
+    } else if (e.key === 'g' || e.key === 'G') {
+      /* Post-1.250.9: quick jump to Contacts (res.partner list). */
+      var tg = e.target;
+      if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA' || tg.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      window.location.hash = '#contacts';
+    } else if (e.key === 'd' || e.key === 'D') {
+      /* Post-1.250.10: quick jump to Discuss. */
+      var td = e.target;
+      if (td && (td.tagName === 'INPUT' || td.tagName === 'TEXTAREA' || td.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      window.location.hash = '#discuss';
     }
   });
 
@@ -1216,7 +1066,16 @@
     if (AppCore.GanttView && typeof AppCore.GanttView.setImpl === "function") AppCore.GanttView.setImpl(renderGanttView);
     if (AppCore.ActivityView && typeof AppCore.ActivityView.setImpl === "function") AppCore.ActivityView.setImpl(renderActivityMatrix);
     if (AppCore.DiscussView && typeof AppCore.DiscussView.setImpl === "function") {
-      AppCore.DiscussView.setImpl(function () {
+      AppCore.DiscussView.setImpl(function (container, opts) {
+        var dmod = window.AppCore && window.AppCore.DiscussViewModule;
+        if (dmod && typeof dmod.render === "function") {
+          return dmod.render(container || main, Object.assign({
+            rpc: rpc,
+            showToast: showToast,
+            bus: window.Services && window.Services.bus,
+            session: window.Services && window.Services.session,
+          }, opts || {}));
+        }
         return false;
       });
     }
@@ -1228,6 +1087,20 @@
     }
   }
 
+
+  /* Phase 1.250.17: configure view module helpers (moves helper ownership to modules) */
+  var _lvm = window.AppCore && window.AppCore.ListViewModule;
+  if (_lvm && _lvm.helpers && typeof _lvm.helpers.configure === 'function') {
+    _lvm.helpers.configure({ viewsSvc: viewsSvc, rpc: rpc });
+  }
+  var _fvm = window.AppCore && window.AppCore.FormViewModule;
+  if (_fvm && _fvm.helpers && typeof _fvm.helpers.configure === 'function') {
+    _fvm.helpers.configure({ viewsSvc: viewsSvc });
+  }
+  var _kvm = window.AppCore && window.AppCore.KanbanViewModule;
+  if (_kvm && _kvm.helpers && typeof _kvm.helpers.configure === 'function') {
+    _kvm.helpers.configure({ viewsSvc: viewsSvc, rpc: rpc });
+  }
 
   /* Phase 1.245: install extraction module contexts */
   if (FV.install) FV.install({

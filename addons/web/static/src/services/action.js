@@ -45,44 +45,91 @@
     doAction(actionDef, options) {
       const def = actionDef || {};
       const type = def.type || "ir.actions.act_window";
+      const opts = options || {};
       // Notify onAction hooks
       _onActionHooks.forEach(function (hook) {
-        try { hook({ type: type, action: def, options: options }); } catch (_e) {}
+        try { hook({ type: type, action: def, options: opts }); } catch (_e) {}
       });
+      // Push to in-memory stack for breadcrumb history
+      _stack.push({ type, payload: def, options: opts });
       if (type === "ir.actions.act_window" || type === "window") {
-        return this._doWindowAction(def, options);
+        return this._doWindowAction(def, opts);
       }
       if (type === "ir.actions.act_url" || type === "url") {
-        return this._doUrlAction(def, options);
+        return this._doUrlAction(def, opts);
       }
       if (type === "ir.actions.act_client" || type === "ir.actions.client" || type === "client") {
-        return this._doClientAction(def, options);
+        return this._doClientAction(def, opts);
       }
       if (type === "ir.actions.report" || type === "report") {
-        return this._doReportAction(def, options);
+        return this._doReportAction(def, opts);
       }
       if (type === "ir.actions.server" || type === "server") {
-        return this._doServerAction(def, options);
+        return this._doServerAction(def, opts);
       }
       throw new Error("Unknown action type: " + type);
     },
-    _doWindowAction(actionDef) {
-      return {
+    _doWindowAction(actionDef, options) {
+      const opts = options || {};
+      const resModel = actionDef.res_model || actionDef.resModel || "";
+      const viewMode = actionDef.view_mode || actionDef.viewMode || "list";
+      const primaryView = viewMode.split(",")[0].trim() || "list";
+      const resId = actionDef.res_id || actionDef.resId || opts.resId || null;
+      const domain = actionDef.domain || opts.domain || [];
+      const context = Object.assign({}, actionDef.context || {}, opts.context || {});
+      const result = {
         type: "window",
-        resModel: actionDef.res_model || actionDef.resModel,
-        viewMode: actionDef.view_mode || actionDef.viewMode || "list",
+        resModel,
+        viewMode: primaryView,
         target: actionDef.target || "current",
         action: actionDef,
       };
+
+      // Push a breadcrumb stack entry for back-navigation
+      const stackEntry = {
+        label: actionDef.name || actionDef.display_name || resModel,
+        hash: window.location.hash,
+      };
+      if (window.ActionManager && typeof window.ActionManager.doAction === "function") {
+        const stack = window.ActionManager.loadFromStorage ? window.ActionManager.loadFromStorage() : [];
+        window.ActionManager.doAction(stack, stackEntry);
+      }
+
+      // Dispatch to OWL ActionContainer when mounted
+      if (window.__ERP_OWL_ACTION_CONTAINER_MOUNTED) {
+        const AB = window.AppCore && window.AppCore.ActionBus;
+        if (AB && typeof AB.trigger === "function") {
+          AB.trigger("ACTION_MANAGER:UPDATE", {
+            viewType: primaryView,
+            resModel,
+            resId: resId || undefined,
+            props: { domain, context, limit: actionDef.limit },
+          });
+        }
+      } else {
+        // Legacy path: update hash so the concat-bundle router picks it up
+        const route = resModel.replace(/\./g, "_");
+        const newHash = resId
+          ? "#" + route + "/form/" + resId
+          : "#" + route + "/" + primaryView;
+        if (window.location.hash !== newHash) {
+          window.location.hash = newHash;
+        }
+      }
+
+      return result;
     },
     _doUrlAction(actionDef) {
       const url = actionDef.url || actionDef.target_url || "#";
+      const target = actionDef.target || "_blank";
       if (url.startsWith("http") || url.startsWith("//")) {
-        window.open(url, actionDef.target || "_blank");
-      } else {
+        window.open(url, target === "current" ? "_self" : "_blank", "noopener");
+      } else if (target === "current") {
         window.location.hash = url.startsWith("#") ? url : "#" + url;
+      } else {
+        window.open(url.startsWith("#") ? url : "#" + url, "_blank", "noopener");
       }
-      return undefined;
+      return { type: "url", url };
     },
     _doClientAction(actionDef, options) {
       const tag = actionDef.tag || actionDef.name || actionDef.xml_id;
@@ -137,12 +184,29 @@
       const reportName = actionDef.report_name || actionDef.reportName || actionDef.name;
       const resId = actionDef.res_id || actionDef.resId || (opts.active_id != null ? opts.active_id : null);
       const ids = actionDef.ids || opts.active_ids || (resId != null ? [resId] : []);
-      if (reportName && ids && ids.length) {
-        const path = "/report/html/" + reportName + "/" + ids.join(",");
-        window.open(path, "_blank", "noopener");
-        return { type: "report", reportName: reportName, ids: ids, url: path };
+      const reportType = actionDef.report_type || "qweb-html";
+
+      if (!reportName) {
+        return { type: "report", error: "missing report name", action: actionDef };
       }
-      return { type: "report", error: "missing report name or ids", action: actionDef };
+      if (!ids || !ids.length) {
+        return { type: "report", error: "missing record ids", action: actionDef };
+      }
+
+      const format = reportType.includes("pdf") ? "pdf" : "html";
+      const path = "/report/" + format + "/" + reportName + "/" + ids.join(",");
+
+      // Use inline PDF viewer if available (prevents popup blocker issues)
+      if (format === "pdf") {
+        const PdfViewer = window.UIComponents && window.UIComponents.PdfViewer;
+        if (PdfViewer && typeof PdfViewer.open === "function") {
+          PdfViewer.open(path, actionDef.name || "Report");
+          return { type: "report", reportName, ids, url: path, preview: true };
+        }
+      }
+
+      window.open(path, "_blank", "noopener");
+      return { type: "report", reportName, ids, url: path, preview: false };
     },
   };
 

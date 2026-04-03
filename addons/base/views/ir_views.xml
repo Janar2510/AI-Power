@@ -36,10 +36,10 @@
           <sheet>
           <group string="Contact">
             <field name="name"/>
-            <field name="is_company"/>
+            <field name="is_company" widget="boolean_toggle"/>
             <field name="type"/>
-            <field name="email"/>
-            <field name="phone"/>
+            <field name="email" widget="email"/>
+            <field name="phone" widget="phone"/>
           </group>
           <notebook>
             <page string="Address">

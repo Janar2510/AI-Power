@@ -387,6 +387,18 @@ class Application:
         match = _match_route(request.path, request.method)
         if match:
             endpoint, kwargs = match
+            # Enforce auth="user" routes at the dispatcher level
+            from .controller import _ROUTES as _all_routes
+            route_meta = _all_routes.get(request.path, {})
+            if route_meta.get("auth") == "user":
+                from .auth import get_session_uid
+                if get_session_uid(request) is None:
+                    import json
+                    return Response(
+                        json.dumps({"error": "unauthorized"}),
+                        status=401,
+                        content_type="application/json",
+                    )(environ, start_response)
             try:
                 result = endpoint(request, **kwargs)
                 if isinstance(result, Response):

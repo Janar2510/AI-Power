@@ -30,7 +30,15 @@
   function _callKw(model, method, args, kwargs) {
     var rpc = _rpc();
     if (!rpc) return Promise.reject(new Error('RPC service not available'));
-    return rpc.callKw(model, method, args || [], _mergeContext(kwargs));
+    var p = rpc.callKw(model, method, args || [], _mergeContext(kwargs));
+    /** Post-1.250.9: bound all legacy ORM RPC (same default as OWL list/form via rpc_deadline.js). */
+    var race = typeof window !== 'undefined' && window.__ERP_rpcRaceDeadline;
+    if (typeof race === 'function') {
+      var ms = (window.__ERP_RPC_DEADLINE_DEFAULT_MS != null) ? window.__ERP_RPC_DEADLINE_DEFAULT_MS : 25000;
+      var label = 'call_kw timed out: ' + String(model || '') + '.' + String(method || '');
+      return race(p, ms, label);
+    }
+    return p;
   }
 
   function _relationalModel() {

@@ -11,6 +11,9 @@
     { key: "l", when: "form route", action: "Return to list hash for route" },
     { key: "k", when: "list route", action: "dispatchActWindowForListRoute + switch to kanban + reload records" },
     { key: "/", when: "list route", action: "Focus and select #list-search (phase 812)" },
+    { key: "r", when: "outside inputs", action: "Re-run route() for current hash (phase 1.250.8 refresh)" },
+    { key: "g", when: "outside inputs", action: "Navigate to #contacts (phase 1.250.9)" },
+    { key: "d", when: "outside inputs", action: "Navigate to #discuss (phase 1.250.10)" },
     { key: "p", when: "print/preview control", action: "Click #btn-preview-pdf or #btn-print-form" },
   ];
   window.__ERP_WEBCLIENT_SHORTCUT_CONTRACT = Object.freeze({
@@ -41,6 +44,18 @@
         when: "list route (DATA_ROUTES_SLUGS)",
         action: "dispatchActWindowForListRoute + switch to kanban (shortcutAltK)",
         source: "main.js keydown Alt branch",
+      }),
+      Object.freeze({
+        key: "alt+g",
+        when: "outside inputs",
+        action: "Navigate to #contacts",
+        source: "Services.hotkey.register from bootModernWebClient (1.250.9)",
+      }),
+      Object.freeze({
+        key: "alt+d",
+        when: "outside inputs",
+        action: "Navigate to #discuss",
+        source: "main.js keydown Alt branch (1.250.10)",
       }),
     ]),
   });

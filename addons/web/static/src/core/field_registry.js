@@ -1,7 +1,8 @@
 /**
  * Field widget registry — Odoo-style widget name -> HTML for form fields (Phase 5).
- * Phase 806 / 814: widgets referenced in `addons/**/views/*.xml` are covered here —
- * statusbar, many2many_tags, priority, progressbar, percentage, binary, one2many (grep-driven).
+ * Phase 806 / 814 / 1.250.8 / 1.250.9 / 1.250.10: widgets referenced in `addons/**/views/*.xml` are covered here —
+ * statusbar, many2many_tags, priority, progressbar, percentage, binary, one2many, boolean_toggle (base res.partner is_company),
+ * email, phone, monetary, date (wired in sale.order + project.task + res.partner), remaining_days (deadline badge).
  */
 (function () {
   var registry = {};
@@ -39,7 +40,7 @@
       (req ? " *" : "") +
       '</label><input type="color" name="' +
       esc(fname) +
-      '" value="#4a9eff" class="o-field-color"></p>'
+      '" class="o-field-color"></p>'
     );
   });
 
@@ -295,6 +296,30 @@
       "</label></p>"
     );
   });
+  /** Odoo-style toggle (same semantics as boolean; distinct shell for list/form parity slices). */
+  register("boolean_toggle", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    var req = api.getFieldMeta && api.getFieldMeta(model, fname) && api.getFieldMeta(model, fname).required;
+    return (
+      '<p class="attr-field attr-field--boolean-toggle" data-fname="' +
+      esc(fname) +
+      '"><span class="o-boolean-toggle">' +
+      '<input type="checkbox" role="switch" name="' +
+      esc(fname) +
+      '" value="1" id="o-bool-toggle-' +
+      esc(fname) +
+      '" class="o-field-checkbox o-boolean-toggle__input"' +
+      (req ? " required" : "") +
+      "/>" +
+      '<label for="o-bool-toggle-' +
+      esc(fname) +
+      '" class="o-boolean-toggle__label">' +
+      esc(label) +
+      (req ? " *" : "") +
+      "</label></span></p>"
+    );
+  });
   register("selection", function (model, f, api) {
     var fname = f.name;
     var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
@@ -443,6 +468,39 @@
       '" class="o-field-bin-status"></span></p>'
     );
   });
+  /**
+   * remaining_days: computes days until a date field value and renders a token-coloured badge.
+   * Negative = overdue (red), 0-2 = urgent (orange), 3-7 = warning (yellow), >7 = ok (green).
+   * Falls back to an empty badge when no value is available.
+   */
+  register("remaining_days", function (model, f, api) {
+    var fname = f.name;
+    var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;
+    var value = f.value != null ? f.value : (api.getFieldValue && api.getFieldValue(model, fname));
+    var badgeCls = "o-remaining-days o-remaining-days--empty";
+    var text = "";
+    if (value) {
+      var target = new Date(value);
+      var now = new Date();
+      now.setHours(0, 0, 0, 0);
+      var diff = Math.round((target - now) / 86400000);
+      text = diff === 0 ? "Today" : diff > 0 ? diff + "d" : Math.abs(diff) + "d overdue";
+      badgeCls = diff < 0
+        ? "o-remaining-days o-remaining-days--overdue"
+        : diff <= 2
+          ? "o-remaining-days o-remaining-days--urgent"
+          : diff <= 7
+            ? "o-remaining-days o-remaining-days--warning"
+            : "o-remaining-days o-remaining-days--ok";
+    }
+    return (
+      '<p class="attr-field" data-fname="' + esc(fname) + '">' +
+      '<label>' + esc(label) + '</label>' +
+      '<span class="' + badgeCls + '" data-fname="' + esc(fname) + '">' + esc(text) + '</span>' +
+      '<input type="date" name="' + esc(fname) + '" class="o-field-input o-field-input--max12 o-remaining-days__input"></p>'
+    );
+  });
+
   register("image", function (model, f, api) {
     var fname = f.name;
     var label = (api.getFieldLabel && api.getFieldLabel(model, fname)) || fname;

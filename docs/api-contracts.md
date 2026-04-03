@@ -5,7 +5,7 @@
 - **Transport**: JSON-RPC over POST
 - **Session**: Cookie or session store; session-aware
 - **Protection**: Record rules applied; access rights enforced
-- **Error model**: HTTP 200 with JSON error payload for application errors
+- **Error model**: HTTP 200 with JSON-RPC `result` on success; HTTP 401 (no session), 403 (CSRF/access), 429 (rate limit), or 500 (server exception) with JSON-RPC `error` body on failure. Client (`rpc.js`) handles non-JSON responses, CSRF retry (one attempt on 403), and typed `RateLimitError` for 429.
 
 ## External JSON-2 (Deferred)
 

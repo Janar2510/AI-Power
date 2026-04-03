@@ -160,6 +160,145 @@
     });
   };
 
+  /**
+   * Direct domain accessor for OWL components and ListController.
+   * Delegates to buildDomain with baseDomain as actionDomain.
+   * @param {any[]} [baseDomain] — base domain to prepend (e.g. action domain from props)
+   * @returns {any[]}
+   */
+  SearchModel.prototype.getDomain = function (baseDomain) {
+    return this.buildDomain({ actionDomain: baseDomain || [] });
+  };
+
+  /**
+   * Return current groupBy value.
+   * @returns {string|null}
+   */
+  SearchModel.prototype.getGroupBy = function () {
+    return this.state.groupBy || null;
+  };
+
+  /**
+   * Clear all facets, searchTerm, and groupBy.
+   */
+  SearchModel.prototype.clearAll = function () {
+    this.state.facets = [];
+    this.state.searchTerm = "";
+    this.state.groupBy = null;
+    this.state.activeSearchFilters = [];
+    this._emit("change");
+  };
+
+  /**
+   * Persist current domain as a favorite filter via ir.filters.
+   * Falls back to localStorage when rpc is unavailable.
+   * @param {string} name
+   * @param {boolean} [shared] — if true, user_id = false (global)
+   * @returns {Promise<number|string>} — id of created filter
+   */
+  SearchModel.prototype.saveFavorite = function (name, shared) {
+    var domain = this.buildDomain({});
+    var model = this.model;
+    var rpc = window.Services && window.Services.rpc;
+    if (!rpc || typeof rpc.callKw !== "function") {
+      return this._saveFavoriteLocal(name, model, domain);
+    }
+    return rpc.callKw("ir.filters", "create", [[{
+      name: name || "Favorite",
+      model_id: model,
+      domain: JSON.stringify(domain),
+      user_id: shared ? false : undefined,
+    }]], {}).then(function (res) {
+      var id = Array.isArray(res) ? res[0] : (res && res.id != null ? res.id : res);
+      return id;
+    }).catch(function () {
+      return this._saveFavoriteLocal(name, model, domain);
+    }.bind(this));
+  };
+
+  SearchModel.prototype._saveFavoriteLocal = function (name, model, domain) {
+    try {
+      var key = "erp_search_favs_" + (model || "").replace(/\./g, "_");
+      var favs = [];
+      try { favs = JSON.parse(localStorage.getItem(key) || "[]"); } catch (_) {}
+      if (!Array.isArray(favs)) favs = [];
+      var id = "fav_" + Date.now();
+      favs.push({ id: id, name: name || "Favorite", domain: domain || [] });
+      localStorage.setItem(key, JSON.stringify(favs));
+      return Promise.resolve(id);
+    } catch (_) {
+      return Promise.resolve(null);
+    }
+  };
+
+  /**
+   * Load saved favorite filters for this model.
+   * @returns {Promise<Array<{ id, name, domain }>>}
+   */
+  SearchModel.prototype.loadFavorites = function () {
+    var model = this.model;
+    var rpc = window.Services && window.Services.rpc;
+    if (!rpc || typeof rpc.callKw !== "function") {
+      return this._loadFavoritesLocal(model);
+    }
+    return rpc.callKw("ir.filters", "search_read",
+      [[["model_id", "=", model || ""]]],
+      { fields: ["id", "name", "domain"], limit: 100 }
+    ).then(function (rows) {
+      return (rows || []).map(function (r) {
+        var dom = [];
+        try { dom = r.domain ? JSON.parse(r.domain) : []; } catch (_) {}
+        return { id: r.id, name: r.name || "Favorite", domain: dom };
+      });
+    }).catch(function () {
+      return this._loadFavoritesLocal(model);
+    }.bind(this));
+  };
+
+  SearchModel.prototype._loadFavoritesLocal = function (model) {
+    try {
+      var key = "erp_search_favs_" + (model || "").replace(/\./g, "_");
+      var raw = localStorage.getItem(key);
+      if (!raw) return Promise.resolve([]);
+      var arr = JSON.parse(raw);
+      return Promise.resolve(Array.isArray(arr) ? arr : []);
+    } catch (_) {
+      return Promise.resolve([]);
+    }
+  };
+
+  /**
+   * Remove a saved favorite by id.
+   * @param {number|string} id
+   * @returns {Promise<boolean>}
+   */
+  SearchModel.prototype.removeFavoriteById = function (id) {
+    var model = this.model;
+    var rpc = window.Services && window.Services.rpc;
+    if (typeof id === "string" && id.indexOf("fav_") === 0) {
+      return this._removeFavoriteLocal(model, id);
+    }
+    if (!rpc || typeof rpc.callKw !== "function") {
+      return this._removeFavoriteLocal(model, id);
+    }
+    return rpc.callKw("ir.filters", "unlink", [[parseInt(id, 10)]], {})
+      .then(function () { return true; })
+      .catch(function () { return this._removeFavoriteLocal(model, id); }.bind(this));
+  };
+
+  SearchModel.prototype._removeFavoriteLocal = function (model, id) {
+    try {
+      var key = "erp_search_favs_" + (model || "").replace(/\./g, "_");
+      var arr = [];
+      try { arr = JSON.parse(localStorage.getItem(key) || "[]"); } catch (_) {}
+      if (!Array.isArray(arr)) arr = [];
+      localStorage.setItem(key, JSON.stringify(arr.filter(function (f) { return String(f.id) !== String(id); })));
+      return Promise.resolve(true);
+    } catch (_) {
+      return Promise.resolve(false);
+    }
+  };
+
   SearchModel.prototype.buildDomain = function (ctx) {
     ctx = ctx || {};
     var domain = (ctx.actionDomain || []).slice();

@@ -279,6 +279,50 @@ Verification checklist for AI assistant module deployment and feature additions.
 - [x] **Shell / list cross-reference:** **`webclient.js`** comment; **`legacy_main_list_views.js`** note re **`session.js`** (**evidence:** same files).
 - [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`parity_matrix.md`**.
 
+## Post-1.250.8 (release 1.250.8 — Odoo vs ERP extended phases slice; no P5 / 679)
+
+- [x] **UI governance:** **`docs/ai-rules.md`** + **`docs/frontend.md`** — **ui-ux-pro-max** `--design-system` + **`design-system/`** reconciliation; **`npm run check:uipro:setup`** (**evidence:** same files).
+- [x] **Load UX (OWL):** **`rpc_deadline.js`** + **`ListController`** / **`FormController`** **`__ERP_rpcRaceDeadline`** + error + **Retry**; **`ActionContainer`** **35s** loading watchdog (**evidence:** **`webclient.css`** tokens).
+- [x] **Route plugin E:** **`route_apply_plugin_keyboard_shortcuts.js`** — **`#keyboard-shortcuts`** (**evidence:** **`__manifest__.py`**).
+- [x] **Hotkey D:** **`main.js`** **Alt+R** → **`route()`**; **`webclient_shortcut_contract.js`** (**8** **Alt+** rows) (**evidence:** **`test_webclient_shortcut_contract.js`**).
+- [x] **Widget C:** **`boolean_toggle`** **`field_registry.js`** + tests (**evidence:** **`test_field_registry.js`**).
+- [x] **Design spec:** **`design-system/specs/app-shell.md`** loading/failure surfaces.
+- [x] **Backend asset test:** **`tests/test_assets.py`** lists new JS paths.
+- [x] **JS:** **`test_rpc_deadline.js`** in **`test_runner.html`**.
+- [x] **Product gates:** **`647b`** / **`679`** / **`809`** unchanged — **`deferred_product_backlog.md`** **Post–1.250.8** log.
+- [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`parity_matrix.md`**, **`DeploymentChecklist.md`**.
+
+## Post-1.250.11 (release 1.250.11 — frontend next phases post-1.250.10; no P5 / 679)
+
+- [x] **Token hygiene:** `_tokens.css` + `_dark.css` now define `--surface-secondary`, `--color-success-bg`, `--color-warning-bg`, `--color-warning-dark`, `--color-danger-bg`, `--kanban-accent-10`; `webclient.css` fallback hex removed; **evidence:** grep for `var(--surface-secondary,` returns 0 matches.
+- [x] **JS color audit (top 3):** `field_registry.js` `#4a9eff` removed from color_picker default; `core_fields.js` `#000000` replaced with `getComputedStyle` read of `--color-text`; `search_panel.js` `#ccc` replaced with `var(--border-color)`.
+- [x] **RPC non-JSON guard:** `rpc.js` wraps body parse in `r.text()` + `JSON.parse` with catch; non-JSON throws `"Server returned non-JSON response (status: N)"`.
+- [x] **RPC 429 handling:** `rpc.js` checks `r.status === 429` before JSON-RPC parse; throws typed `RateLimitError` with server message + `err.status = 429`.
+- [x] **`api-contracts.md` fix:** Error model updated to document actual HTTP 401/403/429/500 + CSRF retry behavior.
+- [x] **Route extraction — reports:** `route_apply_plugin_reports.js` handles 5 report routes; `main.js` report branches removed; `__manifest__.py` + `test_assets.py` updated.
+- [x] **Route extraction — settings:** `route_apply_plugin_settings.js` handles apikeys, totp, dashboard-widgets, settings; `main.js` settings branches removed; `__manifest__.py` + `test_assets.py` updated.
+- [x] **RPC resilience tests:** `test_rpc_resilience.js` covers non-JSON guard, 429 handling, CSRF retry; added to `test_runner.html`.
+- [x] **Release docs:** `core/release.py` 1.250.11, `changelog.md`, `parity_matrix.md`, `DeploymentChecklist.md`, `ai-implementation-checklist.md`.
+
+## Post-1.250.10 (release 1.250.10 — extended phases post-1.250.9; no P5 / 679)
+
+- [x] **Widget wiring + xml_loader.py fix:** `xml_loader.py` `_arch_to_dict` list-column parser captures `widget` attr; `email`+`phone` on `res.partner`, `monetary`+`date` on `sale.order`, `date`→list/`remaining_days`→form on `project.task`; **evidence:** `test_views_registry.py` 3 new tests all pass.
+- [x] **`remaining_days` widget:** `field_registry.js` new `register("remaining_days", ...)` with token-coloured badge (overdue/urgent/warning/ok); CSS `.o-remaining-days-*` tokens; `test_field_registry.js` 3 new tests.
+- [x] **Route plugin extraction:** `route_apply_plugin_discuss.js` extracted from `installRouteApplyRegistryPlugins`; registered in `__manifest__.py`; `main.js` discuss branch removed; **evidence:** `test_assets.py` includes discuss plugin.
+- [x] **Alt+D hotkey:** `main.js` + `app/main.js` + `webclient_shortcut_contract.js` (10 Alt+, `alt+d` in modular); keyboard shortcuts panel shows Alt+D; `test_webclient_shortcut_contract.js` updated.
+- [x] **LoadingIndicator OWL component:** `app/loading_indicator.js`; `window.__ERP_LOADING` counter bus; mounted in `webclient.js` on `#o-loading-indicator-host`; `webclient_templates.xml` host element; CSS tokens + `@keyframes erp-loading-slide`; `prefers-reduced-motion` safe; **evidence:** `npm run build:web` OK.
+- [x] **Release docs:** `core/release.py` 1.250.10, `changelog.md`, `parity_matrix.md`, `DeploymentChecklist.md`, `ai-implementation-checklist.md`.
+
+## Post-1.250.9 (release 1.250.9 — post-1.250.8 next phases; no P5 / 679)
+
+- [x] **ORM reliability:** **`services/orm.js`** **`_callKw`** uses **`__ERP_rpcRaceDeadline`** for all legacy **`Services.orm`** RPC (**evidence:** same file; **`rpc_deadline.js`** before **`orm.js`** in manifest).
+- [x] **814a-style XML widget:** **`base.res_partner_form`** **`is_company`** **`widget="boolean_toggle"`**; **`tests/test_views_registry.py`** **`test_res_partner_form_is_company_uses_boolean_toggle_phase12509`**.
+- [x] **Hotkey:** **Alt+G** → **`#contacts`** — **`main.js`** + **`app/main.js`** **`hotkey.register`**; **`webclient_shortcut_contract.js`** (**9** **Alt+** + modular **alt+g**); **`test_webclient_shortcut_contract.js`**.
+- [x] **Route plugin:** **`route_apply_plugin_client_info.js`** — **`#client-info`**; **`test_assets.py`**; keyboard help links (**evidence:** **`route_apply_plugin_keyboard_shortcuts.js`**).
+- [x] **Design spec:** **`design-system/specs/form-view.md`** **`boolean_toggle`** note.
+- [x] **Product gates:** **`deferred_product_backlog.md`** **Post–1.250.9** — **679** unchanged.
+- [x] **Release docs:** **`core/release.py`**, **`changelog.md`**, **`parity_matrix.md`**, **`odoo19-webclient-gap-table.md`**, **`docs/frontend.md`**, **`DeploymentChecklist.md`**.
+
 ## Post-1.250.6 (release 1.250.6 — post–1.250.5 plan: 814–817 + product gate log)
 
 - [x] **814a — Field widgets:** **`crm.lead`** form **`ai_win_probability`** + **`widget="percentage"`**; **`field_registry.js`** docstring; **`test_field_registry.js`** case (**evidence:** **`crm_views.xml`**).

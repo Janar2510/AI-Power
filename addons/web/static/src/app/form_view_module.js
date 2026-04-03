@@ -85,8 +85,62 @@
     return true;
   }
 
+  // ── Form view helper functions (Phase 1.250.17) ──────────────────────────
+  // Canonical implementations moved from main.js; main.js delegates via
+  // window.AppCore.FormViewModule.helpers after install().
+
+  var _formViewsSvc = null;
+
+  function _configureFormHelpers(opts) {
+    if (opts.viewsSvc) _formViewsSvc = opts.viewsSvc;
+  }
+
+  function getFormFields(model) {
+    if (_formViewsSvc && model) {
+      var v = _formViewsSvc.getView(model, "form");
+      if (v && v.fields && v.fields.length) {
+        var raw = v.fields.map(function (f) { return (typeof f === "object" ? f.name : f) || f; });
+        var out = [];
+        raw.forEach(function (f) {
+          var cf = getMonetaryCurrencyFieldFallback(model, f);
+          if (cf && out.indexOf(cf) < 0) out.push(cf);
+          out.push(f);
+        });
+        return out;
+      }
+    }
+    if (model === "crm.lead") return ["name", "type", "partner_id", "user_id", "stage_id", "ai_score", "ai_score_label", "currency_id", "expected_revenue", "description", "note_html", "tag_ids", "activity_ids", "message_ids"];
+    if (model === "sale.order") return ["name", "partner_id", "date_order", "state", "currency_id", "amount_total", "order_line"];
+    if (model === "product.product") return ["name", "list_price"];
+    if (model === "res.users") return ["name", "login", "active", "group_ids"];
+    if (model === "ir.attachment") return ["name", "res_model", "res_id", "datas"];
+    return ["name", "is_company", "type", "email", "phone", "street", "street2", "city", "zip", "country_id", "state_id"];
+  }
+
+  function getMonetaryCurrencyFieldFallback(model, fieldName) {
+    // Delegate to FV (legacy_main_form_views.js) if available
+    var FV = window.__ERP_FORM_VIEWS || {};
+    if (FV.getMonetaryCurrencyField) return FV.getMonetaryCurrencyField(model, fieldName);
+    return null;
+  }
+
+  /**
+   * Navigate from a form record back to its parent list route.
+   * @param {string} route  list route (e.g. "contacts")
+   */
+  function navigateToList(route) {
+    if (route) window.location.hash = "#" + route;
+  }
+
+  var formHelpers = {
+    getFormFields: getFormFields,
+    navigateToList: navigateToList,
+    configure: _configureFormHelpers,
+  };
+
   window.AppCore = window.AppCore || {};
   window.AppCore.FormViewModule = {
     render: render,
+    helpers: formHelpers,
   };
 })();

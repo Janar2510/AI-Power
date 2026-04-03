@@ -49,80 +49,80 @@
           var viewsSvc = opts.viewsSvc;
           var showToast = opts.showToast || function() {
           };
-          var helpers = opts.helpers || {};
-          var getListColumns = helpers.getListColumns || function() {
+          var helpers2 = opts.helpers || {};
+          var getListColumns2 = helpers2.getListColumns || function() {
             return [];
           };
-          var getTitle = helpers.getTitle || function() {
+          var getTitle = helpers2.getTitle || function() {
             return route;
           };
-          var getReportName = helpers.getReportName || function() {
+          var getReportName = helpers2.getReportName || function() {
             return null;
           };
-          var loadRecords = helpers.loadRecords || function() {
+          var loadRecords = helpers2.loadRecords || function() {
           };
-          var setViewAndReload = helpers.setViewAndReload || function() {
+          var setViewAndReload = helpers2.setViewAndReload || function() {
           };
-          var deleteRecord = helpers.deleteRecord || function() {
+          var deleteRecord = helpers2.deleteRecord || function() {
           };
-          var getMany2oneComodel = helpers.getMany2oneComodel || function() {
+          var getMany2oneComodel = helpers2.getMany2oneComodel || function() {
             return null;
           };
-          var getMany2manyInfo = helpers.getMany2manyInfo || function() {
+          var getMany2manyInfo = helpers2.getMany2manyInfo || function() {
             return null;
           };
-          var isMonetaryField = helpers.isMonetaryField || function() {
+          var isMonetaryField = helpers2.isMonetaryField || function() {
             return false;
           };
-          var getMonetaryCurrencyField = helpers.getMonetaryCurrencyField || function() {
+          var getMonetaryCurrencyField = helpers2.getMonetaryCurrencyField || function() {
             return null;
           };
-          var getSelectionLabel = helpers.getSelectionLabel || function(_model, _field, value) {
+          var getSelectionLabel = helpers2.getSelectionLabel || function(_model, _field, value) {
             return value;
           };
-          var getDisplayNames = helpers.getDisplayNames || function() {
+          var getDisplayNames = helpers2.getDisplayNames || function() {
             return Promise.resolve({});
           };
-          var getDisplayNamesForMany2many = helpers.getDisplayNamesForMany2many || function() {
+          var getDisplayNamesForMany2many = helpers2.getDisplayNamesForMany2many || function() {
             return Promise.resolve({});
           };
-          var getActionForRoute = helpers.getActionForRoute || function() {
+          var getActionForRoute = helpers2.getActionForRoute || function() {
             return null;
           };
-          var parseActionDomain = helpers.parseActionDomain || function() {
+          var parseActionDomain = helpers2.parseActionDomain || function() {
             return [];
           };
-          var buildSearchDomain = helpers.buildSearchDomain || function() {
+          var buildSearchDomain2 = helpers2.buildSearchDomain || function() {
             return [];
           };
-          var parseFilterDomain = helpers.parseFilterDomain || function() {
+          var parseFilterDomain = helpers2.parseFilterDomain || function() {
             return [];
           };
-          var saveSavedFilter = helpers.saveSavedFilter || function() {
+          var saveSavedFilter2 = helpers2.saveSavedFilter || function() {
             return Promise.resolve();
           };
-          var showImportModal = helpers.showImportModal || function() {
+          var showImportModal = helpers2.showImportModal || function() {
           };
           function resolveListHashDomain() {
-            var fn = helpers.getHashDomainParam;
+            var fn = helpers2.getHashDomainParam;
             if (fn && typeof fn === "function") return fn();
             if (typeof window !== "undefined" && typeof window.__ERP_getHashDomainParam === "function") {
               return window.__ERP_getHashDomainParam();
             }
             return null;
           }
-          var confirmModal = helpers.confirmModal || function() {
+          var confirmModal = helpers2.confirmModal || function() {
             return Promise.resolve(false);
           };
-          var applyActionStackForList = helpers.applyActionStackForList || function() {
+          var applyActionStackForList = helpers2.applyActionStackForList || function() {
           };
-          var renderViewSwitcher = helpers.renderViewSwitcher || function() {
+          var renderViewSwitcher = helpers2.renderViewSwitcher || function() {
             return "";
           };
-          var dispatchListActWindowThenFormHash = helpers.dispatchListActWindowThenFormHash || function() {
+          var dispatchListActWindowThenFormHash = helpers2.dispatchListActWindowThenFormHash || function() {
           };
           if (typeof window !== "undefined") window.chatContext = { model, active_id: null };
-          var cols = getListColumns(model);
+          var cols = getListColumns2(model);
           var title = getTitle(route);
           var addLabel = route === "contacts" ? "Add contact" : route === "leads" ? "Add lead" : route === "orders" ? "Add order" : route === "products" ? "Add product" : route === "settings/users" ? "Add user" : "Add";
           var stageFilter = currentListState.route === route ? currentListState.stageFilter : null;
@@ -447,7 +447,7 @@
           var btnExportExcel = document.getElementById("btn-export-excel");
           if (btnExportExcel && records && records.length) {
             btnExportExcel.onclick = function() {
-              var exportCols = getListColumns(model);
+              var exportCols = getListColumns2(model);
               var fields = ["id"].concat(exportCols.map(function(c) {
                 return typeof c === "object" ? c.name : c;
               }));
@@ -457,7 +457,7 @@
                 var parsed = parseActionDomain(action.domain);
                 if (parsed && parsed.length) domain = parsed;
               }
-              var searchDom = buildSearchDomain(model, document.getElementById("list-search") && document.getElementById("list-search").value || "");
+              var searchDom = buildSearchDomain2(model, document.getElementById("list-search") && document.getElementById("list-search").value || "");
               if (searchDom && searchDom.length) domain = domain.concat(searchDom);
               var stageEl = document.getElementById("list-stage-filter");
               if ((model === "crm.lead" || model === "helpdesk.ticket") && stageEl && stageEl.value) {
@@ -711,19 +711,164 @@
               var action = getActionForRoute(route);
               var actionDomain = action ? parseActionDomain(action.domain || "") : [];
               var domain = actionDomain.slice();
-              var searchDom = buildSearchDomain(model, st);
+              var searchDom = buildSearchDomain2(model, st);
               if (searchDom.length) domain = domain.concat(searchDom);
               if (model === "crm.lead" && stageFilter) domain = domain.concat([["stage_id", "=", stageFilter]]);
-              saveSavedFilter(model, name.trim(), domain).then(function() {
+              saveSavedFilter2(model, name.trim(), domain).then(function() {
                 loadRecords(model, route, st, stageFilter, null, null, 0, null);
               });
             };
           }
           return true;
         }
+        var _viewsSvc = null;
+        var _rpc = null;
+        function _configureHelpers(opts) {
+          if (opts.viewsSvc) _viewsSvc = opts.viewsSvc;
+          if (opts.rpc) _rpc = opts.rpc;
+        }
+        function getListColumns(model) {
+          if (_viewsSvc && model) {
+            var v = _viewsSvc.getView(model, "list");
+            if (v && v.columns && v.columns.length) {
+              return v.columns.map(function(c) {
+                return (typeof c === "object" ? c.name : c) || c;
+              });
+            }
+          }
+          if (model === "crm.lead") return ["name", "type", "stage_id", "ai_score_label", "date_deadline", "expected_revenue", "tag_ids"];
+          if (model === "sale.order") return ["name", "partner_id", "date_order", "state", "amount_total"];
+          if (model === "product.product") return ["name", "list_price"];
+          if (model === "res.users") return ["name", "login", "active"];
+          return ["name", "is_company", "email", "phone", "city", "country_id", "state_id"];
+        }
+        function getSearchFields(model) {
+          if (_viewsSvc && model) {
+            var v = _viewsSvc.getView(model, "search");
+            if (v && v.search_fields && v.search_fields.length) return v.search_fields;
+          }
+          return ["name"];
+        }
+        function buildSearchDomain(model, searchTerm) {
+          var fields = getSearchFields(model);
+          if (!searchTerm || !fields.length) return [];
+          if (fields.length === 1) return [[fields[0], "ilike", searchTerm]];
+          var terms = fields.map(function(f) {
+            return [f, "ilike", searchTerm];
+          });
+          var ops = [];
+          for (var i = 0; i < terms.length - 1; i++) ops.push("|");
+          return ops.concat(terms);
+        }
+        function getSavedFiltersFromStorage(model) {
+          try {
+            var raw = localStorage.getItem("erp_saved_filters_" + (model || "").replace(/\./g, "_"));
+            if (!raw) return [];
+            var arr = JSON.parse(raw);
+            return Array.isArray(arr) ? arr : [];
+          } catch (e) {
+            return [];
+          }
+        }
+        function getSavedFilters(model) {
+          var sessionSvc = window.Services && window.Services.session;
+          if (!sessionSvc || !_rpc) return Promise.resolve(getSavedFiltersFromStorage(model));
+          return sessionSvc.getSessionInfo().then(function(info) {
+            if (!info || !info.uid) return getSavedFiltersFromStorage(model);
+            var domain = [["model_id", "=", model || ""], "|", ["user_id", "=", false], ["user_id", "=", info.uid]];
+            return _rpc.callKw("ir.filters", "search_read", [domain], { fields: ["id", "name", "domain"], limit: 100 }).then(function(rows) {
+              return (rows || []).map(function(r) {
+                var dom = [];
+                try {
+                  dom = r.domain ? JSON.parse(r.domain) : [];
+                } catch (e) {
+                }
+                return { id: r.id, name: r.name || "Filter", domain: dom };
+              });
+            }).catch(function() {
+              return getSavedFiltersFromStorage(model);
+            });
+          }).catch(function() {
+            return getSavedFiltersFromStorage(model);
+          });
+        }
+        function saveSavedFilter(model, name, domain) {
+          var sessionSvc = window.Services && window.Services.session;
+          var key = "erp_saved_filters_" + (model || "").replace(/\./g, "_");
+          if (!sessionSvc || !_rpc) {
+            var filters = getSavedFiltersFromStorage(model);
+            var id = "f" + Date.now();
+            filters.push({ id, name: name || "Filter", domain: domain || [] });
+            try {
+              localStorage.setItem(key, JSON.stringify(filters));
+            } catch (e) {
+            }
+            return Promise.resolve(id);
+          }
+          return sessionSvc.getSessionInfo().then(function(info) {
+            if (!info || !info.uid) {
+              var filters2 = getSavedFiltersFromStorage(model);
+              var id2 = "f" + Date.now();
+              filters2.push({ id: id2, name: name || "Filter", domain: domain || [] });
+              try {
+                localStorage.setItem(key, JSON.stringify(filters2));
+              } catch (e) {
+              }
+              return id2;
+            }
+            return _rpc.callKw("ir.filters", "create", [{ name: name || "Filter", model_id: model || "", domain: JSON.stringify(domain || []), user_id: info.uid }], {}).then(function(rec) {
+              if (!rec) return null;
+              if (Array.isArray(rec) && rec.length) return rec[0];
+              return rec.ids ? rec.ids[0] : rec.id != null ? rec.id : null;
+            }).catch(function() {
+              var filters3 = getSavedFiltersFromStorage(model);
+              var id3 = "f" + Date.now();
+              filters3.push({ id: id3, name: name || "Filter", domain: domain || [] });
+              try {
+                localStorage.setItem(key, JSON.stringify(filters3));
+              } catch (e) {
+              }
+              return id3;
+            });
+          });
+        }
+        function removeSavedFilter(model, id) {
+          var key = "erp_saved_filters_" + (model || "").replace(/\./g, "_");
+          if (typeof id === "string" && id.indexOf("f") === 0) {
+            var filters = getSavedFiltersFromStorage(model).filter(function(f) {
+              return f.id !== id;
+            });
+            try {
+              localStorage.setItem(key, JSON.stringify(filters));
+            } catch (e) {
+            }
+            return Promise.resolve();
+          }
+          if (!_rpc) return Promise.resolve();
+          return _rpc.callKw("ir.filters", "unlink", [[parseInt(id, 10)]], {}).catch(function() {
+            var filters2 = getSavedFiltersFromStorage(model).filter(function(f) {
+              return f.id !== id;
+            });
+            try {
+              localStorage.setItem(key, JSON.stringify(filters2));
+            } catch (e) {
+            }
+          });
+        }
+        var helpers = {
+          getListColumns,
+          getSearchFields,
+          buildSearchDomain,
+          getSavedFilters,
+          getSavedFiltersFromStorage,
+          saveSavedFilter,
+          removeSavedFilter,
+          configure: _configureHelpers
+        };
         window.AppCore = window.AppCore || {};
         window.AppCore.ListViewModule = {
-          render
+          render,
+          helpers
         };
       })();
     }
@@ -880,6 +1025,122 @@
       return Object.keys(byCat).map(function(title) {
         return { title, items: byCat[title] };
       });
+    };
+    SearchModel.prototype.getDomain = function(baseDomain) {
+      return this.buildDomain({ actionDomain: baseDomain || [] });
+    };
+    SearchModel.prototype.getGroupBy = function() {
+      return this.state.groupBy || null;
+    };
+    SearchModel.prototype.clearAll = function() {
+      this.state.facets = [];
+      this.state.searchTerm = "";
+      this.state.groupBy = null;
+      this.state.activeSearchFilters = [];
+      this._emit("change");
+    };
+    SearchModel.prototype.saveFavorite = function(name, shared) {
+      var domain = this.buildDomain({});
+      var model = this.model;
+      var rpc = window.Services && window.Services.rpc;
+      if (!rpc || typeof rpc.callKw !== "function") {
+        return this._saveFavoriteLocal(name, model, domain);
+      }
+      return rpc.callKw("ir.filters", "create", [[{
+        name: name || "Favorite",
+        model_id: model,
+        domain: JSON.stringify(domain),
+        user_id: shared ? false : void 0
+      }]], {}).then(function(res) {
+        var id = Array.isArray(res) ? res[0] : res && res.id != null ? res.id : res;
+        return id;
+      }).catch(function() {
+        return this._saveFavoriteLocal(name, model, domain);
+      }.bind(this));
+    };
+    SearchModel.prototype._saveFavoriteLocal = function(name, model, domain) {
+      try {
+        var key = "erp_search_favs_" + (model || "").replace(/\./g, "_");
+        var favs = [];
+        try {
+          favs = JSON.parse(localStorage.getItem(key) || "[]");
+        } catch (_) {
+        }
+        if (!Array.isArray(favs)) favs = [];
+        var id = "fav_" + Date.now();
+        favs.push({ id, name: name || "Favorite", domain: domain || [] });
+        localStorage.setItem(key, JSON.stringify(favs));
+        return Promise.resolve(id);
+      } catch (_) {
+        return Promise.resolve(null);
+      }
+    };
+    SearchModel.prototype.loadFavorites = function() {
+      var model = this.model;
+      var rpc = window.Services && window.Services.rpc;
+      if (!rpc || typeof rpc.callKw !== "function") {
+        return this._loadFavoritesLocal(model);
+      }
+      return rpc.callKw(
+        "ir.filters",
+        "search_read",
+        [[["model_id", "=", model || ""]]],
+        { fields: ["id", "name", "domain"], limit: 100 }
+      ).then(function(rows) {
+        return (rows || []).map(function(r) {
+          var dom = [];
+          try {
+            dom = r.domain ? JSON.parse(r.domain) : [];
+          } catch (_) {
+          }
+          return { id: r.id, name: r.name || "Favorite", domain: dom };
+        });
+      }).catch(function() {
+        return this._loadFavoritesLocal(model);
+      }.bind(this));
+    };
+    SearchModel.prototype._loadFavoritesLocal = function(model) {
+      try {
+        var key = "erp_search_favs_" + (model || "").replace(/\./g, "_");
+        var raw = localStorage.getItem(key);
+        if (!raw) return Promise.resolve([]);
+        var arr = JSON.parse(raw);
+        return Promise.resolve(Array.isArray(arr) ? arr : []);
+      } catch (_) {
+        return Promise.resolve([]);
+      }
+    };
+    SearchModel.prototype.removeFavoriteById = function(id) {
+      var model = this.model;
+      var rpc = window.Services && window.Services.rpc;
+      if (typeof id === "string" && id.indexOf("fav_") === 0) {
+        return this._removeFavoriteLocal(model, id);
+      }
+      if (!rpc || typeof rpc.callKw !== "function") {
+        return this._removeFavoriteLocal(model, id);
+      }
+      return rpc.callKw("ir.filters", "unlink", [[parseInt(id, 10)]], {}).then(function() {
+        return true;
+      }).catch(function() {
+        return this._removeFavoriteLocal(model, id);
+      }.bind(this));
+    };
+    SearchModel.prototype._removeFavoriteLocal = function(model, id) {
+      try {
+        var key = "erp_search_favs_" + (model || "").replace(/\./g, "_");
+        var arr = [];
+        try {
+          arr = JSON.parse(localStorage.getItem(key) || "[]");
+        } catch (_) {
+        }
+        if (!Array.isArray(arr)) arr = [];
+        localStorage.setItem(key, JSON.stringify(arr.filter(function(f) {
+          return String(f.id) !== String(id);
+        })));
+        return Promise.resolve(true);
+      } catch (_) {
+        return Promise.resolve(false);
+      }
     };
     SearchModel.prototype.buildDomain = function(ctx) {
       ctx = ctx || {};
@@ -1632,7 +1893,11 @@
             const windowPayload = result && result.type === "window" ? result : null;
             if (isWindowType || windowPayload) {
               const act = windowPayload && windowPayload.action || actionDef;
-              navigateForActWindow(act);
+              const nextRoute = actionToRoute(act || {});
+              const curRoute = (window.location.hash || "#home").replace(/^#/, "").split("?")[0] || "home";
+              if (nextRoute && nextRoute !== curRoute) {
+                navigateForActWindow(act);
+              }
             }
             return result;
           });
@@ -1971,6 +2236,11 @@
     }
     return true;
   }
+  function canMountOwl() {
+    if (cspScriptEvalBlocked()) return false;
+    if (!window.__ERP_OWL_ACTION_CONTAINER_MOUNTED) return false;
+    return true;
+  }
   function fallbackMount(ComponentClass, target, config, error) {
     if (!ComponentClass || typeof ComponentClass.fallbackMount !== "function") {
       throw error;
@@ -1993,8 +2263,8 @@
       return Promise.resolve(ComponentClass.fallbackMount(cfg.env || null, target));
     }
     try {
-      const owl26 = getOwl();
-      return Promise.resolve(owl26.mount(ComponentClass, target, cfg)).catch(function(error) {
+      const owl29 = getOwl();
+      return Promise.resolve(owl29.mount(ComponentClass, target, cfg)).catch(function(error) {
         return fallbackMount(ComponentClass, target, cfg, error);
       });
     } catch (error) {
@@ -2694,610 +2964,11 @@
   window.AppCore = window.AppCore || {};
   window.AppCore.Pager = Pager;
 
-  // addons/web/static/src/app/views/list/list_controller.js
-  var owl6 = window.owl;
-  var { Component: Component5, useState: useState4, xml: xml5, onMounted: onMounted4, useEnv: useEnv2 } = owl6;
-  var DEFAULT_LIMIT = 80;
-  var ListController = class extends Component5 {
-    static template = xml5`
-    <div class="o-list-controller o-list-view">
-      <div class="o-list-header">
-        <h2 class="o-list-title"><t t-esc="state.title"/></h2>
-        <div class="o-list-actions-bar">
-          <button t-if="!state.selectedIds.length"
-                  type="button" class="o-btn o-btn-primary"
-                  t-on-click="onNew">
-            New
-          </button>
-          <button t-if="state.selectedIds.length"
-                  type="button" class="o-btn o-btn-danger"
-                  t-on-click="onDeleteSelected">
-            Delete (<t t-esc="state.selectedIds.length"/>)
-          </button>
-        </div>
-        <Pager offset="state.offset"
-               limit="state.limit"
-               total="state.totalCount"
-               isLoading="state.loading"
-               onUpdate="onPagerUpdate"/>
-      </div>
-      <ListRenderer
-        records="state.records"
-        columns="columns"
-        selectable="true"
-        selectedIds="state.selectedIds"
-        order="state.order"
-        aggregates="state.aggregates"
-        onSort="onSort"
-        onRowClick="onRowClick"
-        onToggleRecord="onToggleRecord"
-        onToggleAll="onToggleAll"
-        onDeleteRow="onDeleteRow"/>
-    </div>`;
-    static components = { ListRenderer, Pager };
-    static props = {
-      resModel: String,
-      columns: { type: Array, optional: true },
-      domain: { type: Array, optional: true },
-      context: { type: Object, optional: true },
-      limit: { type: Number, optional: true },
-      onOpenRecord: { type: Function, optional: true },
-      /** SearchModel instance provided by WithSearch HOC (Track O1). */
-      searchModel: { optional: true },
-      slots: { type: Object, optional: true }
-    };
-    setup() {
-      this.env = useEnv2();
-      this._orm = window.Services && window.Services.orm || null;
-      this._searchModel = this.props.searchModel || null;
-      this.state = useState4({
-        title: this._titleFor(this.props.resModel),
-        records: [],
-        loading: false,
-        offset: 0,
-        limit: this.props.limit || DEFAULT_LIMIT,
-        totalCount: 0,
-        selectedIds: [],
-        order: null,
-        aggregates: {}
-      });
-      if (this._searchModel && typeof this._searchModel.subscribe === "function") {
-        this._searchModel.subscribe(() => {
-          this.state.offset = 0;
-          this.loadRecords();
-        });
-      }
-      onMounted4(() => {
-        this.loadRecords();
-      });
-    }
-    get columns() {
-      if (this.props.columns && this.props.columns.length) return this.props.columns;
-      if (this.state.records.length) {
-        return Object.keys(this.state.records[0]).filter((k) => k !== "__id" && !k.startsWith("_")).slice(0, 8).map((k) => ({ name: k, label: k }));
-      }
-      return [{ name: "name", label: "Name" }, { name: "id", label: "ID" }];
-    }
-    _titleFor(model) {
-      if (!model) return "List";
-      const parts = String(model).split(".");
-      return parts[parts.length - 1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-    async loadRecords() {
-      const orm = this._orm;
-      if (!orm) {
-        this._loadFallback();
-        return;
-      }
-      this.state.loading = true;
-      try {
-        const domain = this._searchModel && typeof this._searchModel.getDomain === "function" ? this._searchModel.getDomain(this.props.domain || []) : this.props.domain || [];
-        const fields = this.columns.map((c) => c.name || c).filter(Boolean);
-        const result = await orm.searchRead(
-          this.props.resModel,
-          domain,
-          fields,
-          { offset: this.state.offset, limit: this.state.limit, order: this.state.order || "" }
-        );
-        this.state.records = Array.isArray(result) ? result : result.records || [];
-        if (result.length !== void 0) {
-          this.state.totalCount = this.state.records.length < this.state.limit ? this.state.offset + this.state.records.length : this.state.offset + this.state.limit + 1;
-        } else {
-          this.state.totalCount = result.length || 0;
-        }
-      } catch (err) {
-        console.error("[ListController] loadRecords error:", err);
-      } finally {
-        this.state.loading = false;
-      }
-    }
-    /** Fallback: delegate to legacy AppCore.ListViewModule */
-    _loadFallback() {
-      const LVM = window.AppCore && window.AppCore.ListViewModule;
-      if (LVM && typeof LVM.render === "function") {
-      }
-    }
-    onPagerUpdate({ offset, limit }) {
-      this.state.offset = offset;
-      this.state.limit = limit;
-      this.loadRecords();
-    }
-    onSort(col) {
-      const name = col.name;
-      if (!name) return;
-      if (this.state.order === name) {
-        this.state.order = name + " desc";
-      } else if (this.state.order === name + " desc") {
-        this.state.order = null;
-      } else {
-        this.state.order = name;
-      }
-      this.state.offset = 0;
-      this.loadRecords();
-    }
-    onRowClick(record) {
-      if (typeof this.props.onOpenRecord === "function") {
-        this.props.onOpenRecord(record);
-      } else {
-        const model = this.props.resModel;
-        if (model && record.id) {
-          const route = model.replace(/\./g, "_");
-          window.location.hash = "#" + route + "/form/" + record.id;
-        }
-      }
-    }
-    onToggleRecord(record, checked) {
-      if (checked) {
-        this.state.selectedIds = [...this.state.selectedIds, record.id];
-      } else {
-        this.state.selectedIds = this.state.selectedIds.filter((id) => id !== record.id);
-      }
-    }
-    onToggleAll(checked) {
-      this.state.selectedIds = checked ? this.state.records.map((r) => r.id) : [];
-    }
-    async onDeleteRow(record) {
-      const confirmed = await this._confirm("Delete this record?");
-      if (!confirmed) return;
-      const orm = this._orm;
-      if (orm && typeof orm.unlink === "function") {
-        await orm.unlink(this.props.resModel, [record.id]);
-        await this.loadRecords();
-      }
-    }
-    async onDeleteSelected() {
-      if (!this.state.selectedIds.length) return;
-      const confirmed = await this._confirm(
-        `Delete ${this.state.selectedIds.length} record(s)?`
-      );
-      if (!confirmed) return;
-      const orm = this._orm;
-      if (orm && typeof orm.unlink === "function") {
-        await orm.unlink(this.props.resModel, this.state.selectedIds);
-        this.state.selectedIds = [];
-        await this.loadRecords();
-      }
-    }
-    onNew() {
-      const model = this.props.resModel;
-      if (model) {
-        const route = model.replace(/\./g, "_");
-        window.location.hash = "#" + route + "/new";
-      }
-    }
-    _confirm(message) {
-      const DS = window.AppCore && window.AppCore.DialogService;
-      if (DS && typeof DS.confirm === "function") {
-        return DS.confirm({ title: "Confirm", body: message });
-      }
-      return Promise.resolve(window.confirm(message));
-    }
-  };
-  viewRegistry.add("list", {
-    type: "list",
-    Controller: ListController,
-    Renderer: ListRenderer,
-    searchMenuTypes: ["filter", "groupBy", "favorite"]
-  });
-  window.AppCore = window.AppCore || {};
-  window.AppCore.ListController = ListController;
-
-  // addons/web/static/src/app/views/form/form_renderer.js
-  var owl7 = window.owl;
-  var { Component: Component6, xml: xml6 } = owl7;
-  function formatValue(field, value, record) {
-    const fieldReg = window.Services && window.Services.fieldRegistry;
-    if (fieldReg && typeof fieldReg.format === "function") {
-      try {
-        return fieldReg.format(field.name || field, value, record, field);
-      } catch (_e) {
-      }
-    }
-    if (value == null) return "";
-    if (typeof value === "boolean") return value ? "Yes" : "No";
-    if (Array.isArray(value)) {
-      return value.map((v) => Array.isArray(v) ? v[1] || v[0] : String(v)).join(", ");
-    }
-    return String(value);
-  }
-  function isTextField(type) {
-    return ["text", "html"].includes(type);
-  }
-  function isDateField(type) {
-    return ["date", "datetime"].includes(type);
-  }
-  function isNumericField(type) {
-    return ["integer", "float", "monetary"].includes(type);
-  }
-  var FormRenderer = class extends Component6 {
-    static template = xml6`
-    <div class="o-form-renderer o-form-sheet">
-      <t t-foreach="fieldGroups" t-as="group" t-key="group_index">
-        <div class="o-form-group">
-          <t t-foreach="group" t-as="field" t-key="field.name">
-            <div class="o-form-row"
-                 t-att-class="{ 'o-form-row--readonly': !props.editMode }">
-              <label class="o-form-label"
-                     t-att-for="'field-' + field.name">
-                <t t-esc="field.label || field.name"/>
-                <t t-if="field.required and props.editMode">
-                  <span class="o-field-required" aria-hidden="true"> *</span>
-                </t>
-              </label>
-              <div class="o-form-field"
-                   t-att-class="'o-form-field--' + (field.type || 'char')">
-                <t t-if="!props.editMode">
-                  <span class="o-field-value"
-                        t-att-class="{ 'o-field-empty': !getDisplayValue(field) }">
-                    <t t-esc="getDisplayValue(field) || '-'"/>
-                  </span>
-                </t>
-                <t t-elif="field.type === 'boolean'">
-                  <input type="checkbox"
-                         t-att-id="'field-' + field.name"
-                         t-att-checked="props.record[field.name] ? '' : null"
-                         t-on-change="(ev) => onFieldChange(field, ev.target.checked)"/>
-                </t>
-                <t t-elif="isTextField(field.type)">
-                  <textarea class="o-field-textarea o-field-input"
-                            t-att-id="'field-' + field.name"
-                            t-att-name="field.name"
-                            t-on-change="(ev) => onFieldChange(field, ev.target.value)">
-                    <t t-esc="props.record[field.name] || ''"/>
-                  </textarea>
-                </t>
-                <t t-elif="isNumericField(field.type)">
-                  <input type="number"
-                         class="o-field-input o-field-numeric"
-                         t-att-id="'field-' + field.name"
-                         t-att-name="field.name"
-                         t-att-value="props.record[field.name] ?? ''"
-                         t-on-change="(ev) => onFieldChange(field, ev.target.valueAsNumber)"/>
-                </t>
-                <t t-elif="field.type === 'selection' and field.selection">
-                  <select class="o-field-input o-field-select"
-                          t-att-id="'field-' + field.name"
-                          t-att-name="field.name"
-                          t-on-change="(ev) => onFieldChange(field, ev.target.value)">
-                    <option value="">-</option>
-                    <t t-foreach="field.selection" t-as="opt" t-key="opt[0]">
-                      <option t-att-value="opt[0]"
-                              t-att-selected="props.record[field.name] === opt[0] ? '' : null">
-                        <t t-esc="opt[1]"/>
-                      </option>
-                    </t>
-                  </select>
-                </t>
-                <t t-else="">
-                  <input type="text"
-                         class="o-field-input"
-                         t-att-id="'field-' + field.name"
-                         t-att-name="field.name"
-                         t-att-value="props.record[field.name] ?? ''"
-                         t-att-type="isDateField(field.type) ? (field.type === 'datetime' ? 'datetime-local' : 'date') : 'text'"
-                         t-on-change="(ev) => onFieldChange(field, ev.target.value)"/>
-                </t>
-              </div>
-            </div>
-          </t>
-        </div>
-      </t>
-    </div>`;
-    static props = {
-      record: Object,
-      fields: Array,
-      editMode: Boolean,
-      onFieldChange: { type: Function, optional: true },
-      slots: { type: Object, optional: true }
-    };
-    isTextField = isTextField;
-    isNumericField = isNumericField;
-    isDateField = isDateField;
-    get fieldGroups() {
-      const fields = this.props.fields || [];
-      const groups = [];
-      for (let i = 0; i < fields.length; i += 2) {
-        groups.push(fields.slice(i, i + 2));
-      }
-      return groups.length ? groups : [fields];
-    }
-    getDisplayValue(field) {
-      const value = this.props.record[field.name];
-      return formatValue(field, value, this.props.record);
-    }
-    onFieldChange(field, value) {
-      if (typeof this.props.onFieldChange === "function") {
-        this.props.onFieldChange(field.name, value);
-      }
-    }
-  };
-  window.AppCore = window.AppCore || {};
-  window.AppCore.FormRenderer = FormRenderer;
-
-  // addons/web/static/src/app/views/form/form_controller.js
-  var owl8 = window.owl;
-  var { Component: Component7, useState: useState5, xml: xml7, onMounted: onMounted5, useEnv: useEnv3 } = owl8;
-  var FormController = class extends Component7 {
-    static template = xml7`
-    <div class="o-form-controller o-form-view">
-      <div class="o-form-header">
-        <div class="o-form-breadcrumb-slot">
-          <span class="o-form-model-label"><t t-esc="state.title"/></span>
-          <t t-if="state.record.id">
-            <span class="o-form-record-name"><t t-esc="state.record.display_name || state.record.name || ('#' + state.record.id)"/></span>
-          </t>
-        </div>
-        <div class="o-form-button-box">
-          <t t-if="!state.editMode">
-            <button type="button" class="o-btn o-btn-primary" t-on-click="startEdit">Edit</button>
-            <button type="button" class="o-btn o-btn-secondary" t-on-click="onBack">&#8592; Back</button>
-          </t>
-          <t t-else="">
-            <button type="button" class="o-btn o-btn-primary" t-on-click="onSave"
-                    t-att-disabled="state.saving ? '' : null">
-              <t t-if="state.saving">Saving…</t>
-              <t t-else="">Save</t>
-            </button>
-            <button type="button" class="o-btn o-btn-secondary" t-on-click="onDiscard">Discard</button>
-          </t>
-        </div>
-      </div>
-      <t t-if="state.loading">
-        <div class="o-form-loading o-skeleton-msg">Loading…</div>
-      </t>
-      <t t-elif="state.error">
-        <div class="o-error-panel__muted"><t t-esc="state.error"/></div>
-      </t>
-      <t t-else="">
-        <FormRenderer
-          record="state.record"
-          fields="state.fields"
-          editMode="state.editMode"
-          onFieldChange="onFieldChange"/>
-      </t>
-    </div>`;
-    static components = { FormRenderer };
-    static props = {
-      resModel: String,
-      resId: { type: [Number, String], optional: true },
-      domain: { type: Array, optional: true },
-      context: { type: Object, optional: true },
-      onSaved: { type: Function, optional: true },
-      onBack: { type: Function, optional: true },
-      slots: { type: Object, optional: true }
-    };
-    setup() {
-      this.env = useEnv3();
-      this._orm = window.Services && window.Services.orm || null;
-      this.state = useState5({
-        title: this._titleFor(this.props.resModel),
-        record: {},
-        fields: [],
-        editMode: !this.props.resId,
-        // New records start in edit
-        loading: !!this.props.resId,
-        saving: false,
-        error: null
-      });
-      this._pendingChanges = {};
-      onMounted5(() => {
-        if (this.props.resId) {
-          this._loadRecord(this.props.resId);
-        } else {
-          this._loadDefaultFields();
-        }
-      });
-    }
-    _titleFor(model) {
-      if (!model) return "Form";
-      const parts = String(model).split(".");
-      return parts[parts.length - 1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-    async _loadRecord(id) {
-      const orm = this._orm;
-      if (!orm) {
-        this.state.loading = false;
-        return;
-      }
-      this.state.loading = true;
-      this.state.error = null;
-      try {
-        const fields = await this._getFields();
-        const fieldNames = fields.map((f) => f.name).filter(Boolean);
-        const records = await orm.read(this.props.resModel, [Number(id)], fieldNames);
-        const record = (Array.isArray(records) ? records : [])[0] || {};
-        this.state.record = record;
-        this.state.fields = fields;
-        this._pendingChanges = {};
-      } catch (err) {
-        this.state.error = "Failed to load record: " + (err && err.message ? err.message : String(err));
-      } finally {
-        this.state.loading = false;
-      }
-    }
-    async _loadDefaultFields() {
-      const fields = await this._getFields();
-      this.state.fields = fields;
-      this.state.record = {};
-    }
-    async _getFields() {
-      const views = window.Services && window.Services.views;
-      if (views && typeof views.getView === "function") {
-        const formView = views.getView(this.props.resModel, "form");
-        if (formView && formView.fields) {
-          return Object.entries(formView.fields).map(
-            ([name, meta]) => Object.assign({ name }, typeof meta === "object" ? meta : { type: meta })
-          );
-        }
-      }
-      if (views && typeof views.getFieldsMeta === "function") {
-        const meta = views.getFieldsMeta(this.props.resModel);
-        if (meta && typeof meta === "object") {
-          return Object.entries(meta).map(
-            ([name, info]) => Object.assign({ name }, typeof info === "object" ? info : {})
-          );
-        }
-      }
-      return [{ name: "name", label: "Name", type: "char" }];
-    }
-    startEdit() {
-      this._pendingChanges = {};
-      this.state.editMode = true;
-    }
-    onFieldChange(fieldName, value) {
-      this._pendingChanges[fieldName] = value;
-      this.state.record = Object.assign({}, this.state.record, { [fieldName]: value });
-    }
-    async onSave() {
-      const orm = this._orm;
-      if (!orm) return;
-      this.state.saving = true;
-      this.state.error = null;
-      try {
-        const changes = this._pendingChanges;
-        const id = this.state.record.id;
-        if (id) {
-          await orm.write(this.props.resModel, [id], changes);
-        } else {
-          const newId = await orm.create(this.props.resModel, [changes]);
-          await this._loadRecord(newId);
-        }
-        this._pendingChanges = {};
-        this.state.editMode = false;
-        if (typeof this.props.onSaved === "function") {
-          this.props.onSaved(this.state.record);
-        }
-      } catch (err) {
-        this.state.error = "Save failed: " + (err && err.message ? err.message : String(err));
-      } finally {
-        this.state.saving = false;
-      }
-    }
-    onDiscard() {
-      this._pendingChanges = {};
-      if (this.state.record.id) {
-        this._loadRecord(this.state.record.id);
-      } else {
-        this.state.record = {};
-      }
-      this.state.editMode = false;
-      this.state.error = null;
-    }
-    onBack() {
-      if (typeof this.props.onBack === "function") {
-        this.props.onBack();
-      } else {
-        window.history.back();
-      }
-    }
-  };
-  viewRegistry.add("form", {
-    type: "form",
-    Controller: FormController,
-    Renderer: FormRenderer,
-    searchMenuTypes: ["filter", "favorite"]
-  });
-  window.AppCore = window.AppCore || {};
-  window.AppCore.FormController = FormController;
-
-  // addons/web/static/src/app/views/kanban/kanban_controller.js
-  var owl9 = window.owl;
-  var { Component: Component8, useState: useState6, xml: xml8, onMounted: onMounted6, onPatched: onPatched3, useRef: useRef5, useEnv: useEnv4 } = owl9;
-  var KanbanController = class extends Component8 {
-    static template = xml8`
-    <div class="o-kanban-controller o-kanban-view" t-ref="root">
-      <div class="o-kanban-header">
-        <h2 class="o-kanban-title"><t t-esc="title"/></h2>
-        <button type="button" class="o-btn o-btn-primary" t-on-click="onNew">New</button>
-      </div>
-      <div class="o-kanban-content" t-ref="kanbanContent"/>
-    </div>`;
-    static props = {
-      resModel: String,
-      domain: { type: Array, optional: true },
-      context: { type: Object, optional: true },
-      groupBy: { type: String, optional: true },
-      onOpenRecord: { type: Function, optional: true },
-      slots: { type: Object, optional: true }
-    };
-    setup() {
-      this.env = useEnv4();
-      this.rootRef = useRef5("root");
-      this.contentRef = useRef5("kanbanContent");
-      this.state = useState6({ loading: false });
-      this._lastDomainJson = "";
-      onMounted6(() => {
-        this._renderLegacy();
-      });
-      onPatched3(() => {
-        var d = JSON.stringify(this.props.domain || []);
-        if (d !== this._lastDomainJson) {
-          this._lastDomainJson = d;
-          this._renderLegacy();
-        }
-      });
-    }
-    get title() {
-      const parts = String(this.props.resModel || "").split(".");
-      return parts[parts.length - 1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-    _renderLegacy() {
-      const KVM = window.AppCore && window.AppCore.KanbanViewModule;
-      const el = this.contentRef.el;
-      if (!el) return;
-      if (KVM && typeof KVM.render === "function") {
-        KVM.render(el, {
-          model: this.props.resModel,
-          domain: this.props.domain || [],
-          context: this.props.context || {},
-          groupBy: this.props.groupBy || null,
-          rpc: window.Services && window.Services.rpc,
-          viewsSvc: window.Services && window.Services.views
-        });
-      } else {
-        el.innerHTML = '<p class="o-skeleton-msg">Kanban view loading\u2026</p>';
-      }
-    }
-    onNew() {
-      const model = this.props.resModel;
-      if (model) {
-        window.location.hash = "#" + model.replace(/\./g, "_") + "/new";
-      }
-    }
-  };
-  viewRegistry.add("kanban", {
-    type: "kanban",
-    Controller: KanbanController,
-    searchMenuTypes: ["filter", "groupBy", "favorite"]
-  });
-  window.AppCore = window.AppCore || {};
-  window.AppCore.KanbanController = KanbanController;
-
   // addons/web/static/src/app/search/search_bar.js
-  var owl10 = window.owl;
-  var { Component: Component9, useState: useState7, xml: xml9, useRef: useRef6, useEnv: useEnv5, onWillUnmount: onWillUnmount4 } = owl10;
-  var SearchBar = class extends Component9 {
-    static template = xml9`
+  var owl6 = window.owl;
+  var { Component: Component5, useState: useState4, xml: xml5, useRef: useRef5, useEnv: useEnv2, onWillUnmount: onWillUnmount4 } = owl6;
+  var SearchBar = class extends Component5 {
+    static template = xml5`
     <div class="o-search-bar-owl" role="search">
       <div class="o-search-bar-facets">
         <t t-foreach="facets" t-as="facet" t-key="facet_index">
@@ -3371,8 +3042,8 @@
       slots: { type: Object, optional: true }
     };
     setup() {
-      this.inputRef = useRef6("input");
-      this.state = useState7({
+      this.inputRef = useRef5("input");
+      this.state = useState4({
         term: "",
         suggestions: [],
         suggestionsOpen: false,
@@ -3499,11 +3170,875 @@
   window.AppCore = window.AppCore || {};
   window.AppCore.SearchBarOWL = SearchBar;
 
-  // addons/web/static/src/app/core/dropdown.js
+  // addons/web/static/src/app/search/search_panel.js
+  var owl7 = window.owl;
+  var { Component: Component6, useState: useState5, xml: xml6, onMounted: onMounted4, onWillUnmount: onWillUnmount5, useEnv: useEnv3 } = owl7;
+  var SearchPanelSection = class extends Component6 {
+    static template = xml6`
+    <div class="o-search-panel-section">
+      <button type="button"
+              class="o-search-panel-section-header"
+              t-att-aria-expanded="!state.collapsed ? 'true' : 'false'"
+              t-on-click="toggleCollapse">
+        <span class="o-search-panel-section-title"><t t-esc="props.title"/></span>
+        <span class="o-search-panel-chevron" aria-hidden="true">
+          <t t-if="state.collapsed">&#9654;</t>
+          <t t-else="">&#9660;</t>
+        </span>
+      </button>
+      <t t-if="!state.collapsed">
+        <div class="o-search-panel-section-items" role="list">
+          <t t-foreach="props.items" t-as="item" t-key="item.id || item_index">
+            <div class="o-search-panel-item"
+                 t-att-class="{ 'o-search-panel-item--active': isActive(item) }"
+                 role="listitem"
+                 tabindex="0"
+                 t-on-click="() => onItemClick(item)"
+                 t-on-keydown="(ev) => onItemKeyDown(ev, item)">
+              <t t-if="props.type === 'filter'">
+                <input type="checkbox"
+                       class="o-search-panel-checkbox"
+                       t-att-checked="isActive(item) ? '' : null"
+                       t-att-aria-label="item.name"
+                       t-on-click.stop="() => onItemClick(item)"/>
+              </t>
+              <span class="o-search-panel-item-icon"
+                    t-if="item.color != null"
+                    t-att-style="'background:var(--color-' + item.color + ', var(--border-color))'"/>
+              <span class="o-search-panel-item-label"><t t-esc="item.name || item.display_name"/></span>
+              <t t-if="item.count != null">
+                <span class="o-search-panel-item-count">(<t t-esc="item.count"/>)</span>
+              </t>
+            </div>
+          </t>
+        </div>
+      </t>
+    </div>`;
+    static props = {
+      title: String,
+      items: Array,
+      type: { type: String, optional: true },
+      // "category" | "filter"
+      activeIds: { type: Array, optional: true },
+      onToggle: { type: Function, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    setup() {
+      this.state = useState5({ collapsed: false });
+    }
+    isActive(item) {
+      const ids = this.props.activeIds || [];
+      return ids.includes(item.id);
+    }
+    toggleCollapse() {
+      this.state.collapsed = !this.state.collapsed;
+    }
+    onItemClick(item) {
+      if (typeof this.props.onToggle === "function") {
+        this.props.onToggle(item);
+      }
+    }
+    onItemKeyDown(ev, item) {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        this.onItemClick(item);
+      }
+    }
+  };
+  var SearchPanel = class extends Component6 {
+    static template = xml6`
+    <aside class="o-search-panel"
+           role="complementary"
+           aria-label="Search filters"
+           t-att-class="{ 'o-search-panel--collapsed': state.collapsed }">
+      <div class="o-search-panel-toggle-bar">
+        <button type="button"
+                class="o-search-panel-collapse-btn"
+                t-att-aria-label="state.collapsed ? 'Expand search filters' : 'Collapse search filters'"
+                t-on-click="toggleCollapsed">
+          <t t-if="state.collapsed">&#9658;</t>
+          <t t-else="">&#9664;</t>
+        </button>
+      </div>
+      <t t-if="!state.collapsed">
+        <t t-foreach="sections" t-as="section" t-key="section.id || section_index">
+          <SearchPanelSection
+            title="section.title"
+            items="section.items || []"
+            type="section.type || 'category'"
+            activeIds="getActiveIds(section)"
+            onToggle="(item) => onToggle(section, item)"/>
+        </t>
+        <t t-if="!sections.length">
+          <div class="o-search-panel-empty">No filters available</div>
+        </t>
+      </t>
+    </aside>`;
+    static components = { SearchPanelSection };
+    static props = {
+      sections: { type: Array, optional: true },
+      searchModel: { type: Object, optional: true },
+      onFiltersChange: { type: Function, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    setup() {
+      this.state = useState5({
+        collapsed: false,
+        activeBySection: {},
+        modelSections: []
+      });
+      this._smUnsubscribe = null;
+      onMounted4(() => {
+        this._bindSearchModel();
+      });
+      onWillUnmount5(() => {
+        if (typeof this._smUnsubscribe === "function") this._smUnsubscribe();
+      });
+    }
+    get sections() {
+      if (this.props.sections && this.props.sections.length) return this.props.sections;
+      return this.state.modelSections;
+    }
+    /**
+     * Bind to the SearchModel: load sections via getSearchPanelSections() and
+     * subscribe so the panel refreshes whenever the model emits "change".
+     */
+    _bindSearchModel() {
+      const sm = this.props.searchModel;
+      if (!sm) return;
+      this._refreshSections(sm);
+      if (typeof sm.subscribe === "function") {
+        sm.subscribe(() => this._refreshSections(sm));
+        this._smUnsubscribe = () => {
+          if (sm._listeners) {
+            sm._listeners = sm._listeners.filter((fn) => fn !== this._refreshSections);
+          }
+        };
+      }
+    }
+    /** Pull sections from the model and mirror active filter state. */
+    _refreshSections(sm) {
+      const sections = typeof sm.getSearchPanelSections === "function" ? sm.getSearchPanelSections() : [];
+      this.state.modelSections = sections;
+      const activeFilters = sm.state && sm.state.activeSearchFilters || [];
+      const bySection = {};
+      sections.forEach((sec) => {
+        bySection[sec.id || sec.title] = (sec.items || []).filter((item) => activeFilters.includes(item.value || item.name || "")).map((item) => item.id || item.value || item.name);
+      });
+      this.state.activeBySection = bySection;
+    }
+    getActiveIds(section) {
+      return this.state.activeBySection[section.id || section.title] || [];
+    }
+    onToggle(section, item) {
+      const sectionKey = section.id || section.title;
+      const current = this.state.activeBySection[sectionKey] || [];
+      const itemKey = item.id || item.value || item.name;
+      const isActive = current.includes(itemKey);
+      let next;
+      if (section.type === "filter") {
+        next = isActive ? current.filter((k) => k !== itemKey) : [...current, itemKey];
+      } else {
+        next = isActive ? [] : [itemKey];
+      }
+      this.state.activeBySection = Object.assign({}, this.state.activeBySection, { [sectionKey]: next });
+      const sm = this.props.searchModel;
+      if (sm) {
+        const filterName = item.value || item.name || "";
+        if (typeof sm.toggleFilter === "function" && filterName) {
+          sm.toggleFilter(filterName);
+        } else if (typeof sm.addFacet === "function" && next.length) {
+          sm.addFacet({
+            type: section.type || "filter",
+            name: section.fieldName || sectionKey,
+            label: `${section.title}: ${item.name || item.label || itemKey}`,
+            value: next,
+            domain: item.domain || null,
+            removable: true
+          });
+        }
+      }
+      if (typeof this.props.onFiltersChange === "function") {
+        this.props.onFiltersChange({ section, activeIds: next });
+      }
+    }
+    toggleCollapsed() {
+      this.state.collapsed = !this.state.collapsed;
+    }
+  };
+  window.AppCore = window.AppCore || {};
+  window.AppCore.SearchPanel = SearchPanel;
+  window.AppCore.SearchPanelSection = SearchPanelSection;
+
+  // addons/web/static/src/app/views/list/list_controller.js
+  var owl8 = window.owl;
+  var { Component: Component7, useState: useState6, xml: xml7, onMounted: onMounted5, useEnv: useEnv4 } = owl8;
+  var DEFAULT_LIMIT = 80;
+  var ListController = class extends Component7 {
+    static template = xml7`
+    <div class="o-list-controller o-list-view">
+      <t t-if="_searchModelOwned">
+        <div class="o-list-inline-search">
+          <SearchBar searchModel="activeSearchModel"
+                     searchFields="props.searchFields"
+                     onSearch="onSearchBarSearch"
+                     searchPanelToggle="props.showSearchPanel"
+                     searchPanelOpen="state.searchPanelOpen"
+                     onToggleSearchPanel="onToggleSearchPanel"/>
+        </div>
+      </t>
+      <div class="o-list-body-wrap" t-att-class="{ 'o-list-with-panel': state.searchPanelOpen and _searchModelOwned }">
+        <t t-if="state.searchPanelOpen and _searchModelOwned">
+          <SearchPanel searchModel="activeSearchModel"/>
+        </t>
+        <div class="o-list-main">
+          <div class="o-list-header">
+            <h2 class="o-list-title"><t t-esc="state.title"/></h2>
+            <div class="o-list-actions-bar">
+              <button t-if="!state.selectedIds.length"
+                      type="button" class="o-btn o-btn-primary"
+                      t-on-click="onNew">
+                New
+              </button>
+              <button t-if="state.selectedIds.length"
+                      type="button" class="o-btn o-btn-danger"
+                      t-on-click="onDeleteSelected">
+                Delete (<t t-esc="state.selectedIds.length"/>)
+              </button>
+            </div>
+            <Pager offset="state.offset"
+                   limit="state.limit"
+                   total="state.totalCount"
+                   isLoading="state.loading"
+                   onUpdate="onPagerUpdate"/>
+          </div>
+          <t t-if="state.loadError">
+            <div class="o-load-failure-panel" role="alert">
+              <p class="o-error-panel__muted"><t t-esc="state.loadError"/></p>
+              <button type="button" class="o-btn o-btn-primary o-load-failure-retry" t-on-click="onRetryLoad">Retry</button>
+            </div>
+          </t>
+          <t t-else="">
+            <ListRenderer
+              records="state.records"
+              columns="columns"
+              selectable="true"
+              selectedIds="state.selectedIds"
+              order="state.order"
+              aggregates="state.aggregates"
+              onSort="onSort"
+              onRowClick="onRowClick"
+              onToggleRecord="onToggleRecord"
+              onToggleAll="onToggleAll"
+              onDeleteRow="onDeleteRow"/>
+          </t>
+        </div>
+      </div>
+    </div>`;
+    static components = { ListRenderer, Pager, SearchBar, SearchPanel };
+    static props = {
+      resModel: String,
+      columns: { type: Array, optional: true },
+      domain: { type: Array, optional: true },
+      context: { type: Object, optional: true },
+      limit: { type: Number, optional: true },
+      onOpenRecord: { type: Function, optional: true },
+      /** SearchModel instance provided by WithSearch HOC (Track O1). */
+      searchModel: { optional: true },
+      /** Optional search field descriptors for SearchBar autocomplete. */
+      searchFields: { type: Array, optional: true },
+      /** Whether to show the search panel toggle button. */
+      showSearchPanel: { type: Boolean, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    setup() {
+      this.env = useEnv4();
+      this._orm = window.Services && window.Services.orm || null;
+      const SM = window.AppCore && window.AppCore.SearchModel;
+      this._searchModel = this.props.searchModel || (SM ? new SM(this.props.resModel, window.Services && window.Services.views, {}) : null);
+      this._searchModelOwned = !this.props.searchModel;
+      this.state = useState6({
+        title: this._titleFor(this.props.resModel),
+        records: [],
+        loading: false,
+        loadError: null,
+        offset: 0,
+        limit: this.props.limit || DEFAULT_LIMIT,
+        totalCount: 0,
+        selectedIds: [],
+        order: null,
+        aggregates: {},
+        searchPanelOpen: false
+      });
+      if (this._searchModel && typeof this._searchModel.subscribe === "function") {
+        this._searchModel.subscribe(() => {
+          this.state.offset = 0;
+          this.loadRecords();
+        });
+      }
+      onMounted5(() => {
+        this.loadRecords();
+      });
+    }
+    /** Active SearchModel instance (own or provided via props). */
+    get activeSearchModel() {
+      return this._searchModel;
+    }
+    onSearchBarSearch({ domain, term }) {
+      this.state.offset = 0;
+      this.loadRecords();
+    }
+    onToggleSearchPanel() {
+      this.state.searchPanelOpen = !this.state.searchPanelOpen;
+    }
+    get columns() {
+      if (this.props.columns && this.props.columns.length) return this.props.columns;
+      if (this.state.records.length) {
+        return Object.keys(this.state.records[0]).filter((k) => k !== "__id" && !k.startsWith("_")).slice(0, 8).map((k) => ({ name: k, label: k }));
+      }
+      return [{ name: "name", label: "Name" }, { name: "id", label: "ID" }];
+    }
+    _titleFor(model) {
+      if (!model) return "List";
+      const parts = String(model).split(".");
+      return parts[parts.length - 1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    async loadRecords() {
+      const orm = this._orm;
+      if (!orm) {
+        this._loadFallback();
+        return;
+      }
+      this.state.loading = true;
+      this.state.loadError = null;
+      const race = typeof window !== "undefined" && typeof window.__ERP_rpcRaceDeadline === "function" ? window.__ERP_rpcRaceDeadline : (p) => p;
+      try {
+        const domain = this._searchModel && typeof this._searchModel.getDomain === "function" ? this._searchModel.getDomain(this.props.domain || []) : this.props.domain || [];
+        const fields = this.columns.map((c) => c.name || c).filter(Boolean);
+        const result = await race(
+          orm.searchRead(
+            this.props.resModel,
+            domain,
+            fields,
+            { offset: this.state.offset, limit: this.state.limit, order: this.state.order || "" }
+          ),
+          typeof window !== "undefined" ? window.__ERP_RPC_DEADLINE_DEFAULT_MS : 25e3,
+          "List load timed out"
+        );
+        this.state.records = Array.isArray(result) ? result : result.records || [];
+        if (result.length !== void 0) {
+          this.state.totalCount = this.state.records.length < this.state.limit ? this.state.offset + this.state.records.length : this.state.offset + this.state.limit + 1;
+        } else {
+          this.state.totalCount = result.length || 0;
+        }
+      } catch (err) {
+        console.error("[ListController] loadRecords error:", err);
+        this.state.records = [];
+        this.state.loadError = (err && err.message ? String(err.message) : String(err)) || "Could not load records.";
+      } finally {
+        this.state.loading = false;
+      }
+    }
+    onRetryLoad() {
+      this.state.loadError = null;
+      this.loadRecords();
+    }
+    /** Fallback: delegate to legacy AppCore.ListViewModule */
+    _loadFallback() {
+      const LVM = window.AppCore && window.AppCore.ListViewModule;
+      if (LVM && typeof LVM.render === "function") {
+      }
+    }
+    onPagerUpdate({ offset, limit }) {
+      this.state.offset = offset;
+      this.state.limit = limit;
+      this.loadRecords();
+    }
+    onSort(col) {
+      const name = col.name;
+      if (!name) return;
+      if (this.state.order === name) {
+        this.state.order = name + " desc";
+      } else if (this.state.order === name + " desc") {
+        this.state.order = null;
+      } else {
+        this.state.order = name;
+      }
+      this.state.offset = 0;
+      this.loadRecords();
+    }
+    onRowClick(record) {
+      if (typeof this.props.onOpenRecord === "function") {
+        this.props.onOpenRecord(record);
+      } else {
+        const model = this.props.resModel;
+        if (model && record.id) {
+          const route = model.replace(/\./g, "_");
+          window.location.hash = "#" + route + "/form/" + record.id;
+        }
+      }
+    }
+    onToggleRecord(record, checked) {
+      if (checked) {
+        this.state.selectedIds = [...this.state.selectedIds, record.id];
+      } else {
+        this.state.selectedIds = this.state.selectedIds.filter((id) => id !== record.id);
+      }
+    }
+    onToggleAll(checked) {
+      this.state.selectedIds = checked ? this.state.records.map((r) => r.id) : [];
+    }
+    async onDeleteRow(record) {
+      const confirmed = await this._confirm("Delete this record?");
+      if (!confirmed) return;
+      const orm = this._orm;
+      if (orm && typeof orm.unlink === "function") {
+        await orm.unlink(this.props.resModel, [record.id]);
+        await this.loadRecords();
+      }
+    }
+    async onDeleteSelected() {
+      if (!this.state.selectedIds.length) return;
+      const confirmed = await this._confirm(
+        `Delete ${this.state.selectedIds.length} record(s)?`
+      );
+      if (!confirmed) return;
+      const orm = this._orm;
+      if (orm && typeof orm.unlink === "function") {
+        await orm.unlink(this.props.resModel, this.state.selectedIds);
+        this.state.selectedIds = [];
+        await this.loadRecords();
+      }
+    }
+    onNew() {
+      const model = this.props.resModel;
+      if (model) {
+        const route = model.replace(/\./g, "_");
+        window.location.hash = "#" + route + "/new";
+      }
+    }
+    _confirm(message) {
+      const DS = window.AppCore && window.AppCore.DialogService;
+      if (DS && typeof DS.confirm === "function") {
+        return DS.confirm({ title: "Confirm", body: message });
+      }
+      return Promise.resolve(window.confirm(message));
+    }
+  };
+  viewRegistry.add("list", {
+    type: "list",
+    Controller: ListController,
+    Renderer: ListRenderer,
+    searchMenuTypes: ["filter", "groupBy", "favorite"]
+  });
+  window.AppCore = window.AppCore || {};
+  window.AppCore.ListController = ListController;
+
+  // addons/web/static/src/app/views/form/form_renderer.js
+  var owl9 = window.owl;
+  var { Component: Component8, xml: xml8 } = owl9;
+  function formatValue(field, value, record) {
+    const fieldReg = window.Services && window.Services.fieldRegistry;
+    if (fieldReg && typeof fieldReg.format === "function") {
+      try {
+        return fieldReg.format(field.name || field, value, record, field);
+      } catch (_e) {
+      }
+    }
+    if (value == null) return "";
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    if (Array.isArray(value)) {
+      return value.map((v) => Array.isArray(v) ? v[1] || v[0] : String(v)).join(", ");
+    }
+    return String(value);
+  }
+  function isTextField(type) {
+    return ["text", "html"].includes(type);
+  }
+  function isDateField(type) {
+    return ["date", "datetime"].includes(type);
+  }
+  function isNumericField(type) {
+    return ["integer", "float", "monetary"].includes(type);
+  }
+  var FormRenderer = class extends Component8 {
+    static template = xml8`
+    <div class="o-form-renderer o-form-sheet">
+      <t t-foreach="fieldGroups" t-as="group" t-key="group_index">
+        <div class="o-form-group">
+          <t t-foreach="group" t-as="field" t-key="field.name">
+            <div class="o-form-row"
+                 t-att-class="{ 'o-form-row--readonly': !props.editMode }">
+              <label class="o-form-label"
+                     t-att-for="'field-' + field.name">
+                <t t-esc="field.label || field.name"/>
+                <t t-if="field.required and props.editMode">
+                  <span class="o-field-required" aria-hidden="true"> *</span>
+                </t>
+              </label>
+              <div class="o-form-field"
+                   t-att-class="'o-form-field--' + (field.type || 'char')">
+                <t t-if="!props.editMode">
+                  <span class="o-field-value"
+                        t-att-class="{ 'o-field-empty': !getDisplayValue(field) }">
+                    <t t-esc="getDisplayValue(field) || '-'"/>
+                  </span>
+                </t>
+                <t t-elif="field.type === 'boolean'">
+                  <input type="checkbox"
+                         t-att-id="'field-' + field.name"
+                         t-att-checked="props.record[field.name] ? '' : null"
+                         t-on-change="(ev) => onFieldChange(field, ev.target.checked)"/>
+                </t>
+                <t t-elif="isTextField(field.type)">
+                  <textarea class="o-field-textarea o-field-input"
+                            t-att-id="'field-' + field.name"
+                            t-att-name="field.name"
+                            t-on-change="(ev) => onFieldChange(field, ev.target.value)">
+                    <t t-esc="props.record[field.name] || ''"/>
+                  </textarea>
+                </t>
+                <t t-elif="isNumericField(field.type)">
+                  <input type="number"
+                         class="o-field-input o-field-numeric"
+                         t-att-id="'field-' + field.name"
+                         t-att-name="field.name"
+                         t-att-value="props.record[field.name] ?? ''"
+                         t-on-change="(ev) => onFieldChange(field, ev.target.valueAsNumber)"/>
+                </t>
+                <t t-elif="field.type === 'selection' and field.selection">
+                  <select class="o-field-input o-field-select"
+                          t-att-id="'field-' + field.name"
+                          t-att-name="field.name"
+                          t-on-change="(ev) => onFieldChange(field, ev.target.value)">
+                    <option value="">-</option>
+                    <t t-foreach="field.selection" t-as="opt" t-key="opt[0]">
+                      <option t-att-value="opt[0]"
+                              t-att-selected="props.record[field.name] === opt[0] ? '' : null">
+                        <t t-esc="opt[1]"/>
+                      </option>
+                    </t>
+                  </select>
+                </t>
+                <t t-else="">
+                  <input type="text"
+                         class="o-field-input"
+                         t-att-id="'field-' + field.name"
+                         t-att-name="field.name"
+                         t-att-value="props.record[field.name] ?? ''"
+                         t-att-type="isDateField(field.type) ? (field.type === 'datetime' ? 'datetime-local' : 'date') : 'text'"
+                         t-on-change="(ev) => onFieldChange(field, ev.target.value)"/>
+                </t>
+              </div>
+            </div>
+          </t>
+        </div>
+      </t>
+    </div>`;
+    static props = {
+      record: Object,
+      fields: Array,
+      editMode: Boolean,
+      onFieldChange: { type: Function, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    isTextField = isTextField;
+    isNumericField = isNumericField;
+    isDateField = isDateField;
+    get fieldGroups() {
+      const fields = this.props.fields || [];
+      const groups = [];
+      for (let i = 0; i < fields.length; i += 2) {
+        groups.push(fields.slice(i, i + 2));
+      }
+      return groups.length ? groups : [fields];
+    }
+    getDisplayValue(field) {
+      const value = this.props.record[field.name];
+      return formatValue(field, value, this.props.record);
+    }
+    onFieldChange(field, value) {
+      if (typeof this.props.onFieldChange === "function") {
+        this.props.onFieldChange(field.name, value);
+      }
+    }
+  };
+  window.AppCore = window.AppCore || {};
+  window.AppCore.FormRenderer = FormRenderer;
+
+  // addons/web/static/src/app/views/form/form_controller.js
+  var owl10 = window.owl;
+  var { Component: Component9, useState: useState7, xml: xml9, onMounted: onMounted6, useEnv: useEnv5 } = owl10;
+  var FormController = class extends Component9 {
+    static template = xml9`
+    <div class="o-form-controller o-form-view">
+      <div class="o-form-header">
+        <div class="o-form-breadcrumb-slot">
+          <span class="o-form-model-label"><t t-esc="state.title"/></span>
+          <t t-if="state.record.id">
+            <span class="o-form-record-name"><t t-esc="state.record.display_name || state.record.name || ('#' + state.record.id)"/></span>
+          </t>
+        </div>
+        <div class="o-form-button-box">
+          <t t-if="!state.editMode">
+            <button type="button" class="o-btn o-btn-primary" t-on-click="startEdit">Edit</button>
+            <button type="button" class="o-btn o-btn-secondary" t-on-click="onBack">&#8592; Back</button>
+          </t>
+          <t t-else="">
+            <button type="button" class="o-btn o-btn-primary" t-on-click="onSave"
+                    t-att-disabled="state.saving ? '' : null">
+              <t t-if="state.saving">Saving…</t>
+              <t t-else="">Save</t>
+            </button>
+            <button type="button" class="o-btn o-btn-secondary" t-on-click="onDiscard">Discard</button>
+          </t>
+        </div>
+      </div>
+      <t t-if="state.loading">
+        <div class="o-form-loading o-skeleton-msg">Loading…</div>
+      </t>
+      <t t-elif="state.error">
+        <div class="o-error-panel__muted"><t t-esc="state.error"/></div>
+      </t>
+      <t t-else="">
+        <FormRenderer
+          record="state.record"
+          fields="state.fields"
+          editMode="state.editMode"
+          onFieldChange="onFieldChange"/>
+      </t>
+    </div>`;
+    static components = { FormRenderer };
+    static props = {
+      resModel: String,
+      resId: { type: [Number, String], optional: true },
+      domain: { type: Array, optional: true },
+      context: { type: Object, optional: true },
+      onSaved: { type: Function, optional: true },
+      onBack: { type: Function, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    setup() {
+      this.env = useEnv5();
+      this._orm = window.Services && window.Services.orm || null;
+      this.state = useState7({
+        title: this._titleFor(this.props.resModel),
+        record: {},
+        fields: [],
+        editMode: !this.props.resId,
+        // New records start in edit
+        loading: !!this.props.resId,
+        saving: false,
+        error: null
+      });
+      this._pendingChanges = {};
+      onMounted6(() => {
+        if (this.props.resId) {
+          this._loadRecord(this.props.resId);
+        } else {
+          this._loadDefaultFields();
+        }
+      });
+    }
+    _titleFor(model) {
+      if (!model) return "Form";
+      const parts = String(model).split(".");
+      return parts[parts.length - 1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    /** Post-1.250.8: bounded wait for hung JSON-RPC (same helper as list controller). */
+    _withDeadline(promise, label) {
+      const race = typeof window !== "undefined" && typeof window.__ERP_rpcRaceDeadline === "function" ? window.__ERP_rpcRaceDeadline : (p) => p;
+      const ms = typeof window !== "undefined" && window.__ERP_RPC_DEADLINE_DEFAULT_MS ? window.__ERP_RPC_DEADLINE_DEFAULT_MS : 25e3;
+      return race(promise, ms, label);
+    }
+    async _loadRecord(id) {
+      const orm = this._orm;
+      if (!orm) {
+        this.state.loading = false;
+        return;
+      }
+      this.state.loading = true;
+      this.state.error = null;
+      try {
+        const fields = await this._withDeadline(this._getFields(), "Fields metadata timed out");
+        const fieldNames = fields.map((f) => f.name).filter(Boolean);
+        const records = await this._withDeadline(
+          orm.read(this.props.resModel, [Number(id)], fieldNames),
+          "Record load timed out"
+        );
+        const record = (Array.isArray(records) ? records : [])[0] || {};
+        this.state.record = record;
+        this.state.fields = fields;
+        this._pendingChanges = {};
+      } catch (err) {
+        this.state.error = "Failed to load record: " + (err && err.message ? err.message : String(err));
+      } finally {
+        this.state.loading = false;
+      }
+    }
+    async _loadDefaultFields() {
+      const fields = await this._withDeadline(this._getFields(), "Fields metadata timed out");
+      this.state.fields = fields;
+      this.state.record = {};
+    }
+    async _getFields() {
+      const views = window.Services && window.Services.views;
+      if (views && typeof views.getView === "function") {
+        const formView = views.getView(this.props.resModel, "form");
+        if (formView && formView.fields) {
+          return Object.entries(formView.fields).map(
+            ([name, meta]) => Object.assign({ name }, typeof meta === "object" ? meta : { type: meta })
+          );
+        }
+      }
+      if (views && typeof views.getFieldsMeta === "function") {
+        const meta = views.getFieldsMeta(this.props.resModel);
+        if (meta && typeof meta === "object") {
+          return Object.entries(meta).map(
+            ([name, info]) => Object.assign({ name }, typeof info === "object" ? info : {})
+          );
+        }
+      }
+      return [{ name: "name", label: "Name", type: "char" }];
+    }
+    startEdit() {
+      this._pendingChanges = {};
+      this.state.editMode = true;
+    }
+    onFieldChange(fieldName, value) {
+      this._pendingChanges[fieldName] = value;
+      this.state.record = Object.assign({}, this.state.record, { [fieldName]: value });
+    }
+    async onSave() {
+      const orm = this._orm;
+      if (!orm) return;
+      this.state.saving = true;
+      this.state.error = null;
+      try {
+        const changes = this._pendingChanges;
+        const id = this.state.record.id;
+        if (id) {
+          await orm.write(this.props.resModel, [id], changes);
+        } else {
+          const newId = await orm.create(this.props.resModel, [changes]);
+          await this._loadRecord(newId);
+        }
+        this._pendingChanges = {};
+        this.state.editMode = false;
+        if (typeof this.props.onSaved === "function") {
+          this.props.onSaved(this.state.record);
+        }
+      } catch (err) {
+        this.state.error = "Save failed: " + (err && err.message ? err.message : String(err));
+      } finally {
+        this.state.saving = false;
+      }
+    }
+    onDiscard() {
+      this._pendingChanges = {};
+      if (this.state.record.id) {
+        this._loadRecord(this.state.record.id);
+      } else {
+        this.state.record = {};
+      }
+      this.state.editMode = false;
+      this.state.error = null;
+    }
+    onBack() {
+      if (typeof this.props.onBack === "function") {
+        this.props.onBack();
+      } else {
+        window.history.back();
+      }
+    }
+  };
+  viewRegistry.add("form", {
+    type: "form",
+    Controller: FormController,
+    Renderer: FormRenderer,
+    searchMenuTypes: ["filter", "favorite"]
+  });
+  window.AppCore = window.AppCore || {};
+  window.AppCore.FormController = FormController;
+
+  // addons/web/static/src/app/views/kanban/kanban_controller.js
   var owl11 = window.owl;
-  var { Component: Component10, useState: useState8, xml: xml10, useRef: useRef7, onMounted: onMounted7, onWillUnmount: onWillUnmount5, useEnv: useEnv6 } = owl11;
-  var DropdownItem = class extends Component10 {
+  var { Component: Component10, useState: useState8, xml: xml10, onMounted: onMounted7, onPatched: onPatched3, useRef: useRef6, useEnv: useEnv6 } = owl11;
+  var KanbanController = class extends Component10 {
     static template = xml10`
+    <div class="o-kanban-controller o-kanban-view" t-ref="root">
+      <div class="o-kanban-header">
+        <h2 class="o-kanban-title"><t t-esc="title"/></h2>
+        <button type="button" class="o-btn o-btn-primary" t-on-click="onNew">New</button>
+      </div>
+      <div class="o-kanban-content" t-ref="kanbanContent"/>
+    </div>`;
+    static props = {
+      resModel: String,
+      domain: { type: Array, optional: true },
+      context: { type: Object, optional: true },
+      groupBy: { type: String, optional: true },
+      onOpenRecord: { type: Function, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    setup() {
+      this.env = useEnv6();
+      this.rootRef = useRef6("root");
+      this.contentRef = useRef6("kanbanContent");
+      this.state = useState8({ loading: false });
+      this._lastDomainJson = "";
+      onMounted7(() => {
+        this._renderLegacy();
+      });
+      onPatched3(() => {
+        var d = JSON.stringify(this.props.domain || []);
+        if (d !== this._lastDomainJson) {
+          this._lastDomainJson = d;
+          this._renderLegacy();
+        }
+      });
+    }
+    get title() {
+      const parts = String(this.props.resModel || "").split(".");
+      return parts[parts.length - 1].replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    _renderLegacy() {
+      const KVM = window.AppCore && window.AppCore.KanbanViewModule;
+      const el = this.contentRef.el;
+      if (!el) return;
+      if (KVM && typeof KVM.render === "function") {
+        KVM.render(el, {
+          model: this.props.resModel,
+          domain: this.props.domain || [],
+          context: this.props.context || {},
+          groupBy: this.props.groupBy || null,
+          rpc: window.Services && window.Services.rpc,
+          viewsSvc: window.Services && window.Services.views
+        });
+      } else {
+        el.innerHTML = '<p class="o-skeleton-msg">Kanban view loading\u2026</p>';
+      }
+    }
+    onNew() {
+      const model = this.props.resModel;
+      if (model) {
+        window.location.hash = "#" + model.replace(/\./g, "_") + "/new";
+      }
+    }
+  };
+  viewRegistry.add("kanban", {
+    type: "kanban",
+    Controller: KanbanController,
+    searchMenuTypes: ["filter", "groupBy", "favorite"]
+  });
+  window.AppCore = window.AppCore || {};
+  window.AppCore.KanbanController = KanbanController;
+
+  // addons/web/static/src/app/core/dropdown.js
+  var owl12 = window.owl;
+  var { Component: Component11, useState: useState9, xml: xml11, useRef: useRef7, onMounted: onMounted8, onWillUnmount: onWillUnmount6, useEnv: useEnv7 } = owl12;
+  var DropdownItem = class extends Component11 {
+    static template = xml11`
     <li class="o-dropdown-item"
         t-att-class="{ 'o-dropdown-item--disabled': props.disabled }"
         role="menuitem"
@@ -3531,8 +4066,8 @@
       }
     }
   };
-  var Dropdown = class extends Component10 {
-    static template = xml10`
+  var Dropdown = class extends Component11 {
+    static template = xml11`
     <div class="o-dropdown" t-att-class="{ 'o-dropdown--open': state.open }">
       <div class="o-dropdown-toggle"
            t-att-aria-expanded="state.open ? 'true' : 'false'"
@@ -3558,7 +4093,7 @@
       slots: { type: Object, optional: true }
     };
     setup() {
-      this.state = useState8({ open: false });
+      this.state = useState9({ open: false });
       this.menuRef = useRef7("menu");
       useExternalListener(document, "click", this.onDocumentClick.bind(this));
       useExternalListener(document, "keydown", this.onDocumentKeyDown.bind(this));
@@ -3614,10 +4149,10 @@
   window.AppCore.DropdownItem = DropdownItem;
 
   // addons/web/static/src/app/search/control_panel.js
-  var owl12 = window.owl;
-  var { Component: Component11, useState: useState9, xml: xml11, useEnv: useEnv7 } = owl12;
-  var Breadcrumbs = class extends Component11 {
-    static template = xml11`
+  var owl13 = window.owl;
+  var { Component: Component12, useState: useState10, xml: xml12, useEnv: useEnv8 } = owl13;
+  var Breadcrumbs = class extends Component12 {
+    static template = xml12`
     <nav class="o-control-panel-breadcrumbs" aria-label="Breadcrumb">
       <t t-foreach="props.breadcrumbs" t-as="crumb" t-key="crumb_index">
         <t t-if="crumb_index > 0">
@@ -3649,8 +4184,8 @@
       }
     }
   };
-  var ViewSwitcher = class extends Component11 {
-    static template = xml11`
+  var ViewSwitcher = class extends Component12 {
+    static template = xml12`
     <div class="o-view-switcher" role="toolbar" aria-label="View type">
       <t t-foreach="props.views" t-as="view" t-key="view.type">
         <button type="button"
@@ -3680,8 +4215,8 @@
       }
     }
   };
-  var ActionMenu = class extends Component11 {
-    static template = xml11`
+  var ActionMenu = class extends Component12 {
+    static template = xml12`
     <Dropdown>
       <button type="button" class="o-btn o-btn-secondary o-action-menu-btn">
         Actions &#9660;
@@ -3700,8 +4235,8 @@
       slots: { type: Object, optional: true }
     };
   };
-  var ControlPanel = class extends Component11 {
-    static template = xml11`
+  var ControlPanel = class extends Component12 {
+    static template = xml12`
     <div class="o-control-panel">
       <div class="o-control-panel-main">
         <Breadcrumbs
@@ -3777,8 +4312,8 @@
   });
 
   // addons/web/static/src/app/search/with_search.js
-  var owl13 = window.owl;
-  var { Component: Component12, useState: useState10, xml: xml12, onMounted: onMounted8, onWillUnmount: onWillUnmount6 } = owl13;
+  var owl14 = window.owl;
+  var { Component: Component13, useState: useState11, xml: xml13, onMounted: onMounted9, onWillUnmount: onWillUnmount7 } = owl14;
   function createSearchModel(resModel, opts) {
     opts = opts || {};
     const SM = window.AppCore && window.AppCore.SearchModel || window.__ERP_SearchLayer && window.__ERP_SearchLayer.SearchModel;
@@ -3819,8 +4354,8 @@
   function WithSearch(Controller, options) {
     options = options || {};
     const formMode = !!options.formMode;
-    class WithSearchWrapper extends Component12 {
-      static template = xml12`
+    class WithSearchWrapper extends Component13 {
+      static template = xml13`
       <div class="o-with-search">
         <ControlPanel t-props="controlPanelProps"/>
         <t t-component="InnerController"
@@ -3853,7 +4388,7 @@
         } else if (options.searchMenuTypes) {
           viewsChrome = [{ type: "list", label: "List" }, { type: "kanban", label: "Kanban" }];
         }
-        this.state = useState10({
+        this.state = useState11({
           domain: this._computeDomain(),
           breadcrumbs: [{ name: this._titleFor(resModel) }],
           availableViews: viewsChrome,
@@ -3865,7 +4400,7 @@
             this.state.domain = this._computeDomain();
           });
         }
-        onWillUnmount6(() => {
+        onWillUnmount7(() => {
           if (typeof this._unsubscribe === "function") this._unsubscribe();
         });
       }
@@ -3937,8 +4472,8 @@
   window.AppCore.createSearchModel = createSearchModel;
 
   // addons/web/static/src/app/action_container.js
-  var owl14 = window.owl;
-  var { Component: Component13, useState: useState11, xml: xml13, onMounted: onMounted9, onWillUnmount: onWillUnmount7, useRef: useRef8 } = owl14;
+  var owl15 = window.owl;
+  var { Component: Component14, useState: useState12, xml: xml14, onMounted: onMounted10, onWillUnmount: onWillUnmount8 } = owl15;
   var ListWithSearch = WithSearch(ListController, { searchMenuTypes: ["filter", "groupBy", "favorite"] });
   var KanbanWithSearch = WithSearch(KanbanController, { searchMenuTypes: ["filter", "groupBy", "favorite"] });
   var FormWithSearch = WithSearch(FormController, {
@@ -3970,13 +4505,20 @@
     form: FormWithSearch,
     kanban: KanbanWithSearch
   };
-  var ActionContainer = class extends Component13 {
-    static template = xml13`
+  var ACTION_LOADING_WATCHDOG_MS = 35e3;
+  var ActionContainer = class extends Component14 {
+    static template = xml14`
     <div class="o-action-container" t-ref="root">
       <t t-if="state.componentInfo">
         <t t-component="state.componentInfo.Controller"
            t-props="state.componentInfo.props"
            t-key="state.componentInfo.key"/>
+      </t>
+      <t t-elif="state.loadTimeoutError">
+        <div class="o-load-failure-panel" role="alert">
+          <p class="o-error-panel__muted">This view took too long to load. Check your connection or try again.</p>
+          <button type="button" class="o-btn o-btn-primary o-load-failure-retry" t-on-click="onRetryAfterTimeout">Retry</button>
+        </div>
       </t>
       <t t-elif="state.loading">
         <div class="o-action-loading o-skeleton-msg">Loading…</div>
@@ -3986,34 +4528,64 @@
       </t>
     </div>`;
     setup() {
-      this.state = useState11({
+      this.state = useState12({
         componentInfo: null,
-        loading: false
+        loading: false,
+        loadTimeoutError: false
       });
+      this._loadingWatchdog = null;
       this._unsubscribeBus = ActionBus.on("ACTION_MANAGER:UPDATE", this._onUpdate.bind(this));
       const onDomUpdate = (ev) => this._onUpdate(ev.detail);
-      onMounted9(() => {
+      onMounted10(() => {
         window.__ERP_OWL_ACTION_CONTAINER_MOUNTED = true;
         window.addEventListener("erp:action-update", onDomUpdate);
       });
-      onWillUnmount7(() => {
+      onWillUnmount8(() => {
         window.__ERP_OWL_ACTION_CONTAINER_MOUNTED = false;
+        this._clearLoadingWatchdog();
         this._unsubscribeBus();
         window.removeEventListener("erp:action-update", onDomUpdate);
       });
+    }
+    _clearLoadingWatchdog() {
+      if (this._loadingWatchdog != null) {
+        clearTimeout(this._loadingWatchdog);
+        this._loadingWatchdog = null;
+      }
+    }
+    _armLoadingWatchdog() {
+      this._clearLoadingWatchdog();
+      this._loadingWatchdog = setTimeout(() => {
+        this._loadingWatchdog = null;
+        if (!this.state.componentInfo && this.state.loading) {
+          this.state.loadTimeoutError = true;
+          this.state.loading = false;
+        }
+      }, ACTION_LOADING_WATCHDOG_MS);
+    }
+    onRetryAfterTimeout() {
+      this.state.loadTimeoutError = false;
+      window.location.reload();
     }
     _onUpdate(detail) {
       if (!detail) return;
       const { type, viewType, resModel, resId, props } = detail;
       if (type === "clear") {
+        this._clearLoadingWatchdog();
         this.state.componentInfo = null;
+        this.state.loadTimeoutError = false;
+        this.state.loading = false;
         return;
       }
       if (type === "loading") {
+        this.state.loadTimeoutError = false;
         this.state.loading = true;
+        this._armLoadingWatchdog();
         return;
       }
+      this._clearLoadingWatchdog();
       this.state.loading = false;
+      this.state.loadTimeoutError = false;
       const vt = viewType || "list";
       let Controller = null;
       const descriptor = resolveViewDescriptor(vt, this.env);
@@ -4061,6 +4633,80 @@
   };
   window.AppCore.ActionContainer = ActionContainer;
 
+  // addons/web/static/src/app/loading_indicator.js
+  var owl16 = window.owl;
+  var { Component: Component15, useState: useState13, xml: xml15, onMounted: onMounted11, onWillUnmount: onWillUnmount9 } = owl16;
+  var LoadingIndicator = class extends Component15 {
+    static template = xml15`
+    <div class="o-loading-bar-host" aria-hidden="true">
+      <div t-if="state.count > 0"
+           class="o-loading-bar"
+           role="progressbar"
+           aria-valuemin="0"
+           aria-valuemax="100"
+           aria-label="Loading"/>
+    </div>
+  `;
+    setup() {
+      this.state = useState13({ count: 0 });
+      this._onStart = () => {
+        this.state.count += 1;
+      };
+      this._onEnd = () => {
+        this.state.count = Math.max(0, this.state.count - 1);
+      };
+      onMounted11(() => {
+        window.addEventListener("erp:loading:start", this._onStart);
+        window.addEventListener("erp:loading:end", this._onEnd);
+        this._syncBus();
+      });
+      onWillUnmount9(() => {
+        window.removeEventListener("erp:loading:start", this._onStart);
+        window.removeEventListener("erp:loading:end", this._onEnd);
+      });
+    }
+    _syncBus() {
+      const self = this;
+      const bus = window.__ERP_LOADING;
+      if (bus && typeof bus._subscribe === "function") {
+        bus._subscribe(function(count) {
+          self.state.count = count;
+        });
+      }
+    }
+  };
+  (function mountLoadingBus() {
+    let _count = 0;
+    const _listeners2 = [];
+    function notify() {
+      _listeners2.forEach(function(fn) {
+        fn(_count);
+      });
+    }
+    window.__ERP_LOADING = {
+      push() {
+        _count += 1;
+        notify();
+        window.dispatchEvent(new CustomEvent("erp:loading:start"));
+      },
+      pop() {
+        _count = Math.max(0, _count - 1);
+        notify();
+        window.dispatchEvent(new CustomEvent("erp:loading:end"));
+      },
+      reset() {
+        _count = 0;
+        notify();
+      },
+      get count() {
+        return _count;
+      },
+      _subscribe(fn) {
+        _listeners2.push(fn);
+      }
+    };
+  })();
+
   // addons/web/static/src/app/debug_boot.js
   function erpDebugBootLog(event, detail) {
     try {
@@ -4088,6 +4734,7 @@
       this.navbarApp = null;
       this.sidebarApp = null;
       this.actionContainerApp = null;
+      this.loadingIndicatorApp = null;
     }
     mount() {
       if (!this.target) return;
@@ -4123,6 +4770,12 @@
       shellLoadedOrTimeout.finally(() => {
         this.navbarApp = mountNavBar(this.env, navbar);
         this.sidebarApp = mountSidebar(this.env, sidebar);
+        const loadingHost = document.getElementById("o-loading-indicator-host");
+        if (loadingHost) {
+          mountComponent(LoadingIndicator, loadingHost, { env: this.env }).then((app) => {
+            this.loadingIndicatorApp = app;
+          });
+        }
         if (actionMgr) {
           mountComponent(ActionContainer, actionMgr, { env: this.env }).then((app) => {
             this.actionContainerApp = app;
@@ -4320,9 +4973,50 @@
       opts.wireForm(main);
       return true;
     }
+    var _formViewsSvc = null;
+    function _configureFormHelpers(opts) {
+      if (opts.viewsSvc) _formViewsSvc = opts.viewsSvc;
+    }
+    function getFormFields(model) {
+      if (_formViewsSvc && model) {
+        var v = _formViewsSvc.getView(model, "form");
+        if (v && v.fields && v.fields.length) {
+          var raw = v.fields.map(function(f) {
+            return (typeof f === "object" ? f.name : f) || f;
+          });
+          var out = [];
+          raw.forEach(function(f) {
+            var cf = getMonetaryCurrencyFieldFallback(model, f);
+            if (cf && out.indexOf(cf) < 0) out.push(cf);
+            out.push(f);
+          });
+          return out;
+        }
+      }
+      if (model === "crm.lead") return ["name", "type", "partner_id", "user_id", "stage_id", "ai_score", "ai_score_label", "currency_id", "expected_revenue", "description", "note_html", "tag_ids", "activity_ids", "message_ids"];
+      if (model === "sale.order") return ["name", "partner_id", "date_order", "state", "currency_id", "amount_total", "order_line"];
+      if (model === "product.product") return ["name", "list_price"];
+      if (model === "res.users") return ["name", "login", "active", "group_ids"];
+      if (model === "ir.attachment") return ["name", "res_model", "res_id", "datas"];
+      return ["name", "is_company", "type", "email", "phone", "street", "street2", "city", "zip", "country_id", "state_id"];
+    }
+    function getMonetaryCurrencyFieldFallback(model, fieldName) {
+      var FV = window.__ERP_FORM_VIEWS || {};
+      if (FV.getMonetaryCurrencyField) return FV.getMonetaryCurrencyField(model, fieldName);
+      return null;
+    }
+    function navigateToList(route) {
+      if (route) window.location.hash = "#" + route;
+    }
+    var formHelpers = {
+      getFormFields,
+      navigateToList,
+      configure: _configureFormHelpers
+    };
     window.AppCore = window.AppCore || {};
     window.AppCore.FormViewModule = {
-      render
+      render,
+      helpers: formHelpers
     };
   })();
 
@@ -4369,7 +5063,7 @@
         searchTerm: searchTerm || "",
         addLabel,
         middleSlotHtml: mid
-      }) : "<h2>" + title + '</h2><p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">' + vs + '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '"><button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>' + mid + '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p><div id="kanban-area"></div>';
+      }) : "<h2>" + title + '</h2><p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">' + vs + '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '"><button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>' + mid + '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + addLabel + '</button></p><div id="kanban-area"></div>';
       main.innerHTML = html;
       setListState({
         model,
@@ -4496,9 +5190,89 @@
       }
       return true;
     }
+    var _kanbanViewsSvc = null;
+    var _kanbanRpc = null;
+    function _configureKanbanHelpers(opts) {
+      if (opts.viewsSvc) _kanbanViewsSvc = opts.viewsSvc;
+      if (opts.rpc) _kanbanRpc = opts.rpc;
+    }
+    function getKanbanGroupBy(model) {
+      if (_kanbanViewsSvc && model) {
+        var v = _kanbanViewsSvc.getView(model, "kanban");
+        if (v && v.group_by) return v.group_by;
+      }
+      if (model === "crm.lead") return "stage_id";
+      if (model === "helpdesk.ticket") return "stage_id";
+      if (model === "project.task") return "stage_id";
+      return null;
+    }
+    function groupRecordsByField(records, field) {
+      var groups = {};
+      var order = [];
+      (records || []).forEach(function(rec) {
+        var raw = rec[field];
+        var key, label;
+        if (Array.isArray(raw)) {
+          key = String(raw[0] != null ? raw[0] : "__none__");
+          label = raw[1] != null ? String(raw[1]) : "(none)";
+        } else if (raw != null) {
+          key = String(raw);
+          label = key;
+        } else {
+          key = "__none__";
+          label = "(none)";
+        }
+        if (!groups[key]) {
+          groups[key] = { key, label, records: [] };
+          order.push(key);
+        }
+        groups[key].records.push(rec);
+      });
+      return order.map(function(k) {
+        return groups[k];
+      });
+    }
+    function wireKanbanDragDrop(container, onDrop) {
+      if (!container || typeof onDrop !== "function") return;
+      var cards = container.querySelectorAll("[data-kanban-record-id]");
+      cards.forEach(function(card) {
+        card.setAttribute("draggable", "true");
+        card.addEventListener("dragstart", function(e) {
+          e.dataTransfer.setData("text/plain", card.getAttribute("data-kanban-record-id") || "");
+          card.classList.add("o-kanban-dragging");
+        });
+        card.addEventListener("dragend", function() {
+          card.classList.remove("o-kanban-dragging");
+        });
+      });
+      var columns = container.querySelectorAll("[data-kanban-group-key]");
+      columns.forEach(function(col) {
+        col.addEventListener("dragover", function(e) {
+          e.preventDefault();
+          col.classList.add("o-kanban-dragover");
+        });
+        col.addEventListener("dragleave", function() {
+          col.classList.remove("o-kanban-dragover");
+        });
+        col.addEventListener("drop", function(e) {
+          e.preventDefault();
+          col.classList.remove("o-kanban-dragover");
+          var id = e.dataTransfer.getData("text/plain");
+          var groupKey = col.getAttribute("data-kanban-group-key");
+          if (id && groupKey) onDrop(id, groupKey);
+        });
+      });
+    }
+    var kanbanHelpers = {
+      getKanbanGroupBy,
+      groupRecordsByField,
+      wireKanbanDragDrop,
+      configure: _configureKanbanHelpers
+    };
     window.AppCore = window.AppCore || {};
     window.AppCore.KanbanViewModule = {
-      render
+      render,
+      helpers: kanbanHelpers
     };
   })();
 
@@ -4657,13 +5431,13 @@
         html += '<span class="graph-type-switcher" style="display:inline-flex;gap:2px;margin-right:0.5rem">';
         ["bar", "line", "pie"].forEach(function(t) {
           var active = t === graphType;
-          html += '<button type="button" class="btn-graph-type' + (active ? " active" : "") + '" data-type="' + t + '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' + (active ? "#1a1a2e;color:white;border-color:#1a1a2e" : "#fff;color:#333") + ';border-radius:4px;cursor:pointer;font-size:0.9rem">' + (t.charAt(0).toUpperCase() + t.slice(1)) + "</button>";
+          html += '<button type="button" class="btn-graph-type' + (active ? " active" : "") + '" data-type="' + t + '" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);background:' + (active ? "var(--color-primary);color:var(--color-bg);border-color:var(--color-primary)" : "var(--color-surface-1);color:var(--color-text)") + ';border-radius:var(--radius-sm);cursor:pointer;font-size:0.9rem">' + (t.charAt(0).toUpperCase() + t.slice(1)) + "</button>";
         });
         html += "</span>";
-        html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '">';
+        html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '">';
         html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
         if (model === "crm.lead") {
-          html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+          html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)"><option value="">All stages</option></select>';
         }
         html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';
       }
@@ -4858,10 +5632,10 @@
         html += renderViewSwitcher(route, "pivot");
         html += '<button type="button" id="btn-pivot-flip" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Flip axes</button>';
         html += '<button type="button" id="btn-pivot-download" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Download CSV</button>';
-        html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '">';
+        html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '">';
         html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
         if (model === "crm.lead") {
-          html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+          html += '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)"><option value="">All stages</option></select>';
         }
         html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + pivotAddLabel + "</button></p>";
       }
@@ -5055,7 +5829,7 @@
         html += '<span id="cal-title" style="min-width:140px;font-weight:600">' + monthTitleStr + "</span>";
         html += '<button type="button" id="cal-next" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Next</button>';
         html += '<button type="button" id="cal-today" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;background:#fff">Today</button>';
-        html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '">';
+        html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' + (searchTerm || "").replace(/"/g, "&quot;") + '">';
         html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
         html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + calAddLabel + "</button></p>";
       }
@@ -5764,7 +6538,7 @@
     let html = "<h2>" + escHtml3(title) + "</h2>";
     html += '<p class="o-kanban-control-strip" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">';
     html += vs;
-    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' + escAttr(st) + '">';
+    html += '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' + escAttr(st) + '">';
     html += '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
     html += mid;
     html += '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">' + escHtml3(addLabel) + "</button></p>";
@@ -5951,8 +6725,8 @@
   })();
 
   // addons/web/static/src/app/core/dialog.js
-  var owl15 = window.owl;
-  var { Component: Component14, useState: useState12, xml: xml14, useRef: useRef9, onMounted: onMounted10, onWillUnmount: onWillUnmount8, useEnv: useEnv8 } = owl15;
+  var owl17 = window.owl;
+  var { Component: Component16, useState: useState14, xml: xml16, useRef: useRef8, onMounted: onMounted12, onWillUnmount: onWillUnmount10, useEnv: useEnv9 } = owl17;
   var _overlayStack = [];
   function pushOverlay(entry) {
     _overlayStack.push(entry);
@@ -5969,8 +6743,8 @@
   function nextOverlayId() {
     return "dialog-" + _nextId++;
   }
-  var Dialog = class extends Component14 {
-    static template = xml14`
+  var Dialog = class extends Component16 {
+    static template = xml16`
     <div class="o-dialog-overlay"
          role="dialog"
          aria-modal="true"
@@ -6015,11 +6789,11 @@
       this._overlayId = nextOverlayId();
       pushOverlay({ id: this._overlayId, component: this });
       useExternalListener(document, "keydown", this.onKeyDown.bind(this));
-      onWillUnmount8(() => {
+      onWillUnmount10(() => {
         removeOverlay(this._overlayId);
       });
-      const focusRef = useRef9("firstFocus");
-      onMounted10(() => {
+      const focusRef = useRef8("firstFocus");
+      onMounted12(() => {
         const panel = document.querySelector('.o-dialog-overlay[role="dialog"]');
         if (panel) {
           const focusable = panel.querySelector(
@@ -6047,8 +6821,8 @@
       }
     }
   };
-  var ConfirmationDialog = class extends Component14 {
-    static template = xml14`
+  var ConfirmationDialog = class extends Component16 {
+    static template = xml16`
     <Dialog title="props.title" t-on-dialog-close="onCancel">
       <p class="o-dialog-body-text"><t t-esc="props.body || props.message"/></p>
       <t t-set-slot="footer">
@@ -6152,10 +6926,10 @@
   window.AppCore.ConfirmationDialog = ConfirmationDialog;
 
   // addons/web/static/src/app/core/notebook.js
-  var owl16 = window.owl;
-  var { Component: Component15, useState: useState13, xml: xml15, onMounted: onMounted11 } = owl16;
-  var NotebookPage = class extends Component15 {
-    static template = xml15`
+  var owl18 = window.owl;
+  var { Component: Component17, useState: useState15, xml: xml17, onMounted: onMounted13 } = owl18;
+  var NotebookPage = class extends Component17 {
+    static template = xml17`
     <div class="o-notebook-page"
          t-att-class="{ 'o-notebook-page--active': props.isActive }"
          role="tabpanel"
@@ -6170,8 +6944,8 @@
       slots: { type: Object, optional: true }
     };
   };
-  var Notebook = class extends Component15 {
-    static template = xml15`
+  var Notebook = class extends Component17 {
+    static template = xml17`
     <div class="o-notebook">
       <div class="o-notebook-tabs" role="tablist">
         <t t-foreach="computedPages" t-as="page" t-key="page.id">
@@ -6210,8 +6984,8 @@
     };
     setup() {
       const firstId = this._getFirstPageId();
-      this.state = useState13({ activePage: this.props.defaultPage || firstId || "" });
-      onMounted11(() => {
+      this.state = useState15({ activePage: this.props.defaultPage || firstId || "" });
+      onMounted13(() => {
         if (!this.state.activePage && this.computedPages.length) {
           this.state.activePage = this.computedPages[0].id;
         }
@@ -6252,10 +7026,10 @@
   window.AppCore.NotebookPage = NotebookPage;
 
   // addons/web/static/src/app/core/autocomplete.js
-  var owl17 = window.owl;
-  var { Component: Component16, useState: useState14, xml: xml16, useRef: useRef10, onWillUnmount: onWillUnmount9 } = owl17;
-  var AutoComplete = class extends Component16 {
-    static template = xml16`
+  var owl19 = window.owl;
+  var { Component: Component18, useState: useState16, xml: xml18, useRef: useRef9, onWillUnmount: onWillUnmount11 } = owl19;
+  var AutoComplete = class extends Component18 {
+    static template = xml18`
     <div class="o-autocomplete" t-att-class="{ 'o-autocomplete--open': state.open }">
       <input
         t-ref="input"
@@ -6304,14 +7078,14 @@
       slots: { type: Object, optional: true }
     };
     setup() {
-      this.state = useState14({
+      this.state = useState16({
         inputValue: this._labelFor(this.props.value) || "",
         open: false,
         options: [],
         loading: false,
         activeIdx: -1
       });
-      this.inputRef = useRef10("input");
+      this.inputRef = useRef9("input");
       this._search = useDebounce(this._doSearch.bind(this), this.props.debounce ?? 250);
       useExternalListener(document, "click", this.onDocumentClick.bind(this));
     }
@@ -6399,8 +7173,8 @@
   window.AppCore.AutoComplete = AutoComplete;
 
   // addons/web/static/src/app/core/colorlist.js
-  var owl18 = window.owl;
-  var { Component: Component17, useState: useState15, xml: xml17 } = owl18;
+  var owl20 = window.owl;
+  var { Component: Component19, useState: useState17, xml: xml19 } = owl20;
   var COLORS = [
     { idx: 0, name: "No color", css: "transparent" },
     { idx: 1, name: "Red", css: "#e06c75" },
@@ -6415,8 +7189,8 @@
     { idx: 10, name: "Purple", css: "#c678dd" },
     { idx: 11, name: "Pink", css: "#d44e8e" }
   ];
-  var ColorList = class extends Component17 {
-    static template = xml17`
+  var ColorList = class extends Component19 {
+    static template = xml19`
     <div class="o-colorlist">
       <button type="button"
               class="o-colorlist-toggle"
@@ -6448,7 +7222,7 @@
     };
     static colors = COLORS;
     setup() {
-      this.state = useState15({ expanded: false });
+      this.state = useState17({ expanded: false });
       this.colors = COLORS;
       useExternalListener(window, "click", this.onWindowClick.bind(this));
     }
@@ -6475,10 +7249,10 @@
   window.AppCore.COLOR_PALETTE = COLORS;
 
   // addons/web/static/src/app/views/graph/graph_controller.js
-  var owl19 = window.owl;
-  var { Component: Component18, useState: useState16, xml: xml18, onMounted: onMounted12, useRef: useRef11, useEnv: useEnv9 } = owl19;
-  var GraphController = class extends Component18 {
-    static template = xml18`
+  var owl21 = window.owl;
+  var { Component: Component20, useState: useState18, xml: xml20, onMounted: onMounted14, useRef: useRef10, useEnv: useEnv10 } = owl21;
+  var GraphController = class extends Component20 {
+    static template = xml20`
     <div class="o-graph-controller o-graph-view">
       <div class="o-graph-toolbar" t-ref="toolbar"/>
       <div class="o-graph-content" t-ref="content"/>
@@ -6494,10 +7268,10 @@
       slots: { type: Object, optional: true }
     };
     setup() {
-      this.env = useEnv9();
-      this.toolbarRef = useRef11("toolbar");
-      this.contentRef = useRef11("content");
-      onMounted12(() => this._renderLegacy());
+      this.env = useEnv10();
+      this.toolbarRef = useRef10("toolbar");
+      this.contentRef = useRef10("content");
+      onMounted14(() => this._renderLegacy());
     }
     _renderLegacy() {
       const GVM = window.AppCore && window.AppCore.GraphViewModule;
@@ -6525,10 +7299,10 @@
   window.AppCore.GraphController = GraphController;
 
   // addons/web/static/src/app/views/pivot/pivot_controller.js
-  var owl20 = window.owl;
-  var { Component: Component19, xml: xml19, onMounted: onMounted13, useRef: useRef12, useEnv: useEnv10 } = owl20;
-  var PivotController = class extends Component19 {
-    static template = xml19`
+  var owl22 = window.owl;
+  var { Component: Component21, xml: xml21, onMounted: onMounted15, useRef: useRef11, useEnv: useEnv11 } = owl22;
+  var PivotController = class extends Component21 {
+    static template = xml21`
     <div class="o-pivot-controller o-pivot-view">
       <div class="o-pivot-toolbar" t-ref="toolbar"/>
       <div class="o-pivot-content" t-ref="content"/>
@@ -6543,9 +7317,9 @@
       slots: { type: Object, optional: true }
     };
     setup() {
-      this.env = useEnv10();
-      this.contentRef = useRef12("content");
-      onMounted13(() => this._renderLegacy());
+      this.env = useEnv11();
+      this.contentRef = useRef11("content");
+      onMounted15(() => this._renderLegacy());
     }
     _renderLegacy() {
       const PVM = window.AppCore && window.AppCore.PivotViewModule;
@@ -6571,10 +7345,10 @@
   window.AppCore.PivotController = PivotController;
 
   // addons/web/static/src/app/views/calendar/calendar_controller.js
-  var owl21 = window.owl;
-  var { Component: Component20, xml: xml20, onMounted: onMounted14, useRef: useRef13, useEnv: useEnv11 } = owl21;
-  var CalendarController = class extends Component20 {
-    static template = xml20`
+  var owl23 = window.owl;
+  var { Component: Component22, xml: xml22, onMounted: onMounted16, useRef: useRef12, useEnv: useEnv12 } = owl23;
+  var CalendarController = class extends Component22 {
+    static template = xml22`
     <div class="o-calendar-controller o-calendar-view">
       <div class="o-calendar-toolbar" t-ref="toolbar"/>
       <div class="o-calendar-content" t-ref="content"/>
@@ -6588,9 +7362,9 @@
       slots: { type: Object, optional: true }
     };
     setup() {
-      this.env = useEnv11();
-      this.contentRef = useRef13("content");
-      onMounted14(() => this._renderLegacy());
+      this.env = useEnv12();
+      this.contentRef = useRef12("content");
+      onMounted16(() => this._renderLegacy());
     }
     _renderLegacy() {
       const CVM = window.AppCore && window.AppCore.CalendarViewModule;
@@ -6615,6 +7389,203 @@
   });
   window.AppCore = window.AppCore || {};
   window.AppCore.CalendarController = CalendarController;
+
+  // addons/web/static/src/app/views/gantt/gantt_controller.js
+  var owl24 = window.owl;
+  var { Component: Component23, xml: xml23, onMounted: onMounted17, onPatched: onPatched4, useRef: useRef13, useEnv: useEnv13 } = owl24;
+  var GanttController = class extends Component23 {
+    static template = xml23`
+    <div class="o-gantt-controller o-gantt-view">
+      <div class="o-gantt-content" t-ref="content"/>
+    </div>`;
+    static props = {
+      resModel: String,
+      route: { type: String, optional: true },
+      domain: { type: Array, optional: true },
+      context: { type: Object, optional: true },
+      dateStart: { type: String, optional: true },
+      dateStop: { type: String, optional: true },
+      searchTerm: { type: String, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    setup() {
+      this.env = useEnv13();
+      this.contentRef = useRef13("content");
+      onMounted17(() => this._renderLegacy());
+      onPatched4(() => this._renderLegacy());
+    }
+    _renderLegacy() {
+      const GVM = window.AppCore && window.AppCore.GanttViewModule;
+      const el = this.contentRef.el;
+      if (!el) return;
+      if (!GVM || typeof GVM.render !== "function") {
+        el.innerHTML = '<p class="o-skeleton-msg">Gantt view loading\u2026</p>';
+        return;
+      }
+      const rpc = window.Services && window.Services.rpc;
+      const route = this.props.route || this.props.resModel.split(".").pop();
+      GVM.render(el, {
+        model: this.props.resModel,
+        route,
+        records: [],
+        searchTerm: this.props.searchTerm || "",
+        dateStart: this.props.dateStart || "date_start",
+        dateStop: this.props.dateStop || "date_deadline",
+        domain: this.props.domain || [],
+        rpc,
+        getTitle: (r) => {
+          const t = window.__ERP_SHELL_ROUTES && window.__ERP_SHELL_ROUTES.getTitle;
+          return typeof t === "function" ? t(r) : r;
+        },
+        renderViewSwitcher: (r, v) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          return lv && typeof lv.renderViewSwitcher === "function" ? lv.renderViewSwitcher(r, v) : "";
+        },
+        loadRecords: (model, r, s, sf, vt, sid, oo, ord, dom) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.loadRecords === "function") {
+            lv.loadRecords(model, r, s, sf, vt, sid, oo, ord, dom);
+          }
+        },
+        dispatchListActWindowThenFormHash: (r, suffix, src) => {
+          const lr = window.ErpLegacyRouter;
+          if (lr && typeof lr.dispatchListActWindowThenFormHash === "function") {
+            lr.dispatchListActWindowThenFormHash(r, suffix, src);
+          } else {
+            window.location.hash = r + "/" + suffix;
+          }
+        },
+        setViewAndReload: (r, v) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.setViewAndReload === "function") lv.setViewAndReload(r, v);
+        },
+        setListState: (s) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.setCurrentListState === "function") lv.setCurrentListState(s);
+        },
+        setActionStack: (s) => {
+          const rt = window.__erpLegacyRuntime;
+          if (rt && typeof rt.setActionStack === "function") rt.setActionStack(s);
+        },
+        attachActWindowFormLinkDelegation: (sel, r, src) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.attachActWindowFormLinkDelegation === "function") {
+            lv.attachActWindowFormLinkDelegation(sel, r, src);
+          }
+        }
+      });
+    }
+  };
+  viewRegistry.add("gantt", {
+    type: "gantt",
+    Controller: GanttController,
+    searchMenuTypes: ["filter", "groupBy", "favorite"]
+  });
+  window.AppCore = window.AppCore || {};
+  window.AppCore.GanttController = GanttController;
+
+  // addons/web/static/src/app/views/activity/activity_controller.js
+  var owl25 = window.owl;
+  var { Component: Component24, xml: xml24, onMounted: onMounted18, onPatched: onPatched5, useRef: useRef14, useEnv: useEnv14 } = owl25;
+  var ActivityController = class extends Component24 {
+    static template = xml24`
+    <div class="o-activity-controller o-activity-view">
+      <div class="o-activity-content" t-ref="content"/>
+    </div>`;
+    static props = {
+      resModel: String,
+      route: { type: String, optional: true },
+      domain: { type: Array, optional: true },
+      context: { type: Object, optional: true },
+      searchTerm: { type: String, optional: true },
+      userId: { type: Number, optional: true },
+      slots: { type: Object, optional: true }
+    };
+    setup() {
+      this.env = useEnv14();
+      this.contentRef = useRef14("content");
+      onMounted18(() => this._renderLegacy());
+      onPatched5(() => this._renderLegacy());
+    }
+    _renderLegacy() {
+      const AVM = window.AppCore && window.AppCore.ActivityViewModule;
+      const el = this.contentRef.el;
+      if (!el) return;
+      if (!AVM || typeof AVM.render !== "function") {
+        el.innerHTML = '<p class="o-skeleton-msg">Activity view loading\u2026</p>';
+        return;
+      }
+      const rpc = window.Services && window.Services.rpc;
+      const route = this.props.route || this.props.resModel.split(".").pop();
+      const userId = this.props.userId != null ? this.props.userId : window.__ERP_SESSION && window.__ERP_SESSION.uid || 1;
+      AVM.render(el, {
+        model: this.props.resModel,
+        route,
+        records: [],
+        activityTypes: [],
+        activities: [],
+        searchTerm: this.props.searchTerm || "",
+        domain: this.props.domain || [],
+        userId,
+        rpc,
+        showToast: (msg, type) => {
+          const ui = window.UIComponents && window.UIComponents.Toast;
+          if (typeof ui === "function") ui({ message: msg, type: type || "info" });
+        },
+        getTitle: (r) => {
+          const t = window.__ERP_SHELL_ROUTES && window.__ERP_SHELL_ROUTES.getTitle;
+          return typeof t === "function" ? t(r) : r;
+        },
+        renderViewSwitcher: (r, v) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          return lv && typeof lv.renderViewSwitcher === "function" ? lv.renderViewSwitcher(r, v) : "";
+        },
+        loadRecords: (model, r, s, sf, vt, sid, oo, ord, dom) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.loadRecords === "function") {
+            lv.loadRecords(model, r, s, sf, vt, sid, oo, ord, dom);
+          }
+        },
+        dispatchListActWindowThenFormHash: (r, suffix, src) => {
+          const lr = window.ErpLegacyRouter;
+          if (lr && typeof lr.dispatchListActWindowThenFormHash === "function") {
+            lr.dispatchListActWindowThenFormHash(r, suffix, src);
+          } else {
+            window.location.hash = r + "/" + suffix;
+          }
+        },
+        setViewAndReload: (r, v) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.setViewAndReload === "function") lv.setViewAndReload(r, v);
+        },
+        setListState: (s) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.setCurrentListState === "function") lv.setCurrentListState(s);
+        },
+        getListState: () => {
+          const lv = window.__ERP_LIST_VIEWS;
+          return lv && typeof lv.getCurrentListState === "function" ? lv.getCurrentListState() : {};
+        },
+        setActionStack: (s) => {
+          const rt = window.__erpLegacyRuntime;
+          if (rt && typeof rt.setActionStack === "function") rt.setActionStack(s);
+        },
+        attachActWindowFormLinkDelegation: (sel, r, src) => {
+          const lv = window.__ERP_LIST_VIEWS;
+          if (lv && typeof lv.attachActWindowFormLinkDelegation === "function") {
+            lv.attachActWindowFormLinkDelegation(sel, r, src);
+          }
+        }
+      });
+    }
+  };
+  viewRegistry.add("activity", {
+    type: "activity",
+    Controller: ActivityController,
+    searchMenuTypes: ["filter", "groupBy", "favorite"]
+  });
+  window.AppCore = window.AppCore || {};
+  window.AppCore.ActivityController = ActivityController;
 
   // addons/web/static/src/app/client_actions.js
   function hashAction(hash) {
@@ -6693,8 +7664,8 @@
   window.AppCore.BUILTIN_CLIENT_ACTIONS = BUILTIN_CLIENT_ACTIONS;
 
   // addons/web/static/src/app/views/fields/field.js
-  var owl22 = window.owl;
-  var { Component: Component21, useState: useState17, xml: xml21, useEnv: useEnv12 } = owl22;
+  var owl26 = window.owl;
+  var { Component: Component25, useState: useState19, xml: xml25, useEnv: useEnv15 } = owl26;
   var _fieldDescriptors = /* @__PURE__ */ new Map();
   var fieldRegistry = {
     add(type, descriptor) {
@@ -6744,8 +7715,8 @@
     const invalid = required && editMode && (value === null || value === void 0 || value === "");
     return { required, readonly, invalid };
   }
-  var Field = class extends Component21 {
-    static template = xml21`
+  var Field = class extends Component25 {
+    static template = xml25`
     <div class="o-field"
          t-att-class="{
            'o-field--readonly': feedback.readonly,
@@ -6786,7 +7757,7 @@
       slots: { type: Object, optional: true }
     };
     setup() {
-      this.state = useState17({ loading: false });
+      this.state = useState19({ loading: false });
     }
     get fieldInfo() {
       return this.props.fieldInfo || {};
@@ -6837,8 +7808,8 @@
   window.AppCore.Field = Field;
 
   // addons/web/static/src/app/views/fields/core_fields.js
-  var owl23 = window.owl;
-  var { Component: Component22, xml: xml22 } = owl23;
+  var owl27 = window.owl;
+  var { Component: Component26, xml: xml26 } = owl27;
   var BASE_FIELD_PROPS = {
     name: String,
     value: { optional: true },
@@ -6853,8 +7824,8 @@
       component.props.onChange(component.props.name, value);
     }
   }
-  var CharField = class extends Component22 {
-    static template = xml22`
+  var CharField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value"><t t-esc="props.value || ''"/></span>
     </t>
@@ -6869,8 +7840,8 @@
       emitChange(this, v);
     }
   };
-  var IntegerField = class extends Component22 {
-    static template = xml22`
+  var IntegerField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-numeric"><t t-esc="props.value ?? ''"/></span>
     </t>
@@ -6885,8 +7856,8 @@
       emitChange(this, isNaN(v) ? 0 : v);
     }
   };
-  var FloatField = class extends Component22 {
-    static template = xml22`
+  var FloatField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-numeric">
         <t t-esc="props.value != null ? Number(props.value).toFixed(props.fieldInfo and props.fieldInfo.digits or 2) : ''"/>
@@ -6903,8 +7874,8 @@
       emitChange(this, isNaN(v) ? 0 : v);
     }
   };
-  var BooleanField = class extends Component22 {
-    static template = xml22`
+  var BooleanField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-boolean"
             t-att-class="{ 'o-field-boolean--true': props.value, 'o-field-boolean--false': !props.value }">
@@ -6923,8 +7894,8 @@
       emitChange(this, !!v);
     }
   };
-  var DateField = class extends Component22 {
-    static template = xml22`
+  var DateField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-date"><t t-esc="formatDate(props.value)"/></span>
     </t>
@@ -6955,8 +7926,8 @@
       emitChange(this, v);
     }
   };
-  var DatetimeField = class extends Component22 {
-    static template = xml22`
+  var DatetimeField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-datetime"><t t-esc="formatDatetime(props.value)"/></span>
     </t>
@@ -6987,8 +7958,8 @@
       emitChange(this, v ? v.replace("T", " ") : v);
     }
   };
-  var TextField = class extends Component22 {
-    static template = xml22`
+  var TextField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-text"><t t-esc="props.value || ''"/></span>
     </t>
@@ -7004,8 +7975,8 @@
       emitChange(this, v);
     }
   };
-  var SelectionField = class extends Component22 {
-    static template = xml22`
+  var SelectionField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-selection"><t t-esc="selectedLabel"/></span>
     </t>
@@ -7033,8 +8004,8 @@
       emitChange(this, v === "" ? false : v);
     }
   };
-  var MonetaryField = class extends Component22 {
-    static template = xml22`
+  var MonetaryField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-value o-field-monetary">
         <t t-if="currencySymbol"><t t-esc="currencySymbol"/>&nbsp;</t>
@@ -7070,8 +8041,8 @@
       emitChange(this, isNaN(v) ? 0 : v);
     }
   };
-  var BadgeField = class extends Component22 {
-    static template = xml22`
+  var BadgeField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-badge"><t t-esc="displayText"/></span>
     </t>
@@ -7091,8 +8062,8 @@
       emitChange(this, v);
     }
   };
-  var StatusbarField = class extends Component22 {
-    static template = xml22`
+  var StatusbarField = class extends Component26 {
+    static template = xml26`
     <div class="o-field-statusbar" role="list">
       <t t-foreach="steps" t-as="step" t-key="step[0]">
         <span class="o-field-statusbar-step"
@@ -7107,8 +8078,8 @@
       return fi.selection || [];
     }
   };
-  var PriorityField = class extends Component22 {
-    static template = xml22`
+  var PriorityField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-priority" t-att-aria-label="'Priority ' + level">
         <t t-foreach="starIndices" t-as="n" t-key="n">
@@ -7137,8 +8108,8 @@
       emitChange(this, v);
     }
   };
-  var UrlField = class extends Component22 {
-    static template = xml22`
+  var UrlField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <a t-if="href" class="o-field-link o-field-url" t-att-href="href" rel="noopener noreferrer" target="_blank">
         <t t-esc="href"/>
@@ -7161,8 +8132,8 @@
       emitChange(this, v);
     }
   };
-  var EmailField = class extends Component22 {
-    static template = xml22`
+  var EmailField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <a t-if="props.value" class="o-field-link o-field-email" t-att-href="'mailto:' + props.value">
         <t t-esc="props.value"/>
@@ -7178,8 +8149,8 @@
       emitChange(this, v);
     }
   };
-  var PhoneField = class extends Component22 {
-    static template = xml22`
+  var PhoneField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <a t-if="props.value" class="o-field-link o-field-phone" t-att-href="'tel:' + telHref">
         <t t-esc="props.value"/>
@@ -7198,8 +8169,8 @@
       emitChange(this, v);
     }
   };
-  var ImageField = class extends Component22 {
-    static template = xml22`
+  var ImageField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-image-wrap">
         <img t-if="imgSrc" class="o-field-image-thumb" t-att-src="imgSrc" alt=""/>
@@ -7222,8 +8193,8 @@
       emitChange(this, v);
     }
   };
-  var ColorPickerField = class extends Component22 {
-    static template = xml22`
+  var ColorPickerField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <span class="o-field-color-swatch" t-att-style="swatchStyle" role="img" t-att-aria-label="colorLabel"/>
     </t>
@@ -7234,7 +8205,7 @@
     static props = BASE_FIELD_PROPS;
     get hexValue() {
       const v = this.props.value;
-      if (!v) return "#000000";
+      if (!v) return getComputedStyle(document.documentElement).getPropertyValue("--color-text").trim() || "#000000";
       const s = String(v);
       return s.startsWith("#") ? s : "#" + s;
     }
@@ -7248,8 +8219,8 @@
       emitChange(this, v);
     }
   };
-  var HtmlField = class extends Component22 {
-    static template = xml22`
+  var HtmlField = class extends Component26 {
+    static template = xml26`
     <t t-if="!props.editMode">
       <div class="o-field-value o-field-html" t-out="props.value || ''"/>
     </t>
@@ -7264,6 +8235,113 @@
     onBlur(ev) {
       emitChange(this, ev.target.innerHTML);
     }
+  };
+  var RadioField = class extends Component26 {
+    static template = xml26`
+    <div class="o-field-radio" t-att-class="{ 'o-field-radio--inline': props.fieldInfo and props.fieldInfo.horizontal }">
+      <t t-if="!props.editMode">
+        <span class="o-field-value o-field-selection"><t t-esc="selectedLabel"/></span>
+      </t>
+      <t t-else="">
+        <t t-foreach="selection" t-as="opt" t-key="opt[0]">
+          <label class="o-field-radio-option">
+            <input type="radio"
+                   t-att-name="props.name"
+                   t-att-value="opt[0]"
+                   t-att-checked="props.value === opt[0] ? '' : null"
+                   t-on-change="() => onChange(opt[0])"/>
+            <span class="o-field-radio-label"><t t-esc="opt[1]"/></span>
+          </label>
+        </t>
+      </t>
+    </div>`;
+    static props = BASE_FIELD_PROPS;
+    get selection() {
+      return this.props.fieldInfo && this.props.fieldInfo.selection || [];
+    }
+    get selectedLabel() {
+      const opt = this.selection.find((o) => o[0] === this.props.value);
+      return opt ? opt[1] : this.props.value || "\u2014";
+    }
+    onChange(v) {
+      emitChange(this, v);
+    }
+  };
+  var BinaryField = class extends Component26 {
+    static template = xml26`
+    <div class="o-field-binary">
+      <t t-if="!props.editMode">
+        <a t-if="downloadHref"
+           class="o-field-link o-field-binary-link"
+           t-att-href="downloadHref"
+           rel="noopener noreferrer"
+           download="">
+          <span class="o-field-binary-icon">&#128196;</span>
+          <t t-esc="filename"/>
+        </a>
+        <span t-else="" class="o-field-value">—</span>
+      </t>
+      <t t-else="">
+        <input type="file" class="o-field-file-input"
+               t-att-name="props.name"
+               t-on-change="onFileChange"/>
+        <t t-if="filename">
+          <span class="o-field-binary-current"><t t-esc="filename"/></span>
+        </t>
+      </t>
+    </div>`;
+    static props = BASE_FIELD_PROPS;
+    get filename() {
+      const fi = this.props.fieldInfo || {};
+      return fi.filename || (this.props.value ? "file" : "");
+    }
+    get downloadHref() {
+      const v = this.props.value;
+      if (!v) return "";
+      const record = this.props.record || {};
+      if (record.id && this.props.name) {
+        const model = this.props.fieldInfo && this.props.fieldInfo.model || "";
+        if (model) {
+          return `/web/content?model=${model}&id=${record.id}&field=${this.props.name}&download=true`;
+        }
+      }
+      return v.startsWith("data:") ? v : "data:application/octet-stream;base64," + v;
+    }
+    onFileChange(ev) {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (re) => {
+        const result = re.target.result;
+        const b64 = result.indexOf(",") >= 0 ? result.split(",")[1] : result;
+        emitChange(this, b64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  var ProgressBarField = class extends Component26 {
+    static template = xml26`
+    <div class="o-field-progressbar">
+      <div class="o-field-progressbar-track" role="progressbar"
+           t-att-aria-valuenow="pct"
+           aria-valuemin="0" aria-valuemax="100">
+        <div class="o-field-progressbar-fill"
+             t-att-style="'width:' + pct + '%;background:var(--color-primary)'"/>
+      </div>
+      <span class="o-field-progressbar-label"><t t-esc="pct"/>%</span>
+    </div>`;
+    static props = BASE_FIELD_PROPS;
+    get pct() {
+      const v = parseFloat(this.props.value);
+      if (isNaN(v)) return 0;
+      const max = this.props.fieldInfo && this.props.fieldInfo.max_value || 100;
+      return Math.min(100, Math.max(0, Math.round(v / max * 100)));
+    }
+  };
+  var HandleField = class extends Component26 {
+    static template = xml26`
+    <span class="o-field-handle" aria-hidden="true" title="Drag to reorder">&#9723;</span>`;
+    static props = BASE_FIELD_PROPS;
   };
   function reg(type, component, format) {
     const desc = { type, component };
@@ -7297,21 +8375,35 @@
   reg("phone", PhoneField, (v) => v == null ? "" : String(v));
   reg("image", ImageField, (v) => v ? "[image]" : "");
   reg("color_picker", ColorPickerField, (v) => v == null ? "" : String(v));
+  reg("radio", RadioField, (v, _r, col) => {
+    const sel = col && col.selection || [];
+    const opt = sel.find((o) => o[0] === v);
+    return opt ? opt[1] : v != null ? String(v) : "";
+  });
+  reg("binary", BinaryField, (v) => v ? "[file]" : "");
+  reg("progressbar", ProgressBarField, (v) => v != null ? String(v) + "%" : "");
+  reg("handle", HandleField, () => "");
   window.AppCore = window.AppCore || {};
   window.AppCore.CoreFields = Object.fromEntries(
     CORE_FIELD_COMPONENTS.map(([t, c]) => [t, c])
   );
+  Object.assign(window.AppCore.CoreFields, {
+    radio: RadioField,
+    binary: BinaryField,
+    progressbar: ProgressBarField,
+    handle: HandleField
+  });
 
   // addons/web/static/src/app/views/fields/relational_fields.js
-  var owl24 = window.owl;
-  var { Component: Component23, useState: useState18, xml: xml23, useEnv: useEnv13, onMounted: onMounted15 } = owl24;
+  var owl28 = window.owl;
+  var { Component: Component27, useState: useState20, xml: xml27, useEnv: useEnv16, onMounted: onMounted19 } = owl28;
   function emitChange2(component, value) {
     if (typeof component.props.onChange === "function") {
       component.props.onChange(component.props.name, value);
     }
   }
-  var Many2oneField = class extends Component23 {
-    static template = xml23`
+  var Many2oneField = class extends Component27 {
+    static template = xml27`
     <div class="o-field-many2one">
       <t t-if="!props.editMode">
         <span class="o-field-value">
@@ -7369,8 +8461,8 @@
       emitChange2(this, [option.value, option.label]);
     }
   };
-  var Many2manyTagsField = class extends Component23 {
-    static template = xml23`
+  var Many2manyTagsField = class extends Component27 {
+    static template = xml27`
     <div class="o-field-many2many-tags">
       <div class="o-m2m-tags-container">
         <t t-foreach="tags" t-as="tag" t-key="tag.id">
@@ -7445,8 +8537,8 @@
       emitChange2(this, next.map((t) => [t.id, t.name]));
     }
   };
-  var X2ManyField = class extends Component23 {
-    static template = xml23`
+  var X2ManyField = class extends Component27 {
+    static template = xml27`
     <div class="o-field-x2many">
       <div class="o-x2many-list">
         <t t-if="!rows.length">
@@ -7526,177 +8618,13 @@
     X2ManyField
   });
 
-  // addons/web/static/src/app/search/search_panel.js
-  var owl25 = window.owl;
-  var { Component: Component24, useState: useState19, xml: xml24, onMounted: onMounted16, useEnv: useEnv14 } = owl25;
-  var SearchPanelSection = class extends Component24 {
-    static template = xml24`
-    <div class="o-search-panel-section">
-      <button type="button"
-              class="o-search-panel-section-header"
-              t-att-aria-expanded="!state.collapsed ? 'true' : 'false'"
-              t-on-click="toggleCollapse">
-        <span class="o-search-panel-section-title"><t t-esc="props.title"/></span>
-        <span class="o-search-panel-chevron" aria-hidden="true">
-          <t t-if="state.collapsed">&#9654;</t>
-          <t t-else="">&#9660;</t>
-        </span>
-      </button>
-      <t t-if="!state.collapsed">
-        <div class="o-search-panel-section-items" role="list">
-          <t t-foreach="props.items" t-as="item" t-key="item.id || item_index">
-            <div class="o-search-panel-item"
-                 t-att-class="{ 'o-search-panel-item--active': isActive(item) }"
-                 role="listitem"
-                 tabindex="0"
-                 t-on-click="() => onItemClick(item)"
-                 t-on-keydown="(ev) => onItemKeyDown(ev, item)">
-              <t t-if="props.type === 'filter'">
-                <input type="checkbox"
-                       class="o-search-panel-checkbox"
-                       t-att-checked="isActive(item) ? '' : null"
-                       t-att-aria-label="item.name"
-                       t-on-click.stop="() => onItemClick(item)"/>
-              </t>
-              <span class="o-search-panel-item-icon"
-                    t-if="item.color != null"
-                    t-att-style="'background:var(--color-' + item.color + ', #ccc)'"/>
-              <span class="o-search-panel-item-label"><t t-esc="item.name || item.display_name"/></span>
-              <t t-if="item.count != null">
-                <span class="o-search-panel-item-count">(<t t-esc="item.count"/>)</span>
-              </t>
-            </div>
-          </t>
-        </div>
-      </t>
-    </div>`;
-    static props = {
-      title: String,
-      items: Array,
-      type: { type: String, optional: true },
-      // "category" | "filter"
-      activeIds: { type: Array, optional: true },
-      onToggle: { type: Function, optional: true },
-      slots: { type: Object, optional: true }
-    };
-    setup() {
-      this.state = useState19({ collapsed: false });
-    }
-    isActive(item) {
-      const ids = this.props.activeIds || [];
-      return ids.includes(item.id);
-    }
-    toggleCollapse() {
-      this.state.collapsed = !this.state.collapsed;
-    }
-    onItemClick(item) {
-      if (typeof this.props.onToggle === "function") {
-        this.props.onToggle(item);
-      }
-    }
-    onItemKeyDown(ev, item) {
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        this.onItemClick(item);
-      }
-    }
-  };
-  var SearchPanel = class extends Component24 {
-    static template = xml24`
-    <aside class="o-search-panel"
-           role="complementary"
-           aria-label="Search filters"
-           t-att-class="{ 'o-search-panel--collapsed': state.collapsed }">
-      <div class="o-search-panel-toggle-bar">
-        <button type="button"
-                class="o-search-panel-collapse-btn"
-                t-att-aria-label="state.collapsed ? 'Expand search filters' : 'Collapse search filters'"
-                t-on-click="toggleCollapsed">
-          <t t-if="state.collapsed">&#9658;</t>
-          <t t-else="">&#9664;</t>
-        </button>
-      </div>
-      <t t-if="!state.collapsed">
-        <t t-foreach="sections" t-as="section" t-key="section.id || section_index">
-          <SearchPanelSection
-            title="section.title"
-            items="section.items || []"
-            type="section.type || 'category'"
-            activeIds="getActiveIds(section)"
-            onToggle="(item) => onToggle(section, item)"/>
-        </t>
-        <t t-if="!sections.length">
-          <div class="o-search-panel-empty">No filters available</div>
-        </t>
-      </t>
-    </aside>`;
-    static components = { SearchPanelSection };
-    static props = {
-      sections: { type: Array, optional: true },
-      searchModel: { type: Object, optional: true },
-      onFiltersChange: { type: Function, optional: true },
-      slots: { type: Object, optional: true }
-    };
-    setup() {
-      this.state = useState19({
-        collapsed: false,
-        activeBySection: {}
-      });
-      onMounted16(() => {
-        this._loadSectionsFromModel();
-      });
-    }
-    get sections() {
-      if (this.props.sections) return this.props.sections;
-      return this.state.modelSections || [];
-    }
-    _loadSectionsFromModel() {
-      const sm = this.props.searchModel;
-      if (!sm) return;
-      const searchView = typeof sm.getSearchView === "function" ? sm.getSearchView() : null;
-      if (!searchView) return;
-      this.state.modelSections = [];
-    }
-    getActiveIds(section) {
-      return this.state.activeBySection[section.id] || [];
-    }
-    onToggle(section, item) {
-      const current = this.state.activeBySection[section.id] || [];
-      const isActive = current.includes(item.id);
-      let next;
-      if (section.type === "filter") {
-        next = isActive ? current.filter((id) => id !== item.id) : [...current, item.id];
-      } else {
-        next = isActive ? [] : [item.id];
-      }
-      this.state.activeBySection = Object.assign({}, this.state.activeBySection, { [section.id]: next });
-      const sm = this.props.searchModel;
-      if (sm && typeof sm.addFacet === "function") {
-        if (next.length) {
-          sm.addFacet({
-            type: section.type || "filter",
-            name: section.fieldName || section.id,
-            label: `${section.title}: ${item.name || item.id}`,
-            value: next,
-            removable: true
-          });
-        }
-      }
-      if (typeof this.props.onFiltersChange === "function") {
-        this.props.onFiltersChange({ section, activeIds: next });
-      }
-    }
-    toggleCollapsed() {
-      this.state.collapsed = !this.state.collapsed;
-    }
-  };
-  window.AppCore = window.AppCore || {};
-  window.AppCore.SearchPanel = SearchPanel;
-  window.AppCore.SearchPanelSection = SearchPanelSection;
-
   // addons/web/static/src/app/services/view_service.js
-  var _cache = /* @__PURE__ */ new Map();
+  var _promiseCache = /* @__PURE__ */ new Map();
+  var _resolvedCache = /* @__PURE__ */ new Map();
   var _fieldCache = /* @__PURE__ */ new Map();
+  var _fieldResolvedCache = /* @__PURE__ */ new Map();
+  var _globalRegistryPromise = null;
+  var _globalRegistryResolved = null;
   function _cacheKey(model, viewTypes) {
     return model + ":" + [...viewTypes].sort().join(",");
   }
@@ -7725,17 +8653,60 @@
       clearTimeout(tid);
     }
   }
+  function _loadGlobalRegistry() {
+    if (_globalRegistryPromise) return _globalRegistryPromise;
+    _globalRegistryPromise = (async () => {
+      const legacySvc = window.Services && window.Services.views;
+      if (legacySvc && typeof legacySvc.getAll === "function") {
+        try {
+          const reg2 = legacySvc.getAll();
+          if (reg2 && reg2.views) {
+            _globalRegistryResolved = reg2;
+            return reg2;
+          }
+        } catch (_e) {
+        }
+      }
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const tid = setTimeout(() => {
+        if (controller) try {
+          controller.abort();
+        } catch (_e) {
+        }
+      }, VIEWS_RPC_FETCH_MS);
+      try {
+        const res = await fetch("/web/load_views", {
+          method: "GET",
+          credentials: "include",
+          signal: controller ? controller.signal : void 0
+        });
+        if (!res.ok) throw new Error(`/web/load_views \u2192 HTTP ${res.status}`);
+        const reg2 = await res.json();
+        _globalRegistryResolved = reg2;
+        return reg2;
+      } finally {
+        clearTimeout(tid);
+      }
+    })().catch((_err) => {
+      _globalRegistryPromise = null;
+      _globalRegistryResolved = null;
+      return { views: {}, fields_meta: {}, menus: [], actions: {} };
+    });
+    return _globalRegistryPromise;
+  }
   async function loadViews(model, viewTypes, context) {
     const key = _cacheKey(model, viewTypes);
-    if (_cache.has(key)) return _cache.get(key);
-    const promise = _jsonRpc("/web/dataset/call_kw", {
-      model,
-      method: "get_views",
-      args: [viewTypes.map((t) => [false, t])],
-      kwargs: { context: context || {} }
-    }).then((result) => {
-      if (result && result.views) return result;
-      return { views: result || {}, fields: {} };
+    if (_promiseCache.has(key)) return _promiseCache.get(key);
+    const promise = _loadGlobalRegistry().then((reg2) => {
+      const allModelViews = reg2.views && reg2.views[model] || {};
+      const fields = reg2.fields_meta && reg2.fields_meta[model] || {};
+      const views = {};
+      viewTypes.forEach((t) => {
+        views[t] = allModelViews[t] || { arch: null, fields: {} };
+      });
+      const result = { views, fields };
+      _resolvedCache.set(key, result);
+      return result;
     }).catch((_err) => {
       const stub = {};
       viewTypes.forEach((t) => {
@@ -7743,7 +8714,7 @@
       });
       return { views: stub, fields: {} };
     });
-    _cache.set(key, promise);
+    _promiseCache.set(key, promise);
     return promise;
   }
   async function loadView(model, viewType, context) {
@@ -7757,15 +8728,27 @@
       method: "fields_get",
       args: [],
       kwargs: { attributes: ["string", "type", "required", "readonly", "selection"], context: context || {} }
-    }).catch(() => ({}));
+    }).then((fields) => {
+      _fieldResolvedCache.set(model, fields);
+      return fields;
+    }).catch(async () => {
+      const reg2 = _globalRegistryResolved || await _loadGlobalRegistry();
+      const fallback = reg2 && reg2.fields_meta && reg2.fields_meta[model] || {};
+      _fieldResolvedCache.set(model, fallback);
+      return fallback;
+    });
     _fieldCache.set(model, promise);
     return promise;
   }
   function clearViewCache(model) {
-    for (const key of _cache.keys()) {
-      if (key.startsWith(model + ":")) _cache.delete(key);
+    for (const key of _promiseCache.keys()) {
+      if (key.startsWith(model + ":")) {
+        _promiseCache.delete(key);
+        _resolvedCache.delete(key);
+      }
     }
     _fieldCache.delete(model);
+    _fieldResolvedCache.delete(model);
   }
   function createViewService2() {
     return {
@@ -7774,18 +8757,19 @@
       getFields,
       clearViewCache,
       /**
-       * Sync helper: returns cached view arch if already resolved, else null.
-       * Useful for synchronous code that wants to check if data is available.
+       * Sync helper: returns cached view result if already resolved, else null.
+       * Fixed from prior version — resolves by storing in _resolvedCache after
+       * the Promise settles rather than capturing the value before the `.then()`.
        */
       getCachedView(model, viewType) {
         const key = _cacheKey(model, [viewType]);
-        const p = _cache.get(key);
-        if (!p) return null;
-        let resolved = null;
-        p.then((v) => {
-          resolved = v;
-        });
-        return resolved;
+        const resolved = _resolvedCache.get(key);
+        if (!resolved) return null;
+        return resolved.views && resolved.views[viewType] || null;
+      },
+      /** Expose full resolved registry for legacy Services.views compatibility. */
+      getAll() {
+        return _globalRegistryResolved;
       }
     };
   }
@@ -7814,6 +8798,7 @@
     window.AppCore.WithSearch = WithSearch;
     window.AppCore.createSearchModel = createSearchModel;
     window.AppCore.ViewService = createViewService2();
+    window.__ERP_canMountOwl = canMountOwl;
   }
   function bootModernWebClient() {
     if (window.__ERPModernWebClientLoaded) {
@@ -7834,13 +8819,42 @@
       }
       const hk = window.Services && window.Services.hotkey;
       if (hk && typeof hk.register === "function") {
-        hk.register("alt+h", function(evt) {
+        const _navGuard = (fn) => function(evt) {
           if (!evt || evt.defaultPrevented) return;
           var t = evt.target;
           if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
           evt.preventDefault();
+          fn();
+        };
+        hk.register("alt+h", _navGuard(() => {
           window.location.hash = "#home";
-        });
+        }));
+        hk.register("alt+g", _navGuard(() => {
+          window.location.hash = "#contacts";
+        }));
+        hk.register("alt+d", _navGuard(() => {
+          window.location.hash = "#discuss";
+        }));
+        hk.register("alt+s", _navGuard(() => {
+          window.location.hash = "#settings";
+        }));
+        hk.register("alt+l", _navGuard(() => {
+          const AB = window.AppCore && window.AppCore.ActionBus;
+          if (AB) AB.trigger("ACTION_MANAGER:VIEW_SWITCH", { viewType: "list" });
+        }));
+        hk.register("alt+k", _navGuard(() => {
+          const AB = window.AppCore && window.AppCore.ActionBus;
+          if (AB) AB.trigger("ACTION_MANAGER:VIEW_SWITCH", { viewType: "kanban" });
+        }));
+        hk.register("alt+n", _navGuard(() => {
+          const AB = window.AppCore && window.AppCore.ActionBus;
+          if (AB) AB.trigger("ACTION_MANAGER:NEW_RECORD", {});
+          else {
+            const hash = window.location.hash || "";
+            const base = hash.replace(/\/form\/\d+$/, "").replace(/\/new$/, "");
+            window.location.hash = base + "/new";
+          }
+        }));
       }
       window.ERPFrontendRuntime = window.ERPFrontendRuntime || {};
       window.ERPFrontendRuntime.menuUtils = menu_utils_exports;
@@ -7849,6 +8863,22 @@
         });
       }
       registerBuiltinClientActions(env);
+      const cp2 = window.Services && window.Services.commandPalette;
+      if (cp2 && typeof cp2.registerCommand === "function") {
+        [
+          ["#home", "Home", "home apps dashboard"],
+          ["#contacts", "Contacts", "contacts partners customers suppliers"],
+          ["#leads", "Leads", "leads crm pipeline sales"],
+          ["#discuss", "Discuss", "discuss chat messages mail inbox"],
+          ["#settings", "Settings", "settings config configuration preferences"],
+          ["#calendar", "Calendar", "calendar events scheduling meetings"],
+          ["#activities", "Activities", "activities todo tasks"],
+          ["#reports", "Reports", "reports analytics print"],
+          ["#import", "Import", "import upload csv data"]
+        ].forEach(function(row) {
+          cp2.registerCommand(row[0], row[1], row[2]);
+        });
+      }
       const app = new WebClient(env, document.getElementById("webclient"));
       app.mount();
       const runtime = {

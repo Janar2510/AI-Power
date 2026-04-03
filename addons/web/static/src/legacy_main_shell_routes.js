@@ -860,4 +860,34 @@
   SR.renderDashboardWidgets = renderDashboardWidgets;
   SR.renderApiKeysSettings = renderApiKeysSettings;
   SR.renderTotpSettings = renderTotpSettings;
+
+  // ── Route title map (Phase 1.250.17 — extracted from main.js) ─────────────
+  var _TITLE_MAP = {
+    "contacts": "Contacts", "pipeline": "Pipeline", "crm/activities": "CRM Activities",
+    "leads": "Leads", "orders": "Orders", "products": "Products",
+    "attachments": "Attachments", "settings/users": "Users",
+    "settings/approval_rules": "Approval Rules", "settings/approval_requests": "Approval Requests",
+    "marketing/mailing_lists": "Mailing Lists", "marketing/mailings": "Mailings",
+    "articles": "Articles", "knowledge_categories": "Categories",
+    "leaves": "Leaves", "leave_types": "Leave Types", "allocations": "Allocations",
+    "cron": "Scheduled Actions", "server_actions": "Server Actions", "sequences": "Sequences",
+    "manufacturing": "Manufacturing Orders", "boms": "Bills of Materials",
+    "workcenters": "Work Centers", "transfers": "Transfers", "warehouses": "Warehouses",
+    "purchase_orders": "Purchase Orders", "invoices": "Invoices",
+    "bank_statements": "Bank Statements", "journals": "Journals",
+    "accounts": "Chart of Accounts", "employees": "Employees",
+    "departments": "Departments", "jobs": "Job Positions", "attendances": "Attendances",
+    "recruitment": "Recruitment", "time_off": "Time Off", "expenses": "Expenses",
+    "projects": "Projects", "repair_orders": "Repairs", "surveys": "Surveys",
+    "lunch_orders": "Lunch", "livechat_channels": "Live Chat", "project_todos": "To-Do",
+    "recycle_models": "Data Recycle", "skills": "Skills", "elearning": "eLearning",
+    "timesheets": "Timesheets", "tickets": "Tickets", "crm_stages": "CRM Stages",
+    "crm_tags": "CRM Tags", "crm_lost_reasons": "Lost Reasons", "meetings": "Calendar",
+    "pos_orders": "Point of Sale Orders", "pos_sessions": "POS Sessions",
+  };
+
+  SR.getTitle = function (route) {
+    if (_TITLE_MAP[route]) return _TITLE_MAP[route];
+    return route ? (route.charAt(0).toUpperCase() + route.slice(1)) : "Records";
+  };
 })();

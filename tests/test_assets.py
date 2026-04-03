@@ -48,3 +48,12 @@ class TestAssets(unittest.TestCase):
         for u in urls["js"]:
             self.assertTrue(u.startswith("/"), f"URL should start with /: {u}")
             self.assertIn("static", u)
+        js_flat = " ".join(urls["js"])
+        self.assertIn("rpc_deadline.js", js_flat)
+        self.assertIn("route_apply_plugin_keyboard_shortcuts.js", js_flat)
+        self.assertIn("route_apply_plugin_client_info.js", js_flat)
+        self.assertIn("route_apply_plugin_discuss.js", js_flat)
+        self.assertIn("route_apply_plugin_reports.js", js_flat)
+        self.assertIn("route_apply_plugin_settings.js", js_flat)
+        self.assertIn("route_apply_plugin_website.js", js_flat)
+        self.assertIn("route_apply_plugin_ecommerce.js", js_flat)

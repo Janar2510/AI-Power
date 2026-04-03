@@ -11,7 +11,7 @@
       let html = '<table role="grid" style="width:100%;border-collapse:collapse"><thead><tr>';
       cols.forEach(c => {
         const field = typeof c === 'string' ? c : (c.name || c);
-        html += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid #ddd">' + (field || '').replace(/</g, '&lt;') + '</th>';
+        html += '<th style="text-align:left;padding:0.5rem;border-bottom:1px solid var(--border-color)">' + (field || '').replace(/</g, '&lt;') + '</th>';
       });
       html += '<th></th></tr></thead><tbody>';
       records.forEach(r => {
@@ -19,7 +19,7 @@
         cols.forEach(c => {
           const field = typeof c === 'string' ? c : (c.name || c);
           const val = r[field] != null ? String(r[field]) : '';
-          html += '<td style="padding:0.5rem;border-bottom:1px solid #eee">' + val.replace(/</g, '&lt;') + '</td>';
+          html += '<td style="padding:0.5rem;border-bottom:1px solid var(--border-color)">' + val.replace(/</g, '&lt;') + '</td>';
         });
         html += '<td style="padding:0.5rem"></td></tr>';
       });

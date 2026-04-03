@@ -5,7 +5,7 @@
  */
 
 const owl = window.owl;
-const { Component, useState, xml, onMounted, useEnv } = owl;
+const { Component, useState, xml, onMounted, onWillUnmount, useEnv } = owl;
 
 export class SearchPanelSection extends Component {
   static template = xml`
@@ -38,7 +38,7 @@ export class SearchPanelSection extends Component {
               </t>
               <span class="o-search-panel-item-icon"
                     t-if="item.color != null"
-                    t-att-style="'background:var(--color-' + item.color + ', #ccc)'"/>
+                    t-att-style="'background:var(--color-' + item.color + ', var(--border-color))'"/>
               <span class="o-search-panel-item-label"><t t-esc="item.name || item.display_name"/></span>
               <t t-if="item.count != null">
                 <span class="o-search-panel-item-count">(<t t-esc="item.count"/>)</span>
@@ -128,53 +128,93 @@ export class SearchPanel extends Component {
     this.state = useState({
       collapsed: false,
       activeBySection: {},
+      modelSections: [],
     });
+    this._smUnsubscribe = null;
     onMounted(() => {
-      this._loadSectionsFromModel();
+      this._bindSearchModel();
+    });
+    onWillUnmount(() => {
+      if (typeof this._smUnsubscribe === "function") this._smUnsubscribe();
     });
   }
 
   get sections() {
-    if (this.props.sections) return this.props.sections;
-    return this.state.modelSections || [];
+    if (this.props.sections && this.props.sections.length) return this.props.sections;
+    return this.state.modelSections;
   }
 
-  _loadSectionsFromModel() {
+  /**
+   * Bind to the SearchModel: load sections via getSearchPanelSections() and
+   * subscribe so the panel refreshes whenever the model emits "change".
+   */
+  _bindSearchModel() {
     const sm = this.props.searchModel;
     if (!sm) return;
-    // Try to load search view sections from the model's getSearchView()
-    const searchView = typeof sm.getSearchView === "function" ? sm.getSearchView() : null;
-    if (!searchView) return;
-    // Future: parse searchView arch XML for filter/category elements
-    this.state.modelSections = [];
+
+    this._refreshSections(sm);
+
+    if (typeof sm.subscribe === "function") {
+      sm.subscribe(() => this._refreshSections(sm));
+      // Track the subscription so we can clean up
+      this._smUnsubscribe = () => {
+        if (sm._listeners) {
+          sm._listeners = sm._listeners.filter((fn) => fn !== this._refreshSections);
+        }
+      };
+    }
+  }
+
+  /** Pull sections from the model and mirror active filter state. */
+  _refreshSections(sm) {
+    const sections = typeof sm.getSearchPanelSections === "function"
+      ? sm.getSearchPanelSections()
+      : [];
+    this.state.modelSections = sections;
+
+    // Mirror active filters: rebuild activeBySection from sm.state.activeSearchFilters
+    const activeFilters = (sm.state && sm.state.activeSearchFilters) || [];
+    const bySection = {};
+    sections.forEach((sec) => {
+      bySection[sec.id || sec.title] = (sec.items || [])
+        .filter((item) => activeFilters.includes(item.value || item.name || ""))
+        .map((item) => item.id || item.value || item.name);
+    });
+    this.state.activeBySection = bySection;
   }
 
   getActiveIds(section) {
-    return (this.state.activeBySection[section.id] || []);
+    return this.state.activeBySection[section.id || section.title] || [];
   }
 
   onToggle(section, item) {
-    const current = this.state.activeBySection[section.id] || [];
-    const isActive = current.includes(item.id);
+    const sectionKey = section.id || section.title;
+    const current = this.state.activeBySection[sectionKey] || [];
+    const itemKey = item.id || item.value || item.name;
+    const isActive = current.includes(itemKey);
     let next;
     if (section.type === "filter") {
-      // Multi-select
-      next = isActive ? current.filter((id) => id !== item.id) : [...current, item.id];
+      next = isActive ? current.filter((k) => k !== itemKey) : [...current, itemKey];
     } else {
-      // Category: single-select (or deselect)
-      next = isActive ? [] : [item.id];
+      // Category: single-select (toggle off if already active)
+      next = isActive ? [] : [itemKey];
     }
-    this.state.activeBySection = Object.assign({}, this.state.activeBySection, { [section.id]: next });
+    this.state.activeBySection = Object.assign({}, this.state.activeBySection, { [sectionKey]: next });
 
-    // Notify SearchModel
     const sm = this.props.searchModel;
-    if (sm && typeof sm.addFacet === "function") {
-      if (next.length) {
+    if (sm) {
+      const filterName = item.value || item.name || "";
+      if (typeof sm.toggleFilter === "function" && filterName) {
+        // Use SearchModel.toggleFilter for predefined view filters
+        sm.toggleFilter(filterName);
+      } else if (typeof sm.addFacet === "function" && next.length) {
+        // Fallback: add a domain facet
         sm.addFacet({
           type: section.type || "filter",
-          name: section.fieldName || section.id,
-          label: `${section.title}: ${item.name || item.id}`,
+          name: section.fieldName || sectionKey,
+          label: `${section.title}: ${item.name || item.label || itemKey}`,
           value: next,
+          domain: item.domain || null,
           removable: true,
         });
       }

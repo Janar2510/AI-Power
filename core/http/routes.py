@@ -142,45 +142,6 @@ TOTP_HTML = """<!DOCTYPE html>
 </html>"""
 
 
-@route("/health", auth="public", methods=["GET"])
-def health(request):
-    """Liveness: process is up; `db` in JSON reflects whether the named database exists (Phase 99, 225, 529).
-
-    Use for load-balancer **liveness** — does not fail when DB is missing. For **readiness**
-    (traffic routing), use ``GET /readiness`` which returns 503 when the database is unavailable.
-    """
-    import json
-    try:
-        from core import release
-        version = getattr(release, "version", "1.0")
-    except Exception:
-        version = "1.0"
-    db = request.args.get("db", config.get_config().get("db_name", "erp"))
-    db_ok = db_exists(db)
-    try:
-        body = json.dumps({"status": "ok", "db": db_ok, "version": version})
-    except Exception:
-        body = '{"status":"ok","db":false,"version":"1.0"}'
-    return Response(body, content_type="application/json")
-
-
-@route("/readiness", auth="public", methods=["GET"])
-def readiness(request):
-    """Readiness: returns 200 only when the database exists (Phase 517, 529).
-
-    Kubernetes/load balancers should use this for **ready** probes; pair with ``GET /health``
-    for liveness. Query param ``db`` overrides default database name (same as config ``PGDATABASE``).
-    """
-    import json
-    db = request.args.get("db", config.get_config().get("db_name", "erp"))
-    ok = db_exists(db)
-    try:
-        body = json.dumps({"ready": bool(ok), "db": db})
-    except Exception:
-        body = '{"ready":false,"db":""}'
-    status = 200 if ok else 503
-    return Response(body, content_type="application/json", status=status)
-
 
 @route("/metrics", auth="public", methods=["GET"])
 def metrics(request):
@@ -1399,13 +1360,17 @@ def index(request):
 def health_check(request):
     """Process-alive probe for load balancers / container orchestrators (Track R1).
 
-    Returns 200 OK with a JSON body ``{"status": "ok"}`` when the process is
-    handling requests normally.  No database access is performed — this endpoint
-    must remain fast and dependency-free.
+    Returns 200 OK with JSON ``{"status":"ok","version":"<release>","service":"erp-platform"}``.
+    No database access is performed — this endpoint must remain fast and dependency-free.
     """
     import json
+    try:
+        from core import release as _release
+        version = getattr(_release, "version", "1.0")
+    except Exception:
+        version = "1.0"
     return Response(
-        json.dumps({"status": "ok", "service": "erp-platform"}),
+        json.dumps({"status": "ok", "service": "erp-platform", "version": version}),
         content_type="application/json",
         status=200,
     )

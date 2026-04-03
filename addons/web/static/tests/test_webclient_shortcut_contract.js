@@ -22,14 +22,14 @@
       errors.push("missing __ERP_WEBCLIENT_SHORTCUT_CONTRACT.alt");
       return { pass: pass, fail: fail, errors: errors };
     }
-    if (c.alt.length !== 7) {
+    if (c.alt.length !== 10) {
       fail++;
-      errors.push("expected 7 Alt+ shortcuts, got " + c.alt.length);
+      errors.push("expected 10 Alt+ shortcuts, got " + c.alt.length);
     } else {
       pass++;
     }
     var keys = sortedAltKeys(c);
-    if (keys !== "/eklnps") {
+    if (keys !== "/degklnprs") {
       fail++;
       errors.push("unexpected alt key set: " + keys);
     } else {
@@ -65,9 +65,15 @@
         return x.key;
       })
       .join(",");
-    if (keys.indexOf("mod+k") < 0 || keys.indexOf("alt+h") < 0 || keys.indexOf("alt+k") < 0) {
+    if (
+      keys.indexOf("mod+k") < 0 ||
+      keys.indexOf("alt+h") < 0 ||
+      keys.indexOf("alt+k") < 0 ||
+      keys.indexOf("alt+g") < 0 ||
+      keys.indexOf("alt+d") < 0
+    ) {
       fail++;
-      errors.push("modular keys should include alt+h, mod+k, alt+k: " + keys);
+      errors.push("modular keys should include alt+h, alt+g, alt+d, mod+k, alt+k: " + keys);
     } else {
       pass++;
     }

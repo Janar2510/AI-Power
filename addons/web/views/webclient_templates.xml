@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/web/static/src/scss/webclient.css"/>
   </head>
   <body>
+    <div id="o-loading-indicator-host" class="o-loading-bar-host" aria-hidden="true"></div>
     <div id="webclient" class="o-app-shell">
       <div id="o-sidebar-backdrop" class="o-sidebar-backdrop" hidden aria-hidden="true"></div>
       <aside id="app-sidebar" class="o-app-sidebar" aria-label="Application menu"></aside>

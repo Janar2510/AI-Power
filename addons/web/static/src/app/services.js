@@ -374,7 +374,11 @@ function createActionService(viewsService, menuService, routerService) {
           const windowPayload = result && result.type === "window" ? result : null;
           if (isWindowType || windowPayload) {
             const act = (windowPayload && windowPayload.action) || actionDef;
-            navigateForActWindow(act);
+            const nextRoute = actionToRoute(act || {});
+            const curRoute = (window.location.hash || "#home").replace(/^#/, "").split("?")[0] || "home";
+            if (nextRoute && nextRoute !== curRoute) {
+              navigateForActWindow(act);
+            }
           }
           return result;
         });

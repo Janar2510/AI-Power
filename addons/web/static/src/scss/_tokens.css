@@ -10,6 +10,11 @@
   --color-danger: #c62828;
   --color-on-danger: #ffffff;
   --color-warning: #f9a825;
+  --color-warning-dark: #856404;
+  --surface-secondary: #f0f0f0;
+  --color-success-bg: #d4edda;
+  --color-warning-bg: #fff3cd;
+  --color-danger-bg: #ffe5e0;
   --text-muted: #666;
   --border-color: #ddd;
   --color-surface-1: #ffffff;
@@ -109,4 +114,5 @@
   --kanban-accent-7: #56b6c2;
   --kanban-accent-8: #61afef;
   --kanban-accent-9: #5e81f4;
+  --kanban-accent-10: #c678dd;
 }

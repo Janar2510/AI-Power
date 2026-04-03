@@ -395,7 +395,7 @@ export class ColorPickerField extends Component {
   static props = BASE_FIELD_PROPS;
   get hexValue() {
     const v = this.props.value;
-    if (!v) return "#000000";
+    if (!v) return getComputedStyle(document.documentElement).getPropertyValue("--color-text").trim() || "#000000";
     const s = String(v);
     return s.startsWith("#") ? s : "#" + s;
   }
@@ -425,6 +425,121 @@ export class HtmlField extends Component {
   onBlur(ev) {
     emitChange(this, ev.target.innerHTML);
   }
+}
+
+// ─── RadioField (widget: radio — selection with radio buttons) ────────────────
+export class RadioField extends Component {
+  static template = xml`
+    <div class="o-field-radio" t-att-class="{ 'o-field-radio--inline': props.fieldInfo and props.fieldInfo.horizontal }">
+      <t t-if="!props.editMode">
+        <span class="o-field-value o-field-selection"><t t-esc="selectedLabel"/></span>
+      </t>
+      <t t-else="">
+        <t t-foreach="selection" t-as="opt" t-key="opt[0]">
+          <label class="o-field-radio-option">
+            <input type="radio"
+                   t-att-name="props.name"
+                   t-att-value="opt[0]"
+                   t-att-checked="props.value === opt[0] ? '' : null"
+                   t-on-change="() => onChange(opt[0])"/>
+            <span class="o-field-radio-label"><t t-esc="opt[1]"/></span>
+          </label>
+        </t>
+      </t>
+    </div>`;
+  static props = BASE_FIELD_PROPS;
+  get selection() {
+    return (this.props.fieldInfo && this.props.fieldInfo.selection) || [];
+  }
+  get selectedLabel() {
+    const opt = this.selection.find((o) => o[0] === this.props.value);
+    return opt ? opt[1] : (this.props.value || "—");
+  }
+  onChange(v) { emitChange(this, v); }
+}
+
+// ─── BinaryField (widget: binary — download / file upload) ───────────────────
+export class BinaryField extends Component {
+  static template = xml`
+    <div class="o-field-binary">
+      <t t-if="!props.editMode">
+        <a t-if="downloadHref"
+           class="o-field-link o-field-binary-link"
+           t-att-href="downloadHref"
+           rel="noopener noreferrer"
+           download="">
+          <span class="o-field-binary-icon">&#128196;</span>
+          <t t-esc="filename"/>
+        </a>
+        <span t-else="" class="o-field-value">—</span>
+      </t>
+      <t t-else="">
+        <input type="file" class="o-field-file-input"
+               t-att-name="props.name"
+               t-on-change="onFileChange"/>
+        <t t-if="filename">
+          <span class="o-field-binary-current"><t t-esc="filename"/></span>
+        </t>
+      </t>
+    </div>`;
+  static props = BASE_FIELD_PROPS;
+  get filename() {
+    const fi = this.props.fieldInfo || {};
+    return fi.filename || (this.props.value ? "file" : "");
+  }
+  get downloadHref() {
+    const v = this.props.value;
+    if (!v) return "";
+    const record = this.props.record || {};
+    if (record.id && this.props.name) {
+      const model = (this.props.fieldInfo && this.props.fieldInfo.model) || "";
+      if (model) {
+        return `/web/content?model=${model}&id=${record.id}&field=${this.props.name}&download=true`;
+      }
+    }
+    // Fallback: try to render base64 data URI
+    return v.startsWith("data:") ? v : "data:application/octet-stream;base64," + v;
+  }
+  onFileChange(ev) {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (re) => {
+      const result = re.target.result;
+      // Strip data URI prefix to get raw base64
+      const b64 = result.indexOf(",") >= 0 ? result.split(",")[1] : result;
+      emitChange(this, b64);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+// ─── ProgressBarField (widget: progressbar) ──────────────────────────────────
+export class ProgressBarField extends Component {
+  static template = xml`
+    <div class="o-field-progressbar">
+      <div class="o-field-progressbar-track" role="progressbar"
+           t-att-aria-valuenow="pct"
+           aria-valuemin="0" aria-valuemax="100">
+        <div class="o-field-progressbar-fill"
+             t-att-style="'width:' + pct + '%;background:var(--color-primary)'"/>
+      </div>
+      <span class="o-field-progressbar-label"><t t-esc="pct"/>%</span>
+    </div>`;
+  static props = BASE_FIELD_PROPS;
+  get pct() {
+    const v = parseFloat(this.props.value);
+    if (isNaN(v)) return 0;
+    const max = (this.props.fieldInfo && this.props.fieldInfo.max_value) || 100;
+    return Math.min(100, Math.max(0, Math.round((v / max) * 100)));
+  }
+}
+
+// ─── HandleField (widget: handle — sequence drag grip) ────────────────────────
+export class HandleField extends Component {
+  static template = xml`
+    <span class="o-field-handle" aria-hidden="true" title="Drag to reorder">&#9723;</span>`;
+  static props = BASE_FIELD_PROPS;
 }
 
 // ─── Register all core fields ─────────────────────────────────────────────────
@@ -464,10 +579,26 @@ reg("email", EmailField, (v) => (v == null ? "" : String(v)));
 reg("phone", PhoneField, (v) => (v == null ? "" : String(v)));
 reg("image", ImageField, (v) => (v ? "[image]" : ""));
 reg("color_picker", ColorPickerField, (v) => (v == null ? "" : String(v)));
+// 1.250.14: extended widget matrix
+reg("radio", RadioField, (v, _r, col) => {
+  const sel = (col && col.selection) || [];
+  const opt = sel.find((o) => o[0] === v);
+  return opt ? opt[1] : (v != null ? String(v) : "");
+});
+reg("binary", BinaryField, (v) => (v ? "[file]" : ""));
+reg("progressbar", ProgressBarField, (v) => (v != null ? String(v) + "%" : ""));
+reg("handle", HandleField, () => "");
 
 window.AppCore = window.AppCore || {};
 window.AppCore.CoreFields = Object.fromEntries(
   CORE_FIELD_COMPONENTS.map(([t, c]) => [t, c])
 );
+// 1.250.14 additions
+Object.assign(window.AppCore.CoreFields, {
+  radio: RadioField,
+  binary: BinaryField,
+  progressbar: ProgressBarField,
+  handle: HandleField,
+});
 
 // Named exports already declared via `export class` above.

@@ -365,10 +365,15 @@ def dispatch_jsonrpc(request: Request) -> Response:
                         mimetype="application/json",
                     )
 
-        # Fallback: echo for unknown methods (backward compat, no session required)
-        result = {"method": method, "params": params}
+        # Unknown method: return JSON-RPC -32601 Method Not Found (no echo of params)
+        _logger.warning("JSON-RPC unknown method attempted: %s", method)
         return Response(
-            json.dumps({"jsonrpc": "2.0", "result": result, "id": req_id}),
+            json.dumps({
+                "jsonrpc": "2.0",
+                "error": {"code": -32601, "message": "Method not found: " + str(method)},
+                "id": req_id,
+            }),
+            status=404,
             mimetype="application/json",
         )
     except Exception as e:

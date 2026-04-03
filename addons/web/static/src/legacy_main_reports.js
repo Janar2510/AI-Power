@@ -20,7 +20,7 @@ function renderAccountingReport(reportType, title) {
     '<label>From <input type="date" id="report-date-from" value="' + yearStart + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
     '<label>To <input type="date" id="report-date-to" value="' + today + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
     '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
-    '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
+    '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer;margin-left:0.25rem">Print</button>' +
     '</p><div id="report-table" style="overflow-x:auto">' + _ctx.skeletonHtml(8, true) + '</div>';
   function loadReport() {
     const df = document.getElementById('report-date-from').value || yearStart;
@@ -66,7 +66,7 @@ function renderStockValuationReport() {
   _ctx.setActionStack([{ label: 'Stock Valuation', hash: 'reports/stock-valuation' }]);
   _ctx.main.innerHTML = '<h2>Stock Valuation</h2><p style="margin-bottom:1rem">' +
     '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Refresh</button>' +
-    '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
+    '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer;margin-left:0.25rem">Print</button>' +
     '</p><div id="report-table" style="overflow-x:auto">' + _ctx.skeletonHtml(8, true) + '</div>';
   function loadReport() {
     _ctx.rpc.callKw('product.product', 'get_stock_valuation_report', [], {})
@@ -113,7 +113,7 @@ function renderSalesRevenueReport() {
     '<label>To <input type="date" id="report-date-to" value="' + today + '" style="padding:0.35rem;margin:0 0.5rem"></label>' +
     '<label>Group by <select id="report-group-by" style="padding:0.35rem;margin:0 0.5rem"><option value="month">Month</option><option value="week">Week</option><option value="day">Day</option><option value="product">Product</option></select></label>' +
     '<button type="button" id="report-refresh" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer;margin-left:0.5rem">Refresh</button>' +
-    '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid #ddd;border-radius:4px;cursor:pointer;margin-left:0.25rem">Print</button>' +
+    '<button type="button" id="report-print" style="padding:0.5rem 1rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer;margin-left:0.25rem">Print</button>' +
     '</p><div id="report-table" style="overflow-x:auto">' + _ctx.skeletonHtml(8, true) + '</div>';
   function loadReport() {
     const df = document.getElementById('report-date-from').value || yearStart;

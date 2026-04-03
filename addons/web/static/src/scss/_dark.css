@@ -9,6 +9,11 @@
   --color-danger: #f44336;
   --color-on-danger: #ffffff;
   --color-warning: #ff9800;
+  --color-warning-dark: #ffc107;
+  --surface-secondary: #262d3d;
+  --color-success-bg: rgba(76, 175, 80, 0.18);
+  --color-warning-bg: rgba(255, 152, 0, 0.18);
+  --color-danger-bg: rgba(244, 67, 54, 0.18);
   --text-muted: #9e9e9e;
   --border-color: #333;
   --color-surface-1: #1f2430;

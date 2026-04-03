@@ -92,15 +92,31 @@ export class FormController extends Component {
       .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
+  /** Post-1.250.8: bounded wait for hung JSON-RPC (same helper as list controller). */
+  _withDeadline(promise, label) {
+    const race =
+      typeof window !== "undefined" && typeof window.__ERP_rpcRaceDeadline === "function"
+        ? window.__ERP_rpcRaceDeadline
+        : (p) => p;
+    const ms =
+      typeof window !== "undefined" && window.__ERP_RPC_DEADLINE_DEFAULT_MS
+        ? window.__ERP_RPC_DEADLINE_DEFAULT_MS
+        : 25000;
+    return race(promise, ms, label);
+  }
+
   async _loadRecord(id) {
     const orm = this._orm;
     if (!orm) { this.state.loading = false; return; }
     this.state.loading = true;
     this.state.error = null;
     try {
-      const fields = await this._getFields();
+      const fields = await this._withDeadline(this._getFields(), "Fields metadata timed out");
       const fieldNames = fields.map((f) => f.name).filter(Boolean);
-      const records = await orm.read(this.props.resModel, [Number(id)], fieldNames);
+      const records = await this._withDeadline(
+        orm.read(this.props.resModel, [Number(id)], fieldNames),
+        "Record load timed out"
+      );
       const record = (Array.isArray(records) ? records : [])[0] || {};
       this.state.record = record;
       this.state.fields = fields;
@@ -113,7 +129,7 @@ export class FormController extends Component {
   }
 
   async _loadDefaultFields() {
-    const fields = await this._getFields();
+    const fields = await this._withDeadline(this._getFields(), "Fields metadata timed out");
     this.state.fields = fields;
     this.state.record = {};
   }

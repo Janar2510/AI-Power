@@ -35,7 +35,23 @@
       }).then(r => {
         if (r.status === 401) throw new Error('Session expired. Please log in again.');
         if (r.status === 403) throw new Error('CSRF/session invalid. Please refresh login session.');
-        return r.json();
+        if (r.status === 429) {
+          return r.text().then(function (body) {
+            var msg = 'Too many requests';
+            try { var parsed = JSON.parse(body); msg = parsed.error || parsed.message || msg; } catch (_e) {}
+            var err = new Error(msg);
+            err.type = 'RateLimitError';
+            err.status = 429;
+            throw err;
+          });
+        }
+        return r.text().then(function (body) {
+          try {
+            return JSON.parse(body);
+          } catch (_e) {
+            throw new Error('Server returned non-JSON response (status: ' + r.status + ')');
+          }
+        });
       }).then(data => {
         if (data.error) throw new Error(data.error.message || 'RPC error');
         return data.result != null ? data.result : data;

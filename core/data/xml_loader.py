@@ -149,6 +149,9 @@ def _arch_to_dict(node: ET.Element) -> Dict[str, Any]:
             comodel = f.get("comodel", "")
             if comodel:
                 col_def["comodel"] = comodel
+            widget = f.get("widget", "")
+            if widget:
+                col_def["widget"] = widget
             cols.append(col_def)
         editable = node.get("editable", "")  # Phase 176: "top" or "bottom"
         return {"type": "list", "columns": cols, "editable": editable}

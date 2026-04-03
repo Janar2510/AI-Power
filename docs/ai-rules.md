@@ -32,6 +32,7 @@ This document codifies rules from the AI-Powered ERP Build Plan and [deep-resear
 - **Component model**: Declarative; registries for view types, field widgets, services.
 - **State rules**: Separate server-state (authoritative) from UI-state (ephemeral, serialisable).
 - **Design system**: Follow `docs/brand-system.md`, `docs/frontend-design-rules.md`, `design-system/MASTER.md`, and the relevant `design-system/specs/*.md` files before changing frontend surfaces.
+- **UI/UX Pro Max (mandatory for UI work)**: For any frontend **planning, design review, or implementation** that changes visible UX, run the **ui-ux-pro-max** workflow: `python3 <skill>/scripts/search.py "<query>" --design-system` (optionally `-f markdown`, `-p "Foundry One"`), then **reconcile** outputs with `design-system/MASTER.md` and the relevant `design-system/specs/*.md` before merge. Do not treat Tailwind-oriented snippets as copy-paste; map recommendations to **CSS custom properties** and existing tokens. Verify the local toolchain with `npm run check:uipro:setup` when changing UI governance or onboarding agents.
 - **Theming**: New UI work must support both light and dark mode at the token level.
 - **Styling discipline**: Prefer classes and CSS custom properties; do not add new inline visual `style=` assignments when shared CSS can own the surface.
 

@@ -64,7 +64,7 @@
           title +
           '</h2><p style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">' +
           vs +
-          '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' +
+          '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' +
           (searchTerm || "").replace(/"/g, "&quot;") +
           '"><button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>' +
           mid +
@@ -207,8 +207,108 @@
     return true;
   }
 
+  // ── Kanban view helper functions (Phase 1.250.17) ────────────────────────
+  // Canonical kanban grouping + drag-drop stub; main.js delegates via
+  // window.AppCore.KanbanViewModule.helpers.
+
+  var _kanbanViewsSvc = null;
+  var _kanbanRpc = null;
+
+  function _configureKanbanHelpers(opts) {
+    if (opts.viewsSvc) _kanbanViewsSvc = opts.viewsSvc;
+    if (opts.rpc) _kanbanRpc = opts.rpc;
+  }
+
+  /**
+   * Return the groupBy field for kanban (from view registry or model fallback).
+   * @param {string} model
+   * @returns {string|null}
+   */
+  function getKanbanGroupBy(model) {
+    if (_kanbanViewsSvc && model) {
+      var v = _kanbanViewsSvc.getView(model, "kanban");
+      if (v && v.group_by) return v.group_by;
+    }
+    if (model === "crm.lead") return "stage_id";
+    if (model === "helpdesk.ticket") return "stage_id";
+    if (model === "project.task") return "stage_id";
+    return null;
+  }
+
+  /**
+   * Group a flat array of records by a field value.
+   * @param {Object[]} records
+   * @param {string} field
+   * @returns {{ key: string, label: string, records: Object[] }[]}
+   */
+  function groupRecordsByField(records, field) {
+    var groups = {};
+    var order = [];
+    (records || []).forEach(function (rec) {
+      var raw = rec[field];
+      var key, label;
+      if (Array.isArray(raw)) {
+        key = String(raw[0] != null ? raw[0] : "__none__");
+        label = raw[1] != null ? String(raw[1]) : "(none)";
+      } else if (raw != null) {
+        key = String(raw);
+        label = key;
+      } else {
+        key = "__none__";
+        label = "(none)";
+      }
+      if (!groups[key]) {
+        groups[key] = { key: key, label: label, records: [] };
+        order.push(key);
+      }
+      groups[key].records.push(rec);
+    });
+    return order.map(function (k) { return groups[k]; });
+  }
+
+  /**
+   * Drag-drop stub: registers drag/drop handlers on kanban column cards.
+   * Real DnD is deferred to Phase 1.250.18; this ensures the DOM is ready.
+   * @param {HTMLElement} container
+   * @param {Function} onDrop  callback(recordId, newGroupKey)
+   */
+  function wireKanbanDragDrop(container, onDrop) {
+    if (!container || typeof onDrop !== "function") return;
+    var cards = container.querySelectorAll("[data-kanban-record-id]");
+    cards.forEach(function (card) {
+      card.setAttribute("draggable", "true");
+      card.addEventListener("dragstart", function (e) {
+        e.dataTransfer.setData("text/plain", card.getAttribute("data-kanban-record-id") || "");
+        card.classList.add("o-kanban-dragging");
+      });
+      card.addEventListener("dragend", function () {
+        card.classList.remove("o-kanban-dragging");
+      });
+    });
+    var columns = container.querySelectorAll("[data-kanban-group-key]");
+    columns.forEach(function (col) {
+      col.addEventListener("dragover", function (e) { e.preventDefault(); col.classList.add("o-kanban-dragover"); });
+      col.addEventListener("dragleave", function () { col.classList.remove("o-kanban-dragover"); });
+      col.addEventListener("drop", function (e) {
+        e.preventDefault();
+        col.classList.remove("o-kanban-dragover");
+        var id = e.dataTransfer.getData("text/plain");
+        var groupKey = col.getAttribute("data-kanban-group-key");
+        if (id && groupKey) onDrop(id, groupKey);
+      });
+    });
+  }
+
+  var kanbanHelpers = {
+    getKanbanGroupBy: getKanbanGroupBy,
+    groupRecordsByField: groupRecordsByField,
+    wireKanbanDragDrop: wireKanbanDragDrop,
+    configure: _configureKanbanHelpers,
+  };
+
   window.AppCore = window.AppCore || {};
   window.AppCore.KanbanViewModule = {
     render: render,
+    helpers: kanbanHelpers,
   };
 })();

@@ -8,7 +8,7 @@
  */
 
 const owl = window.owl;
-const { Component, useState, xml, onMounted, onWillUnmount, useRef } = owl;
+const { Component, useState, xml, onMounted, onWillUnmount } = owl;
 import { resolveViewDescriptor } from "./views/view_registry.js";
 import { ListController } from "./views/list/list_controller.js";
 import { FormController } from "./views/form/form_controller.js";
@@ -54,6 +54,9 @@ const CONTROLLER_MAP = {
   kanban: KanbanWithSearch,
 };
 
+/** Post-1.250.8: if ACTION_MANAGER:UPDATE type=loading never completes, show recoverable error (Safari / hung RPC). */
+const ACTION_LOADING_WATCHDOG_MS = 35000;
+
 export class ActionContainer extends Component {
   static template = xml`
     <div class="o-action-container" t-ref="root">
@@ -61,6 +64,12 @@ export class ActionContainer extends Component {
         <t t-component="state.componentInfo.Controller"
            t-props="state.componentInfo.props"
            t-key="state.componentInfo.key"/>
+      </t>
+      <t t-elif="state.loadTimeoutError">
+        <div class="o-load-failure-panel" role="alert">
+          <p class="o-error-panel__muted">This view took too long to load. Check your connection or try again.</p>
+          <button type="button" class="o-btn o-btn-primary o-load-failure-retry" t-on-click="onRetryAfterTimeout">Retry</button>
+        </div>
       </t>
       <t t-elif="state.loading">
         <div class="o-action-loading o-skeleton-msg">Loading…</div>
@@ -74,7 +83,9 @@ export class ActionContainer extends Component {
     this.state = useState({
       componentInfo: null,
       loading: false,
+      loadTimeoutError: false,
     });
+    this._loadingWatchdog = null;
 
     this._unsubscribeBus = ActionBus.on("ACTION_MANAGER:UPDATE", this._onUpdate.bind(this));
 
@@ -86,9 +97,33 @@ export class ActionContainer extends Component {
     });
     onWillUnmount(() => {
       window.__ERP_OWL_ACTION_CONTAINER_MOUNTED = false;
+      this._clearLoadingWatchdog();
       this._unsubscribeBus();
       window.removeEventListener("erp:action-update", onDomUpdate);
     });
+  }
+
+  _clearLoadingWatchdog() {
+    if (this._loadingWatchdog != null) {
+      clearTimeout(this._loadingWatchdog);
+      this._loadingWatchdog = null;
+    }
+  }
+
+  _armLoadingWatchdog() {
+    this._clearLoadingWatchdog();
+    this._loadingWatchdog = setTimeout(() => {
+      this._loadingWatchdog = null;
+      if (!this.state.componentInfo && this.state.loading) {
+        this.state.loadTimeoutError = true;
+        this.state.loading = false;
+      }
+    }, ACTION_LOADING_WATCHDOG_MS);
+  }
+
+  onRetryAfterTimeout() {
+    this.state.loadTimeoutError = false;
+    window.location.reload();
   }
 
   _onUpdate(detail) {
@@ -96,16 +131,23 @@ export class ActionContainer extends Component {
     const { type, viewType, resModel, resId, props } = detail;
 
     if (type === "clear") {
+      this._clearLoadingWatchdog();
       this.state.componentInfo = null;
+      this.state.loadTimeoutError = false;
+      this.state.loading = false;
       return;
     }
 
     if (type === "loading") {
+      this.state.loadTimeoutError = false;
       this.state.loading = true;
+      this._armLoadingWatchdog();
       return;
     }
 
+    this._clearLoadingWatchdog();
     this.state.loading = false;
+    this.state.loadTimeoutError = false;
 
     // Resolve controller from view registry or built-in map
     const vt = viewType || "list";

@@ -61,9 +61,13 @@
       };
       const runDoAction = function () {
         if (svc && typeof svc.doAction === "function" && action) {
-          return Promise.resolve(svc.doAction(action, opts));
+          return Promise.resolve(svc.doAction(action, opts)).then(function (result) {
+            return result;
+          });
         }
-        return runLegacyFallback();
+        return runLegacyFallback().then(function (route) {
+          return route;
+        });
       };
       if (viewSvc && typeof viewSvc.loadViews === "function" && resModel) {
         const loadP = viewSvc.loadViews(resModel, [["list"], ["form"]]);

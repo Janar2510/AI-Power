@@ -123,6 +123,91 @@
       if (!rpc) return Promise.reject(new Error("RPC unavailable"));
       return rpc.callKw(model, "onchange", [ids, vals || {}, fieldNames || []], {});
     },
+
+    /**
+     * Create one or more records.
+     * @param {string} resModel
+     * @param {Object|Object[]} vals — single values dict or array of dicts
+     * @returns {Promise<number|number[]>} — created id(s)
+     */
+    create: function (resModel, vals) {
+      var orm = _orm();
+      if (!orm) return Promise.reject(new Error("ORM unavailable"));
+      return orm.create(resModel, vals).then(function (ids) {
+        RelationalModel.invalidateReadRecordCache(resModel);
+        return ids;
+      });
+    },
+
+    /**
+     * Write (update) one or more records.
+     * @param {string} resModel
+     * @param {number[]} ids
+     * @param {Object} data — values to update
+     * @returns {Promise<boolean>}
+     */
+    write: function (resModel, ids, data) {
+      var orm = _orm();
+      if (!orm) return Promise.reject(new Error("ORM unavailable"));
+      var idList = Array.isArray(ids) ? ids : [ids];
+      return orm.write(resModel, idList, data || {}).then(function (ok) {
+        idList.forEach(function (id) {
+          RelationalModel.invalidateReadRecordCache(resModel, id);
+        });
+        return ok;
+      });
+    },
+
+    /**
+     * Unlink (delete) one or more records.
+     * @param {string} resModel
+     * @param {number[]} ids
+     * @returns {Promise<boolean>}
+     */
+    unlink: function (resModel, ids) {
+      var orm = _orm();
+      if (!orm) return Promise.reject(new Error("ORM unavailable"));
+      var idList = Array.isArray(ids) ? ids : [ids];
+      return orm.unlink(resModel, idList).then(function (ok) {
+        idList.forEach(function (id) {
+          RelationalModel.invalidateReadRecordCache(resModel, id);
+        });
+        return ok;
+      });
+    },
+
+    /**
+     * Load field descriptors for a model via `fields_get`.
+     * Result is a plain object keyed by field name.
+     * @param {string} resModel
+     * @param {string[]} [attributes] — field attributes to include (default: useful set)
+     * @returns {Promise<Object>} — { fieldName: { type, string, required, comodel_name, ... }, ... }
+     */
+    loadFieldDescriptors: function (resModel, attributes) {
+      var rpc = window.Services && window.Services.rpc;
+      if (!rpc) return Promise.reject(new Error("RPC unavailable"));
+      var attrs = attributes || ["type", "string", "required", "readonly", "selection",
+        "comodel_name", "relation", "field_description", "help", "store"];
+      return rpc.callKw(resModel, "fields_get", [], { attributes: attrs })
+        .then(function (fields) {
+          return fields || {};
+        });
+    },
+
+    /**
+     * Build a list of DynamicList records and attach their field descriptors.
+     * Convenience: calls loadList + loadFieldDescriptors in parallel.
+     * @param {string} resModel
+     * @param {{ domain?, fields?, limit?, offset?, order? }} [opts]
+     * @returns {Promise<{ list: DynamicList, fieldDescriptors: Object }>}
+     */
+    loadListWithFields: function (resModel, opts) {
+      var listP = RelationalModel.loadList(resModel, opts);
+      var fieldsP = RelationalModel.loadFieldDescriptors(resModel);
+      return Promise.all([listP, fieldsP]).then(function (results) {
+        return { list: results[0], fieldDescriptors: results[1] };
+      });
+    },
   };
 
   window.__ERP_RELATIONAL_MODEL = RelationalModel;

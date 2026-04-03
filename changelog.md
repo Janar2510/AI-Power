@@ -1,5 +1,256 @@
 # Changelog
 
+## 1.250.17 — View Ownership Transfer
+
+### Changed
+
+- **`list_view_module.js` now owns list view helpers** ([`app/list_view_module.js`](addons/web/static/src/app/list_view_module.js)):
+  - Added `helpers` object with canonical implementations: `getListColumns`, `getSearchFields`, `buildSearchDomain`, `getSavedFilters`, `getSavedFiltersFromStorage`, `saveSavedFilter`, `removeSavedFilter`.
+  - `configure({ viewsSvc, rpc })` method lets `main.js` pass context once at boot.
+  - `main.js` delegates `getListColumns`, `getSearchFields`, `buildSearchDomain` to `AppCore.ListViewModule.helpers`.
+
+- **`form_view_module.js` now owns form view helpers** ([`app/form_view_module.js`](addons/web/static/src/app/form_view_module.js)):
+  - Added `helpers` with `getFormFields(model)` and `navigateToList(route)`.
+  - `configure({ viewsSvc })` for lazy context injection.
+  - `main.js` delegates `getFormFields` to `AppCore.FormViewModule.helpers`.
+
+- **`kanban_view_module.js` now owns kanban helpers** ([`app/kanban_view_module.js`](addons/web/static/src/app/kanban_view_module.js)):
+  - Added `helpers` with `getKanbanGroupBy(model)`, `groupRecordsByField(records, field)`, `wireKanbanDragDrop(container, onDrop)` (drag-drop stub).
+  - `configure({ viewsSvc, rpc })` for context injection.
+
+- **`main.js` slim-down** ([`main.js`](addons/web/static/src/main.js)):
+  - Removed ~127 lines of dead/duplicated code: saved filter implementations (overridden by LV delegation shims) and the `getTitle` 55-line if-chain.
+  - `getTitle` moved to `legacy_main_shell_routes.js` as `SR.getTitle` using a compact lookup map; `main.js` delegates.
+  - `main.js` now configures all three view modules at boot via `ListViewModule.helpers.configure()`, `FormViewModule.helpers.configure()`, `KanbanViewModule.helpers.configure()`.
+  - Down from 1,415 lines → 1,288 lines (phase infrastructure in place for further slim-down in 1.250.18).
+
+---
+
+## 1.250.16 — Production Hardening
+
+### Changed
+
+- **RPC security: replaced echo stub with -32601 MethodNotFound** ([`core/http/rpc.py`](core/http/rpc.py)):
+  - Unknown JSON-RPC methods previously returned HTTP 200 with `{result: {method, params}}` (echoing request params — an information disclosure risk).
+  - Now returns `{"jsonrpc":"2.0","error":{"code":-32601,"message":"Method not found: <method>"},"id":...}` with HTTP 404.
+  - Unknown method attempts are logged at `WARNING` level.
+  - Python test: `tests/test_rpc.py` (3 cases: error returned, no param echo, `call_kw` with nonexistent method).
+
+- **Dispatcher auth enforcement** ([`core/http/application.py`](core/http/application.py)):
+  - Routes decorated with `auth="user"` are now rejected with HTTP 401 before the endpoint is called, removing the need for manual `if uid is None` guards in every handler.
+
+- **PWA service worker URL fixed** ([`services/pwa.js`](addons/web/static/src/services/pwa.js)):
+  - Corrected registration URL from `/web/static/src/pwa/sw.js` (static file — 404 in production) to `/web/sw.js` (routes.py route — includes cache versioning).
+  - Added `scope: "/"` to registration.
+  - `addons/web/static/src/pwa/sw.js` documented as dev-only fallback.
+
+- **Debug menu enhanced with submenus** ([`services/debug_menu.js`](addons/web/static/src/services/debug_menu.js)):
+  - Toggle button now shows a dropdown panel with: version display, "View metadata" (model/route/type), "Technical info" (UID, DB, company), "Toggle assets debug" (`?debug=assets`), "Run JS tests" (opens `test_runner.html`), and "Enable/Disable debug mode".
+  - All colours use CSS custom properties (`--color-surface`, `--color-border`, etc.) consistent with the design system.
+
+- **AI routes changed from `auth="public"` to `auth="user"`** ([`addons/ai_assistant/controllers/ai_controller.py`](addons/ai_assistant/controllers/ai_controller.py)):
+  - All 10 AI endpoints now declare `auth="user"`, enforced by the dispatcher layer.
+  - Rate limiting added to `/ai/chat`: 30 requests per 60-second sliding window per session UID; returns HTTP 429 with `retry_after` on breach.
+
+- **Bundle size budget script added** ([`scripts/check_bundle_budget.js`](scripts/check_bundle_budget.js)):
+  - `npm run check:bundle-budget` — reads `dist/meta.json` (or falls back to `fs.stat`) and fails if `modern_webclient.js` > 400 KB.
+  - `npm run build:web:meta` — builds with `--metafile` output.
+  - Current size: 351.2 KB (headroom: 48.8 KB).
+
+---
+
+## 1.250.15 — ViewService Completion + Legacy Extraction
+
+### Changed
+
+- **`ViewService` rewritten to use `/web/load_views` GET endpoint** ([`app/services/view_service.js`](addons/web/static/src/app/services/view_service.js)):
+  - Replaced broken `call_kw → get_views` RPC (method does not exist on ORM) with a single `GET /web/load_views` fetch that returns the full registry (`views`, `fields_meta`, `menus`, `actions`).
+  - Global registry is fetched once per session and cached; `loadViews(model, types)` slices per-model views from the global result.
+  - **`getCachedView` bug fixed**: previously captured `resolved` before the Promise settled (always `null`). Now stores resolved values in a synchronous `_resolvedCache` Map in the `.then()` handler so `getCachedView` returns real data after the first `loadViews` call.
+  - `getFields` now falls back to `fields_meta` from the cached registry when `fields_get` RPC fails.
+  - `getAll()` method added for legacy `Services.views` compatibility.
+
+- **`route_engine.js` extracted** ([`core/route_engine.js`](addons/web/static/src/core/route_engine.js)):
+  - `tryOwlRoute(viewType, model, resId, extraProps)` — the OWL/ActionBus routing guard, previously duplicated inside `main.js`.
+  - `canMountOwl()` — canonical CSP + ActionContainer readiness check; single source of truth.
+  - `parseDomainFromHash(hashSlice?)` — hash `?domain=` query extractor.
+  - Exposed on `window.__ERP_RouteEngine`, `window.__ERP_tryOwlRoute`, `window.__ERP_canMountOwl`.
+  - `main.js._tryOwlRoute` now delegates to `window.__ERP_tryOwlRoute` with inline fallback.
+
+- **`breadcrumb_engine.js` extracted** ([`core/breadcrumb_engine.js`](addons/web/static/src/core/breadcrumb_engine.js)):
+  - `push`, `popTo`, `reset`, `syncHashIfMulti`, `applyForList`, `getStack`, `setStack` — full action-stack management previously in `main.js`.
+  - `main.js.pushBreadcrumb`, `popBreadcrumbTo`, `syncHashWithActionStackIfMulti` now delegate to `window.__ERP_BreadcrumbEngine`.
+
+- **`owl_bridge.js` OWL/CSP consolidation** ([`app/owl_bridge.js`](addons/web/static/src/app/owl_bridge.js)):
+  - `cspScriptEvalBlocked()` is now exported (was previously unexported private function).
+  - New exported `canMountOwl()` — combines CSP check + ActionContainer mount check; mirrors `window.__ERP_canMountOwl` from `route_engine.js`.
+  - `app/main.js` exposes `canMountOwl` on `window.__ERP_canMountOwl` at boot time.
+
+- **`__manifest__.py` updated** to load `route_engine.js` and `breadcrumb_engine.js` before `route_apply_registry.js`.
+
+### Tests Added
+
+- **`test_view_service.js`** — 6 cases: `loadViews` arch/fields, cache hit, `clearViewCache`, `getCachedView` before/after load, `getFields` descriptors.
+- **`test_pwa.js`** — 2 cases: SW registration URL check, graceful no-op when SW API absent.
+- **`test_action_service_full.js`** — 7 cases: all 5 action types push to stack, LIFO pop, `clearStack`, client action registry round-trip.
+- `test_runner.html` updated to include all three new test files and the new core engine scripts.
+
+---
+
+## 1.250.14 — Search, Action, and Command Parity
+
+### Changed
+
+- **`SearchPanel` connected to `SearchModel` state** ([`app/search/search_panel.js`](addons/web/static/src/app/search/search_panel.js)):
+  - `_loadSectionsFromModel` stub replaced with `_bindSearchModel()` which calls `sm.getSearchPanelSections()` on mount and subscribes to `sm` changes via `subscribe()`.
+  - `_refreshSections(sm)` keeps `state.modelSections` and `state.activeBySection` in sync with `sm.state.activeSearchFilters` on every change event.
+  - `onToggle` delegates to `sm.toggleFilter(name)` for predefined view filters; falls back to `sm.addFacet(...)` for ad-hoc domain facets.
+  - Cleanup via `onWillUnmount`.
+
+- **`ListController` inline SearchBar + SearchPanel** ([`app/views/list/list_controller.js`](addons/web/static/src/app/views/list/list_controller.js)):
+  - Detects standalone mode (`_searchModelOwned = !props.searchModel`); when standalone, renders an inline `SearchBar` (with panel toggle) and a collapsible `SearchPanel` sidebar.
+  - When used inside the `WithSearch` HOC (external `searchModel` prop), the inline search UI is hidden — the `ControlPanel` above already provides `SearchBar`.
+  - Imports `SearchPanel` alongside `SearchBar`; both added to `static components`.
+
+- **Action service `_doWindowAction` now dispatches to `ActionContainer`** ([`services/action.js`](addons/web/static/src/services/action.js)):
+  - When `window.__ERP_OWL_ACTION_CONTAINER_MOUNTED` is true, triggers `ActionBus.trigger("ACTION_MANAGER:UPDATE", ...)` to mount the OWL controller.
+  - Falls back to legacy hash navigation when the OWL container is not mounted.
+  - Pushes a breadcrumb entry to `ActionManager.doAction` (sessionStorage) for back-navigation.
+  - `_doUrlAction` now respects `target: "current"` (uses `window.location`) vs `"_blank"` (uses `window.open`).
+  - `_doReportAction` now supports `report_type: "qweb-pdf"` (uses `PdfViewer.open` when available) and `"qweb-html"` (opens tab).
+  - `doAction` pushes every action to the in-memory `_stack` for `getStack()` introspection.
+
+- **Command palette arrow-key navigation + action callbacks** ([`services/command_palette.js`](addons/web/static/src/services/command_palette.js)):
+  - Added `activeIndex` tracking; `ArrowUp`/`ArrowDown` navigate through results with visual highlight.
+  - `Enter` activates the highlighted item (was always the first item).
+  - New `registerActionCommand(title, fn, keys?, href?)` API for action callbacks (not just hash routes).
+  - New `clearCommands()` API for re-seeding on menu load.
+  - Results list gets `role="option"` and `aria-selected` for accessibility.
+
+- **Hotkey matrix expanded** ([`app/main.js`](addons/web/static/src/app/main.js)):
+  - `alt+s` → `#settings`
+  - `alt+l` → switch to list view (via `ActionBus`)
+  - `alt+k` → switch to kanban view (via `ActionBus`)
+  - `alt+n` → new record (navigates to `/new` hash or fires `ACTION_MANAGER:NEW_RECORD`)
+  - Command palette seeded with 9 built-in navigation commands on boot.
+
+### Added (Field Widgets — Track M2 expansion)
+
+- **`RadioField`** (`widget: radio`): selection rendered as radio-button group; `horizontal` fieldInfo flag enables inline layout.
+- **`BinaryField`** (`widget: binary`): read mode shows a download link (resolves `/web/content?...`); edit mode accepts file upload and emits base64 via `onChange`.
+- **`ProgressBarField`** (`widget: progressbar`): renders a CSS bar filled to `(value / max_value) × 100%`; supports `fieldInfo.max_value`.
+- **`HandleField`** (`widget: handle`): drag-grip icon for list sequence reordering (cosmetic only; actual DnD wired in list renderer separately).
+
+---
+
+## 1.250.13 — View stack hardening: Gantt/Activity OWL controllers + Discuss impl + website plugins + RelationalModel CRUD
+
+### Added
+
+- **GanttController OWL component** ([`app/views/gantt/gantt_controller.js`](addons/web/static/src/app/views/gantt/gantt_controller.js)): wraps `AppCore.GanttViewModule` with `viewRegistry.add("gantt", ...)`. Imported in `app/main.js`.
+- **ActivityController OWL component** ([`app/views/activity/activity_controller.js`](addons/web/static/src/app/views/activity/activity_controller.js)): wraps `AppCore.ActivityViewModule` with `viewRegistry.add("activity", ...)`. Imported in `app/main.js`.
+- **Discuss view — stub replaced**: `main.js` `AppCore.DiscussView.setImpl` now delegates to `DiscussViewModule.render()` instead of returning `false`.
+- **Website/eCommerce route plugins extracted**: `route_apply_plugin_website.js` and `route_apply_plugin_ecommerce.js` extracted from inline `main.js`; registered in `__manifest__.py`; `main.js` inline plugin block removed.
+- **RelationalModel CRUD enrichment** ([`model/relational_model.js`](addons/web/static/src/model/relational_model.js)):
+  - `create(resModel, vals)` — delegates to `orm.create`, invalidates cache
+  - `write(resModel, ids, data)` — delegates to `orm.write`, invalidates per-record cache
+  - `unlink(resModel, ids)` — delegates to `orm.unlink`, invalidates per-record cache
+  - `loadFieldDescriptors(resModel, attributes?)` — `fields_get` via `rpc.callKw`
+  - `loadListWithFields(resModel, opts?)` — parallel `loadList` + `loadFieldDescriptors`
+
+### Tests
+
+- [`test_relational_model.js`](addons/web/static/tests/test_relational_model.js): 8 tests covering DynamicList.load, readRecord cache, cache invalidation, create/write/unlink, loadFieldDescriptors, loadListWithFields, onchange.
+
+---
+
+## 1.250.12 — Stabilize: debug cleanup + CSP revert + route dedup + CSS token audit + routing smoke test
+
+### Fixed
+
+- **Debug instrumentation removed:** All 9 temporary `fetch('http://127.0.0.1:7473/...')` agent log blocks removed from `main.js`, `view_manager.js`, and `legacy_main_shell_routes.js`.
+- **CSP reverted:** `connect-src` in [`security.py`](core/http/security.py) restored to `'self'` only (removed dev debug entry).
+- **Duplicate route handlers:** Removed duplicate `/health` and `/readiness` `@route` definitions from [`routes.py`](core/http/routes.py); consolidated into single Track R1 canonical pair. `health_check` now includes `version` from `core/release.py`.
+- **CSS token audit:** `webclient.css` print block uses `white` / `#111` instead of `#ffffff` / `#111111`; removed `#2e6be6` fallback from `.o-loading-bar`; `.o-remaining-days--overdue` uses `var(--color-on-danger, white)`. Inline `#ddd` / `#eee` in JS files (`kanban_control_strip.js`, `kanban_view_module.js`, `calendar_view_module.js`, `graph_view_module.js`, `pivot_view_module.js`, `list_renderer.js`, `legacy_main_reports.js`, `legacy_main_form_views.js`) replaced with `var(--border-color)` / `var(--color-surface-1)`.
+
+### Added
+
+- **Routing smoke test:** [`test_routing_smoke.js`](addons/web/static/tests/test_routing_smoke.js) covers `routeApplyRegistry` dispatch, plugin error swallowing, `doAction` same-route guard (no re-entry), and `Router.routeApply` single-call assertion. Registered in `test_runner.html`.
+
+---
+
+## 1.250.11 — Token hygiene + RPC resilience + route extraction + JS color audit (frontend next phases post-1.250.10)
+
+### Added
+
+- **Design token hygiene:** Defined `--surface-secondary`, `--color-success-bg`, `--color-warning-bg`, `--color-warning-dark`, `--color-danger-bg` in [`_tokens.css`](addons/web/static/src/scss/_tokens.css) + dark mode overrides in [`_dark.css`](addons/web/static/src/scss/_dark.css). Removed all CSS fallback hex from `webclient.css`. Added `--kanban-accent-10` token; replaced hardcoded `#c678dd` in [`_kanban_controller.scss`](addons/web/static/src/scss/views/kanban/_kanban_controller.scss).
+- **JS color audit:** Removed hardcoded `#4a9eff` from `color_picker` default in [`field_registry.js`](addons/web/static/src/core/field_registry.js); `core_fields.js` color fallback reads `--color-text` via `getComputedStyle`; `search_panel.js` fallback uses `var(--border-color)` instead of `#ccc`.
+- **RPC resilience:** [`rpc.js`](addons/web/static/src/services/rpc.js) now guards against non-JSON server responses (proxy HTML, 502) with clear error message; handles 429 rate-limit with typed `RateLimitError` before JSON-RPC parse.
+- **Route plugin extraction:** `route_apply_plugin_reports.js` (5 report routes) and `route_apply_plugin_settings.js` (apikeys, totp, dashboard-widgets, settings) extracted from `main.js`; inline `installRouteApplyRegistryPlugins` reduced to website/ecommerce placeholders only.
+- **`api-contracts.md`:** Error model updated to document actual HTTP 401/403/429/500 behavior.
+
+### Tests
+
+- `test_rpc_resilience.js`: non-JSON guard, 429 handling, CSRF retry path.
+- `test_assets.py`: `route_apply_plugin_reports.js` and `route_apply_plugin_settings.js` asserted in bundle URLs.
+
+---
+
+## 1.250.10 — Widget wiring + remaining_days + #discuss route plugin + Alt+D + LoadingIndicator (extended phases post-1.250.9)
+
+### Added
+
+- **Widget wiring (xml):** `email`+`phone` → `res.partner` form; `monetary`+`date` → `sale.order` list/form; `date` → `project.task` list; `remaining_days` → `project.task` form ([`ir_views.xml`](addons/base/views/ir_views.xml), [`sale_views.xml`](addons/sale/views/sale_views.xml), [`project_views.xml`](addons/project/views/project_views.xml)).
+- **`xml_loader.py`:** List column parser now captures `widget` attribute (was silently dropped).
+- **`remaining_days` widget:** Token-based deadline badge (overdue/urgent/warning/ok) + date input fallback ([`field_registry.js`](addons/web/static/src/core/field_registry.js)); CSS tokens `.o-remaining-days-*` in [`webclient.css`](addons/web/static/src/scss/webclient.css).
+- **`route_apply_plugin_discuss.js`:** `#discuss` / `#discuss/<id>` route extracted from `main.js`; uses `window.__ERP_SHELL_ROUTES.renderDiscuss` when available, renders informational fallback otherwise ([`__manifest__.py`](addons/web/__manifest__.py)).
+- **Alt+D hotkey:** `#discuss` navigation in `main.js`, `app/main.js` (`Services.hotkey`), and `webclient_shortcut_contract.js` (10 Alt+ entries); route plugin keyboard shortcuts panel updated.
+- **`LoadingIndicator` OWL component:** Top-bar indeterminate progress bar; uses `erp:loading:start`/`erp:loading:end` events + `window.__ERP_LOADING` counter bus; mounted in `WebClient.mount()` on `#o-loading-indicator-host`; `prefers-reduced-motion` safe ([`loading_indicator.js`](addons/web/static/src/app/loading_indicator.js), [`webclient.js`](addons/web/static/src/app/webclient.js)).
+- **CSS:** `.o-loading-bar-host` / `.o-loading-bar` / `@keyframes erp-loading-slide` tokens in `webclient.css`.
+
+### Tests
+
+- `tests/test_views_registry.py`: 3 new widget-attribute assertions (email/phone on res.partner, monetary/date on sale.order, date/remaining_days on project.task).
+- `addons/web/static/tests/test_field_registry.js`: `remaining_days` badge/class tests + production-wired input-type assertions.
+- `tests/test_assets.py`: `route_apply_plugin_discuss.js` asserted in bundle URLs.
+- Shortcut contract test updated to expect 10 Alt+ keys and include `alt+d` in modular check.
+
+---
+
+## 1.250.9 — ORM rpc race + Contacts form toggle + Alt+G + #client-info (post-1.250.8 plan)
+
+### Added
+
+- **`Services.orm`:** All **`call_kw`** paths wrap in **`window.__ERP_rpcRaceDeadline`** when present (default **25s**), aligning legacy list/form/kanban RPC with OWL deadlines ([`orm.js`](addons/web/static/src/services/orm.js)).
+- **Field widget slice:** **`res.partner`** form **`is_company`** uses **`widget="boolean_toggle"`** ([`ir_views.xml`](addons/base/views/ir_views.xml)); unittest walks form **`children`** ([`test_views_registry.py`](tests/test_views_registry.py)).
+- **Hotkey:** **Alt+G** (outside inputs) → **`#contacts`** in [`main.js`](addons/web/static/src/main.js) and **`Services.hotkey`** in [`app/main.js`](addons/web/static/src/app/main.js); contract + modular docs in [`webclient_shortcut_contract.js`](addons/web/static/src/core/webclient_shortcut_contract.js).
+- **Route plugin:** **`#client-info`** diagnostics panel ([`route_apply_plugin_client_info.js`](addons/web/static/src/core/route_apply_plugin_client_info.js)); **`#keyboard-shortcuts`** links to it.
+
+### Docs
+
+- [`docs/frontend.md`](docs/frontend.md), [`design-system/specs/form-view.md`](design-system/specs/form-view.md), parity / checklist / gap table / DeploymentChecklist.
+
+---
+
+## 1.250.8 — OWL load UX + rpc deadline helper + shortcuts route + boolean_toggle (extended phases slice)
+
+### Added
+
+- **`core/rpc_deadline.js`:** Shared **`window.__ERP_rpcRaceDeadline`** (default **25s**) for hung **`search_read` / read** chains; **`window.__ERP_RPC_DEADLINE_DEFAULT_MS`**.
+- **OWL list/form:** **`ListController`** / **`FormController`** use the race helper; **Retry** + **`role="alert"`** error panel on timeout or RPC error (tokens in **`webclient.css`**).
+- **`ActionContainer`:** **35s** watchdog when **`type: "loading"`** never resolves; **Retry** runs full reload.
+- **Route plugin:** **`#keyboard-shortcuts`** help surface via **`route_apply_plugin_keyboard_shortcuts.js`** (after **`route_apply_registry.js`** in manifest).
+- **Hotkey:** **Alt+R** (outside inputs) re-runs **`route()`** for the current hash.
+- **Field widget:** **`boolean_toggle`** in **`field_registry.js`** (Odoo-style switch markup + **`test_field_registry.js`**).
+- **Governance:** **`docs/ai-rules.md`** + **`docs/frontend.md`** — mandatory **ui-ux-pro-max** workflow + **`npm run check:uipro:setup`**; **`design-system/specs/app-shell.md`** — loading/failure surfaces.
+- **JS test:** **`test_rpc_deadline.js`** + **`test_runner.html`** script order.
+
+### Tests
+
+- **`tests/test_assets.py`:** Bundle URLs include **`rpc_deadline.js`** and **`route_apply_plugin_keyboard_shortcuts.js`**.
+
+---
+
 ## 1.250.7 — Frontend reliability (session + ViewService fetch bounds; next-phase plan slice)
 
 ### Fixed

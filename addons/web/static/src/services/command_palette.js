@@ -1,11 +1,13 @@
 /**
  * Command palette — fuzzy filter + menu-derived commands (Phase 416).
+ * 1.250.14: arrow-key navigation, action callback support, extended hotkey matrix.
  */
 (function () {
   var mounted = false;
   var allCommands = [];
   var palettePreviousFocus = null;
   var globalEscapeBound = false;
+  var activeIndex = -1;
 
   function slug(s) {
     return String(s || "")
@@ -57,44 +59,67 @@
     } catch (e) {}
   }
 
+  /** Highlight the item at given index; -1 clears all highlights. */
+  function highlightItem(listEl, idx) {
+    var items = listEl.querySelectorAll(".o-command-item");
+    items.forEach(function (n, i) {
+      if (i === idx) {
+        n.setAttribute("aria-selected", "true");
+        n.style.background = "var(--color-surface-2)";
+        n.scrollIntoView({ block: "nearest" });
+      } else {
+        n.removeAttribute("aria-selected");
+        n.style.background = "";
+      }
+    });
+  }
+
+  /** Execute a command (href navigation or action callback). */
+  function executeCommand(cmd) {
+    if (typeof cmd.action === "function") {
+      cmd.action();
+    } else if (cmd.href) {
+      window.location.hash = cmd.href.replace(/^#/, "");
+    }
+    close();
+  }
+
+  var currentRanked = [];
+
   function renderResults(input, wrap) {
     var q = (input.value || "").trim();
     var listEl = wrap.querySelector("#o-command-results");
     if (!listEl) return;
-    var ranked = allCommands
+    currentRanked = allCommands
       .map(function (c) {
-        return { c: c, s: Math.max(score(q, c.title), score(q, c.keys)) };
+        return { c: c, s: Math.max(score(q, c.title), score(q, c.keys || "")) };
       })
-      .filter(function (x) {
-        return x.s > 0;
-      })
-      .sort(function (a, b) {
-        return b.s - a.s;
-      })
+      .filter(function (x) { return x.s > 0; })
+      .sort(function (a, b) { return b.s - a.s; })
       .slice(0, 12);
     listEl.innerHTML = "";
-    ranked.forEach(function (x, idx) {
+    activeIndex = currentRanked.length > 0 ? 0 : -1;
+    currentRanked.forEach(function (x, idx) {
       var li = document.createElement("button");
       li.type = "button";
       li.className = "o-command-item";
+      li.setAttribute("role", "option");
       li.style.cssText =
         "display:block;width:100%;text-align:left;padding:var(--space-sm) var(--space-md);border:none;background:transparent;cursor:pointer;font:inherit;color:inherit;border-radius:var(--radius-sm)";
       li.textContent = x.c.title;
-      li.dataset.href = x.c.href;
+      if (x.c.href) li.dataset.href = x.c.href;
       li.onmouseenter = function () {
-        listEl.querySelectorAll(".o-command-item").forEach(function (n) {
-          n.style.background = "";
-        });
-        li.style.background = "var(--color-surface-2)";
+        activeIndex = idx;
+        highlightItem(listEl, activeIndex);
       };
-      li.onclick = function () {
-        if (x.c.href) window.location.hash = x.c.href.replace(/^#/, "");
-        close();
-      };
+      li.onclick = function () { executeCommand(x.c); };
       listEl.appendChild(li);
     });
-    if (!ranked.length) {
+    if (!currentRanked.length) {
       listEl.innerHTML = '<div style="padding:var(--space-md);color:var(--text-muted)">No matches</div>';
+      activeIndex = -1;
+    } else {
+      highlightItem(listEl, activeIndex);
     }
   }
 
@@ -137,12 +162,26 @@
         renderResults(input, wrap);
       });
       input.addEventListener("keydown", function (e) {
-        if (e.key === "Escape") return close();
-        if (e.key === "Enter") {
-          var first = wrap.querySelector(".o-command-item");
-          if (first && first.dataset.href) {
-            window.location.hash = first.dataset.href.replace(/^#/, "");
-            close();
+        var listEl = wrap.querySelector("#o-command-results");
+        if (e.key === "Escape") {
+          return close();
+        }
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          if (currentRanked.length) {
+            activeIndex = Math.min(activeIndex + 1, currentRanked.length - 1);
+            highlightItem(listEl, activeIndex);
+          }
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          if (currentRanked.length) {
+            activeIndex = Math.max(activeIndex - 1, 0);
+            highlightItem(listEl, activeIndex);
+          }
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          if (activeIndex >= 0 && currentRanked[activeIndex]) {
+            executeCommand(currentRanked[activeIndex].c);
           }
         }
       });
@@ -190,8 +229,28 @@
     open: open,
     close: close,
     initHotkey: initHotkey,
+    /**
+     * Register a navigation command (resolves to a hash route).
+     * @param {string} href - Hash route e.g. "#contacts"
+     * @param {string} title - Display label
+     * @param {string} [keys] - Additional search keywords
+     */
     registerCommand: function (href, title, keys) {
       allCommands.push({ href: href, title: title, keys: keys || title });
+    },
+    /**
+     * Register a command with an action callback instead of (or in addition to) an href.
+     * @param {string} title - Display label
+     * @param {Function} action - Called when the command is activated
+     * @param {string} [keys] - Additional search keywords
+     * @param {string} [href] - Optional fallback hash
+     */
+    registerActionCommand: function (title, action, keys, href) {
+      allCommands.push({ title: title, action: action, keys: keys || title, href: href || null });
+    },
+    /** Remove all registered commands (useful for re-seeding on menu load). */
+    clearCommands: function () {
+      allCommands = [];
     },
   };
 })();

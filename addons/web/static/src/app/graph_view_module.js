@@ -95,22 +95,22 @@
           (active ? " active" : "") +
           '" data-type="' +
           t +
-          '" style="padding:0.35rem 0.6rem;border:1px solid #ddd;background:' +
-          (active ? "#1a1a2e;color:white;border-color:#1a1a2e" : "#fff;color:#333") +
-          ';border-radius:4px;cursor:pointer;font-size:0.9rem">' +
+          '" style="padding:0.35rem 0.6rem;border:1px solid var(--border-color);background:' +
+          (active ? "var(--color-primary);color:var(--color-bg);border-color:var(--color-primary)" : "var(--color-surface-1);color:var(--color-text)") +
+          ';border-radius:var(--radius-sm);cursor:pointer;font-size:0.9rem">' +
           (t.charAt(0).toUpperCase() + t.slice(1)) +
           "</button>";
       });
       html += "</span>";
       html +=
-        '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid #ddd;border-radius:4px;min-width:200px" value="' +
+        '<input type="text" id="list-search" placeholder="Search..." style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);min-width:200px" value="' +
         (searchTerm || "").replace(/"/g, "&quot;") +
         '">';
       html +=
         '<button type="button" id="btn-search" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Search</button>';
       if (model === "crm.lead") {
         html +=
-          '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid #ddd;border-radius:4px"><option value="">All stages</option></select>';
+          '<select id="list-stage-filter" style="padding:0.5rem;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--color-surface-1)"><option value="">All stages</option></select>';
       }
       html +=
         '<button type="button" id="btn-add" style="padding:0.5rem 1rem;background:#1a1a2e;color:white;border:none;border-radius:4px;cursor:pointer">Add lead</button></p>';

@@ -35,10 +35,10 @@
 @media print {
   :root,
   :root[data-theme="dark"] {
-    --color-bg: #ffffff;
-    --color-surface-1: #ffffff;
-    --color-surface-2: #ffffff;
-    --color-text: #111111;
+    --color-bg: white;
+    --color-surface-1: white;
+    --color-surface-2: white;
+    --color-text: #111;
     --border-color: #c7c7c7;
   }
 }
@@ -1741,6 +1741,133 @@ i.o-sidebar-icon {
 }
 .o-error-panel__links a {
   color: var(--color-primary);
+}
+
+.o-load-failure-panel {
+  margin: var(--space-md) 0;
+  padding: var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--surface-elevated, var(--bg-secondary));
+}
+
+.o-load-failure-retry {
+  margin-top: var(--space-sm);
+  cursor: pointer;
+}
+
+.o-keyboard-shortcuts-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-md) 0;
+}
+
+.o-keyboard-shortcuts-list li {
+  margin: var(--space-sm) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.o-kbd {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--surface-muted, var(--bg-tertiary));
+  color: var(--text-primary);
+}
+
+.o-boolean-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.o-boolean-toggle__label {
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+/* LoadingIndicator top bar (1.250.10) */
+.o-loading-bar-host {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  height: 4px;
+  pointer-events: none;
+}
+
+.o-loading-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 40%;
+  background: var(--color-primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  animation: erp-loading-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes erp-loading-slide {
+  0%   { left: -40%; width: 40%; }
+  50%  { left: 40%; width: 30%; }
+  100% { left: 110%; width: 40%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .o-loading-bar {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+/* remaining_days widget badge (1.250.10) */
+.o-remaining-days {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem var(--space-xs);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  min-width: 3rem;
+  text-align: center;
+}
+
+.o-remaining-days--empty {
+  background: var(--surface-secondary);
+  color: var(--text-muted);
+}
+
+.o-remaining-days--ok {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.o-remaining-days--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-dark);
+}
+
+.o-remaining-days--urgent {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.o-remaining-days--overdue {
+  background: var(--color-danger);
+  color: var(--color-on-danger, white);
+}
+
+.o-remaining-days__input {
+  margin-left: var(--space-sm);
 }
 
 .breadcrumbs {

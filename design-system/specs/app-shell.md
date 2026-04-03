@@ -66,6 +66,13 @@
 - The shell-level AI trigger must visually harmonize with command/search tools while still remaining discoverable.
 - AI panels and drawers should use the same overlay hierarchy as notifications and command surfaces.
 
+## Loading and failure surfaces (post-1.250.8)
+
+- Long-running view loads must not spin silently: use **token-based** messaging (`--text-muted`, `--border-color`) and a **primary Retry** action.
+- OWL **list/form** paths use `__ERP_rpcRaceDeadline` (default **25s**) so hung RPC surfaces **Retry** instead of infinite “Loading…”.
+- **ActionContainer** may show a **timeout** panel with **Retry** (full reload) when a `loading` signal never completes (**35s** watchdog).
+- Inline help routes (e.g. `#keyboard-shortcuts`) use the same **empty-state** vocabulary as placeholders: title, muted body, primary CTA.
+
 ## Main Content Transition
 
 - `#main` should feel like the working plane below the shell chrome.

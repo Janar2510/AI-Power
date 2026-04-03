@@ -8,12 +8,24 @@ export function getOwl() {
 /**
  * Server sets __erpFrontendBootstrap.cspScriptEvalBlocked from enforcing CSP (no unsafe-eval).
  * Avoids a client-side `new Function` probe that would itself violate CSP / Trusted Types.
+ *
+ * Exported so route_engine.js and main.js share one implementation.
  */
-function cspScriptEvalBlocked() {
+export function cspScriptEvalBlocked() {
   const b = typeof window !== "undefined" && window.__erpFrontendBootstrap;
   if (b && b.cspScriptEvalBlocked === false) {
     return false;
   }
+  return true;
+}
+
+/**
+ * True when OWL templates can compile and the ActionContainer is mounted.
+ * Single canonical check; mirrors window.__ERP_canMountOwl from route_engine.js.
+ */
+export function canMountOwl() {
+  if (cspScriptEvalBlocked()) return false;
+  if (!window.__ERP_OWL_ACTION_CONTAINER_MOUNTED) return false;
   return true;
 }
 

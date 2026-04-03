@@ -1,7 +1,13 @@
-"""AI controller - /ai/chat (jsonrpc), /ai/tools (http), /ai/config (http)."""
+"""AI controller - /ai/chat (jsonrpc), /ai/tools (http), /ai/config (http).
+
+All routes require an active session (auth="user").  Rate limiting on /ai/chat
+is enforced in-process via a sliding window counter keyed on session UID.
+"""
 
 import json
 import hashlib
+import time
+from collections import defaultdict
 from datetime import datetime, timezone
 
 from core.http.controller import route
@@ -15,6 +21,26 @@ from ..tools.registry import get_tools, execute_tool, log_audit, retrieve_chunks
 from ..llm import call_llm
 from ..agent import run_agent
 
+import logging
+_logger = logging.getLogger(__name__)
+
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+_RATE_LIMIT_MAX = 30       # requests per window
+_RATE_LIMIT_WINDOW = 60    # seconds
+_rate_counters: dict = defaultdict(list)  # uid -> [timestamp, ...]
+
+
+def _check_rate_limit(uid: int) -> bool:
+    """Return True if the request is within the allowed rate, False if over limit."""
+    now = time.monotonic()
+    bucket = _rate_counters[uid]
+    # Remove entries outside the window
+    _rate_counters[uid] = [t for t in bucket if now - t < _RATE_LIMIT_WINDOW]
+    if len(_rate_counters[uid]) >= _RATE_LIMIT_MAX:
+        return False
+    _rate_counters[uid].append(now)
+    return True
+
 
 def _get_llm_config(env) -> dict:
     """Return LLM config from ir.config_parameter."""
@@ -27,7 +53,7 @@ def _get_llm_config(env) -> dict:
         return {"llm_enabled": "0", "llm_model": "gpt-4o-mini"}
 
 
-@route("/ai/config", auth="public", methods=["GET"])
+@route("/ai/config", auth="user", methods=["GET"])
 def ai_config(request: Request) -> Response:
     """Return AI config (llm_enabled, llm_model). Auth required."""
     uid = get_session_uid(request)
@@ -42,7 +68,7 @@ def ai_config(request: Request) -> Response:
     return Response(json.dumps(cfg), content_type="application/json")
 
 
-@route("/ai/tools", auth="public", methods=["GET"])
+@route("/ai/tools", auth="user", methods=["GET"])
 def ai_tools(request: Request) -> Response:
     """List available AI tools. Requires auth."""
     uid = get_session_uid(request)
@@ -52,7 +78,7 @@ def ai_tools(request: Request) -> Response:
     return Response(json.dumps(tools), content_type="application/json")
 
 
-@route("/ai/retrieve", auth="public", methods=["GET"])
+@route("/ai/retrieve", auth="user", methods=["GET"])
 def ai_retrieve(request: Request) -> Response:
     """Retrieve document chunks by query. Auth required. Record rules applied before retrieval."""
     uid = get_session_uid(request)
@@ -71,7 +97,7 @@ def ai_retrieve(request: Request) -> Response:
     return Response(json.dumps(chunks), content_type="application/json")
 
 
-@route("/ai/nl_search", auth="public", methods=["POST"])
+@route("/ai/nl_search", auth="user", methods=["POST"])
 def ai_nl_search(request: Request) -> Response:
     """Natural language search: convert query to domain and return results. Auth required."""
     uid = get_session_uid(request)
@@ -103,7 +129,7 @@ def ai_nl_search(request: Request) -> Response:
         )
 
 
-@route("/ai/extract_fields", auth="public", methods=["POST"])
+@route("/ai/extract_fields", auth="user", methods=["POST"])
 def ai_extract_fields(request: Request) -> Response:
     """Extract structured fields from pasted text for a model. Auth required."""
     uid = get_session_uid(request)
@@ -134,7 +160,7 @@ def ai_extract_fields(request: Request) -> Response:
         )
 
 
-@route("/ai/process-document", auth="public", methods=["POST"])
+@route("/ai/process-document", auth="user", methods=["POST"])
 def ai_process_document(request: Request) -> Response:
     """Extract vendor bill data from attachment using LLM vision. Phase 222."""
     uid = get_session_uid(request)
@@ -165,7 +191,7 @@ def ai_process_document(request: Request) -> Response:
         )
 
 
-@route("/ai/chat/stream", auth="public", methods=["GET", "POST"])
+@route("/ai/chat/stream", auth="user", methods=["GET", "POST"])
 def ai_chat_stream(request: Request) -> Response:
     """Phase C3: streaming hook — not enabled; returns 501 until SSE/WebSocket product scope."""
     return Response(
@@ -175,13 +201,22 @@ def ai_chat_stream(request: Request) -> Response:
     )
 
 
-@route("/ai/chat", auth="public", methods=["POST"])
+@route("/ai/chat", auth="user", methods=["POST"])
 def ai_chat(request: Request) -> Response:
     """Handle AI chat - tool calls or LLM execute as requesting user."""
     uid = get_session_uid(request)
     db = get_session_db(request)
     if uid is None:
         return Response(json.dumps({"error": "unauthorized"}), status=401, content_type="application/json")
+
+    # Rate limit: 30 requests per minute per session user
+    if not _check_rate_limit(uid):
+        _logger.warning("AI chat rate limit exceeded for uid=%s", uid)
+        return Response(
+            json.dumps({"error": "rate_limit_exceeded", "retry_after": _RATE_LIMIT_WINDOW}),
+            status=429,
+            content_type="application/json",
+        )
 
     try:
         data = request.get_json() or {}
@@ -299,7 +334,7 @@ def ai_chat(request: Request) -> Response:
         )
 
 
-@route("/ai/agent/run", auth="public", methods=["POST"])
+@route("/ai/agent/run", auth="user", methods=["POST"])
 def ai_agent_run(request: Request) -> Response:
     """Run autonomous agent. Phase 214. Creates ai.agent.task, runs ReAct loop."""
     uid = get_session_uid(request)
@@ -331,7 +366,7 @@ def ai_agent_run(request: Request) -> Response:
         )
 
 
-@route("/ai/agent/status", auth="public", methods=["GET"])
+@route("/ai/agent/status", auth="user", methods=["GET"])
 def ai_agent_status(request: Request) -> Response:
     """Get agent task status. Phase 214."""
     uid = get_session_uid(request)
